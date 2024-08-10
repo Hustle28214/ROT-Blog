@@ -1,0 +1,108 @@
+:root {
+  --ifm-color-primary: #11659a;
+  --ifm-color-primary-dark: #0f5b8b;
+  --ifm-color-primary-darker: #0e5683;
+  --ifm-color-primary-darkest: #0c476c;
+  --ifm-color-primary-light: #136fa9;
+  --ifm-color-primary-lighter: #1474b1;
+  --ifm-color-primary-lightest: #1683c8;
+  --ifm-background-color: #e9f1f6;
+  --ifm-navbar-background-color: #E9F1F6;
+  --ifm-code-font-size: 95%;
+  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.1);
+  --sb-track-color:#222222;
+  --sb-thumb-color: #f6c430;
+  --sb-thumb-color-dark: #4a8a6f;
+  --sb-size: 100px;
+}
+
+[data-theme='dark'] {
+  --ifm-color-primary: #e9f1f6;
+  --ifm-color-primary-dark: #c7dbe8;
+  --ifm-color-primary-darker: #b6d1e1;
+  --ifm-color-primary-darkest: #83b0cc;
+  --ifm-color-primary-light: #ffffff;
+  --ifm-color-primary-lighter: #ffffff;
+  --ifm-color-primary-lightest: #ffffff;
+  --ifm-background-color: #11659a;
+  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.3);
+  --ifm-navbar-background-color: #11659a;
+   /* 修改背景色为 #005153 */
+  --sb-track-color: #232e33;
+  --sb-thumb-color: #f6c430;
+  --sb-thumb-color-dark: #4a8a6f; /* 确保此颜色定义存在 */
+  --sb-size: 100px;
+}
+
+/* 通用背景色 */
+body {
+  background-color: var(--ifm-background-color);
+}
+
+/* 暗模式下背景色 */
+[data-theme='dark'] body {
+  background-color: var(--ifm-background-color);
+}
+
+body {
+  scrollbar-color: var(--sb-thumb-color) var(--sb-track-color);
+}
+
+
+
+
+body::-webkit-scrollbar {
+  width: var(--sb-size);
+}
+
+body::-webkit-scrollbar-track {
+  background: var(--isb-track-color);
+  border-radius: 10px;
+}
+
+body::-webkit-scrollbar-thumb {
+  background: var(--isb-thumb-color);
+  border-radius: 10px;
+  border: 1px solid #1a1a1a; /* 可以根据需要调整 */
+}
+
+
+
+
+
+
+/* 滚动条样式 */
+[data-theme='dark'] body::-webkit-scrollbar {
+  width: var(--sb-size);
+}
+
+[data-theme='dark'] body::-webkit-scrollbar-track {
+  background: var(--sb-track-color);
+  border-radius: 10px;
+}
+
+[data-theme='dark'] body::-webkit-scrollbar-thumb {
+  background: var(--sb-thumb-color);
+  border-radius: 10px;
+  border: 1px solid #1a1a1a; /* 可以根据需要调整 */
+}
+
+/* Firefox 滚动条样式 */
+[data-theme='dark'] body {
+  scrollbar-color: var(--sb-thumb-color) var(--sb-track-color);
+}
+
+/* 导航栏颜色 */
+[data-theme='dark'] .navbar__link {
+  color: #E9F1F6;
+}
+
+[data-theme='dark'] .navbar__title {
+  color: #E9F1F6;
+}
+
+@font-face {
+  font-display: swap;
+  font-family: 'Mengyuan';
+  src: url(../../static/DreamHanSansCN-W24.ttf);
+}

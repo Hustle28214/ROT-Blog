@@ -44,14 +44,14 @@ const config = {
           // Please change this to your repo.
           // Remove this to remove the "edit this page" links.
           editUrl:
-            'https://github.com/Hustle28214/ROT-Blog/tree/main/',
+            'https://github.com/Hustle28214/ROT-Blog/tree/master/',
         },
         blog: {
           showReadingTime: true,
           // Please change this to your repo.
           // Remove this to remove the "edit this page" links.
           editUrl:
-            'https://github.com/Hustle28214/ROT-Blog/tree/main/',
+            'https://github.com/Hustle28214/ROT-Blog/tree/master/',
         },
         theme: {
           customCss: './src/css/custom.css',

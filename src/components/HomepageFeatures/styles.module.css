@@ -1,0 +1,23 @@
+.features {
+  display: flex;
+  align-items: center;
+  padding: 2rem 0;
+  width: 100%;
+}
+
+.featureSvg {
+  transform: scale(0.9);
+  object-fit: contain;
+}
+
+.text--center {
+  margin-top: 0; /* 确保没有额外的顶部间距 */
+}
+
+.padding-horiz--md {
+  margin-top: 0.5rem; /* 调整图片与标题的间距 */
+}
+
+.featureHeading {
+  margin-top: 0.5rem !important;
+}

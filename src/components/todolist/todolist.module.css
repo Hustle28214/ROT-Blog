@@ -1,0 +1,51 @@
+.todolistMain {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    margin: 16px 0 10px;
+}
+
+.todolistLeftContainer,
+.todolistRightContainer {
+    width: calc(50% - 8px);
+}
+
+.todolistItem {
+    background-color: #aedfff;
+    border: 2px dashed #11659a;
+    border-radius: 12px;
+    padding: 10px 1rem 1.2rem;
+    margin-bottom: 1rem;
+}s
+
+.todolistItem ul {
+    margin: 0;
+    padding: 0;
+    list-style-type: none;
+}
+
+.todolistItem li {
+    font-size: 17px;
+    border-bottom: 1px solid #FFFFFF;
+    padding: 8px 0;
+}
+
+.todolistItem li:last-child {
+    border-bottom: none;
+}
+
+[data-theme="dark"] .todolistItem {
+    background-color: #242424;
+    border-color: #f9b800;
+}
+
+[data-theme="dark"] .todolistItem li {
+    border-bottom-color: #f9b800;
+}
+
+@media screen and (max-width: 768px) {
+    .todolistLeftContainer,
+    .todolistRightContainer {
+        width: 100%;
+    }
+}

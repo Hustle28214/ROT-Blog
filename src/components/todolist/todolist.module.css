@@ -10,13 +10,18 @@
     width: calc(50% - 8px);
 }
 
+.todolistFullContainer {
+    width: 100%;
+    margin-bottom: 16px; /* 为大容器添加底部间距 */
+}
+
 .todolistItem {
     background-color: #aedfff;
     border: 2px dashed #11659a;
     border-radius: 12px;
     padding: 10px 1rem 1.2rem;
     margin-bottom: 1rem;
-}s
+}
 
 .todolistItem ul {
     margin: 0;
@@ -45,7 +50,8 @@
 
 @media screen and (max-width: 768px) {
     .todolistLeftContainer,
-    .todolistRightContainer {
+    .todolistRightContainer,
+    .todolistFullContainer {
         width: 100%;
     }
 }

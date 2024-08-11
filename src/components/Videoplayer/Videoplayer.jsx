@@ -1,6 +1,6 @@
 // VideoPlayer.jsx
 import React from 'react';
-import './VideoPlayer.css';
+import './Videoplayer.css';
 
 const VideoPlayer = ({ src, width = '100%', height = 'auto' }) => {
   // 添加 autoplay=0 确保视频不自动播放

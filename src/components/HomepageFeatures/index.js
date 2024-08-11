@@ -40,11 +40,11 @@ const FeatureList = [
     ),
   },
   {
-    title: '',
+    title: '相比其他程序员...',
     Svg: require('@site/static/img/machine.svg').default,
     description: (
       <>
-        10+
+        更多的机械、电子、控制内容。
       </>
     ),
   },

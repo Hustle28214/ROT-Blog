@@ -115,7 +115,11 @@ const config = {
             position: 'right',
           },  
           {to: '/todolist', label: '待办', position: 'left'},
-          {to: '/blog/rss.xml', label: 'RSS', position: 'right'},
+          {
+            href: '/blog/rss.xml',
+            label: 'RSS',
+            position: 'right',
+          },
         ],
       },
       footer: {

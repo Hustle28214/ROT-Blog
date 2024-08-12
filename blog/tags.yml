@@ -2,3 +2,7 @@ poems:
   label: Poems
   permalink: /poems
   description: 一些喜欢的诗词歌赋。
+abstract:
+  label: Abstract
+  permalink: /abstract
+  description: 书摘笔记。

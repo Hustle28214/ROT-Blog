@@ -116,7 +116,7 @@ const config = {
           },  
           {to: '/todolist', label: '待办', position: 'left'},
           {
-            href: '/blog/rss.xml',
+            href: 'https://rot-blog.vercel.app/blog/rss.xml',
             label: 'RSS',
             position: 'right',
           },

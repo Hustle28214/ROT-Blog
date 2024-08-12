@@ -56,7 +56,7 @@ const config = {
           // Remove this to remove the "edit this page" links.
           editUrl:
             'https://github.com/Hustle28214/ROT-Blog/tree/master/',
-            feedOptions: {
+          feedOptions: {
               type: 'all',
               copyright: `Copyright © ${new Date().getFullYear()} Yanyuyedeng.`,
               createFeedItems: async (params) => {
@@ -113,12 +113,9 @@ const config = {
             href: 'https://github.com/Hustle28214',
             label: 'GitHub',
             position: 'right',
-          },
-          {
-            type: 'search',
-            position: 'right',
-          },
-          {to: '/todolist', label: '待办', position: 'left'}
+          },  
+          {to: '/todolist', label: '待办', position: 'left'},
+          {to: '/blog/rss.xml', label: 'RSS', position: 'right'},
         ],
       },
       footer: {

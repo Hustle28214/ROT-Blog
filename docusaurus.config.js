@@ -129,17 +129,14 @@ const config = {
             title: 'Community',
             items: [
               {
-                label: 'Stack Overflow',
-                href: 'https://stackoverflow.com/questions/tagged/docusaurus',
+                label: 'CSDN',
+                href: 'https://blog.csdn.net/hustle28214',
               },
               {
-                label: 'Discord',
-                href: 'https://discordapp.com/invite/docusaurus',
+                label: 'CNBLOGS',
+                href: 'https://www.cnblogs.com/xiaoyeah',
               },
-              {
-                label: 'Twitter',
-                href: 'https://twitter.com/docusaurus',
-              },
+              
             ],
           },
           {
@@ -156,7 +153,7 @@ const config = {
             ],
           },
         ],
-        copyright: `Copyright © ${new Date().getFullYear()} My Project, Inc. Built with Docusaurus.`,
+        copyright: `Copyright © ${new Date().getFullYear()} Yanyuyedeng. Built with Docusaurus.`,
       },
       prism: {
         theme: prismThemes.github,

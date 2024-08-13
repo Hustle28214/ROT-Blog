@@ -48,12 +48,46 @@ reg [4:0] counter ; // reg is a keyword, counter is an identifier
 
 十进制('d 或 'D)，十六进制('h 或 'H)，二进制（'b 或 'B），八进制（'o 或 'O）。指明位宽是任意的。
 
+你还可以指定负数，但负号不能放在基数和数字之间。
+
 ```Verilog
-reg [4:0] counter = 5'd10;
-reg [4:0] counter = 5'hA;
+counter = 5'd10; // 5位宽的十进制数10
+counter = -5'hA; // 5位宽的十六进制数A
+counter = 5'b-101; // 非法说明
 counter = 'b101; // 一般根据编译器自动分频位宽，常为32bit
 ```
 
+实数表示方法：
+```Verilog
+reg [4:0] counter;  // 5 位宽的寄存器定义
+
+// 正确的整数赋值
+counter = 5'd10;  // 将 counter 赋值为十进制的 10
+```
+
+``` Verilog
+// 假设浮点数 10.5e-2 转换为整数
+reg [4:0] counter;
+real float_value;
+integer int_value;
+
+float_value = 10.5e-2;  // 浮点数 0.105
+int_value = $rtoi(float_value * 100);  // 转换为整数 10.5 * 100 = 10.5，取整为 10
+counter = int_value[4:0];  // 确保只取低 5 位
+```
+
+``` Verilog
+reg [4:0] counter;
+
+// 假设要表示的数字是 10000
+integer large_value = 10000;
+counter = large_value[4:0];  // 需要确保大数在 5 位范围内
+```
+
+``` Verilog
+// 使用 5'd 语法定义整数时，确保只使用整数值，并且值在 0 到 31 之间。
+counter = 5'd31;  // 最大值
+```
 其中，四种基本的值表示电平逻辑：
 
 1. 逻辑零：0'b0 或 0'h0 或 0'd0
@@ -62,3 +96,62 @@ counter = 'b101; // 一般根据编译器自动分频位宽，常为32bit
 4. 逻辑 don't care：1'bx 或 1'hx 或 1'dx
 
 逻辑零表示逻辑低电平，逻辑一表示逻辑高电平。逻辑高 impedance 表示逻辑高阻抗，逻辑 don't care 表示逻辑不确定。
+
+## 5. 字符串表示方法
+
+Verilog中，字符串表示方法与C语言类似。字符串为一系列的单字节ASCII字符队列。因此，需要预留出存储单元。字符串不能多行，只能单行。不能包含回车符。
+
+```Verilog
+reg [0:12*8-1] str;
+initial begin
+    str = "Hello, world!";
+end
+```
+
+## 6. 数据类型
+
+###  6.1 线网（wire）
+
+线网(wire)类型表示硬件单元之间的物理连线，由其连接的器件输出端连续驱动。
+
+但也存在没有驱动元件连接到wire型变量的情况，此时缺省值一般为Z（高阻）。
+
+``` Verilog
+wire interrupt;
+wire data1, data2;
+wire gnd = 1b'0;
+```
+
+同时，线网型还有其他数据类型。您可以在[这里](https://www.cnblogs.com/kefu/p/13760298.html)查询。
+
+###  6.2 寄存器（reg）
+
+reg类型表示存储单元，保持数据原有的值，直到被改写。
+
+``` Verilog
+reg clk;
+reg data1, data2;
+```
+
+在always块中，寄存器可能被综合为边沿触发器，在组合逻辑中可能被综合为wire型变量。寄存器不需要驱动源，也不一定需要时钟信号。在仿真时，寄存器的值可在任意时刻通过赋值操作进行改写：
+
+``` Verilog
+reg clk;
+initial begin
+    clk = 1'b0;
+    # 101 
+    clk = 1'b1;
+end
+```
+
+### 6.3 向量
+
+位宽大于1，wire/reg可声明为向量的形式：
+``` Verilog
+wire [2:0] data; // 声明一个3位的wire型变量
+reg [0:31] data1; // 声明一个32位的reg型变量
+```
+
+
+
+

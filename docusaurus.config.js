@@ -149,20 +149,20 @@ const config = {
                 label: 'CNBLOGS',
                 href: 'https://www.cnblogs.com/xiaoyeah',
               },
-              
-            ],
-          },
-          {
-            title: 'More',
-            items: [
-              {
-                label: '随笔',
-                to: '/blog',
-              },
               {
                 label: 'GitHub',
                 href: 'https://github.com/Hustle28214',
               },
+            ],
+          },
+          {
+            title: 'Contact',
+            items: [
+              {
+                label: 'Email',
+                href: 'mailto:hackitlilwave@outlook.com',
+              },
+             
             ],
           },
         ],

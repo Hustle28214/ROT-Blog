@@ -38,7 +38,7 @@ sidebar_position: 1
 ```
 https://rot-blog.vercel.app/blog/rss.xml 
 https://rot-blog.vercel.app/blog/feed.json
-https://example.com/blog/atom.xml
+https://rot-blog.vercel.app/blog/atom.xml
 ```
 
 但是，我的博客也许并不会经常更新硬核技术内容，我会将这一部分放在技术栈上。并且，我的博客内容仅供参考、分享使用。我的博客存在许多待指正、待完善的纰漏之处。

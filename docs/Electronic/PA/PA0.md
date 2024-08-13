@@ -1,0 +1,352 @@
+---
+sidebar_position: 1
+---
+
+## 1. Linux 的相关初步设置
+
+仅附上工程内容。系统：Ubuntu 22.04.04-desktop-amd64
+
+更新APT源：
+
+```bash
+sudo bash -c 'echo "deb https://mirrors.bfsu.edu.cn/ubuntu/ jammy main restricted universe multiverse" > /etc/apt/sources.list'
+sudo cat /etc/apt/sources.list
+sudo apt-get update
+```
+
+安装常用工具：
+
+```bash
+# install basic tools
+apt-get install build-essential    # build-essential packages, include binary utilities, gcc, make, and so on
+apt-get install man                # on-line reference manual
+apt-get install gcc-doc            # on-line reference manual for gcc
+apt-get install gdb                # GNU debugger
+apt-get install git                # revision control system
+apt-get install libreadline-dev    # a library used later
+apt-get install libsdl2-dev        # a library used later
+apt-get install llvm llvm-dev      # llvm project, which contains libraries used later
+apt-get install llvm-11 llvm-11-dev # only for ubuntu20.04
+```
+
+但是执行``apt-get install build-essential``会发现：
+
+```bash
+sudo apt install build-essentialReading package lists... DoneBuilding dependency tree... DoneReading state information... DoneSome packages could not be installed. 
+This may mean that you haverequested an impossible situation or if you are using the unstabledistribution that some required packages have not yet been createdor been moved out of Incoming.The following information may help to resolve the situation:
+The following packages have unmet dependencies: g++-11 : 
+    Depends: gcc-11-base (= 11.2.0-19ubuntu1) but 11.4.0-1ubuntu1~22.04 is to be installed          
+    Depends: libstdc++-11-dev (= 11.2.0-19ubuntu1) but it is not going to be installed gcc-11 : 
+    Depends: cpp-11 (= 11.2.0-19ubuntu1) but 11.4.0-1ubuntu1~22.04 is to be installed          
+    Depends: gcc-11-base (= 11.2.0-19ubuntu1) but 11.4.0-1ubuntu1~22.04 is to be installed          
+    Depends: libcc1-0 (>= 11.2.0-19ubuntu1) but it is not going to be installed          
+    Depends: libgcc-11-dev (= 11.2.0-19ubuntu1) but it is not going to be installed libc6-dev : 
+    Depends: libc6 (= 2.35-0ubuntu3) but 2.35-0ubuntu3.6 is to be installed             
+    Depends: libtirpc-dev but it is not going to be installed             
+    Depends: libnsl-dev but it is not going to be installed
+```
+
+并且底下的命令重复执行两遍都不起作用，说明是每个软件包的依赖出错都有一些不同。
+
+感谢CSDN上空が笑っています的[文章](https://blog.csdn.net/qq_62556650/article/details/132176042)。解决方法是使用能够更好地解决依赖关系的aptitude去安装：
+
+```bash
+sudo apt install aptitude
+sudo aptitude install build-essential
+# 然后在第一个问题中选择第二个选项n
+# 在第二、三个问题中选择y
+# 后面这些也是如法炮制
+sudo aptitude install libreadline-dev
+sudo aptitude install libsdl2-dev
+sudo aptitude install llvm llvm-dev
+# 这个直接选y
+sudo aptitude install llvm-11 llvm-11-dev
+```
+
+安装vim:
+```bash
+# vim的安装同样遇到了依赖版本问题。如下解决：
+sudo aptitude install vim
+vim test
+```
+
+尝试使用man：
+```bash
+man man
+```
+
+### 1.1 Makefile
+
+> 编写一个“Hello World”程序，编译它，然后在GNU/Linux下运行它。编写一个Makefile来编译上面的"Hello World"程序。
+
+程序如下：
+
+![helloProgram](https://github.com/user-attachments/assets/d9c305ed-ee6a-4930-8eaa-500535ed28cf)
+
+Makefile编写：
+
+![makefile](https://github.com/user-attachments/assets/db3712ac-57b3-453f-a44a-f029f09ac026)
+
+结果：
+
+![resultMake](https://github.com/user-attachments/assets/5ecc3d65-5466-457e-b24f-054763bd13fb)
+
+### 1.2 gdb调试
+
+gdb和所需要的软件包刚刚全部安装过了。根据[教程](https://linuxconfig.org/gdb-debugging-tutorial-for-beginners)，我们修改helloWorld.c文件，并使用gdb调试：
+
+```c
+#include <stdio.h>
+int actual_calc(int a, int b){
+  int c;
+  c=a/b;
+  return 0;
+}
+
+int calc(){
+  int a;
+  int b;
+  a=13;
+  b=0;
+  actual_calc(a, b);
+  return 0;
+}
+
+int main(){
+  calc();
+  return 0;
+}
+```
+
+```bash
+gcc -ggdb helloWorld.c -o helloWorld.out
+./helloWorld.out
+# 结果
+Floating point exception (core dumped)
+```
+
+-ggdb的作用是生成调试信息，使得gdb可以调试。
+
+没有看到core dumped，需要设置更好的core dumping。
+
+我选择将以下命令添加到addCoreDump.sh中：
+
+```bash
+if ! grep -qi 'kernel.core_pattern' /etc/sysctl.conf; then
+  sudo sh -c 'echo "kernel.core_pattern=core.%p.%u.%s.%e.%t" >> /etc/sysctl.conf'
+  sudo sysctl -p
+fi
+ulimit -c unlimited
+
+# grep -qi 'kernel.core_pattern' /etc/sysctl.conf：检查 /etc/sysctl.conf 文件中是否包含 kernel.core_pattern 配置。
+# 如果没有匹配项，则使用 echo 命令将 kernel.core_pattern 配置追加到 /etc/sysctl.conf 文件中，并通过 sysctl -p 使改动生效。
+# ulimit -c unlimited：设置系统允许生成无限大小的核心转储文件（core dump）.
+```
+然后chmod运行：
+```bash
+sudo chmod +x setup_core_pattern.sh
+./setup_core_pattern.sh
+# 结果
+kernel.core_pattern = core.%p.%u.%s.%e.%t
+```
+
+持久化我们的设置：
+```bash
+sudo bash -c "cat << EOF > /etc/security/limits.conf
+* soft core unlimited
+* hard core unlimited"
+EOF
+
+# 检查有没有生效
+cat /etc/security/limits.conf
+# 结果
+* soft core unlimited
+* hard core unlimited
+```
+
+但是在输出core文件上还是出错。重新执行
+```bash
+ulimit -c unlimited
+# 此时执行ulimit -c反馈为unlimited
+# 在环境变量中更改以持久化：
+source ~/.bashrc
+# 也可以在所有位置上寻找core文件：
+find / -name 'core.*' 2>/dev/null
+```
+
+![coreProduce](https://github.com/user-attachments/assets/a99b8a13-bd20-4d25-8ada-9e2f3cafbe34)
+
+
+使用gbd分析核心文件：
+```bash
+# 检查核心文件元数据
+file core.14488.1000.8.helloWorld.out.1723567361s
+# 结果
+core.14488.1000.8.helloWorld.out.1723567361: ELF 64-bit LSB core file, x86-64, version 1 (SYSV), SVR4-style, from './helloWorld.out', real uid: 1000, effective uid: 1000, real gid: 1000, effective gid: 1000, execfn: './helloWorld.out', platform: 'x86_64'
+# gdb 分析core
+gdb ./helloWorld.out core.14488.1000.8.helloWorld.out.1723567361
+# 结果
+GNU gdb (Ubuntu 12.1-0ubuntu1~22.04) 12.1
+Copyright (C) 2022 Free Software Foundation, Inc.
+License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>
+This is free software: you are free to change and redistribute it.
+There is NO WARRANTY, to the extent permitted by law.
+Type "show copying" and "show warranty" for details.
+This GDB was configured as "x86_64-linux-gnu".
+Type "show configuration" for configuration details.
+For bug reporting instructions, please see:
+<https://www.gnu.org/software/gdb/bugs/>.
+Find the GDB manual and other documentation resources online at:
+    <http://www.gnu.org/software/gdb/documentation/>.
+
+For help, type "help".
+Type "apropos word" to search for commands related to "word"...
+Reading symbols from ./helloWorld.out...
+[New LWP 14488]
+[Thread debugging using libthread_db enabled]
+Using host libthread_db library "/lib/x86_64-linux-gnu/libthread_db.so.1".
+Core was generated by `./helloWorld.out'.
+Program terminated with signal SIGFPE, Arithmetic exception.
+#0  0x00005bfe5094a13b in actual_calc (a=13, b=0) at helloWorld.c:4
+4	  c=a/b;
+```
+
+用gdb分析崩溃原因：
+```bash
+(gdb) bt # backtrace的简写s
+#0  0x00005bfe5094a13b in actual_calc (a=13, b=0) at helloWorld.c:4
+#1  0x00005bfe5094a171 in calc () at helloWorld.c:13
+#2  0x00005bfe5094a18a in main () at helloWorld.c:18
+(gdb)f 2 # frame的简写f，跳转到frame 2
+#2  0x00005bfe5094a18a in main () at helloWorld.c:18
+18	  calc();
+(gdb)list
+13	  actual_calc(a, b);
+14	  return 0;
+15	}
+16	
+17	int main(){
+18	  calc();
+19	  return 0;
+20	}
+
+(gdb) p a # 查看变量a
+# 此时a还没有在代码中定义
+No symbol "a" in current context.
+
+```
+输出可能显示不适用/更改的源代码。<mark>GDB不会检查是否有源代码修订匹配。</mark>
+
+检查第一帧：
+```bash
+(gdb) f 1
+#1  0x00005bfe5094a171 in calc () at helloWorld.c:13
+13	  actual_calc(a, b);
+(gdb)list
+8	int calc(){
+9	  int a;
+10	  int b;
+11	  a=13;
+12	  b=0;
+13	  actual_calc(a, b);
+14	  return 0;
+15	}
+16	
+17	int main(){
+# 继续查看
+(gdb) p a
+$1 = 13
+(gdb) p b
+$2 = 0
+(gdb) p c
+No symbol "c" in current context.
+(gdb) p a/b
+Division by zero
+```
+打印c的值失败了，因为目前为止c并没有定义。
+
+查看帧#0：
+```bash
+(gdb) f 0
+(gdb) p a
+$3 = 13
+(gdb) p b
+$4 = 0
+(gdb) p c
+$5 = 257
+```
+
+在这里，c其实是未定义的，这个结果值可能是从变量c的某个地址空间读取的（该内存空间还没有初始化/清除）。
+
+### 1.3 安装tmux
+
+tmux 是一个非常强大的终端复用器，它允许你在一个终端窗口中创建、管理和切换多个会话。
+
+```bash
+sudo apt-get install tmux
+cd ~
+vim .tmux.conf
+i
+# 粘贴以下内容
+bind-key c new-window -c "#{pane_current_path}"
+bind-key % split-window -h -c "#{pane_current_path}"
+bind-key '"' split-window -c "#{pane_current_path}"
+esc
+:wq
+```
+![tmuxConfig](https://github.com/user-attachments/assets/52e0e8a6-9d42-4284-bdff-b114de211d54)
+
+### 1.4 获取PA代码
+
+```bash
+git clone -b master git@github.com:OSCPU/ysyx-workbench.git
+# 此处省略用户设置，出于隐私
+git branch -m master
+bash init.sh nemu
+bash init.sh abstract-machine
+# 一定要记得加到环境变量
+source ~/.bashrc
+# 检查
+gufei@gufei-virtual-machine:~/ysyx-workbench$ echo $NEMU_HOME
+/home/gufei/ysyx-workbench/nemu
+gufei@gufei-virtual-machine:~/ysyx-workbench$ echo $AM_HOME
+/home/gufei/ysyx-workbench/abstract-machine
+gufei@gufei-virtual-machine:~/ysyx-workbench$ cd $NEMU_HOME
+gufei@gufei-virtual-machine:~/ysyx-workbench/nemu$ cd $AM_HOME
+gufei@gufei-virtual-machine:~/ysyx-workbench/abstract-machine$ 
+```
+
+### 1.5 编译运行NEMU
+
+```bash
+cd $NEMU_HOME
+make menuconfig
+# 报错, make提示我们缺少依赖
+make menuconfig
+/home/gufei/ysyx-workbench/nemu/scripts/config.mk:20: Warning: .config does not exists!
+/home/gufei/ysyx-workbench/nemu/scripts/config.mk:21: To build the project, first run 'make menuconfig'.
++ CC confdata.c
++ CC expr.c
++ CC preprocess.c
++ CC symbol.c
++ CC util.c
++ YACC build/parser.tab.h
+make[1]: bison: No such file or directory
+make[1]: *** [Makefile:32: build/parser.tab.h] Error 127
+make: *** [/home/gufei/ysyx-workbench/nemu/scripts/config.mk:39: /home/gufei/ysyx-workbench/nemu/tools/kconfig/build/mconf] Error 2
+```
+
+解决方法：
+```bash
+# 事实上就是装2个依赖
+sudo apt install bison flex
+```
+然后您应该可以看到正常运行的界面：
+![nemuConfig](https://github.com/user-attachments/assets/76624a89-5685-4610-9d5a-8dcc710fe24b)
+```bash
+# 编译
+make
+```
+
+
+## 2. 

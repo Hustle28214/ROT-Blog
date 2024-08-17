@@ -1,0 +1,29 @@
+.tableOfContents {
+  position: fixed;
+  right: 0;
+  top: calc(var(--ifm-navbar-height) + 1rem);
+  width: 300px; /* 调整宽度 */
+  max-height: calc(100vh - var(--ifm-navbar-height));
+  overflow-y: auto;
+  padding: 1rem;
+  background-color: var(--ifm-background-color);
+  z-index: 2;
+}
+
+.tocContent {
+  padding-left: 300px; /* 与 TOC 宽度相同 */
+}
+
+@media (max-width: 996px) {
+  .tableOfContents {
+    display: none;
+  }
+
+  .tocContent {
+    padding-left: 0;
+  }
+
+  .docItemContainer {
+    padding: 0 0.3rem;
+  }
+}

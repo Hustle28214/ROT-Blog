@@ -4,6 +4,9 @@ Yanyuyedeng's Blog
 </h2>
 
 <a href="https://vercel.com/new/clone?repository-url=https://github.com/Hustle28214/ROT-Blog/tree/main&project-name=ROTblog&repo-name=ROTblog" rel="nofollow"><img src="https://vercel.com/button"></a>
+<a href="https://docusaurus.io/zh-CN/" target="_blank"><img style="height:50px;margin-top:0.5rem" src="https://github.com/user-attachments/assets/cfb3c49a-ed7a-408f-8947-9021dc776dbc" /><a/>
+
+
 
 ## Install(pnpm)
 ```bash

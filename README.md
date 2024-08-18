@@ -15,7 +15,7 @@ pnpm start
 
 ## Shot
 
-[shot](https://github.com/user-attachments/assets/27d33840-1f48-403d-abf1-85227f5e55c6)
+<img width="1471" alt="Live Demo" src="https://github.com/user-attachments/assets/27d33840-1f48-403d-abf1-85227f5e55c6">
 
 ## License
 

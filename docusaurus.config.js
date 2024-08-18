@@ -8,6 +8,8 @@ import {themes as prismThemes} from 'prism-react-renderer';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 
+const announcementBarContent = `正在施工中🚧`
+
 /** @type {import('@docusaurus/types').Config} */
 const config = {
   title: '烟雨夜灯。',
@@ -92,6 +94,11 @@ const config = {
         disableSwitch: false,
         respectPrefersColorScheme: true,
       },
+      announcementBar: {
+        id: 'announcementBar-1',
+        backgroundColor: '#B3E5FC',
+        content: announcementBarContent,
+      },
       // Replace with your project's social card
       image: 'img/docusaurus-social-card.jpg',
       navbar: {
@@ -105,16 +112,16 @@ const config = {
             type: 'docSidebar',
             sidebarId: 'tutorialSidebar',
             position: 'left',
-            label: '技术栈',
+            label: '📘技术栈',
             
           },
-          {to: '/blog', label: '随笔', position: 'left'},
+          {to: '/blog', label: '📝随笔', position: 'left'},
           {
             href: 'https://github.com/Hustle28214',
             label: 'GitHub',
             position: 'right',
           },  
-          {to: '/todolist', label: '待办', position: 'left'},
+          {to: '/todolist', label: '📂待办', position: 'left'},
           {
             href: 'https://rot-blog.vercel.app/blog/rss.xml',
             label: 'RSS',

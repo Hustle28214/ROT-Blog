@@ -1,41 +1,22 @@
-# Website
+<h2>
+烟雨夜灯的个人博客
+Yanyuyedeng's Blog
+</h2>
 
-This website is built using [Docusaurus](https://docusaurus.io/), a modern static website generator.
+<a href="https://vercel.com/new/clone?repository-url=https://github.com/Hustle28214/ROT-Blog/tree/main&project-name=ROTblog&repo-name=ROTblog" rel="nofollow"><img src="https://vercel.com/button"></a>
 
-### Installation
-
-```
-$ yarn
-```
-
-### Local Development
-
-```
-$ yarn start
-```
-
-This command starts a local development server and opens up a browser window. Most changes are reflected live without having to restart the server.
-
-### Build
-
-```
-$ yarn build
+## Install(pnpm)
+```bash
+git clone https://github.com/Hustle28214/ROT-Blog.git
+cd ROT-Blog
+pnpm install
+pnpm start
 ```
 
-This command generates static content into the `build` directory and can be served using any static contents hosting service.
+## Shot
 
-### Deployment
+<img width="1471" alt="Live Demo" src="https://github.com/user-attachments/assets/27d33840-1f48-403d-abf1-85227f5e55c6">
 
-Using SSH:
+## License
 
-```
-$ USE_SSH=true yarn deploy
-```
-
-Not using SSH:
-
-```
-$ GIT_USER=<Your GitHub username> yarn deploy
-```
-
-If you are using GitHub pages for hosting, this command is a convenient way to build the website and push to the `gh-pages` branch.
+[MIT](./LICENSE)

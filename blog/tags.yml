@@ -6,3 +6,7 @@ abstract:
   label: Abstract
   permalink: /abstract
   description: 书摘笔记。
+daily:
+  label: Daily
+  permalink: /daily
+  description: 生活记录。

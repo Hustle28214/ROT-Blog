@@ -166,7 +166,7 @@ const config = {
             ],
           },
         ],
-        copyright: `Copyright © ${new Date().getFullYear()} Yanyuyedeng. Built with Docusaurus.`,
+        copyright: `Copyright © ${new Date().getFullYear()} Yanyuyedeng | Built with <a href="https://docusaurus.io" target="_blank" rel="noopener noreferrer">Docusaurus</a>`,
       },
       prism: {
         theme: prismThemes.github,

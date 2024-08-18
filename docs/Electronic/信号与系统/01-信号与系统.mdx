@@ -6,14 +6,100 @@ sidebar_position: 1
 
 import VideoPlayer from '../../../src/components/Videoplayer/Videoplayer.jsx';
 
+语音信号的特点是一维、其变化依赖于时间。它的特性有音量和频率。
+
+系统的输入和输出都是信号，信号的种类很多。
+
 ## 1.1 连续时间信号和离散时间信号
 
 <VideoPlayer src="//player.bilibili.com/player.html?isOutside=true&aid=31554698&bvid=BV18W411C757&cid=55249452&p=1" />
 <br />
+
+**信号**：信号可以描述范围极其广泛的物理现象，可以氛围确知信号和随机信号，或者是连续时间信号与离散时间信号。
+
+**确知信号**：一个或几个自变量的函数。作为信号分析的基础。
+
+本课程只研究确知信号。在应用和科研层面，一般是研究随机信号。
+
+您可以使用Python 生成一个随机信号：
+
+```python
+import numpy as np
+import matplotlib.pyplot as plt
+
+# 设置参数
+sample_rate = 1000  # 采样率 (Hz)
+duration = 1.0      # 持续时间 (秒)
+frequency = 5       # 信号频率 (Hz)
+
+# 生成时间序列
+t = np.linspace(0, duration, int(sample_rate * duration), endpoint=False)
+
+# 生成连续随机信号
+random_signal = np.random.normal(0, 1, t.shape)
+
+# 可视化信号
+plt.figure(figsize=(10, 4))
+plt.plot(t, random_signal)
+plt.title('Continuous Random Signal')
+plt.xlabel('Time (s)')
+plt.ylabel('Amplitude')
+plt.grid(True)
+plt.show()
+```
+
+可以这么看：连续时间信号是函数，离散时间信号是数列。（某些时间点上的值）
+
+信号的描述：连续时间信号 $x(t)$，$x(t_1,t_2)$，离散时间信号 $x(n)$，$x(n_1,n_2)$
+
+在做信号处理的时候，时间可以往后退（数学意义上）。使用历史信号也是预测的基础。
+
+连续时间信号在离散时刻点上的样本可以构成一个离散时间信号。
+
+<mark>信号的能量与功率</mark>：
+
+连续时间信号在$[t_1,t_2]$区间的能量定义为：
+
+$$
+E=\int_{t_1}^{t_2}x(t)^2dt
+$$
+
+连续时间信号在$[t_1,t_2]$区间的平均功率为：
+
+$$
+P=\frac{1}{t_2-t_1}\int_{t_1}^{t_2}x(t)^2dt
+$$
+
+需要注意的是，这个积分有可能是过零的，积分是对数，也就是出现无穷大。为了避免这种情况，我们对信号进行了分类。我们将在之后讨论这些分类信号。
+
+离散时间信号在$[n_1,n_2]$区间的能量定义为：
+
+$$
+E=\sum_{n=n_1}^{n_2}x(n)^2
+$$
+
+离散时间信号在$[n_1,n_2]$区间的平均功率为：
+
+$$
+P=\frac{1}{n_2-n_1}\sum_{n=n_1}^{n_2}x(n)^2
+$$
+
+在无限区间上也可以定义信号的总能量：
+
+- 连续时间情况下：
+
+$$
+E = \int_-{\infty}^{\infty} |x(t)|^2 \, dt
+$$
+
+
+
 ## 1.2 自变量变换
 
 <VideoPlayer src="//player.bilibili.com/player.html?isOutside=true&aid=31554698&bvid=BV18W411C757&cid=55169052&p=2" />
 <br />
+
+
 ## 1.3 指数信号与正弦信号
 
 <VideoPlayer src="//player.bilibili.com/player.html?isOutside=true&aid=31554698&bvid=BV18W411C757&cid=55169337&p=3" />

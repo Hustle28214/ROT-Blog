@@ -1,3 +1,11 @@
+@font-face {
+  font-family: 'Mengyuan';
+  src: url(../../static/DreamHanSansCN-W17.ttf) format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
   --ifm-color-primary: #11659a;
   --ifm-color-primary-dark: #0f5b8b;
@@ -8,6 +16,9 @@
   --ifm-color-primary-lightest: #1683c8;
   --ifm-background-color: #e9f1f6;
   --ifm-navbar-background-color: #E9F1F6;
+  --ifm-font-family-base: 'Mengyuan', ui-sans-serif, system-ui, -apple-system;
+  --ifm-font-family-monospace:  'Mengyuan', misans, ui-sans-serif, system-ui, -apple-system;
+  --ifm-heading-font-family: 'Mengyuan', ui-sans-serif, system-ui, -apple-system;
   --ifm-code-font-size: 95%;
   --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.1);
   --sb-track-color:#222222;
@@ -37,6 +48,7 @@
 /* 通用背景色 */
 body {
   background-color: var(--ifm-background-color);
+  font-family: 'Mengyuan', misans, system-ui, -apple-system, 'PingFang SC';
 }
 
 /* 暗模式下背景色 */
@@ -99,10 +111,4 @@ body::-webkit-scrollbar-thumb {
 
 [data-theme='dark'] .navbar__title {
   color: #E9F1F6;
-}
-
-@font-face {
-  font-display: swap;
-  font-family: 'Mengyuan';
-  src: url(../../static/DreamHanSansCN-W24.ttf);
 }

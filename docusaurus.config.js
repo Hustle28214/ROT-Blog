@@ -17,7 +17,7 @@ const config = {
   favicon: 'img/leyan_Logo.ico',
 
   // Set the production url of your site here
-  url: 'https://your-docusaurus-site.example.com',
+  url: 'https://rotleyan.site',
   // Set the /<baseUrl>/ pathname under which your site is served
   // For GitHub pages deployment, it is often '/<projectName>/'
   baseUrl: '/',
@@ -111,22 +111,28 @@ const config = {
           {
             type: 'docSidebar',
             sidebarId: 'tutorialSidebar',
-            position: 'left',
+            position: 'right',
             label: '📘技术栈',
             
           },
-          {to: '/blog', label: '📝随笔', position: 'left'},
+          {to: '/blog', label: '📝随笔', position: 'right'},
+          
+          {
+            to: '/intro', label: '✨关于', position: 'right'
+          },
+          {to: '/todolist', label: '📂待办', position: 'right'},
           {
             href: 'https://github.com/Hustle28214',
             label: 'GitHub',
             position: 'right',
           },  
-          {to: '/todolist', label: '📂待办', position: 'left'},
+
           {
-            href: 'https://rot-blog.vercel.app/blog/rss.xml',
+            href: 'https://www.rotleyan.site/blog/rss.xml',
             label: 'RSS',
             position: 'right',
           },
+          
         ],
       },
       footer: {
@@ -137,12 +143,25 @@ const config = {
             items: [
               {
                 label: '技术栈',
-                to: '/docs/intro',
+                to: '/docs/category/control',
               },
               {
                 label: '随笔',
                 to: '/blog',
               },
+            ],
+          },
+          {
+            title: 'License',
+            items: [
+              {
+                html: `
+              <a href="https://opensource.org/license/mit" target="_blank" rel="noreferrer noopener" aria-label="MIT License">
+                <img src="https://github.com/user-attachments/assets/fd67ceaf-6b37-4108-ad65-d5027bef7cae" alt="MIT License" width="60" height="auto" />
+              </a>
+            `,
+              },
+              
             ],
           },
           {

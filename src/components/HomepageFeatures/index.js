@@ -4,29 +4,11 @@ import styles from './styles.module.css';
 
 const FeatureList = [
   {
-    title: '项目',
+    title: '关于我',
     Svg: require('@site/static/img/women.svg').default,
     description: (
       <>
-        2024国际基因工程机器大赛网页、软件组
-        <br />
-        2023亚太杯数学建模竞赛三等奖
-        <br />
-        美国大学生数学建模竞赛三等奖
-        <br />
-        2024MathorCup数学建模竞赛华北赛区二等奖
-        <br />
-        2023年国际大学生工程力学竞赛二等奖
-        <br />
-        2024年西门子杯信息化网络化华北赛区二等奖
-        <br />
-        2024睿抗机器人开发者大赛初赛一等奖
-        <br />
-        2023北京市工程设计表达竞赛校级二等奖
-        <br />
-        魔方机器人大赛院级一等奖
-        <br />
-        DataWhale优秀学习者
+        一名程序媛。
       </>
     ),
   },

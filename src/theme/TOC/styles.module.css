@@ -15,13 +15,11 @@
 }
 
 .tocFooter {
-  padding-top: 1rem;
-  font-size: 0.875rem;
-  color: var(--ifm-text-color);
-  border-top: 1px solid var(--ifm-border-color);
-  margin-top: 1rem;
-}
+  margin-top: 20px; /* 添加与上方内容的间距 */
+  padding: 10px; /* 添加适当的内边距 */
+  background-color: transparent; /* 背景颜色（可选） */
 
+}
 @media (max-width: 996px) {
   .tableOfContents {
     display: none;

@@ -14,6 +14,14 @@
   padding-left: 300px; /* 与 TOC 宽度相同 */
 }
 
+.tocFooter {
+  padding-top: 1rem;
+  font-size: 0.875rem;
+  color: var(--ifm-text-color);
+  border-top: 1px solid var(--ifm-border-color);
+  margin-top: 1rem;
+}
+
 @media (max-width: 996px) {
   .tableOfContents {
     display: none;

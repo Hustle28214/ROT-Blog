@@ -6,7 +6,7 @@ import styles from './styles.module.css';
 const LINK_CLASS_NAME = 'table-of-contents__link toc-highlight';
 const LINK_ACTIVE_CLASS_NAME = 'table-of-contents__link--active';
 
-export default function TOC({className, ...props}) {
+export default function TOC({className, wordCount, readingTime, ...props}) {
   return (
     <>
       <div className={clsx(styles.tableOfContents, 'thin-scrollbar', className)}>
@@ -17,8 +17,11 @@ export default function TOC({className, ...props}) {
         />
       </div>
       <div className={styles.tocContent}>
-        {/* 这里放置页面主要内容 */}
         {props.children}
+      </div>
+      <div className={styles.tocFooter}>
+        <p>本文字数：{wordCount} 字</p>
+        <p>预计阅读时间：{readingTime} 分钟</p>
       </div>
     </>
   );

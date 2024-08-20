@@ -1,0 +1,409 @@
+import WordCount from '../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+## 9.1 本地用户和组
+
+### Windows Server 2008R2 本地用户与组
+
+用户：包含用户名、密码、权限以及说明。
+
+用户组：具有相同性质的用户归结在一起，统一授权，组成用户组。
+
+创建用户和组：我的电脑-右键-管理-计算机管理-本地用户和组（本地用户信息存储在本地SAM数据库）。
+
+
+
+### 常见用户组与权限
+
+![在这里插入图片描述](https://i-blog.csdnimg.cn/blog_migrate/20cd23101aec7d59e15199fcb04c7b0b.png#pic_center)
+
+
+权限顺序由高到低：Administrators>Power Users>Users>Everyone
+
+## 9.2 活动目录（Active Diretory，AD）
+
+### 工作组模式和域模式
+
+网络中计算机逻辑组织的两种模式：工作组模式和域模式。
+
+工作组模式：每台计算机都拥有自己的本地安全账户管理数据库SAM。（权力分散独立）
+
+域模式：用户信息存储在域控制器，可以在域中漫游，访问域中任意一台服务器上的资源。（权力集中）
+
+### 活动目录（Active Diretory，AD）
+
+活动目录：对域中的账户和资源对象进行存放并集中管理。存储了计算机网络的配置信息和安全信息。
+
+一个动态的分布式文件系统，包含存储网络信息的目录结构和相关目录服务。
+
+域控制器（Domain Controller，DC）域中安装了活动目录的计算机。
+
+dcpromo：运行该命令会安装活动目录，将其升级为域控制器；若已经安装，则执行卸载活动目录指令，将其降级为成员服务器。
+
+AD存储的用户信息，分散在多个DC，操作系统对信息进行备份和选择性复制，维护信息一致性，提供容错能力。
+
+活动目录中对象的名字采用DNS域名结构，安装AD必须先安装DNS组件，必须安装在NTFS分区。
+
+### 活动目录工作组分类
+
+- 全局组（G）：来自本地域，可授权访问域林中的任何信任域。
+- 域本地组（DL）：来自任何域。只能访问本地域中的资源。
+- 通用组（U）：可来自域林中的任何域，访问权限可以达到域林中的任何域。
+
+组策略：
+
+- A-G-DL-P策略
+- A-G-G-DL-P策略
+- A表示用户账号，G表示全局组，U表示通用组，DL表示域本地组，P表示资源权限
+- A-G-DL-P策略：将用户账号添加到全局组中，将全局组添加到域本地组中，然后为域本地组分配资源 权限。
+
+
+## 9.3 远程桌面与 Samba
+
+### 远程桌面基础
+
+远程桌面协议RDP，基于TCP 3389。采用图形化远程桌面连接：开始-所有程序-附加 -远程桌面连接（mstsc）
+
+其由下列角色服务组成：
+
+（1）远程桌面会话主机：远程桌面会话主机（RD会话主机）（以前是终端服务器）使得服务器可以托管Windows桌面/程序。
+（2）RD Web访问：通过“开始”/Web浏览器访问RemoteApp和桌面连接。
+（3）远程桌面授权：远程桌面授权（RD授权）管理每台设备或用户与RD会话主机服务器连接所需的远程桌面服务客户端访问许可证（RDS CAL）。
+（4）RD 网关：允许授权的远程用户从任何连接到IInternet的设备连接到企业内部网络上的资源。
+（5）RD 连接 Broker：支持负载平衡RD会话主机服务器场中的会话负载平衡和会话重新连接。还可以用于RemoteApp。
+（6）远程桌面虚拟化主机：集成了Hyper-V以托管虚拟机，提供给用户。将唯一的虚拟机分配给组织中的每个用户，货位他们提供对虚拟机池的共享访问。
+### Samba
+
+Samba是向Linux主机提供Windows风格的文件和打印机共享服务。其开发目的是让Linux兼容与现网用户共享数据和服务。
+
+## 9.4 IIS 服务器和 Web FTP
+
+### IIS 服务器
+
+IIS（Internet Information Server），因特网信息服务器。它可以用于搭建Web服务器、FTP服务器和SMTP服务器。注意没有POP3和IMAP。
+
+如何安装IIS服务：开始——管理工具——服务器管理——角色——添加角色——Web服务器（IIS）
+
+身份验证支持：4种验证方法，匿名身份验证、集成Windows身份验证、基本身份验证、摘要式身份验证。其中集成Windows认证安全性最高。
+### Linux Apache 服务器配置
+
+- Apache：提供Web和FTP等服务，其中Web配置文件是httpd.conf。其守护进程是httpd。
+
+- Apache站点默认Web根目录是/var/www/html或/home/httpd，不同版本会有一些差异。
+
+- 虚拟主机：基于IP地址、端口、名字。
+
+Apache Webserver的配置页面中，第一部分是Global Configuration，是全局设置。整个Apache服务器都会受影响。第二部分是Virtual Servers，显示当前服务器中的所有虚拟主机，刚进入界面有两个虚拟主机：Default Server默认主机，另一个虚拟主机使用https协议，监听端口443。文档根目录与默认主机相同。第三个部分是Create a New Virtual Server。
+
+### 网站安全性配置
+
+身份验证配置：双击身份验证，编辑“匿名身份验证”设置匿名访问的用户账号。使用默认用户时，由于权限较低，匿名访问比较合适。
+
+
+IP地址与域限制配置：双击“IP地址和域限制”，限制访问站点的计算机。单击“操作”中的“添加允许条目”或“添加拒绝条目”以进一步编辑权限。“操作”中的“编辑功能设置”，可以设置未指定的客户端的访问权为“允许或者拒绝”。
+
+### FTP 服务器配置（少用）
+
+FTP端口：21（控制）TCP 20（数据）数据端口比控制端口小1。
+
+如何添加FTP站点：开始——管理工具——IIS管理器——网站——添加FTP站点。
+
+设置FTP站点名称和物理路径——在“IP地址”下拉列表中设置FTP站点的IP地址。多块网卡绑定多个IP地址，任选一个就可以。
+
+FTP身份验证有两种方式：匿名和基本。基本方式更加安全。“授权”中，允许访问最好选择指定用户，并选择读写权限。单击完成即可添加FTP站点。
+
+
+## 9.5 DNS 基础
+
+### DNS 域名系统
+
+域名系统（Domain Name System，DNS），作用是把域名转化为IP地址。DNS/DHCP服务器所使用的必须为静态IP地址，而Web/FTP均可为动态IP。
+
+Linux系统中提供DNS服务的组件为bind，主配置文件为named.conf。
+
+诊断域名系统基础结构的信息和查看DNS服务器的IP地址命令是：nslookup。
+
+### DNS 域名系统结构
+
+DNS通过层次结构的分布式数据库建立一致性名字空间。
+
+FQDN（完全合格域名），即www.buct.edu.cn。
+
+- 顶层是根域，用“.”表示。
+- 根域下是顶级域，分为国家顶级域和通用顶级域。
+- 顶级域下面是二级域，二级域下面可以划分子域。
+
+### DNS 记录类型
+
+![在这里插入图片描述](https://i-blog.csdnimg.cn/blog_migrate/6dd516a599d50a383e96dfe7a3f67610.png#pic_center)
+
+### DNS 查询过程
+
+![在这里插入图片描述](https://i-blog.csdnimg.cn/blog_migrate/c40b301aaf23c1dc395b56a161846284.png#pic_center)
+
+
+DNS的查询过程已在这一篇博客中详细叙述过：[DNS及相关使用问题](/docs/Computering/计算机网络/漫谈DNS使用问题)
+
+
+
+### DNS  的递归查询和迭代查询
+
+DNS有两大查询方式，分别是递归查询和迭代查询，属于软考难点。
+
+
+递归查询：域名服务器帮助用户进行名字解析，并返回最后的结果。亲身帮你找地址。
+
+迭代查询：域名服务器进行迭代访问，反复多次，直到最后找到结果。把责任踢给别的服务器，让你去找别人。
+
+但是事实上并没有那么多的老好人，递归查询范围是本地-转发器和本地-浏览器这一范围，迭代查询则是转发器-根域名/顶级域名服务器/授权域名服务器（呃，转发器有点牛马...）。需要注意的是，转发器-授权域名服务器的这一路径也会有递归查询的存在。
+
+
+### DNS 通知与配置文件
+
+1. /etc/resolv.conf：DNS服务器配置文件，包含了主机的域名搜索顺序和DNS服务器地址。
+2. /etc/named.conf：DNS主配置文件，存放各类DNS记录，比如A记录、PTR记录。
+3. /etc/hosts：存放主机DNS解析缓存，包含IP地址、主机名。
+4. hosts.conf：解析器查询顺序配置文件。
+
+
+
+## 9.6 DHCP 服务器
+
+DHCP（Dynamic Host Configuration Protocol, 动态主机配置协议）非常重要，非常重要，非常重要。
+
+在大中型网络使用DHCP服务器是非常合适的。这是因为它非常有效率，管理员不用去手动检查每台主机ip地址，DHCP会动态地调整网络中主机ip地址的分配。这就是说假设物理机移动到了另一个子网，DHCP也能包办所有的分配琐事，大大方便了便携机。
+
+### DHCP 工作原理
+
+
+
+![在这里插入图片描述](https://i-blog.csdnimg.cn/blog_migrate/757ef201211de7f8f3f7b3d60a447539.png#pic_center)
+### DHCP 租期更新
+
+![在这里插入图片描述](https://i-blog.csdnimg.cn/blog_migrate/1a3fd22247ff2d9c37a14f156a462f68.png#pic_center)
+- 客户机的租约期到50%，会向DHCP服务器发送DHCP REQUEST消息包。
+- 如果客户机接收到该服务器回应的DHCP ACK消息包，客户机就根据包中所提供的新的租期以及其它已经更新的TCP/IP参数配置，IP租用更新完成。
+- 如果没有收到该服务器的回复，则客户机继续使用现有的IP地址，因为租期还剩50%。
+- 如果在租期过去50%的时候没有更新，则客户机将在租期过去87.5%的时候再次向为其提供IP的DHCP服务器联系。
+- 如果还不成功，到租约的100%的时候，客户机必须放弃这个IP地址，发送DHCP DISCOVER重新申请地址。
+- 如果此时无DHCP可用，客户机会使用169.254.0.0/16中随机的一个地址，并且每隔5min再进行尝试。
+
+### Linux DHCP 配置
+
+- DHcpd.conf的配置文件例进行说明
+```bash
+subnet 192.168.0.0 netmask 255.255.255.0{
+range 192.168.0.200 192.168.0.254;
+ignore client-updates;
+default-lease-time 7200;
+option routers 192.168.0.1;
+option-domain-name"test.org"
+option-domain-name-servers 192.168.0.2;
+host test1 {hardwate ethernet 00:E0:4C:70:33:65;fixed-address 192.168.0.8;}
+}
+```
+DHCP可分配地址为192.168.0.200-254，网关192.168.0.1，DNS地址为192.168.0.2。
+同时对主机test1提供固定的IP地址192.168.0.8。
+
+### 华为DHCP配置
+
+非常重要，非常重要，非常重要！这是华为路由器/三层交换机的DHCP配置，未来华为配置笔记会更详细。
+
+```bash
+[dhcp]dhcp enable
+[dhcp]ip pool vlan10
+[dhcp-ip-tool-vlan10]network 192.168.10.0 mask 24
+[dhcp-ip-tool-vlan10]gateway-list 192.168.10.254
+[dhcp-ip-tool-vlan10]dns-list 8.8.8.8
+[dhcp-ip-tool-vlan10]quit
+[dhcp]ip pool vlan 20
+[dhcp-ip-tool-vlan20]network 192.168.20.0 mask 24
+[dhcp-ip-tool-vlan20]gateway-list 192.168.20.254
+[dhcp-ip-tool-vlan20]dns-list 8.8.8.8
+```
+
+### DHCP 报文格式
+
+![在这里插入图片描述](https://i-blog.csdnimg.cn/blog_migrate/ac24fde645fcc6a7c2ae9c5d95116c0d.png#pic_center)
+除了标准字段，还包含可选部分Option（用户自定义）。
+
+- Option 82：中继代理DHCP Relay信息选项。
+- Option 43：为AP分配IP地址的同时，通告AC的地址。
+
+#### Option 43
+
+![在这里插入图片描述](https://i-blog.csdnimg.cn/blog_migrate/7f984278a6b488653bac0a7cbfdaa795.png#pic_center)
+#### 华为 Option 43 配置
+DHCP常规配置，为AP分配IP地址。
+```bash
+[DHCP-HW]dhcp enable
+[DHCP-HW]ip pool huawei
+[DHCP-HW-ip-pool-huawei]network 192.168.100.0 255.255.255.0
+[DHCP-HW-ip-pool-huawei]gateway-list 192.168.100.1
+```
+配置Option 43，使AP能够获得AC的IP地址，假设AC的IP地址是10.10.10.1。
+```bash
+[DHCP-HW-ip-pool-huawei]option 43 sub-option 3 ascii 10.10.10.1
+```
+
+### DHCP 分配固定IP地址
+
+![在这里插入图片描述](https://i-blog.csdnimg.cn/blog_migrate/ca2cb225bca44ca44b7caa96c5e054bb.png#pic_center)
+### DHCP中继（DHCP Relay）
+
+大企业可能会用到不同网段的IP地址，不仅仅是子网迁移那么简单了，DHCP需要面对更大的问题。好在，DHCP提供了中继（DHCP Relay）功能，可以跨网段“透明地”发送DHCP报文。
+
+![在这里插入图片描述](https://i-blog.csdnimg.cn/blog_migrate/6e68d95939d9cfb33734e4f97ec53028.png#pic_center)
+Relay实际上是把主机的广播报文转为单播报文，穿过网络到达DHCP Server。
+![在这里插入图片描述](https://i-blog.csdnimg.cn/blog_migrate/aac62d5154771de6c012fb9fdceb0fba.png#pic_center)
+### DHCP Relay配置
+
+![在这里插入图片描述](https://i-blog.csdnimg.cn/blog_migrate/0b5f1ce634392efe4810d86ba6d7e14b.png#pic_center)
+### DHCP Snooping 防止私接服务器
+![在这里插入图片描述](https://i-blog.csdnimg.cn/blog_migrate/82942c50b72b3b11e949e308a58f0172.png#pic_center)
+### DHCP Snooping 配置
+```bash
+[Huawei]dhcp snooping enable
+[Huawei]int GigabitEthernet0/0/1
+[Huawei-GigabitEthernet0/0/1]dhcp snooping trusted
+[Huawei]int GigabitEthernet0/0/2
+[Huawei-GigabitEthernet0/0/2]dhcp snooping untrusted
+```
+## 9.7 Linux  网络配置
+
+### 配置文件地址
+
+默认看到这里已经明白了在Linux系统中一切皆是文件的概念了（）
+
+网络相关配置文件大多数位于/etc目录下，我们可以在系统运行时改网络配置文件，一般直接进去改或者vi大法，需要注意的是#是注释内容，并且可能需要chmod +x xxx.conf。
+
+1. 网络配置文件：/etc/sysconfig/network-script/ifcfg-enoxxx
+![在这里插入图片描述](https://i-blog.csdnimg.cn/blog_migrate/eb40450538fb626c38904eb5c4ab1ba8.png#pic_center)
+2. /etc/hostname：系统主机名文件。
+3. /etc/hosts：包含IP地址和主机名之间的映射，还包含主机别名。
+4. /etc/host.conf：指定客户机域名解析顺序：
+```bash
+order hosts,bind
+```
+5. /etc/resolv.conf指定客户机域名搜索顺序和DNS服务器地址。
+```bash
+Seach test.edu.cn
+nameserver 114.114.114.114 #首选DNS服务器
+nameserver 8.8.8.8 #备用
+```
+
+### Linux 网络接口配置/命令
+
+#### Ifconfig 网络接口设置
+
+```bash
+ifconfig interface-name ip-address up|down
+[root@localhost~]#ifconfig eno11230132 10.1.1.1 netmask 255.255.255.0 up
+[root@localhost~]#ifconfig eno11230132
+inet 10.1.1.1 netmask 255.255.255.0
+ether 00:20:57:95:23:ce txqueuelen 1000(Ethernet)
+```
+#### route 配置路由
+
+```bash
+[root@localhost]#route
+Destination Gateway Genmask Flag Metric iface
+Default 10.0.0.254 0.0.0.0 UG 1024 eno1230012
+10.1.1.0 10.1.1.254 255.255.255.0 U 0 eno1230012
+```
+```bash
+Route [add|del][-net|-host]target[netmask Nm][gw GW][if]
+route add -net target 3.3.3.0/24 gw 2.2.2.254
+route add -host target 192.168.168.119 gw 192.168.168.1
+```
+
+#### netstat 网络查询命令
+
+```bash
+# -a 显示所有连接信息，包括正在监听
+# -i 显示已配置网络设备的统计信息
+# -c 持续更新网络状态，每秒一次，直到被人中止
+# -r 显示内核路由表
+# -n 以数字格式而不是已解析的名称显示远程和本地地址
+
+[root@localhost]#netstat -nr
+Routing tables
+
+Destination    Gateway     Flags     Netif Expire
+default      10.1.1.254     UGSc      en0
+127          127.0.0.1      UCS       lo0
+```
+
+## 9.8 Linux 防火墙配置
+
+iptables是Linux的一个客户端代理，使得用户设置的安全设定可以应用到安全框架上。它不是真正意义上的防火墙！是一个方便使用防火墙的客体。
+
+Iptables有著名的四表五链。
+
+![在这里插入图片描述](https://i-blog.csdnimg.cn/blog_migrate/75576afe214966328d919a08c7642675.png#pic_center)
+### iptables 命令的语法格式
+- iptables 【-t表名】管理选项【链名】条件匹配-j执行动作
+- 例如：iptables -t filter -A INPUT -s 192.168.184.20 -p tcp --dport 22 -j DROP
+
+- 通用参数
+- -p 协议 例如：iptables -A INPUT -p tcp
+- -s 源地址 例如：iptables -A INPUT -d 192.168.1.1
+- -d 目的地址 例如：iptables -A INPUT -d 192.168.12.1
+- --sport 源端口 例如：iptables -A INPUT -p tcp --sport 22
+- --dport 目的端口 例如：iptables -A INPUT -p tcp --dport 22
+
+其中：
+
+- -j 处理动作
+- DROP：丢弃（直接丢弃）
+- REJECT：丢弃（回显ICMP不可达消息）
+- LOG：将数据包信息记录到syslog
+- ACCEPT：允许数据包通过
+
+## 9.9 Linux 文件和目录管理
+
+Linux一切皆文件，使用索引节点记录文件信息，每个索引节点有编号。
+
+多机目录树形层次结构，最上层是根目录，用“/”表示。
+
+Linux：/etc/host   只有一个根目录。
+
+Windows：D:\alist   每个磁盘都是单独的树。
+
+Linux文件挂载：将一个文件系统的顶层目录挂到另一个文件系统的子目录上，使他们成为一个整体。
+
+挂载点必须是一个目录，而不能是一个文件。
+
+一个分区挂载在一个已知的目录节点上，这个目录可以不为空，挂载后这个目录以前的内容不可用。
+
+### Linux 文件类型与访问权限
+
+五种文件类型：普通文件、目录文件、链接文件、设备文件和管道文件。
+
+四类权限：读（r）、写（w）、执行（x）、无访问权限（-）。
+
+三类用户：文件所有者、与文件所有者同组用户和其他用户。
+
+![在这里插入图片描述](https://i-blog.csdnimg.cn/blog_migrate/f8f1e87fe0965b63d9362e8684addc60.png#pic_center)
+
+## 9.10 Linux 用户和组管理
+
+Linux中，最重要的用户（也是权限最高）的用户是root用户，UID=0。
+
+用户管理配置文件：
+
+1. /etc/passwd 每个用户在该文件中都有一行对应记录，该文件对所有用户都是可读的。
+- 分为7个域，记录了这个用户的基本属性，格式：
+- 用户名：加密的口令：用户ID：组ID：用户的全名或描述：登录目录：登录shell
+2. /etc/shadow 只有超级用户root能读的文件/etc/shadow，该文件包含了系统中的所有用户及其口令等相关信息，分为9个域：
+![在这里插入图片描述](https://i-blog.csdnimg.cn/blog_migrate/e8930a15d7e5d13a75441e532527e5c3.png#pic_center)
+![在这里插入图片描述](https://i-blog.csdnimg.cn/blog_migrate/daa4fb011c98ea281ecf2b59569d0e4f.png#pic_center)
+3. useradd [-选项] username
+- -d 指定用于取代默认/home/username的用户主目录 useradd -d /home/test user1
+- -g 用户所属用户组的组名或组ID useradd -g test user2
+- passwd [-选项] username
+4. userdel groupadd groupdel
+
+
+</WordCount>

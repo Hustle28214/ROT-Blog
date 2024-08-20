@@ -10,12 +10,14 @@ import rehypeKatex from 'rehype-katex';
 
 const announcementBarContent = `正在施工中🚧`
 
+
 /** @type {import('@docusaurus/types').Config} */
 const config = {
   title: '烟雨夜灯。',
   tagline: '桃李春风一杯酒，江湖夜雨十年灯。',
   favicon: 'img/leyan_Logo.ico',
-
+  
+  
   // Set the production url of your site here
   url: 'https://rotleyan.site',
   // Set the /<baseUrl>/ pathname under which your site is served
@@ -52,7 +54,9 @@ const config = {
             'https://github.com/Hustle28214/ROT-Blog/tree/main/',
           remarkPlugins: [remarkMath],
           rehypePlugins: [rehypeKatex],
+          
         },
+        
         blog: {
           showReadingTime: true,
           // Please change this to your repo.

@@ -5,6 +5,9 @@ sidebar_position: 1
 
 
 import VideoPlayer from '../../../src/components/Videoplayer/Videoplayer.jsx';
+import WordCount from '../../../src/components/WordCount/WordCount.jsx';
+
+<WordCount>
 
 语音信号的特点是一维、其变化依赖于时间。它的特性有音量和频率。
 
@@ -104,13 +107,13 @@ $$
 1. 信号的总能量有限（能量信号）
 
 $$
-E_{\infty}＜\infty,P_{\infty}= 0
+E_{\infty}<\infty,P_{\infty}= 0
 $$
 
 2. 信号的总能量无限，平均功率有限（功率信号）
 
 $$
-E_{\infty}=\infty, 0＜P_{\infty}＜\infty
+E_{\infty}=\infty, 0<P_{\infty}<\infty
 $$
 
 3. 信号的总能量和平均功率都无限
@@ -126,19 +129,19 @@ $$
 值得指出的是，<mark>周期信号一定是功率信号</mark>。在无限个周期内能量越加越大，直到无穷大，但每个周期内能量是有限的。因此，从定义上可见它一定是个功率信号。
 
 $$
-P_{\infty}=\frac{1}{T}\int^{T}_0｜x(t)｜^2  dt
+P_{\infty}=\frac{1}{T}\int^{T}_0|x(t)|^2  dt
 $$
 或
 $$
-P_{\infty}=\frac{1}{2T}\int^{T}_{-T}｜x(t)｜^2 dt
+P_{\infty}=\frac{1}{2T}\int^{T}_{-T}|x(t)|^2 dt
 $$
 
 $$
-P_{\infty}=\frac{1}{N}\sum^{N-1}_{n=0}｜x(n)｜^2
+P_{\infty}=\frac{1}{N}\sum^{N-1}_{n=0}|x(n)|^2
 $$
 或
 $$
-P_{\infty}=\frac{1}{2N+1}\sum^{N}_{n=-N}｜x(n)｜^2
+P_{\infty}=\frac{1}{2N+1}\sum^{N}_{n=-N}|x(n)|^2
 $$
 
 ## 1.2 自变量变换
@@ -159,4 +162,5 @@ $$
 
 ## 1.6 基本系统性质
 
+</WordCount>
 

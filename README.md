@@ -1,4 +1,4 @@
-arti夜灯的个人博客
+烟雨夜灯的个人博客
 Yan's Blog
 </h2>
 <p>
@@ -9,7 +9,7 @@ www.rotleyan.site
 
 # Special Function
 
-📝(2024.08.20)Word Count:Depending on React, now we can count words of every single .mdx or.jsx.
+📝(2024.08.20)Word Count: Depending on React, now we can count words of every single .mdx or.jsx.
 
 ## Install(pnpm)
 ```bash

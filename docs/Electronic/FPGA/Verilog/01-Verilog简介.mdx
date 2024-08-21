@@ -1,3 +1,8 @@
+
+import WordCount from '../../../src/components/WordCount/WordCount.jsx';
+
+<WordCount>
+
 ## 1. Verilog扫盲
 
 Verilog(全称Verilog HDL)是一种硬件描述语言，可以用来设计数字电路、集成电路。主要用来写专用集成电路（ASIC）。宿主软件有Quartus、ModelSim、Vivado ID等，其实，VS Code也能写Verilog，不过，Verilog语法比较复杂，还是建议用专业软件写。
@@ -42,3 +47,4 @@ Veirilog支持其他编程语言接口（PLI）进行扩展，PLI允许外部函
 生产之前，做最后一次仿真，即**时序仿真**。利用模型中已经包含的时延信息和布局布线中获得的精确参数，用仿真软件验证电路的时序。
 
 然后，就是通过开发工具将设计的数字电路目标文件下载到FPGA/CPLD器件上，也就是烧录，从而进行**测试**。
+</WordCount>

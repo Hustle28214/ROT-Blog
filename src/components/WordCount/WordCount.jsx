@@ -31,7 +31,7 @@ export default function WordCount({ children }) {
         console.log('数字:', numbers);
         console.log('标点符号:', punctuations);
         
-        const readingTime = Math.ceil(wordCount / 230);
+        const readingTime = Math.ceil(wordCount / 500);
 
         window.tocStatistic = { wordCount, readingTime };
         window.dispatchEvent(new Event('tocStatisticUpdate'));

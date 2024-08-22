@@ -120,12 +120,13 @@ const config = {
       // Replace with your project's social card
       image: 'img/docusaurus-social-card.jpg',
       navbar: {
-        title: '烟雨夜灯',
+        
         logo: {
           alt: 'My Site Logo',
           src: 'img/leyan_Logo.svg',
         },
         items: [
+          {to :'/', label: '🏠主页', position: 'right'},
           {
             type: 'docSidebar',
             sidebarId: 'tutorialSidebar',

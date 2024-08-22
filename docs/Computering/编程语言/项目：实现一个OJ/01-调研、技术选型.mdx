@@ -77,6 +77,14 @@ import WordCount from '../../../../src/components/WordCount/WordCount';
 
 ## 3. 调研开源OJ
 
+比较合参考和复现的OJ：
+
+1. [HUSTOJ](https://github.com/zhblue/hustoj)：一个开源的在线编程评测系统，支持C、C++、Java、Pascal、C#、Python、PHP、JavaScript、VBScript、SQL、Ruby、Perl、Go、Lua、Pascal、C、C++、Java、Pascal、C#、Python、PHP、JavaScript、VBScript、SQL、Ruby、Perl、Go、Lua、Pascal
+2. [HOJ](https://github.com/HimitZH/HOJ)
+3. [judge0](https://github.com/judge0/judge0)
+
+judge0官网：https://judge0.com/
+
 功能核心：
 
 1. 权限校验
@@ -102,5 +110,39 @@ https://github.com/user-attachments/assets/15090cff-8e5e-441c-947a-23579dda3dcd
 ## 5. 架构设计
 
 
+
+:::warning
+
+确认环境：
+
+nodeJS: 16.x/18.16.0
+
+npm: 9.5.1
+
+:::
+## 6. 初始化
+
+使用vue-cli脚手架：
+
+```bash
+npm install -g @vue/cli
+vue -v
+vue create my-oj
+# 选择Manually select features
+# 空格选择TS、Router、Vuex、Linter / Formatter, enter
+# 选3.x
+# No
+# Yes
+# Y
+# ESLint + Prettier
+# Lint on save
+# In dedicated config files
+# Y
+cd my-oj
+npm install
+npm run serve
+```
+
+[VUE3 installation](https://cli.vuejs.org/zh/guide/installation.html)
 
 </WordCount>

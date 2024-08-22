@@ -15,7 +15,7 @@ function useNavbarItems() {
   // TODO temporary casting until ThemeConfig type is improved
   return useThemeConfig().navbar.items;
 }
-function NavbarItems({items}) {
+function NavbarItems({items, className}) {
   return (
     <>
       {items.map((item, i) => (
@@ -29,7 +29,7 @@ ${JSON.stringify(item, null, 2)}`,
               {cause: error},
             )
           }>
-          <NavbarItem {...item} />
+          <NavbarItem {...item} className={className} />
         </ErrorCauseBoundary>
       ))}
     </>
@@ -51,7 +51,6 @@ export default function NavbarContent() {
   return (
     <NavbarContentLayout
       left={
-        // TODO stop hardcoding items?
         <>
           {!mobileSidebar.disabled && <NavbarMobileSidebarToggle />}
           <NavbarLogo />
@@ -59,10 +58,8 @@ export default function NavbarContent() {
         </>
       }
       right={
-        // TODO stop hardcoding items?
-        // Ask the user to add the respective navbar items => more flexible
         <>
-          <NavbarItems items={rightItems} />
+          <NavbarItems items={rightItems} className={styles.customFont} />
           <NavbarColorModeToggle className={styles.colorModeToggle} />
           {!searchBarItem && (
             <NavbarSearch>

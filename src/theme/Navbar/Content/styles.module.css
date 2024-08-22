@@ -1,6 +1,15 @@
 /*
 Hide color mode toggle in small viewports
  */
+@font-face{
+  font-family: DreamHanSerifCN;
+  src: url(../../../../static/DreamHanSerifCN-W16.ttf);
+}
+
+.customFont {
+  font-family: DreamHanSerifCN;
+}
+
 @media (max-width: 996px) {
   .colorModeToggle {
     display: none;

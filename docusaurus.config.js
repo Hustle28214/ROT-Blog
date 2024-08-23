@@ -243,7 +243,7 @@ const config = {
             ],
           },
         ],
-        copyright: `Copyright © ${new Date().getFullYear()} Yanyuyedeng | Built with <a href="https://docusaurus.io" target="_blank" rel="noopener noreferrer">Docusaurus</a>`,
+        copyright: `Copyright © ${new Date().getFullYear()} Yanyuyedeng | Built with <a href="https://docusaurus.io" target="_blank" rel="noopener noreferrer">Docusaurus</a> | Powered by <a href="https://vercel.com/" target="_blank" rel="noopener noreferrer">Vercel</a>`,
       },
       prism: {
         theme: prismThemes.github,

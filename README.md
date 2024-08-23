@@ -2,7 +2,7 @@
 烟雨夜灯的个人博客
 Yan's Blog
 </h2>
-<p>
+<p align="center">
 www.rotleyan.site
 </p>
 <a href="https://vercel.com/new/clone?repository-url=https://github.com/Hustle28214/ROT-Blog/tree/main&project-name=ROTblog&repo-name=ROTblog" rel="nofollow"><img src="https://vercel.com/button"></a>

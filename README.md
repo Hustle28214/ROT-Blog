@@ -1,4 +1,4 @@
-<h2>
+<h2 align="center">
 烟雨夜灯的个人博客
 Yan's Blog
 </h2>

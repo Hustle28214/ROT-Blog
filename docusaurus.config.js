@@ -8,6 +8,7 @@ import {themes as prismThemes} from 'prism-react-renderer';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 
+
 const announcementBarContent = `正在施工中🚧`
 
 
@@ -39,7 +40,7 @@ const config = {
     defaultLocale: 'en',
     locales: ['en'],
   },
-
+  
   presets: [
     [
       'classic',
@@ -106,7 +107,15 @@ const config = {
       //   template: '#zoom-template',
       // },
     //},
-
+    // giscus: {
+    //   repo: 'Hustle28214/ROT-Blog',
+    //   repoId: 'R_kgDOMh1MFg',
+    //   category: 'General',
+    //   categoryId: 'DIC_kwDOMh1MFs4Ch2s-',
+    //   theme: 'light',
+    //   darkTheme: 'dark',
+    // },
+  
       colorMode: {
         defaultMode: 'light',
         disableSwitch: false,

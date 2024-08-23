@@ -2,12 +2,12 @@
 Hide color mode toggle in small viewports
  */
 @font-face{
-  font-family: DreamHanSerifCN;
-  src: url(../../../../static/DreamHanSerifCN-W16.ttf);
+  font-family: DreamHanSansCN;
+  src: url(../../../../static/DreamHanSansCN-W16.ttf);
 }
 
 .customFont {
-  font-family: DreamHanSerifCN;
+  font-family: DreamHanSansCN;
 }
 
 @media (max-width: 996px) {

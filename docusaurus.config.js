@@ -37,10 +37,18 @@ const config = {
   // useful metadata like html lang. For example, if your site is Chinese, you
   // may want to replace "en" with "zh-Hans".
   i18n: {
-    defaultLocale: 'en',
-    locales: ['en'],
-  },
-  
+     defaultLocale: 'zh-Hans',
+     locales: ['en', 'zh-Hans'],
+     localeConfigs: {
+     'zh-Hans': {
+     htmlLang: 'zh-Hans',
+     },
+     },
+   },
+    
+  plugins: [
+    'plugin-image-zoom'
+  ],
   presets: [
     [
       'classic',
@@ -94,19 +102,22 @@ const config = {
   themeConfig:
     /** @type {import('@docusaurus/preset-classic').ThemeConfig} */
     ({
-      // imageZoom: {
-      // // CSS selector to apply the plugin to, defaults to '.markdown img'
-      // selector: '.markdown img',
-      // // Optional medium-zoom options
-      // // see: https://www.npmjs.com/package/medium-zoom#options
-      // options: {
-      //   margin: 24,
-      //   background: '#BADA55',
-      //   scrollOffset: 0,
-      //   container: '#zoom-container',
-      //   template: '#zoom-template',
-      // },
-    //},
+      imageZoom: {
+        // CSS selector to apply the plugin to, defaults to '.markdown img'
+        selector: '.markdown :not(em) > img',
+        // Optional medium-zoom options
+        // see: https://www.npmjs.com/package/medium-zoom#options
+        options: {
+          margin: 24,
+          background: {
+            light:'#FFFFFF',
+            dark: '#222222'
+          },
+          scrollOffset: 0,
+          //container: '#zoom-container',
+          //template: '#zoom-template',
+        },
+      },// Set z-index:999 in custom.css to avoid conflict with TOC
 
     metadata: [
       {name: 'keywords', content: 'robot, computer, github, blog'},
@@ -140,6 +151,8 @@ const config = {
           src: 'img/leyan_Logo.svg',
         },
         items: [
+
+           
           {to :'/', label: '🏠主页', position: 'right'},
           {
             type: 'docSidebar',
@@ -158,6 +171,8 @@ const config = {
             href: 'https://github.com/Hustle28214',
             label: 'GitHub',
             position: 'right',
+            src: 'img/githubBlur.svg',
+            srcDark: 'img/githubDark.svg',
           },  
 
           {
@@ -165,7 +180,10 @@ const config = {
             label: 'RSS',
             position: 'right',
           },
-          
+          {
+            type: 'localeDropdown',
+            position: 'right',
+          },
         ],
       },
       footer: {

@@ -6,7 +6,7 @@
   max-height: calc(100vh - var(--ifm-navbar-height));
   overflow-y: auto;
   padding: 1rem;
-  background-color: var(--ifm-background-color);
+  background-color: transparent;
   z-index: 2;
 }
 

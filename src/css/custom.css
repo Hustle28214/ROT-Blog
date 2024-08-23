@@ -61,7 +61,10 @@ body {
 }
 
 
-
+.medium-zoom-overlay,
+.medium-zoom-image--opened {
+  z-index: 999;
+}
 
 body::-webkit-scrollbar {
   width: var(--sb-size);

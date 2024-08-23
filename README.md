@@ -15,7 +15,7 @@ www.rotleyan.site
 
 🗺 (2024.08.23) SEO: Upgrade SEO for searching in web.
 
-
+🌏 (2024.08.23) i18n: Upgrade English and Zh-Hans language support. (🚧English support isn't completed. It is still updating) .
 
 ## Install (pnpm)
 ```bash

@@ -7,7 +7,7 @@ www.rotleyan.site
 <a href="https://vercel.com/new/clone?repository-url=https://github.com/Hustle28214/ROT-Blog/tree/main&project-name=ROTblog&repo-name=ROTblog" rel="nofollow"><img src="https://vercel.com/button"></a>
 <a href="https://docusaurus.io/zh-CN/" target="_blank"><img  style="height:32px" src="https://github.com/user-attachments/assets/cfb3c49a-ed7a-408f-8947-9021dc776dbc" /><a/>
 
-# Special Function
+# 🤔Specials
 
 📝 (2024.08.20) Word Count: Depending on React, now we can count words of every single .mdx or.jsx.
 
@@ -17,7 +17,7 @@ www.rotleyan.site
 
 🌏 (2024.08.23) i18n: Upgrade English and Zh-Hans language support. (🚧English support isn't completed. It is still updating) .
 
-## Install (pnpm)
+## 😉Install (pnpm)
 ```bash
 git clone https://github.com/Hustle28214/ROT-Blog.git
 cd ROT-Blog
@@ -31,10 +31,10 @@ npm run start
 
 
 
-## Shot
+## 📸Shot
 
-<img width="1471" alt="Live Demo" src="https://github.com/user-attachments/assets/27d33840-1f48-403d-abf1-85227f5e55c6">
+<img width="1471" alt="Live Demo" src="https://github.com/user-attachments/assets/dec3d1fd-7a02-4c24-b748-a1960c3875b1">
 
-## License
+## 🧾License
 
 [MIT](./LICENSE)

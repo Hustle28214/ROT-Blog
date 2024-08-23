@@ -107,14 +107,14 @@ const config = {
       //   template: '#zoom-template',
       // },
     //},
-    // giscus: {
-    //   repo: 'Hustle28214/ROT-Blog',
-    //   repoId: 'R_kgDOMh1MFg',
-    //   category: 'General',
-    //   categoryId: 'DIC_kwDOMh1MFs4Ch2s-',
-    //   theme: 'light',
-    //   darkTheme: 'dark',
-    // },
+    giscus: {
+      repo: 'Hustle28214/ROT-Blog',
+      repoId: 'R_kgDOMh1MFg',
+      category: 'General',
+      categoryId: 'DIC_kwDOMh1MFs4Ch2s-',
+      theme: 'light',
+      darkTheme: 'dark',
+    },// if you want to enable giscus, pls change "repo","repoId","categoryId" to yours
   
       colorMode: {
         defaultMode: 'light',

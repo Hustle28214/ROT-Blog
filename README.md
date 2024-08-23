@@ -10,6 +10,7 @@ www.rotleyan.site
 # Special Function
 
 📝(2024.08.20)Word Count: Depending on React, now we can count words of every single .mdx or.jsx.
+🗨 (2024.08.23)Comment: Depending on Giscus, you can comment on my blog.
 
 ## Install(pnpm)
 ```bash

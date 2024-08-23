@@ -13,13 +13,23 @@ www.rotleyan.site
 
 🗨 (2024.08.23) Comment: Depending on Giscus, you can comment on my blog.
 
-## Install(pnpm)
+🗺 (2024.08.23) SEO: Upgrade SEO for searching in web.
+
+
+
+## Install (pnpm)
 ```bash
 git clone https://github.com/Hustle28214/ROT-Blog.git
 cd ROT-Blog
 pnpm install
 pnpm start
+## Or you can use npm or yarn
+npm install
+npm run build
+npm run start
 ```
+
+
 
 ## Shot
 

@@ -107,6 +107,11 @@ const config = {
       //   template: '#zoom-template',
       // },
     //},
+
+    metadata: [
+      {name: 'keywords', content: 'robot, computer, github, blog'},
+      {name: 'twitter:card', content: 'summary_large_image'},
+    ],
     giscus: {
       repo: 'Hustle28214/ROT-Blog',
       repoId: 'R_kgDOMh1MFg',

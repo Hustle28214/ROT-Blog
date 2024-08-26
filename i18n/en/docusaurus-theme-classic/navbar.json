@@ -1,0 +1,34 @@
+{
+  "logo.alt": {
+    "message": "My Site Logo",
+    "description": "The alt text of navbar logo"
+  },
+  "item.label.🏠主页": {
+    "message": "🏠Home",
+    "description": "Navbar item with label 🏠主页"
+  },
+  "item.label.📘技术栈": {
+    "message": "📘Tech Stack",
+    "description": "Navbar item with label 📘技术栈"
+  },
+  "item.label.📝随笔": {
+    "message": "📝Essays",
+    "description": "Navbar item with label 📝随笔"
+  },
+  "item.label.✨关于": {
+    "message": "✨About",
+    "description": "Navbar item with label ✨关于"
+  },
+  "item.label.📂待办": {
+    "message": "📂Todo",
+    "description": "Navbar item with label 📂待办"
+  },
+  "item.label.GitHub": {
+    "message": "GitHub",
+    "description": "Navbar item with label GitHub"
+  },
+  "item.label.RSS": {
+    "message": "RSS",
+    "description": "Navbar item with label RSS"
+  }
+}

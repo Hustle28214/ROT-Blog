@@ -8,6 +8,9 @@ cuda程序的后缀：.cu
 
 执行：./hello_world.cu
 
+使用语言还是C++。
+
+
 ## 1. 核函数
 
 ```cuda
@@ -65,6 +68,20 @@ int main() {
 
 线程分块是逻辑上的划分，物理上线程不分块。
 
+配置线程：\<\<\<grid_num, block_num\>\>\>
+
+第一个参数代表着我们有M个线程块，第二个参数代表着我们的每个线程块中有N个线程。他们都是一维的。这昂个参数保存在内建变量(build-in variable)中。
+
+gridDim.x: 该变量的数值等于执行配置中变量grid_num的值。
+
+blockDim.x: 该变量的数值等于执行配置中变量block_num的值。
+
+最大允许线程块的大小为1024。最大允许的网格大小是$2^31-1$（针对一维网格）。
+
+实际使用中，总线程数大于实际使用的线程数能更好地利用计算资源，因为这样可以使得GPU在计算的时候内存访问同时进行，节省计算机计算的时间。使得核心一直处于计算中。
+
+启动核函数后，CPU并不会等待核函数执行完毕，立马去执行主机中其他程序。所以我们要做的就是使得这两部分时间重叠。
+
 
 
 ## 3. 线程块的索引
@@ -78,6 +95,32 @@ int main() {
     return 0;
 }
 ```
+
+线程索引保存成内s建变量(build-in variable)：
+1. blockIdx.x: 该变量指定一个线程在一个网格中的线程块索引值，范围0-girdDim.x-1。
+2. threadIdx.x: 该变量指定一个线程在线程块中的索引值，范围0-blockDim.x-1。
+
+线程具有唯一标识：
+
+$$
+Idx = threadIdx.x + blockDim.x * blockIdx.x;
+$$
+
+## 4. 推广到多维线程
+
+1. CUDA可以组织三维的网格和线程块；
+
+2. blockIdx和threadIdx是类型为uint3的变量，该类型是一个结构体，具有x,y,z三个成员（3个成员都为无符号类型的成员构成）:
+
+$$
+\left\{
+
+
+
+
+\right
+$$
+
 ## Reference
 
 [1]. 权双.CUDA编程基础入门系列（持续更新）\[M/OL\](2023-07-14)[2024-08-21].https://www.bilibili.com/video/BV1sM4y1x7of/?p=7&share_source=copy_web&vd_source=8b2bc57e71349607b55c9fde6b078ebd

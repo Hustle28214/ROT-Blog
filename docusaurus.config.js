@@ -47,7 +47,8 @@ const config = {
    },
     
   plugins: [
-    'plugin-image-zoom'
+    'plugin-image-zoom',
+    
   ],
   presets: [
     [

@@ -1,36 +1,36 @@
 import clsx from 'clsx';
 import Heading from '@theme/Heading';
 import styles from './styles.module.css';
+import Translate, {translate} from '@docusaurus/Translate';
 
 const FeatureList = [
   {
-    title: '关于我',
+    title: <Translate>关于我</Translate>,
     Svg: require('@site/static/img/women.svg').default,
     description: (
       <>
-        一名程序媛。
+        <Translate>一名程序媛。</Translate>
       </>
     ),
   },
   {
-    title: '专业',
+    title: <Translate>专业</Translate>,
     Svg: require('@site/static/img/gundam.svg').default,
     description: (
       <>
-       机器人工程
+       <Translate>机器人工程</Translate>
       </>
     ),
   },
   {
-    title: '相比其他程序员...',
+    title: <Translate>相比其他程序员...</Translate>,
     Svg: require('@site/static/img/machine.svg').default,
     description: (
       <>
-        更多的机械、电子、控制内容。
+        <Translate>更多的机械、电子、控制内容。</Translate>
       </>
     ),
   },
-  
 ];
 
 function Feature({Svg, title, description}) {
@@ -46,7 +46,6 @@ function Feature({Svg, title, description}) {
     </div>
   );
 }
-
 export default function HomepageFeatures() {
   return (
     <section className={styles.features}>

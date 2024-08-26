@@ -1,0 +1,206 @@
+{
+  "version.label": {
+    "message": "Next",
+    "description": "The label for version current"
+  },
+  "sidebar.tutorialSidebar.category.Computering": {
+    "message": "Computering",
+    "description": "The label for category Computering in sidebar tutorialSidebar"
+  },
+  "sidebar.tutorialSidebar.category.并行计算与分布式系统": {
+    "message": "并行计算与分布式系统",
+    "description": "The label for category 并行计算与分布式系统 in sidebar tutorialSidebar"
+  },
+  "sidebar.tutorialSidebar.category.GPU编程": {
+    "message": "GPU编程",
+    "description": "The label for category GPU编程 in sidebar tutorialSidebar"
+  },
+  "sidebar.tutorialSidebar.category.协同进化计算与多智能体系统": {
+    "message": "协同进化计算与多智能体系统",
+    "description": "The label for category 协同进化计算与多智能体系统 in sidebar tutorialSidebar"
+  },
+  "sidebar.tutorialSidebar.category.高性能计算HPC": {
+    "message": "高性能计算HPC",
+    "description": "The label for category 高性能计算HPC in sidebar tutorialSidebar"
+  },
+  "sidebar.tutorialSidebar.category.数字图像处理": {
+    "message": "数字图像处理",
+    "description": "The label for category 数字图像处理 in sidebar tutorialSidebar"
+  },
+  "sidebar.tutorialSidebar.category.编程语言": {
+    "message": "编程语言",
+    "description": "The label for category 编程语言 in sidebar tutorialSidebar"
+  },
+  "sidebar.tutorialSidebar.category.Rust": {
+    "message": "Rust",
+    "description": "The label for category Rust in sidebar tutorialSidebar"
+  },
+  "sidebar.tutorialSidebar.category.项目：实现一个OJ": {
+    "message": "项目：实现一个OJ",
+    "description": "The label for category 项目：实现一个OJ in sidebar tutorialSidebar"
+  },
+  "sidebar.tutorialSidebar.category.鸿蒙": {
+    "message": "鸿蒙",
+    "description": "The label for category 鸿蒙 in sidebar tutorialSidebar"
+  },
+  "sidebar.tutorialSidebar.category.Linux": {
+    "message": "Linux",
+    "description": "The label for category Linux in sidebar tutorialSidebar"
+  },
+  "sidebar.tutorialSidebar.category.WEB开发": {
+    "message": "WEB开发",
+    "description": "The label for category WEB开发 in sidebar tutorialSidebar"
+  },
+  "sidebar.tutorialSidebar.category.实用工作流": {
+    "message": "实用工作流",
+    "description": "The label for category 实用工作流 in sidebar tutorialSidebar"
+  },
+  "sidebar.tutorialSidebar.category.数据结构与算法": {
+    "message": "数据结构与算法",
+    "description": "The label for category 数据结构与算法 in sidebar tutorialSidebar"
+  },
+  "sidebar.tutorialSidebar.category.数据结构": {
+    "message": "数据结构",
+    "description": "The label for category 数据结构 in sidebar tutorialSidebar"
+  },
+  "sidebar.tutorialSidebar.category.算法": {
+    "message": "算法",
+    "description": "The label for category 算法 in sidebar tutorialSidebar"
+  },
+  "sidebar.tutorialSidebar.category.机器学习": {
+    "message": "机器学习",
+    "description": "The label for category 机器学习 in sidebar tutorialSidebar"
+  },
+  "sidebar.tutorialSidebar.category.深度学习": {
+    "message": "深度学习",
+    "description": "The label for category 深度学习 in sidebar tutorialSidebar"
+  },
+  "sidebar.tutorialSidebar.category.虚拟化容器": {
+    "message": "虚拟化容器",
+    "description": "The label for category 虚拟化容器 in sidebar tutorialSidebar"
+  },
+  "sidebar.tutorialSidebar.category.计算机网络": {
+    "message": "计算机网络",
+    "description": "The label for category 计算机网络 in sidebar tutorialSidebar"
+  },
+  "sidebar.tutorialSidebar.category.Electronic": {
+    "message": "Electronic",
+    "description": "The label for category Electronic in sidebar tutorialSidebar"
+  },
+  "sidebar.tutorialSidebar.category.信号与系统": {
+    "message": "信号与系统",
+    "description": "The label for category 信号与系统 in sidebar tutorialSidebar"
+  },
+  "sidebar.tutorialSidebar.category.FPGA": {
+    "message": "FPGA",
+    "description": "The label for category FPGA in sidebar tutorialSidebar"
+  },
+  "sidebar.tutorialSidebar.category.Verilog": {
+    "message": "Verilog",
+    "description": "The label for category Verilog in sidebar tutorialSidebar"
+  },
+  "sidebar.tutorialSidebar.category.PA": {
+    "message": "PA",
+    "description": "The label for category PA in sidebar tutorialSidebar"
+  },
+  "sidebar.tutorialSidebar.category.Machinery": {
+    "message": "Machinery",
+    "description": "The label for category Machinery in sidebar tutorialSidebar"
+  },
+  "sidebar.tutorialSidebar.category.机械设计": {
+    "message": "机械设计",
+    "description": "The label for category 机械设计 in sidebar tutorialSidebar"
+  },
+  "sidebar.tutorialSidebar.category.Control": {
+    "message": "Control",
+    "description": "The label for category Control in sidebar tutorialSidebar"
+  },
+  "sidebar.tutorialSidebar.category.自动控制原理": {
+    "message": "自动控制原理",
+    "description": "The label for category 自动控制原理 in sidebar tutorialSidebar"
+  },
+  "sidebar.tutorialSidebar.category.自动控制概念": {
+    "message": "自动控制概念",
+    "description": "The label for category 自动控制概念 in sidebar tutorialSidebar"
+  },
+  "sidebar.tutorialSidebar.category.数学模型": {
+    "message": "数学模型",
+    "description": "The label for category 数学模型 in sidebar tutorialSidebar"
+  },
+  "sidebar.tutorialSidebar.category.线性系统时域分析与校正": {
+    "message": "线性系统时域分析与校正",
+    "description": "The label for category 线性系统时域分析与校正 in sidebar tutorialSidebar"
+  },
+  "sidebar.tutorialSidebar.category.根轨迹法": {
+    "message": "根轨迹法",
+    "description": "The label for category 根轨迹法 in sidebar tutorialSidebar"
+  },
+  "sidebar.tutorialSidebar.category.线性系统频域分析与校正": {
+    "message": "线性系统频域分析与校正",
+    "description": "The label for category 线性系统频域分析与校正 in sidebar tutorialSidebar"
+  },
+  "sidebar.tutorialSidebar.category.线性离散系统分析与校正": {
+    "message": "线性离散系统分析与校正",
+    "description": "The label for category 线性离散系统分析与校正 in sidebar tutorialSidebar"
+  },
+  "sidebar.tutorialSidebar.category.非线性控制系统分析": {
+    "message": "非线性控制系统分析",
+    "description": "The label for category 非线性控制系统分析 in sidebar tutorialSidebar"
+  },
+  "sidebar.tutorialSidebar.category.微机原理": {
+    "message": "微机原理",
+    "description": "The label for category 微机原理 in sidebar tutorialSidebar"
+  },
+  "sidebar.tutorialSidebar.category.现代控制理论": {
+    "message": "现代控制理论",
+    "description": "The label for category 现代控制理论 in sidebar tutorialSidebar"
+  },
+  "sidebar.tutorialSidebar.category.Mathematics": {
+    "message": "Mathematics",
+    "description": "The label for category Mathematics in sidebar tutorialSidebar"
+  },
+  "sidebar.tutorialSidebar.category.微积分": {
+    "message": "微积分",
+    "description": "The label for category 微积分 in sidebar tutorialSidebar"
+  },
+  "sidebar.tutorialSidebar.category.线性代数": {
+    "message": "线性代数",
+    "description": "The label for category 线性代数 in sidebar tutorialSidebar"
+  },
+  "sidebar.tutorialSidebar.category.概率论与数理统计": {
+    "message": "概率论与数理统计",
+    "description": "The label for category 概率论与数理统计 in sidebar tutorialSidebar"
+  },
+  "sidebar.tutorialSidebar.category.旋量代数与李群李代数": {
+    "message": "旋量代数与李群李代数",
+    "description": "The label for category 旋量代数与李群李代数 in sidebar tutorialSidebar"
+  },
+  "sidebar.tutorialSidebar.category.Mechanics": {
+    "message": "Mechanics",
+    "description": "The label for category Mechanics in sidebar tutorialSidebar"
+  },
+  "sidebar.tutorialSidebar.category.PLC": {
+    "message": "PLC",
+    "description": "The label for category PLC in sidebar tutorialSidebar"
+  },
+  "sidebar.tutorialSidebar.category.Robotics": {
+    "message": "Robotics",
+    "description": "The label for category Robotics in sidebar tutorialSidebar"
+  },
+  "sidebar.tutorialSidebar.category.ROS": {
+    "message": "ROS",
+    "description": "The label for category ROS in sidebar tutorialSidebar"
+  },
+  "sidebar.tutorialSidebar.category.Sensor": {
+    "message": "Sensor",
+    "description": "The label for category Sensor in sidebar tutorialSidebar"
+  },
+  "sidebar.tutorialSidebar.category.传感器与检测技术": {
+    "message": "传感器与检测技术",
+    "description": "The label for category 传感器与检测技术 in sidebar tutorialSidebar"
+  },
+  "sidebar.tutorialSidebar.category.Synbio": {
+    "message": "Synbio",
+    "description": "The label for category Synbio in sidebar tutorialSidebar"
+  }
+}

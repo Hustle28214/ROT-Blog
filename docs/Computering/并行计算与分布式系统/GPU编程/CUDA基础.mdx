@@ -1,0 +1,85 @@
+import WordCount from '../../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+cuda程序的后缀：.cu
+
+编译：nvcc hello_world.cu
+
+执行：./hello_world.cu
+
+## 1. 核函数
+
+```cuda
+__global__ void add(int *a, int *b, int *c) {
+    *c = *a + *b;
+}
+```
+核函数只能访问GPU的内存。也就是显存。CPU的存储它是碰不到的。
+
+并且核函数不能使用变长参数、静态变量、函数指针。
+
+核函数具有异步性。GPU无法控制CPU，CPU也不会去等GPU，所以需要同步，也就是**显式调用同步函数**。有些线程也是需要同步的。
+
+编写CUDA程序：
+```cuda
+int main(void){
+    主机代码
+    核函数调用
+    主机代码
+    return 0;
+}
+```
+核函数不支持C++的iostream。
+
+```cuda
+#include<stdio.h>
+__global__ void hello_from_gpu(){
+    printf("Hello from GPU!\n");
+    __syncthreads();// 显式同步
+}
+int main(){
+    hello_from_gpu<<<1,1>>>();// 显式调用核函数
+    cudaDeviceSynchronize();// 显式同步
+    return 0;
+}
+```
+
+
+
+## 2. 线程块
+
+```cuda
+int main() {
+    int a = 1;
+    int b = 2;
+    int c;
+    add<<<1, 1>>>(&a, &b, &c);
+    return 0;
+}
+```
+线程模型重要概念：
+
+1. grid网格
+2. block线程块
+
+线程分块是逻辑上的划分，物理上线程不分块。
+
+
+
+## 3. 线程块的索引
+
+```cuda
+int main() {
+    int a = 1;
+    int b = 2;
+    int c;
+    add<<<1, 1>>>(&a, &b, &c);
+    return 0;
+}
+```
+## Reference
+
+[1]. 权双.CUDA编程基础入门系列（持续更新）\[M/OL\](2023-07-14)[2024-08-21].https://www.bilibili.com/video/BV1sM4y1x7of/?p=7&share_source=copy_web&vd_source=8b2bc57e71349607b55c9fde6b078ebd
+
+</WordCount>

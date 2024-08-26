@@ -1,6 +1,6 @@
 {
-    "label": "信号与系统",
-    "position": 2,
+    "label": "PA",
+    "position": 4,
     "link": {
       "type": "generated-index"
     }

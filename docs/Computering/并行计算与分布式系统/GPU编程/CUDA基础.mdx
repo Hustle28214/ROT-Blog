@@ -125,6 +125,55 @@ dim3 block_num(5,3); // 等价于dim3 block_num(5,3,1);
 ```
 ![](https://github.com/user-attachments/assets/c30052ba-9937-4bac-a7ab-b4f008fed23e)
 
+## 5. 一维网格 一维线程块
+
+定义grid和block尺寸：
+
+```cuda
+dim3 grid_num(4);
+dim3 block_num(8);
+```
+
+调用核函数：
+
+kernel_fun\<\<\<grid_num, block_num\>\>\>(...);
+
+具体的线程索引方式如图所示。
+
+blockIdx.x从0到3，threadIdx.x从0到7。
+
+计算方式：
+
+$$
+Idx = threadIdx.x + blockDim.x * blockIdx.x;
+$$
+
+## 6. 二维网格 二维线程块
+
+定义grid和block尺寸：
+```cuda
+dim3 grid_num(2,2);
+dim3 block_num(5,3);
+```
+
+调用核函数：
+
+kernel_fun\<\<\<grid_num, block_num\>\>\>(...);
+
+具体的线程索引方式如图所示。
+
+blockIdx.x从0到1，threadIdx.y从0到1。
+
+blockIdx.x从0到1，threadIdx.y从0到3。
+
+计算方式：
+
+$$
+int blockId = blockIdx.x + gridDim.x * blockIdx.y;
+int threadId = threadIdx.x + blockDim.x * threadIdx.y;
+int id = blockId * (blockDim.x * blockDim.y) + threadId;
+$$
+
 ## Reference
 
 [1]. 权双.CUDA编程基础入门系列（持续更新）\[M/OL\](2023-07-14)[2024-08-21].https://www.bilibili.com/video/BV1sM4y1x7of/?p=7&share_source=copy_web&vd_source=8b2bc57e71349607b55c9fde6b078ebd

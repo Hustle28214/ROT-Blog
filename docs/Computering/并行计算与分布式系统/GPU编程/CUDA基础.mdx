@@ -174,6 +174,34 @@ int threadId = threadIdx.x + blockDim.x * threadIdx.y;
 int id = blockId * (blockDim.x * blockDim.y) + threadId;
 $$
 
+## 7. 三维网格 三维线程块
+
+定义grid和block尺寸：
+
+```cuda
+dim3 grid_num(2,2,2);
+dim3 block_num(5,3,1);
+```
+
+调用核函数：
+
+kernel_fun\<\<\<grid_num, block_num\>\>\>(...);
+
+具体的线程索引方式如图所示。
+
+blockIdx.x、blockIdx.y和blcokIdx.z从0到1，
+
+threadIdx.x、threadIdx.y从0到3，threadIdx.z从0到1。
+
+计算方式：
+
+$$
+int blockId = blockIdx.x + gridDim.x * blockIdx.y + gridDim.x * gridDim.y * blockIdx.z;
+int threadId= (threadIdx.z * (blockDim.x * blockDim.y) ) + (threadIdx.y * blockDim.x) + threadIdx.x;
+int id = blockId * (blockDim.x * blockDim.y * blockDim.z) + threadId;
+$$
+
+
 ## Reference
 
 [1]. 权双.CUDA编程基础入门系列（持续更新）\[M/OL\](2023-07-14)[2024-08-21].https://www.bilibili.com/video/BV1sM4y1x7of/?p=7&share_source=copy_web&vd_source=8b2bc57e71349607b55c9fde6b078ebd

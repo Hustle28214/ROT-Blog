@@ -114,7 +114,16 @@ $$
 
 ![](https://github.com/user-attachments/assets/454e36f4-0c8f-4176-ad28-60d15052cc8a)
 
+3. 定义多维网格和线程块（C++构造函数语法）：
 
+dim3 grid_num(Gx,Gy,Gz);
+dim3 block_num(Bx,By,Bz);
+
+```cuda
+dim3 grid_num(2,2); // 等价于dim3 grid_num(2,2,1);
+dim3 block_num(5,3); // 等价于dim3 block_num(5,3,1);
+```
+![](https://github.com/user-attachments/assets/c30052ba-9937-4bac-a7ab-b4f008fed23e)
 
 ## Reference
 

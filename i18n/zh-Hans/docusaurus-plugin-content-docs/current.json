@@ -84,7 +84,7 @@
     "description": "The label for category 计算机网络 in sidebar tutorialSidebar"
   },
   "sidebar.tutorialSidebar.category.Electronic": {
-    "message": "Electronic",
+    "message": "电子科学与技术",
     "description": "The label for category Electronic in sidebar tutorialSidebar"
   },
   "sidebar.tutorialSidebar.category.信号与系统": {

@@ -303,5 +303,14 @@
   "theme.unlistedContent.message": {
     "message": "This page is unlisted. Search engines will not index it, and only users having a direct link can access it.",
     "description": "The unlisted content banner message"
+  },
+  "Leyan Cai": {
+    "message": "Leyan Cai"
+  },
+  "Peach blossoms in the spring breeze, a cup of wine; Ten years' lamp in the night rain of the rivers and lakes.": {
+    "message": "Peach blossoms in the spring breeze, a cup of wine; Ten years' lamp in the night rain of the rivers and lakes."
+  },
+  "HELLO THATS ME 👉": {
+    "message": "HELLO THATS ME 👉"
   }
 }

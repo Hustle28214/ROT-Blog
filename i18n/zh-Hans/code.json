@@ -303,5 +303,14 @@
   "theme.unlistedContent.message": {
     "message": "此页面未列出。搜索引擎不会对其索引，只有拥有直接链接的用户才能访问。",
     "description": "The unlisted content banner message"
+  },
+  "Leyan Cai": {
+    "message": "烟雨夜灯。"
+  },
+  "Peach blossoms in the spring breeze, a cup of wine; Ten years' lamp in the night rain of the rivers and lakes.": {
+    "message": "桃李春风一杯酒，江湖夜雨十年灯。"
+  },
+  "HELLO THATS ME 👉": {
+    "message": "HELLO THATS ME 👉"
   }
 }

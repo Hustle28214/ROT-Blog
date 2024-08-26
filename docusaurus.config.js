@@ -45,10 +45,7 @@ const config = {
      },
      },
    },
-    
-  plugins: [
-    'plugin-image-zoom'
-  ],
+
   presets: [
     [
       'classic',

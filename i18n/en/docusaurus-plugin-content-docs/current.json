@@ -12,7 +12,7 @@
     "description": "The label for category 并行计算与分布式系统 in sidebar tutorialSidebar"
   },
   "sidebar.tutorialSidebar.category.GPU编程": {
-    "message": "GPU编程",
+    "message": "GPU Programming",
     "description": "The label for category GPU编程 in sidebar tutorialSidebar"
   },
   "sidebar.tutorialSidebar.category.协同进化计算与多智能体系统": {
@@ -28,7 +28,7 @@
     "description": "The label for category 数字图像处理 in sidebar tutorialSidebar"
   },
   "sidebar.tutorialSidebar.category.编程语言": {
-    "message": "编程语言",
+    "message": "Programming Language",
     "description": "The label for category 编程语言 in sidebar tutorialSidebar"
   },
   "sidebar.tutorialSidebar.category.Rust": {
@@ -36,11 +36,11 @@
     "description": "The label for category Rust in sidebar tutorialSidebar"
   },
   "sidebar.tutorialSidebar.category.项目：实现一个OJ": {
-    "message": "项目：实现一个OJ",
+    "message": "Project: Implement an OJ",
     "description": "The label for category 项目：实现一个OJ in sidebar tutorialSidebar"
   },
   "sidebar.tutorialSidebar.category.鸿蒙": {
-    "message": "鸿蒙",
+    "message": "Harmony OS",
     "description": "The label for category 鸿蒙 in sidebar tutorialSidebar"
   },
   "sidebar.tutorialSidebar.category.Linux": {
@@ -48,7 +48,7 @@
     "description": "The label for category Linux in sidebar tutorialSidebar"
   },
   "sidebar.tutorialSidebar.category.WEB开发": {
-    "message": "WEB开发",
+    "message": "WEB Development",
     "description": "The label for category WEB开发 in sidebar tutorialSidebar"
   },
   "sidebar.tutorialSidebar.category.实用工作流": {
@@ -64,11 +64,11 @@
     "description": "The label for category 数据结构 in sidebar tutorialSidebar"
   },
   "sidebar.tutorialSidebar.category.算法": {
-    "message": "算法",
+    "message": "Algorithm",
     "description": "The label for category 算法 in sidebar tutorialSidebar"
   },
   "sidebar.tutorialSidebar.category.机器学习": {
-    "message": "机器学习",
+    "message": "Machine Learning",
     "description": "The label for category 机器学习 in sidebar tutorialSidebar"
   },
   "sidebar.tutorialSidebar.category.深度学习": {

@@ -112,7 +112,7 @@
     "description": "The label for category 机械设计 in sidebar tutorialSidebar"
   },
   "sidebar.tutorialSidebar.category.Control": {
-    "message": "控制科学",
+    "message": "控制科学与工程",
     "description": "The label for category Control in sidebar tutorialSidebar"
   },
   "sidebar.tutorialSidebar.category.自动控制原理": {
@@ -156,7 +156,7 @@
     "description": "The label for category 现代控制理论 in sidebar tutorialSidebar"
   },
   "sidebar.tutorialSidebar.category.Mathematics": {
-    "message": "数学",
+    "message": "数学与应用数学",
     "description": "The label for category Mathematics in sidebar tutorialSidebar"
   },
   "sidebar.tutorialSidebar.category.微积分": {

@@ -4,7 +4,7 @@
     "description": "The label for version current"
   },
   "sidebar.tutorialSidebar.category.Computering": {
-    "message": "Computering",
+    "message": "计算机科学与技术",
     "description": "The label for category Computering in sidebar tutorialSidebar"
   },
   "sidebar.tutorialSidebar.category.并行计算与分布式系统": {
@@ -104,7 +104,7 @@
     "description": "The label for category PA in sidebar tutorialSidebar"
   },
   "sidebar.tutorialSidebar.category.Machinery": {
-    "message": "Machinery",
+    "message": "机械工程",
     "description": "The label for category Machinery in sidebar tutorialSidebar"
   },
   "sidebar.tutorialSidebar.category.机械设计": {
@@ -112,7 +112,7 @@
     "description": "The label for category 机械设计 in sidebar tutorialSidebar"
   },
   "sidebar.tutorialSidebar.category.Control": {
-    "message": "Control",
+    "message": "控制科学",
     "description": "The label for category Control in sidebar tutorialSidebar"
   },
   "sidebar.tutorialSidebar.category.自动控制原理": {
@@ -156,7 +156,7 @@
     "description": "The label for category 现代控制理论 in sidebar tutorialSidebar"
   },
   "sidebar.tutorialSidebar.category.Mathematics": {
-    "message": "Mathematics",
+    "message": "数学",
     "description": "The label for category Mathematics in sidebar tutorialSidebar"
   },
   "sidebar.tutorialSidebar.category.微积分": {
@@ -176,15 +176,15 @@
     "description": "The label for category 旋量代数与李群李代数 in sidebar tutorialSidebar"
   },
   "sidebar.tutorialSidebar.category.Mechanics": {
-    "message": "Mechanics",
+    "message": "力学",
     "description": "The label for category Mechanics in sidebar tutorialSidebar"
   },
   "sidebar.tutorialSidebar.category.PLC": {
-    "message": "PLC",
+    "message": "可编程控制器(PLC)",
     "description": "The label for category PLC in sidebar tutorialSidebar"
   },
   "sidebar.tutorialSidebar.category.Robotics": {
-    "message": "Robotics",
+    "message": "机器人学",
     "description": "The label for category Robotics in sidebar tutorialSidebar"
   },
   "sidebar.tutorialSidebar.category.ROS": {
@@ -192,7 +192,7 @@
     "description": "The label for category ROS in sidebar tutorialSidebar"
   },
   "sidebar.tutorialSidebar.category.Sensor": {
-    "message": "Sensor",
+    "message": "仪器科学与技术",
     "description": "The label for category Sensor in sidebar tutorialSidebar"
   },
   "sidebar.tutorialSidebar.category.传感器与检测技术": {
@@ -200,7 +200,7 @@
     "description": "The label for category 传感器与检测技术 in sidebar tutorialSidebar"
   },
   "sidebar.tutorialSidebar.category.Synbio": {
-    "message": "Synbio",
+    "message": "生物信息学",
     "description": "The label for category Synbio in sidebar tutorialSidebar"
   }
 }

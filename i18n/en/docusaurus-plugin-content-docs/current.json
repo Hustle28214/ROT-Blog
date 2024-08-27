@@ -202,5 +202,9 @@
   "sidebar.tutorialSidebar.category.Synbio": {
     "message": "Synbio",
     "description": "The label for category Synbio in sidebar tutorialSidebar"
+  },
+  "sidebar.tutorialSidebar.category.机电传动控制": {
+    "message": "机电传动控制",
+    "description": "The label for category 机电传动控制 in sidebar tutorialSidebar"
   }
 }

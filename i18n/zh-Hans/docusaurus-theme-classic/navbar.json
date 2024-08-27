@@ -30,5 +30,9 @@
   "item.label.RSS": {
     "message": "RSS",
     "description": "Navbar item with label RSS"
+  },
+  "item.label.🏄冲浪": {
+    "message": "🏄冲浪",
+    "description": "Navbar item with label 🏄冲浪"
   }
 }

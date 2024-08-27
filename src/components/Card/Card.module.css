@@ -70,8 +70,10 @@
   height: 50px;
   border-radius: 50%;
   overflow: hidden;
-  background-color: #fff; /* 默认背景色 */
-}
+  background-color: transparent; /* 改为透明背景 */
+  border: none; /* 确保没有边框 */
+  box-shadow: none; 
+}/* 确保没有阴影 */
 
 .cardIcon img {
   width: 100%;

@@ -159,12 +159,11 @@ const config = {
             
           },
           {to: '/blog', label: '📝随笔', position: 'right'},
-          
+          {to: '/todolist', label: '📂待办', position: 'right'},
+          {to: '/link', label: '🏄冲浪', position: 'right'},        
           {
             to: '/intro', label: '✨关于', position: 'right'
           },
-          {to: '/todolist', label: '📂待办', position: 'right'},
-          {to: '/link', label: '🏄冲浪', position: 'right'},
           {
             href: 'https://github.com/Hustle28214',
             label: 'GitHub',

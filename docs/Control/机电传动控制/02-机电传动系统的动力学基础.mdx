@@ -14,11 +14,11 @@ import WordCount from '../../../src/components/WordCount/WordCount';
 
 ## 2.1 机电传动系统的运动方程式
 
-### 单轴机电传动系统运动方程式
+### 2.1.1 单轴机电传动系统运动方程式
 
 ![](https://github.com/user-attachments/assets/2cde2efb-036d-4f7c-ad19-6c5a35e24d76)
 
-### 运动方程
+### 2.1.2 运动方程式
 
 根据动力学原理，$T_M$、$T_L$、$\omega$（或$n$）之间的函数关系如下:
 
@@ -39,8 +39,6 @@ $$
 - $\omega$：角速度($rad/s$)
 - $t$：时间($s$)
 
-### 静态特性
-
 系统动态转矩$T_d$
 $$
 T_d = T_M - T_L
@@ -58,5 +56,46 @@ $$
 - $T_M<T_L, T_d<0, dn/dt<0$, 系统减速
 T_M, T_L有大小，有方向
 :::
+
+### 2.1.3 $T_M, T_L$的正方向及性质
+
+以转速n为参考量 规定: 
+
+与$n$方向相同的$T_M$为正, 
+与$n$方向相反的$T_L$为正; 
+
+与$n$方向相反的$T_M$为负, 
+与$n$方向相同的$T_L$为负; 
+
+:::tip
+1. 
+![微信截图_20240827153812](https://github.com/user-attachments/assets/4889fd95-541b-4346-a315-cd5d78ad2b08)
+
+2. 
+![微信截图_20240827154157](https://github.com/user-attachments/assets/adb04c36-d029-4169-968f-8aaf4a2f9e32)
+:::
+
+
+
+## 2.2 转矩.转动惯量和飞轮转矩的折算
+
+折算原则：能量或功率关系不变
+
+电机和等效负载构成的系统等效一个单轴系统。按照单轴系统进行分析计算
+
+核心公式：
+$$
+T_M-T_L = \frac{GD^2}{375}\frac{dn}{dt}
+$$
+
+![微信截图_20240827154417](https://github.com/user-attachments/assets/f795f61e-70a4-4fc5-ad1c-0bb4f47ce8d5)
+
+### 2.2.1 等效负载转矩$T_L$的折算（按照功率守恒进行）
+
+1. 旋转运动的折算
+
+$$
+\eta - 传动效率
+$$
 
 </WordCount>

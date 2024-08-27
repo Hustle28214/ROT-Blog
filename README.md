@@ -20,6 +20,9 @@ www.rotleyan.site
 
 🌏 (2024.08.23) i18n: Upgrade English and Zh-Hans language support. (🚧English support isn't completed. It is still updating) .
 
+📂 (2024.08.27) TodoList: Upgrade todoList support. You can choose 3 types of todoList card.
+
+🔗 (2024.08.27) Link: Upgrade Link support. Now we can add link as card in blog. Specially, you can add your favicon by iconSrc.(I tried writing a function to automatically retrieve the href of the favicon, but it didn’t work as well as I expected. Therefore, you shall add the href by yourself.)
 
 
 ## 😉Install (pnpm)

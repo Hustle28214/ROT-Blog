@@ -32,7 +32,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: linear-gradient(135deg, #9bddf9 0%, #021821 100%);
+  background: linear-gradient(135deg, #e3f7ff 0%, #00b7ff 100%);
   opacity: 0;
   transition: opacity 0.3s ease;
 }
@@ -90,7 +90,7 @@
 }
 
 [data-theme="dark"] .cardTitle {
-  color: #51c4d3;
+  color: #5ddbec;/*可以试试#f6c430*/
 }
 
 [data-theme="dark"] .cardDescription {

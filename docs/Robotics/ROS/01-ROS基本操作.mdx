@@ -123,4 +123,61 @@ Dash 主页可分为 4 个部分：
 3. 底部： “常用” 和 “全部” 两个标签栏，“常用” 标签栏展示了最常使用的应用；“全部” 标签栏展示了系统安装的所有应用
 4. 右侧：分页栏，若系统中安装的软件较多，一页展示不全，可点击右边按钮切换至其他页面；使用鼠标中键也可实现分页的效果
 
+### Ubuntu system setups
+
+- 在 Dash 主页点击 “设置” 图标，可进入 Ubuntu 的 系统设置。该界面类似手机系统设置界面，左边为设置对象，右边为设置选项
+- 在系统设置中，可进行 Wi-Fi 连接、蓝牙连接、桌面背景设置、输入法、通知、电源、网络等参数的基本设置
+
+### GNOME extension tools
+
+系统设置中对图形界面的设置选项较少，GNOME 支持扩展工具，可安装扩展工具进行个
+性化设置。GNOME 扩展工具的安装方法有两种：(1) 命令行安装；(2) 浏览器安装
+
+1. 命令行安装
+
+gnome-tweak-tool 扩展工具可提供丰富的个性化设置。在终端中输入以下命令
+```bash
+sudo apt-get install gnome-tweak-tool
+```
+根据提示，输入密码后进行安装，安装完成后在 Dash 主页 会新增一个 “优化” 图标
+
+ 在“优化”窗口中，点击“扩展”，可进入到到扩展工具的配置界面。扩展需要下载安装
+才可使用，推荐一个常用扩展工具：dash-to-panel。在终端中输入以下命令
+```bash
+sudo apt-get install gnome-shell-extension-dash-to-panel
+```
+其他扩展工具推荐：gnome-shell-extensions（GNOME常用扩展合集）、gnome-
+shell-extension-top-icons-plus（托盘图标显示扩展）。在终端中输入以下命令
+```bash
+ sudo apt-get install gnome-shell-extensions gnome-shell-extension-top-icons-plus
+```
+
+进入到“扩展”选项卡，
+- 第一步，开启顶部的 “打开” 按钮，表示使用扩展
+- 第二步，有些扩展的功能依赖于 Dash to panel 扩展，因此先开启 Dash to panel 的“打开” 按钮
+- 第三步，点击 Dash to panel 扩展 “打开” 按钮旁边的齿轮图标，可对 Dash to panel
+进行详细的设置，包括位置和风格、行为等。其他带齿轮的图标，使用方法相同
+- 第四步，开启其他扩展的 “打开” 按钮，使用对应的扩展功能
+- 使用 Dash to panel 扩展后，GNOME 的桌面布局发生了变化，回到了我们熟悉的Windows 桌面环境布局，快捷启动栏回到了底部。
+
+2. 浏览器安装
+- GNOME 项目有一个专门用于扩展的网站[Extension](https://extensions.gnome.org/)，该网站类似苹果的应用中心或者 Chrome 的扩展中心，你可以在这里找到你想要的扩展并安装并管理它们。
+- 为了通过浏览器安装扩展工具，你需要准备两件东西：**浏览器附加组件**和**本地主机连接器**。
+
+浏览器附加组件，点击图中链接，按照网页提示安装即可，本地主机连接器的安装，终端输入：
+
+```bash
+sudo apt install chrome-gnome-shell
+```
+
+### Ubuntu software store
+GNOME网站给出了软件推荐列表 [Software](https://wiki.gnome.org/Apps)，以下介绍几个常用软件：
+- WPS：与微软Office兼容的办公套件，在Ubuntu上创建专业文档，电子表格和演示文稿
+- 火狐浏览器：Firefox Quantum现在比Chrome快2倍，体积轻了30%
+- Chromium浏览器：一个快速，简单，安全且专为现代网络而设计的网络浏览器
+- Vscode：可运行于 Mac OS X、Windows和 Linux 之上的跨平台源代码编辑器
+- PyCharm：PyCharm提供了高效的Python编程所需的所有工具
+- VLC播放器：没有其他视频播放器有与之匹配的对不同格式的兼容性
+- Thunderbird：Mozilla最受欢迎的电子邮件应用程序
+
 </WordCount>

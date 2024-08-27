@@ -12,7 +12,7 @@
   border-radius: 10px;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
   text-decoration: none;
-  color: #333;
+  color: #11659a;
   transition: all 0.3s ease;
   position: relative;
   overflow: hidden;
@@ -32,7 +32,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: linear-gradient(135deg, #f6d365 0%, #fda085 100%);
+  background: linear-gradient(135deg, #61b2d4 0%, #2f90b9 100%);
   opacity: 0;
   transition: opacity 0.3s ease;
 }
@@ -53,7 +53,7 @@
   font-size: 1rem;
   font-weight: bold;
   margin: 0;
-  color: #333;
+  color: #11659a;
 }
 
 .cardDescription {

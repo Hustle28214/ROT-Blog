@@ -32,7 +32,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: linear-gradient(135deg, #61b2d4 0%, #2f90b9 100%);
+  background: linear-gradient(135deg, #9bddf9 0%, #021821 100%);
   opacity: 0;
   transition: opacity 0.3s ease;
 }
@@ -73,7 +73,7 @@
   background-color: transparent; /* 改为透明背景 */
   border: none; /* 确保没有边框 */
   box-shadow: none; 
-}/* 确保没有阴影 */
+}
 
 .cardIcon img {
   width: 100%;
@@ -82,7 +82,7 @@
 }
 
 [data-theme="dark"] .card {
-  background-color: #6C6C6C;
+  background-color: #2f2f2f;
 }
 
 [data-theme="dark"] .card:hover {

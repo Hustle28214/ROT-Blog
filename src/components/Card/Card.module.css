@@ -1,0 +1,60 @@
+.card {
+  display: block;
+  width: 200px; /* 减小宽度 */
+  height: 120px; /* 固定高度 */
+  background-color: #f0f0f0; /* 浅灰色背景 */
+  border-radius: 10px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  text-decoration: none;
+  color: #333;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.card:hover {
+  transform: translateY(-5px);
+  background-color: #e0e0e0; /* 鼠标悬停时的背景色 */
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+}
+
+.card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(135deg, #92e9ff 0%, #63bbd0 100%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.card:hover::before {
+  opacity: 0.2;
+}
+
+.cardContent {
+  position: absolute;
+  bottom: 12px;
+  right: 12px;
+  text-align: right;
+  z-index: 1;
+}
+
+.cardTitle {
+  font-size: 1.2rem;
+  font-weight: bold;
+  margin: 0;
+  color: #333;
+}
+
+.cardDescription {
+  font-size: 0.88rem;
+  margin: 4px 0 0;
+  color: #666;
+}
+
+[data-theme="dark"] {
+
+}

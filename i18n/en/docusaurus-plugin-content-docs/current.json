@@ -20,11 +20,11 @@
     "description": "The label for category 协同进化计算与多智能体系统 in sidebar tutorialSidebar"
   },
   "sidebar.tutorialSidebar.category.高性能计算HPC": {
-    "message": "高性能计算HPC",
+    "message": "High Performance Computing",
     "description": "The label for category 高性能计算HPC in sidebar tutorialSidebar"
   },
   "sidebar.tutorialSidebar.category.数字图像处理": {
-    "message": "数字图像处理",
+    "message": "Digital ",
     "description": "The label for category 数字图像处理 in sidebar tutorialSidebar"
   },
   "sidebar.tutorialSidebar.category.编程语言": {

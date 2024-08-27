@@ -46,7 +46,7 @@
   font-size: 1.2rem;
   font-weight: bold;
   margin: 0;
-  color: #333;
+  color: #11659a;
 }
 
 .cardDescription {
@@ -55,6 +55,18 @@
   color: #666;
 }
 
-[data-theme="dark"] {
+[data-theme="dark"] .card {
+  background-color: #6C6C6C;
+}
 
+[data-theme="dark"] .card:hover {
+  background-color: #6C6C6C;
+}
+
+[data-theme="dark"] .cardTitle {
+  color: #51c4d3;
+}
+
+[data-theme="dark"] .cardDescription {
+  color: #f0f0f0;
 }

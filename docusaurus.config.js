@@ -45,18 +45,7 @@ const config = {
      },
      },
    },
-  plugins: [
-    [
-      require.resolve("@cmfcmf/docusaurus-search-local"),
-      {
-        // Options here
-        indexDocs: true,
-        indexBlog: true,
-        indexPages: true,
-        language: "zh",
-      },
-    ],
-  ],
+
   presets: [
     [
       'classic',
@@ -98,6 +87,23 @@ const config = {
       }),
     ],
   ],
+
+  themes: [
+    // ... Your other themes.
+    [
+      require.resolve("@easyops-cn/docusaurus-search-local"),
+      /* @type {import("@easyops-cn/docusaurus-search-local").PluginOptions} */
+      ({
+        // ... Your options.
+        // `hashed` is recommended as long-term-cache of index file is possible.
+        hashed: true,
+        // For Docs using Chinese, The `language` is recommended to set to:
+        // ```
+        language: ["en", "zh"],
+        // ```
+      }),
+    ],
+  ],
   stylesheets: [
     {
       href: 'https://cdn.jsdelivr.net/npm/katex@0.13.24/dist/katex.min.css',
@@ -110,6 +116,7 @@ const config = {
   themeConfig:
     /** @type {import('@docusaurus/preset-classic').ThemeConfig} */
     ({
+      
       imageZoom: {
         // CSS selector to apply the plugin to, defaults to '.markdown img'
         selector: '.markdown :not(em) > img',

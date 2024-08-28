@@ -228,13 +228,50 @@ $x$：测量值或示值
 4. 抵偿性。
 随测量次数的增加，随机误差的算术平均值趋向于零。
 
-$y$--概率密度;
-$\delta$---随机误差:
-$σ$---标准差(均方根误差);
 
 ![images](https://github.com/user-attachments/assets/7dd703c9-3097-444a-b33a-acbc3c25ea73)
 
+$y$--概率密度;
+$\delta$---随机误差:
+$σ$---标准差(均方根误差);
+$\bar{x}$--- 平均值;
+
+概率密度值：
+$$
+y = f(\delta) = \frac{1}{\sigma \sqrt{2\pi}}e^{-\frac{\delta^2}{2\sigma^2}}
+$$
+
+计算标准差：
+
+$$
+\sigma = \sqrt{\frac{1}{n}\sum_{i=1}^{n}(\delta_i)^2}
+$$
+
+计算均值：
+
+$$
+\bar{x} = \frac{1}{n}\sum_{i=1}^{n}x_i
+$$
+
+计算数学期望：
+
+$$
+E = \int ^{+\infty}_{-\infty}f(\delta)d\delta = 0
+$$
+
+随机变量：
+
+$$
+\delta_i = x_i - \bar{x}
+$$
+
+
 ## 1.4 传感器的特性
+
+### 1.4.1 传感器与非电量电测系统
+
+![微信图片_202408281445501](https://github.com/user-attachments/assets/060ffa27-8dcf-4a24-9088-616a156aaae8)
+![微信图片_202408281445502](https://github.com/user-attachments/assets/2c2d6f64-d3a6-4b69-8589-579c0fac87d4)
 
 ## 1.5 变送器
 

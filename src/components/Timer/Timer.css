@@ -2,10 +2,13 @@
     display: flex;
     align-items: center;
     justify-content: center;
+    position: relative;
+
   }
   
   .time-input {
     width: 100px; /* 设置输入框宽度 */
+    position: relative;
     padding: 10px; /* 内边距 */
     border-radius: 5px; /* 圆角边框 */
     border: 2px solid #4db8ff; /* 边框颜色 */
@@ -14,6 +17,7 @@
     text-align: center; /* 文字居中 */
     outline: none; /* 去掉焦点框 */
     box-shadow: 0 0 5px rgba(0,0,0,0.3); /* 阴影效果 */
+    margin-top: 5px;
   }
   
   .time-divider {

@@ -126,8 +126,9 @@ const Timer = () => {
           className="time-input" // 应用新样式
         />
       </div>
-      <div className="circular-progress-bar" style={{ margin: '20px auto' }}>
+      <div className="circular-progress-bar">
         <CircularProgressbar
+          className="circular-progress-bar" // 应用 CSS 类名
           value={(inputMinutes * 60 + inputSeconds - remainingTime) / (inputMinutes * 60 + inputSeconds) * 100}
           text={formatTime(remainingTime)}
           styles={buildStyles({
@@ -135,6 +136,7 @@ const Timer = () => {
             textColor: '#FF944D',
             trailColor: '#8e8e8e',
           })}
+
         />
       </div>
       <div style={{ display: 'flex', justifyContent: 'center', gap: '10px', marginBottom: '20px' }}>

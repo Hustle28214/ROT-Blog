@@ -13,9 +13,11 @@ const Timer = () => {
   const [isRunning, setIsRunning] = useState(false);
   const [isSoundOn, setIsSoundOn] = useState(false);
   const timerRef = useRef(null);
-  const soundRef = useRef(new Audio(birdSound)); // Provide the correct path
+  const soundRef = useRef(null);
 
   useEffect(() => {
+    // Initialize sound
+    soundRef.current = new Audio(birdSound);
     soundRef.current.loop = true; // Loop the white noise
   }, []);
 
@@ -88,12 +90,13 @@ const Timer = () => {
 
   const handleToggleSound = () => {
     setIsSoundOn(prev => {
-      if (prev) {
-        soundRef.current.pause();
-      } else {
+      const newSoundState = !prev;
+      if (newSoundState) {
         soundRef.current.play();
+      } else {
+        soundRef.current.pause();
       }
-      return !prev;
+      return newSoundState;
     });
   };
 
@@ -136,7 +139,6 @@ const Timer = () => {
             textColor: '#FF944D',
             trailColor: '#8e8e8e',
           })}
-
         />
       </div>
       <div style={{ display: 'flex', justifyContent: 'center', gap: '10px', marginBottom: '20px' }}>

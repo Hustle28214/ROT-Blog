@@ -1,0 +1,35 @@
+.time-input-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .time-input {
+    width: 100px; /* 设置输入框宽度 */
+    padding: 10px; /* 内边距 */
+    border-radius: 5px; /* 圆角边框 */
+    border: 2px solid #4db8ff; /* 边框颜色 */
+    background-color: transparent; /* 背景颜色 */
+    font-size: 16px; /* 字号 */
+    text-align: center; /* 文字居中 */
+    outline: none; /* 去掉焦点框 */
+    box-shadow: 0 0 5px rgba(0,0,0,0.3); /* 阴影效果 */
+  }
+  
+  .time-divider {
+    width: 20px;
+    text-align: center;
+    font-size: 24px;
+    color: #000;
+  }
+
+    
+  .time-input:focus {
+    border-color: #4db8ff; /* 获取焦点时边框颜色 */
+    background-color: #ffffff; /* 获取焦点时背景颜色 */
+  }
+  [data-theme="dark"] .time-input:focus {
+    background-color: transparent;
+  }
+
+  

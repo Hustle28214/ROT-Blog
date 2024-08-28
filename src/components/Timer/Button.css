@@ -1,0 +1,36 @@
+/* Button.css */
+
+@font-face {
+    font-family: DreamHanSansCN;
+    src: url(../../../static/DreamHanSansCN-W16.ttf);
+}
+.button {
+    display: block; /* 使每个按钮独占一行 */
+    border: 2px solid #4db8ff; /* 线框颜色 */
+    border-radius: 50px; /* 圆角 */
+    background-color: transparent;
+    color: #4db8ff; /* 文字颜色 */
+    font-family: DreamHanSansCN;
+    font-size: 14px; /* 减小字体大小 */
+    text-align: center;
+    cursor: pointer;
+    padding: 10px 20px;
+    transition: background-color 0.3s, border-color 0.3s;
+    margin: 10px 0; /* 每行之间有间距 */
+  }
+  
+  .button:hover {
+    background-color: #ffffff; /* 鼠标悬停时的背景颜色 */
+    border-color: #FF944D; /* 鼠标悬停时的边框颜色 */
+    color: #FF944D;
+  }
+
+  /* 对底部按钮容器的样式 */
+.circular-progress-bar {
+    margin: 20px auto;
+  }
+
+  [data-theme="dark"]  .button:hover {
+    background-color: transparent; /* 鼠标悬停时的背景颜色 */
+
+  }

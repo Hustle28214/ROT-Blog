@@ -1,0 +1,22 @@
+/* ProgressBar.css */
+.circular-progress-bar {
+    width: 200px; /* 放大进度条的直径 */
+    height: 200px;
+  }
+  
+  .circular-progress-bar .path {
+    stroke: #4db8ff; /* 进度条路径颜色 */
+  }
+  
+  .circular-progress-bar .trail {
+    stroke: #8e8e8e; /* 进度条背景颜色 */
+  }
+  
+  .circular-progress-bar .text {
+    fill: #FF944D; /* 文字颜色 */
+  }
+
+  [data-theme="dark"]  .circular-progress-bar .trail {
+    stroke: #303030; /* 进度条背景颜色 */
+  }
+

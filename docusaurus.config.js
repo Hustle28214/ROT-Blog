@@ -178,6 +178,7 @@ const config = {
           },
           {to: '/blog', label: '📝随笔', position: 'right'},
           {to: '/todolist', label: '📂待办', position: 'right'},
+          {to: '/tomato', label: '🍅番茄', position: 'right'},
           {to: '/link', label: '🏄冲浪', position: 'right'},        
           {
             to: '/intro', label: '✨关于', position: 'right'

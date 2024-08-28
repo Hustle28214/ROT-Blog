@@ -50,7 +50,9 @@ const config = {
       require.resolve("@cmfcmf/docusaurus-search-local"),
       {
         // Options here
-
+        indexDocs: true,
+        indexBlog: true,
+        indexPages: true,
         language: "zh",
       },
     ],

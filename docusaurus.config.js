@@ -264,6 +264,7 @@ const config = {
       prism: {
         theme: prismThemes.github,
         darkTheme: prismThemes.dracula,
+        additionalLanguages: ['c','matlab','verilog','java','bash','cuda'],
       },
     }),
 };

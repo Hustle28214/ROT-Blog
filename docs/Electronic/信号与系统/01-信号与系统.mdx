@@ -7,6 +7,7 @@ sidebar_position: 1
 import VideoPlayer from '../../../src/components/Videoplayer/Videoplayer.jsx';
 import WordCount from '../../../src/components/WordCount/WordCount.jsx';
 
+
 <WordCount>
 
 :::tip
@@ -424,12 +425,35 @@ $\omega_0$愈大，$e^{j \omega_0 t}$振荡频率愈高；
 
 2. 系统框图：图形化展示
 
+![微信截图_20240829214257](https://github.com/user-attachments/assets/b2c9e907-496b-4c1c-bef7-dd52a5f312ed)
+
+
 ### 1.5.2 系统的互联
 
 框图法就是用一个方框来表示一个系统或子系统，而方框中的符号表示输入和输出之间的关系：
 
+```mermaid
+graph LR
+1[x(t)] --> 2[连续时间系统] --> 3[y(t)]
+
+```
+
+1. 串联或级联（Series or Cascade connection）
 
 
+2. 并联（parallel connection）
+
+3. 串并联（Series and parallel connection）
+
+4. 反馈（feedback connection）
+
+
+#### 数学表达式：微分方程和差分方程
+
+
+系统内部元器件或子系统的 连接关系 （ 拓扑约束 ）
+
+另一条是元器件或子系统的 电气特性 （ 性能约束 ）
 
 ## 1.6 基本系统性质
 

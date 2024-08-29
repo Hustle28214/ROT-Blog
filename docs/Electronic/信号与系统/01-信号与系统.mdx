@@ -377,7 +377,7 @@ $\omega_0$愈大，$e^{j \omega_0 t}$振荡频率愈高；
 :::
 
 :::tip
-对于有$\pi$的$\omega_0$，$e^{j \omega_0 n}$一般无法是周期的。这是因为
+对于有理数倍数$\pi$的$\omega_0$，$e^{j \omega_0 n}$一般无法是周期的。这是因为在如此情况下的三角函数，求周期会求出无理数。
 :::
 
 :::warning
@@ -390,6 +390,24 @@ $\omega_0$愈大，$e^{j \omega_0 t}$振荡频率愈高；
 
 <VideoPlayer src="//player.bilibili.com/player.html?isOutside=true&aid=31554698&bvid=BV18W411C757&cid=55169755&p=4" />
 <br />
+
+### 1.4.2 单位冲激函数
+#### 冲激函数的性质(Properties of Impulse Functions)
+1. 对时间的积分等于单位阶跃函数
+2. 采样性质(Sampling Property of $\delta(t)$)：
+ $$
+    x(t)\delta(t) = x(0)\delta(t)
+ $$
+ $$
+    x(t)\delta(t-t_0) = x(t_0)\delta(t-t_0)
+ $$
+
+ 3. 尺度特性
+ $$
+    \delta(t) = \frac{1}{|a|}\delta(t)
+ $$
+ 4. 冲激偶的定义：单位冲激函数的导数
+ 这个就是说单位冲激函数的导数就是冲激偶
 ## 1.5 连续时间系统和离散时间系统
 
 ## 1.6 基本系统性质

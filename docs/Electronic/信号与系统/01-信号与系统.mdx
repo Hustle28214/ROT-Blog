@@ -453,14 +453,31 @@ $\omega_0$愈大，$e^{j \omega_0 t}$振荡频率愈高；
 <Mermaid
   value={`graph LR;
     输入-->系统1;
-    系统1-->系统2;
+    输入-->系统2;
     系统2-->输出;
    `}
 />
 
 3. 串并联（Series and parallel connection）
 
+<Mermaid
+  value={`graph LR;
+    输入-->系统1;
+    系统1-->系统2;
+    输入-->系统3;
+    系统2-->输出;
+   `}
+/>
+
 4. 反馈（feedback connection）
+
+<Mermaid
+  value={`graph LR;
+    输入-->系统1;
+    系统1-->输出;
+    输出-->输入;
+   `}
+/>
 
 
 #### 数学表达式：微分方程和差分方程

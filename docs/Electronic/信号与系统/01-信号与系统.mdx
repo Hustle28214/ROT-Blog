@@ -6,7 +6,7 @@ sidebar_position: 1
 
 import VideoPlayer from '../../../src/components/Videoplayer/Videoplayer.jsx';
 import WordCount from '../../../src/components/WordCount/WordCount.jsx';
-
+import Mermaid from '@theme/Mermaid';
 
 <WordCount>
 
@@ -382,11 +382,15 @@ $\omega_0$愈大，$e^{j \omega_0 t}$振荡频率愈高；
 :::
 
 :::warning
-20240829作业：基本题，P39 1.26 All，1.25 def
+20240829作业：
+
+基本题，P39 1.26 All，1.25 def
 ![1.25](https://github.com/user-attachments/assets/def6f0e7-575d-4703-93aa-0ded72563019)
 ![1.26](https://github.com/user-attachments/assets/9890d7c9-5655-43d8-a3a4-8b954659c55d)
 :::
-
+<details>
+   <summary>答案</summary>
+</details>
 
 ## 1.4 单位冲激函数与单位阶跃函数
 
@@ -426,20 +430,23 @@ $\omega_0$愈大，$e^{j \omega_0 t}$振荡频率愈高；
 2. 系统框图：图形化展示
 
 ![微信截图_20240829214257](https://github.com/user-attachments/assets/b2c9e907-496b-4c1c-bef7-dd52a5f312ed)
-
+![微信截图_20240829223549](https://github.com/user-attachments/assets/40f870e7-e10b-486d-80a7-20a58772b09e)
 
 ### 1.5.2 系统的互联
 
 框图法就是用一个方框来表示一个系统或子系统，而方框中的符号表示输入和输出之间的关系：
 
-```mermaid
-graph LR
-1[x(t)] --> 2[连续时间系统] --> 3[y(t)]
-
-```
 
 1. 串联或级联（Series or Cascade connection）
 
+
+<Mermaid
+  value={`graph LR;
+    输入-->系统1;
+    系统1-->系统2;
+    系统2-->输出;
+   `}
+/>
 
 2. 并联（parallel connection）
 
@@ -456,6 +463,16 @@ graph LR
 另一条是元器件或子系统的 电气特性 （ 性能约束 ）
 
 ## 1.6 基本系统性质
+
+### 1.6.1 记忆系统与无记忆系统
+
+定义：对任意的输入信号，如果每一个时刻系统的**输出信号**值**仅取决于该时刻的输入信号值**,
+
+:::warning
+![微信截图_20240829224235](https://github.com/user-attachments/assets/c06837c1-db65-40b3-b890-08e7d262a5c3)
+:::
+
+
 
 </WordCount>
 

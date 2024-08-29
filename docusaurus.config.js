@@ -103,6 +103,7 @@ const config = {
         // ```
       }),
     ],
+    '@docusaurus/theme-mermaid',
   ],
   stylesheets: [
     {
@@ -202,6 +203,9 @@ const config = {
           },
         ],
       },
+      mermaid: {
+        theme: {light: 'neutral', dark: 'forest'},
+      },
       footer: {
         style: 'dark',
         links: [
@@ -264,7 +268,7 @@ const config = {
       prism: {
         theme: prismThemes.github,
         darkTheme: prismThemes.dracula,
-        additionalLanguages: ['c','matlab','verilog','java','bash','cuda'],
+        additionalLanguages: ['c','matlab','verilog','java','bash'],
       },
     }),
 };

@@ -1,0 +1,11 @@
+.fullScreen {
+  height: 100vh; /* 使容器高度占据整个视口高度 */
+  width: 100vw;  /* 使容器宽度占据整个视口宽度 */
+  margin: 0;     /* 去除默认的外边距 */
+  padding: 0;    /* 去除默认的内边距 */
+  overflow: hidden; /* 防止内容溢出 */
+  display: flex; /* 使子元素可以使用 flex 布局 */
+  justify-content: center; /* 水平居中 */
+  align-items: flex-start; /* 元素顶部对齐 */
+  padding-top: 20px; /* 添加顶部内边距 */
+}

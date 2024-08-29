@@ -14,7 +14,21 @@ const Timer = () => {
   const [isSoundOn, setIsSoundOn] = useState(false);
   const timerRef = useRef(null);
   const soundRef = useRef(null);
+  const fullscreenButtonRef = useRef(null);
 
+  const requestFullscreen = () => {
+    const element = document.documentElement; // 选择整个文档元素
+
+    if (element.requestFullscreen) {
+      element.requestFullscreen();
+    } else if (element.mozRequestFullScreen) { // Firefox
+      element.mozRequestFullScreen();
+    } else if (element.webkitRequestFullscreen) { // Chrome, Safari and Opera
+      element.webkitRequestFullscreen();
+    } else if (element.msRequestFullscreen) { // IE/Edge
+      element.msRequestFullscreen();
+    }
+  };
   useEffect(() => {
     // Initialize sound
     soundRef.current = new Audio(birdSound);
@@ -145,6 +159,7 @@ const Timer = () => {
         <button className="button" onClick={handleToggleSound}>
           {isSoundOn ? '关闭白噪音' : '开启白噪音'}
         </button>
+        <button className="button" ref={fullscreenButtonRef} onClick={requestFullscreen}>进入全屏</button>
       </div>
     </div>
   );

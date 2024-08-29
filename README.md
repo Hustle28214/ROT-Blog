@@ -26,6 +26,7 @@ www.rotleyan.site
 
 🔍 (2024.08.28) Search: Depending on [easyops-cn/docusaurus-search-local](https://github.com/easyops-cn/docusaurus-search-local), now full-text search is supported.
 
+🍅 (2024.08.29) Tomato: Depending on react-circular-progressbar, we can create a tomato clock. Besides, we can dive into CHAN mode(Fullscreen supported). 
 
 
 ## 😉Install (pnpm)

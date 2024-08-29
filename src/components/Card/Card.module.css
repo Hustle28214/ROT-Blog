@@ -82,7 +82,7 @@
 }
 
 [data-theme="dark"] .card {
-  background-color: #2f2f2f;
+  background-color: #303030;
 }
 
 [data-theme="dark"] .card:hover {
@@ -90,7 +90,7 @@
 }
 
 [data-theme="dark"] .cardTitle {
-  color: #5ddbec;/*可以试试#f6c430*/
+  color: #ffc857;/*可以试试#f6c430*/
 }
 
 [data-theme="dark"] .cardDescription {

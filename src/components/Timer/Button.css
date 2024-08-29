@@ -23,8 +23,8 @@
   
   .button:hover {
     background-color: #ffffff; /* 鼠标悬停时的背景颜色 */
-    border-color: #FF944D; /* 鼠标悬停时的边框颜色 */
-    color: #FF944D;
+    border-color: #1989ac; /* 鼠标悬停时的边框颜色 */
+    color: #1989ac;
   }
 
   /* 对底部按钮容器的样式 */
@@ -32,5 +32,6 @@
 
   [data-theme="dark"]  .button:hover {
     background-color: transparent; /* 鼠标悬停时的背景颜色 */
-
+    border-color: #ffde25; /* 鼠标悬停时的边框颜色 */
+    color: #ffde25;
   }

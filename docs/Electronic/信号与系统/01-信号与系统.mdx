@@ -823,5 +823,158 @@ $x_1(t)-x_2(t) \rightarrow y_1(t)-y_2(t)=3(x_1(t)-x_2(t))$
 
 当增量线性系统的$y_0(t)=0$时，$y(t)=y_f(t)$。此时系统的输出响应完全由$y_f(t)$决定。此时系统处于零初始状态，故将称为系统的零状态响应
 
+可见，增量线性系统的响应包括**零输入响应**和**零状态响应**两部分。
+
+线性系统具有很重要的三个性质：
+
+![微信截图_20240830153051](https://github.com/user-attachments/assets/52a57e55-65f9-4ecd-821a-dcf37babaa25)
+
+:::warning
+![微信截图_20240830153228](https://github.com/user-attachments/assets/69e17091-5593-4820-9a4e-8f9f1986dec5)
+:::
+<details>
+   <summary>答案</summary>
+   ![微信截图_20240830153317](https://github.com/user-attachments/assets/9489353d-67d3-4261-a787-2aaa991e98cd)
+</details>
+
+:::warning
+![微信截图_20240830155218](https://github.com/user-attachments/assets/f34e4106-dcc9-469c-a9b8-703a0c5acdf9)
+:::
+
+<details>
+<summary>答案</summary>
+![微信截图_20240830155206](https://github.com/user-attachments/assets/0c0f129f-939d-43aa-a1f2-9d2b21d85924)
+</details>
+
+:::warning
+![微信截图_20240830155446](https://github.com/user-attachments/assets/32c0b25d-17b5-4bd2-a45a-a23ab1ca0870)
+:::
+<details>
+<summary>答案</summary>
+![微信截图_20240830155455](https://github.com/user-attachments/assets/632d0d36-1655-45b2-915d-4e3721996701)
+</details>
+
+### 1.6.7 线性时不变系统： Linear and Time-invariant system (LTI)
+
+![微信截图_20240830155640](https://github.com/user-attachments/assets/700be8aa-48d2-4410-b7ce-e5107214601b)
+
+例：判断以下系统是否为线性、时不变、记忆、因果、稳定？
+
+![微信截图_20240830160023](https://github.com/user-attachments/assets/a0ba325c-55ff-461d-8ba3-c8a38703fdea)
+
+<details>
+   <summary>答案</summary>
+   1. 线性、时变、记忆、非因果、稳定；
+   2. 线性、时不变、记忆、因果、不稳定；
+   3. 线性、时变、记忆、非因果、不稳定；
+</details>
+
+## 1.7 总结
+
+一、 信号的几种基本分类：
+
+（1）连续信号与离散信号
+
+（注意：离散信号只能在**整数点**上有定义）
+
+（2）周期信号与非周期信号
+
+在连续情况下：$e^{jωt}$ 都是周期信号；
+
+在离散情况下：$e^{jΩn}$在只有在 2π/Ω 为一有理数时才是周期信号；
+
+奇异信号
+
+(a) 单位阶跃函数
+
+$$
+u(x)=
+\begin{cases}
+0 & x>0 \\
+1 & x<0 
+\end{cases}
+$$
+
+(b) 单位冲激信号 $δ(t)$
+
+$$
+δ(t)=
+\begin{cases}
+0 & t<0 \\
+1 & t=0 
+\end{cases}
+$$
+
+$$
+\int ^\infty _{-\infty} δ(t)dt=1
+$$
+
+(c) 单位冲激信号的性质
+
+二、信号的基本运算
+
+相加或相乘、移位、反折、尺度变换、以及微分（差分）和积分（累加）等等
+
+在移位、反折、尺度变换时，一定要注意一点，那就是在对时间**变量t**作变换。
+
+信号的奇偶分解
+
+对于连续信号，$x_e(t) = \frac{x(t)+x(-t)}{2}$，$x_o(t) = \frac{x(t)-x(-t)}{2}$
+
+对于离散信号：$x_e[n] = \frac{x[n]+x[-n]}{2}$，$x_o[n] = \frac{x[n]-x[-n]}{2}$
+
+三、 系统以及系统的性质
+
+<Mermaid
+  value={`stateDiagram
+    输入（激励）-->系统
+    系统-->输出（响应）
+   `}
+/>
+
+$$
+y(t) = T[x(t)]
+$$
+
+系统的性质：
+
+1. 线性
+
+齐次性：$T[ax(t)]=aT[x(t)]$
+
+可加性：$T[x_1 (t) + x_2 (t)]=T[x_1 (t)] +T[x_2 (t)]$
+
+线性系统具有三个重要性质：
+
+1. 微分特性
+2. 积分特性
+3. 频率保持性
+
+2. 时不变性
+
+若$T[x(t)]=y(t)$
+
+则$T[x(t-t_0)]=y(t-t_0)$
+
+称系统为时不变系统。
+
+反折以及尺度变换的系统都是时变系统。
+
+3. 因果性：系统在任何时刻的输出只取决于当前的或以前的输入 
+
+4. 动态特性：若系统的响应不仅与当前的激励有关，则称之为动态（记忆）系统。
+
+5. 稳定性：
+
+<Mermaid
+  value={`stateDiagram
+    输入有界-->系统
+    系统-->输出有界
+   `}
+/>
+
+
+本课程主要研究线性、时不变、动态、稳定系统。这种系统的数学模型主要是线性常系数微分方程或线性常系数差分方程。
+
 </WordCount>
 

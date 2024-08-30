@@ -337,7 +337,71 @@ $$
 
 一阶后向差分定义为：$\nabla x(n) = x(n) - x(n-1)$ 
 
-#### 
+#### 积分(Integration)
+
+$$
+x(t) = \int^{t}_0 x(\tau) d\tau
+$$
+
+#### 累加(Accumulation)
+
+$$
+y[n]=\sum^{n}_{k=0} x[k]
+$$
+
+### 1.2.2 信号的奇偶性
+
+信号的奇偶分解(The odd and even decomposition of the signal)对于连续信号：
+
+$$
+x(t) = x_e(t) + x_o(t)
+$$
+
+则
+$$
+x(-t) = x_e(-t) + x_o(-t) = x_e(t) - x_o(t)
+$$
+
+对于连续信号，
+$$
+x_e(t) = \frac{x(t)+x(-t)}{2}, x_o(t) = \frac{x(t)-x(-t)}{2}
+$$
+
+对于离散信号：
+$$
+x_e[n] = \frac{x[n]+x[-n]}{2}, x_o[n] = \frac{x[n]-x[-n]}{2}
+$$
+
+信号与其偶分量和奇分量之间还满足以下能量关系式:
+
+连续：
+$$
+\int^{\infty}_{-\infty} x^2(t)dt = \int x_e^2(t)dt + \int x_o^2(t)dt
+$$
+
+离散：
+
+$$
+\sum^{\infty}_{n=-\infty} x^2[n] = \sum^{\infty}_{k=-\infty} x_e^2[n] + \sum^{\infty}_{k=-\infty} x_o^2[n]
+$$
+
+:::warning
+![微信截图_20240830203220](https://github.com/user-attachments/assets/23048c0c-1b6b-445e-a414-3fad148a8d71)
+:::
+
+#### 信号的实虚分解
+
+$$
+x(t)=\alpha(t)+j\beta(t),
+
+x^{*}(t)=\alpha(t)-\beta(t)
+$$
+
+则：
+
+$$
+\alpha(t)=\frac{x(t)+x^{*}(t)}{2}, j\beta(t)=\frac{x(t)-x^{*}(t)}{2}
+$$
 
 ## 1.3 指数信号与正弦信号
 

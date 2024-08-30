@@ -298,9 +298,9 @@ $$
 
 如果将信号 $x(t)$ 的自变量乘以正系数$a$为$x(at)$ ， 则: 
 
-$a>1$,将波形进行压缩;
+$a>1$, 将波形进行压缩;
 
-$a<1$,将波形进行扩展;
+$a<1$, 将波形进行扩展;
 
 :::warning
 为什么快放时声音要尖锐些？而慢放声音要低沉些？
@@ -344,6 +344,14 @@ $$
 <VideoPlayer src="//player.bilibili.com/player.html?isOutside=true&aid=31554698&bvid=BV18W411C757&cid=55169337&p=3" />
 <br />
 
+代表很**广泛**的一类信号。
+
+分析很**方便**：其微分与积分都为指数信号。
+
+表征**很大范围**信号：很多信号可以表征为复指数信号的加权和
+
+
+
 ### 1.3.1 连续时间复指数信号与正弦信号
 
 连续时间复指数信号与正弦信号(continus- - time complex exponential signal and sinusoidal signals )中最常用的是<mark>复指数信号</mark>
@@ -355,12 +363,169 @@ $$
 
 其中：C和a一般为复数
 
+$$
+C=\alpha + j\beta, a=r+j\omega_0
+$$
+
+$$
+x(t) = (\alpha + j\beta)e^{r+j\omega_0}t
+$$
+
+#### 实指数信号 (real exponential signal)
+
+$$
+x(t) = (\alpha + j\beta)e^{r+j\omega_0}t
+$$
+
+若$C$和$a$为实数，则为**实指数信号**。
+
+#### 周期复指数信号 (periodic complex signal)
+
+$$
+x(t)=Ce^{at}
+$$
+
+令$a=j\omega_0$，得$x(t)=e^{j\omega_0 t}$
+
+所有$x(t)$都满足$x(t)=x(t+T)$，并且$T=\frac{2\pi}{\omega_0}$。因此$x(t)$是周期信号。
+
+#### 正弦信号(sinusoidal signals)
+
+欧拉公式：
+
+$$
+e^{j\omega_0t} = cos(\omega_0t) + j\sin(\omega_0t)
+$$
+
+$$
+cos(\omega_0t) = \frac{1}{2}e^{j\omega_0t} + \frac{1}{2}e^{-j\omega_0t}
+$$
+
+$$
+sin(\omega_0t) = \frac{1}{2}je^{j\omega_0t} - \frac{1}{2}je^{-j\omega_0t}
+$$
+
+得
+
+$$
+e^{j(\omega_0t+\phi)} = cos(\omega_0t+\phi)+jsin(\omega_0t+\phi)
+$$
+
+取实部则为正弦信号
+
+$$
+x(t) = Acos(\omega_0t+\phi)
+$$
+
+![微信截图_20240830172229](https://github.com/user-attachments/assets/408c4f13-801a-4fc8-8f8a-b70716b05a80)
+
+#### 一般复指数信号
+
+$$
+x(t) = Ce^{at}
+$$
+
+其中,
+
+$$
+C =\alpha + j\beta = |C|e^{j\theta}, a=r+j\omega_0
+$$
+
+$$
+x(t)=|C|e^{j\theta}e^{rt}e^{j\omega_0t} = |C|e^{rt}e^{j(\omega_0+\theta)} = |C|e^{rt}cos(\omega_0t+\theta) + j|C|e^{rt}sin(\omega_0t+\theta)
+$$
+
+一般复指数信号
+
+$$
+x(t)=|C|e^{rt}e^{j\omega_0t}
+$$
+
+一般的复指数信号，可以将它看成是 实指数信号$e^{rt}$和周期复指数信号$e^{j\omega_0t}$相乘的结果；
+
+$\omega_0$ 反映了振荡信号的**变化频率**; r 反映了振荡信号峰值的变化趋势；
+
+用**包络线**来描述信号峰值的变化趋势。
+
+![微信截图_20240830173846](https://github.com/user-attachments/assets/4c079334-bb33-4a44-b18c-1877dc64566d)
+
+:::warning
+![微信截图_20240830173924](https://github.com/user-attachments/assets/b2b26460-9125-48e2-9ae4-a34abd4ec6c2)
+:::
+
+<details>
+   <summary>解题</summary>
+   $$
+   x_1(t)=cos6t
+   $$
+   $$
+   T_1=\frac{2\pi}{6}=\frac{\pi}{3}
+   $$
+   $$
+   x_2(t)=cos^2(4t)=\frac{1+cos(8t)}{2}
+   $$
+   直流信号不影响信号的周期。
+   $$
+   T_2=\frac{2\pi}{8}=\frac{\pi}{4}
+   $$
+   $$
+   x_3(t)=cos\sqrt3t
+   $$
+   $$
+   T_3=\frac{2\pi}{\sqrt3}
+   $$
+   对于$x_1(t)+x_2(t)$，$\frac{T_1}{T_2}=\frac{4}{3}$为有理数，故其周期为：
+   $$
+   T_0=LCM(T_1,T_2)=\pi
+   $$
+   对于$x_1(t)+x_3(t)$，$\frac{T_1}{T_3}=\frac{\sqrt3}{3}$为无理数，该周期不是周期信号。  
+</details>
+
+
+
 ![微信截图_20240829155402](https://github.com/user-attachments/assets/760a7bb0-4f2e-431c-8017-3a09a0bbcedc)
 
 
 ### 1.3.2 离散时间复指数信号与正弦信号
 
-$x[n] = cos(\omega_0n+\phi)$
+复指数信号（序列）：
+
+$$
+x[n] = Ce^{an}
+$$
+C与a均为复数。
+
+#### 实指数信号
+
+$$
+x[n] = Ce^{an}
+$$
+
+![微信截图_20240830200632](https://github.com/user-attachments/assets/e1af9981-5670-4361-b5ae-c5cb658143bd)
+
+#### 正弦信号
+
+$$
+x[n] = cos(\omega_0n+\phi)
+$$
+
+![微信截图_20240830200644](https://github.com/user-attachments/assets/c4b2026a-3ac4-48a0-a2ce-933fae8706d5)
+
+#### 一般复指数信号
+
+$$
+x[n] = Ce^{an}
+$$
+
+其中,
+
+$$
+C = |C|e^{j\theta}, a=|a|e^{j\omega_0}
+$$
+
+![微信截图_20240830200650](https://github.com/user-attachments/assets/d1796319-631e-4a96-bacc-4f8b5faa5b5e)
+
+![微信截图_20240830200659](https://github.com/user-attachments/assets/586113db-3a38-4162-9b7e-1c786614e6ab)
 
 ### 1.3.3 离散时间复指数序列的周期性质
 
@@ -397,7 +562,59 @@ $\omega_0$愈大，$e^{j \omega_0 t}$振荡频率愈高；
 <VideoPlayer src="//player.bilibili.com/player.html?isOutside=true&aid=31554698&bvid=BV18W411C757&cid=55169755&p=4" />
 <br />
 
+### 1.4.1 单位阶跃函数 (Unit Step Functions)
+
+![微信截图_20240830163015](https://github.com/user-attachments/assets/15c8174c-fddc-4436-b84d-6392837fceb8)
+
+:::warning
+![微信截图_20240830164855](https://github.com/user-attachments/assets/5fc368ed-f08b-4b32-8367-41f7dd439da8)
+:::
+
+#### 闭合表达式(Closed Expression)
+
+一般地，我们可以采用与**阶跃函数相乘**的形式来表达分段函数 ， 而写出其闭合表达式 。
+
+![微信截图_20240830165046](https://github.com/user-attachments/assets/5ac31937-5568-4875-8ad1-5b0949b310ff)
+
+![微信截图_20240830165128](https://github.com/user-attachments/assets/c9c7a04e-cad0-401d-8f93-00962491c33e)
+
 ### 1.4.2 单位冲激函数
+
+某些物理现象需要用一个 时间极短 ， 但 取值很大 的函数模型来描述 ， 如力学中的瞬间作用冲击力 ， 电学中的雷击电闪等等 。 “ 冲激函数 ” 就是以这类实际问题为背景而引出的 。冲激函数可由不同的方式来定义 。
+
+(a)某种函数的极限来定义：
+
+$$
+\delta(t) = \lim_{\tau \to 0}\frac{1}{\tau}[u(t+\frac{\tau}{2})-u(t-\frac{\tau}{2})]
+$$
+
+(b)狄拉克（Dirac）定义的冲激函数：
+
+$$
+\delta(t) = \begin{cases}
+                0 & t\neq 0 \\ 
+                \infty & t=0
+            \end{cases}
+$$
+
+$$
+\int \delta(t)dt = 1
+$$
+
+描述在任一点处出现单位冲激信号，可有如下定义：
+
+$$
+\delta(t-t_0) = \begin{cases}
+                0 & t\neq 0 \\ 
+                \infty & t=t_0
+            \end{cases}
+$$
+
+$$
+\int \delta(t-t_0)dt = 1
+$$
+
+
 #### 冲激函数的性质(Properties of Impulse Functions)
 1. 对时间的积分等于单位阶跃函数
 2. <mark>采样性质</mark>(Sampling Property of $\delta(t)$)：
@@ -778,7 +995,7 @@ $x_4(t)=ax_1(t)$
 
    3. 证明过程：
 
-   设：$y_1(t)=x_1(2t)$
+   设：$y_1(t)=x_1(2t)$11
 
    使：$y_2(t)=x_2(2t)$
 
@@ -932,9 +1149,7 @@ $$
    `}
 />
 
-$$
-y(t) = T[x(t)]
-$$
+$y(t) = T[x(t)]$
 
 系统的性质：
 

@@ -461,11 +461,13 @@ $\omega_0$愈大，$e^{j \omega_0 t}$振荡频率愈高；
 3. 串并联（Series and parallel connection）
 
 <Mermaid
-  value={`graph LR;
-    输入-->系统1;
-    系统1-->系统2;
-    输入-->系统3;
-    系统2-->输出;
+  value={`stateDiagram
+    输入-->系统1
+    系统1-->系统2
+    输入-->系统3
+    系统3-->[*]
+    系统2-->[*]
+    [*]-->输出
    `}
 />
 

@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { CircularProgressbar, buildStyles } from 'react-circular-progressbar';
 import 'react-circular-progressbar/dist/styles.css'; // Import the styles
-import birdSound from '../../mp3/bird.mp3'; // Provide the correct path
+import rainSound from '../../mp3/rain.mp3'; // Provide the correct path
+import birdSound from '../../mp3/bird.mp3';
 import './Button.css'; // 引入按钮样式
 import './ProgressBar.css'; // 引入进度条样式
 import './Timer.css'; // 引入新的样式文件
@@ -14,6 +15,8 @@ const Timer = () => {
   const [isSoundOn, setIsSoundOn] = useState(false);
   const timerRef = useRef(null);
   const soundRef = useRef(null);
+  const FireSoundRef = useRef(null);
+  const birdSoundRef = useRef(null);
   const fullscreenButtonRef = useRef(null);
 
   const requestFullscreen = () => {
@@ -31,7 +34,7 @@ const Timer = () => {
   };
   useEffect(() => {
     // Initialize sound
-    soundRef.current = new Audio(birdSound);
+    soundRef.current = new Audio(rainSound);
     soundRef.current.loop = true; // Loop the white noise
   }, []);
 
@@ -114,6 +117,23 @@ const Timer = () => {
     });
   };
 
+  const handleBirdSound = () => {
+    setIsSoundOn(prev => {
+      const newSoundState = !prev;
+      if (newSoundState) {
+        birdSoundRef.current.play();
+      } else {
+        birdSoundRef.current.pause();
+      }
+      return newSoundState;
+    });
+  };
+
+  useEffect(() => {
+    // Initialize sound
+    birdSoundRef.current = new Audio(birdSound);
+    birdSoundRef.current.loop = true; // Loop the white noise
+  }, []);
   const formatTime = (seconds) => {
     const minutes = Math.floor(seconds / 60);
     const secs = seconds % 60;
@@ -157,7 +177,10 @@ const Timer = () => {
         <button className="button" onClick={handleResume} disabled={isRunning || remainingTime === inputMinutes * 60 + inputSeconds}>恢复</button>
         <button className="button" onClick={handleStop} disabled={!isRunning && remainingTime === inputMinutes * 60 + inputSeconds}>停止</button>
         <button className="button" onClick={handleToggleSound}>
-          {isSoundOn ? '关闭白噪音' : '开启白噪音'}
+          {isSoundOn ? '雨停' : '下雨'}
+        </button>
+        <button className="button" onClick={handleBirdSound}>
+          {isSoundOn ? '休息' : '啼鸣'}
         </button>
         <button className="button" ref={fullscreenButtonRef} onClick={requestFullscreen}>进入全屏</button>
       </div>

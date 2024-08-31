@@ -801,7 +801,67 @@ $$
  $$
  4. 冲激偶的定义：单位冲激函数的导数
  这个就是说单位冲激函数的导数就是冲激偶。
- 5. 
+ 5. $\delta(t)$各阶导数
+ $$
+   \int ^{\infty}_{-\infty}x(t)\delta^n(t)dt = (-1)^nx^n(0)
+ $$
+
+ #### 离散的阶跃信号与冲激信号
+1. 阶跃信号
+$$
+   \delta[n] = \begin{cases}
+                0 & n<0 \\ 
+                1 & n≥0
+            \end{cases}
+ $$
+ 移位的单位阶跃序列
+ $$
+   \delta[n-k] = \begin{cases}
+                0 & n<k \\ 
+                1 & n≥k
+            \end{cases}
+ $$
+ 2. 冲激信号
+$$
+   \delta[n] = \begin{cases}
+                0 & n\neq0 \\ 
+                1 & n=0
+            \end{cases}
+ $$
+ 移位的冲激序列
+ $$
+   \delta[n-k] = \begin{cases}
+                0 & n\neq k \\ 
+                1 & n=k
+            \end{cases}
+ $$
+
+ 冲激信号与阶跃信号的关系为：
+ $$
+   \sum^{n}_{m=-\infty}\delta[m] = u[n]
+ $$
+ 以及
+ $$
+ \delta[n] = u[n]-u[n-1]
+ $$
+
+ 采样性质：
+ $$
+   \sum^{\infty}_{n=-\infty}x[n]\delta[n] = x[0]
+ $$
+ $$
+   \sum^{\infty}_{n=-\infty}x[n]\delta[n-k] = x[k]
+ $$
+ 以及
+ $$
+    \sum^{n_2}_{n=n_1}x[n]\delta[n-k]=\begin{cases}
+                x[n_0] & n∈{n_1,n_1} \\ 
+                1 & oth
+            \end{cases}
+ $$
+
+ ![微信截图_20240831205155](https://github.com/user-attachments/assets/a94bf4f6-6aa9-45b2-9a00-136be48709d7)
+
 ## 1.5 连续时间系统和离散时间系统
 
 ### 1.5.1 简单系统举例

@@ -1,0 +1,31 @@
+import WordCount from '../../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+## 怎么Swizzle
+
+> [Swizzle Docs](https://docusaurus.io/docs/swizzling)
+
+Swizzle可谓是docusaurus的精髓，有了Swizzle的允许我们可以很方便的自定义docusaurus的样式。
+
+如果你对目录的位置感到不满意或者是导航栏的样式不合你心意，你可以选择把他们“拉出来”自己改。这跟你在其他框架上的做法内核一样，Docusaurus的Swizzle可以更方便更独立地修改。
+
+首先你应该通过列出所有可以Swizzle的组件来查看哪些组件可以swizzle。（一般是用theme-classic，如果不符合的话你可以自己改）
+
+```bash
+npm run swizzle @docusaurus/theme-classic -- --list
+```
+
+那么我一般是用以下命令去做Swizzle的修改：
+
+```bash
+npm run swizzle -- @docusaurus/theme-classic Navbar
+```
+
+命令执行后会询问你使用的是JS还是TS，然后问你是否确定。然后你可以在/src/theme底下找到你需要修改的文件。
+
+目前，我改了导航栏和TOC侧边栏；TOC侧边栏的样式主要加了字数统计和改了位置。
+
+需要注意的是升级版本之后Swizzle的修改可能不再支持，我曾经遇到过这个问题。出现这个问题，一是在升级版本上改，二是退回版本。退回版本的话你需要在package.json（或者yarn.lock等）里把有关Docusaurus的版本改回稳定的版本，然后重新执行``npm install``。需要注意最好theme-common、theme-classic等的版本最好都是一致的。
+
+</WordCount>

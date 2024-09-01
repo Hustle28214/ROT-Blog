@@ -1,0 +1,105 @@
+import WordCount from '../../../../src/components/WordCount/WordCount';
+import Mermaid from '@theme/Mermaid';
+
+<WordCount>
+
+## 怎么安装插件
+
+Docusaurus提供了非常多的插件，这里我介绍我使用的：
+
+1. [docusaurus-plugin-image-zoom](https://github.com/mattcarlotta/docusaurus-plugin-image-zoom)
+
+这个插件可以让你点击图片放大，但是请注意这个包的引入方式。由于出现了git拉取失败，且由于某些包冲突原因，目前我弃用了这个包。
+
+2. @docusaurus/theme-mermaid
+
+这个插件可以让你直接在markdown中写流程图，非常方便。目前我使用的是Dpcusaurus提供的最后一种流程图使用方法：
+
+```javascript
+import Mermaid from '@theme/Mermaid';
+
+<Mermaid
+  value={`graph TD;
+    A-->B;
+    A-->C;
+    B-->D;
+    C-->D;`}
+/>
+```
+<Mermaid
+  value={`graph TD;
+    A-->B;
+    A-->C;
+    B-->D;
+    C-->D;`}
+/>
+
+3. [@easyops-cn/docusaurus-search-local](https://github.com/easyops-cn/docusaurus-search-local)
+
+这个插件可以执行本地搜索，我个人感觉虽然没有algolia的好用，但还是够用的，algolia的爬虫申请比较复杂，出于考研实际所需也不想太费劲搞docker去跑jq，我使用了这一款插件。具体的一个使用效果，可以直接尝试在博客右上角试试。
+
+要使用这个插件，你需要在配置文件`docusaurus.config.js`中添加如下代码：（注意是当做theme使用的）
+
+```js
+/** @type {import('@docusaurus/types').Config} */
+const config = {
+themes: [
+    // ... Your other themes.
+    [
+      require.resolve("@easyops-cn/docusaurus-search-local"),
+      /* @type {import("@easyops-cn/docusaurus-search-local").PluginOptions} */
+      ({
+        // ... Your options.
+        // `hashed` is recommended as long-term-cache of index file is possible.
+        hashed: true,
+        // For Docs using Chinese, The `language` is recommended to set to:
+        // ```
+        language: ["en", "zh"],
+        // ```
+      }),
+    ],
+  ],
+}
+// 注意我是用Js，并且配置了i18n
+```
+
+4. [giscus](https://giscus.app/zh-CN)
+
+申请过程还是比较方便的，原理是把仓库的discussions作为评论区。
+
+Discussion 分类选择general, 然后在配置文件`docusaurus.config.js`中添加如下代码：
+
+```js
+themeConfig:
+    /** @type {import('@docusaurus/preset-classic').ThemeConfig} */
+({
+giscus: {
+      repo: 'YOUR_REPO_NAME',
+      repoId: 'YOUR_REPO_ID',
+      category: 'General',
+      categoryId: 'YOUR_CATEGORY_ID',
+      theme: 'light',
+      darkTheme: 'dark',
+    },// if you want to enable giscus, pls change "repo","repoId","categoryId" to yours
+}),
+```
+
+一定要用自己申请过后的参数，不然会放到别人的仓库的discussions里面去。
+
+目前我就使用了上述这些插件，因为我使用的是js，所以插件的使用上会受到很多限制，比如说TS支持的限制。兜兜转转剩下这些比较稳定的插件。
+
+## 失败的经验
+
+1. orama对docusaurusv3的支持并不如想象中的好。事实上，有多个issue提出了使用困难，而且前端接口不完善。
+
+2. 各种包的依赖冲突，实际上可能并不要紧。如果你想忽略冲突，可以尝试：
+
+```bash
+npm install YOUR_PACKAGE_NAME --legacy-peer-deps
+```
+
+这个做法比强制安装要安全一些，而且不会因为版本问题而影响你的项目。
+
+
+
+</WordCount>

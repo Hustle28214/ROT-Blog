@@ -33,9 +33,7 @@ www.rotleyan.site
 ```bash
 git clone https://github.com/Hustle28214/ROT-Blog.git
 cd ROT-Blog
-pnpm install
-pnpm start
-## Or you can use npm or yarn
+## Plz use npm or yarn
 npm install
 npm run build
 npm run start

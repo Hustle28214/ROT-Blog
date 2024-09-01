@@ -1,0 +1,152 @@
+import WordCount from '../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+参考资料：
+1. https://www.bilibili.com/video/BV1x3411s7Sy/?spm_id_from=333.788&vd_source=e66dd25b0246f28e772d75f11c80f03c
+
+## 算术基本定理证明
+
+&nbsp;&nbsp;
+> 定理2-2（算术基本定理）：任何非零整数$n$可以表示出如下乘积形式：$n=\pm p_1^{e_1} \cdots p_r^{e_r}$。其中，$p_1, \ldots, p_r$是互不相同的素数，$e_1, \ldots, e_r$是正整数。
+
+&nbsp;&nbsp;
+存在性（任何非零整数$n$可以表示出如下乘积形式：$n=\pm p_1^{e_1} \cdots p_r^{e_r}$）
+
+证明：
+
+$n=1$：$n$是0个素数的乘积，存在性成立。
+
+$n>1$：
+
+假设所有小于$n$的正整数都可以表示成素数的乘积。
+
+对于$n$，分两种情况：
+
+若$n$本身是素数，明显成立。
+
+若$n$是合数，存在整数$1 < a < n$, $1 < b < n$，使得$n = ab$。
+
+$a, b$都可以表示成素数的乘积，那么$ab = n$也可以，存在性成立。
+
+> 定理7-1: 设$p$是素数，$a, b \in \mathbb{Z}$，则$p \mid ab \Rightarrow p \mid a$ 或 $p \mid b$
+> 推论：设$p$是素数，$a_1, \ldots, a_k \in \mathbb{Z}$，则$p \mid a_1 \cdots a_k \Rightarrow p \mid a_i, i \in \{1, k\}$
+
+&nbsp;&nbsp;
+
+唯一性（$p_1, \ldots, p_r = q_1, \ldots, q_s$，$p_1, \ldots, p_r$中可以有重复素数，$q_1, \ldots, q_s$也可以有重复素数）
+
+证明：
+
+$r=0$：必有$s=0$，唯一性成立。
+
+$r > 0$：必有$s > 0$。假设$r-1$时，唯一性成立。对于$r$，考虑素数$p_1$，既然$p_1$是等式左边的因子，它必然是右边的因子。即：$p_1 \mid q_1 \cdots q_s$。
+
+根据推论，必有$q_j$，使得$p_1 \mid q_j$，因为$q_j$是素数，所以$p_1 = q_j$。
+
+从等式两边消掉$p_1$和$q_j$。左边变成$r-1$的情况，根据归纳假设，$r-1$时满足唯一性。
+
+所以$r$时也满足唯一性。得证。
+
+## 等价关系
+
+&nbsp;&nbsp;
+> 例一：实数集合$\mathbb{R}$，二元关系"="。有：
+> 自反性：对于所有$a \in \mathbb{R}$，都有$a = a$；
+> 对称性：对于所有$a, b \in \mathbb{R}$，都有$a = b \Rightarrow b = a$；
+> 传递性：对于所有$a, b, c \in \mathbb{R}$，都有$a = b, b = c \Rightarrow a = c$。
+
+> 例二：全体三角形集合$T$，二元关系"$\cong$"。有：
+> 自反性：对于所有$\triangle A \in T$，都有$\triangle A \cong \triangle A$。
+> 对称性：对于所有$\triangle A, \triangle B \in T$，都有$\triangle A \cong \triangle B$。
+> 传递性：对于所有$\triangle A, \triangle B, \triangle C \in T$，都有$\triangle A \cong \triangle B$，可知$\triangle A \cong \triangle C$。
+
+定义：设集合$S$，定义在$S$上的二元关系$R$。如果$R$满足以下性质，则称它为“等价关系”：
+
+自反性：对于所有$a \in S$，都有$(a, a) \in R$。
+
+对称性：对于所有$a, b \in S$，都有$(a, b) \in R \Rightarrow (b, a) \in R$。
+
+传递性：对于所有$a, b, c \in S$，有$(a, b) \in R$，$(b, c) \in R \Rightarrow (a, c) \in R$。
+
+> 例三：$S = \mathbb{R}$，二元关系$R = \{(x, y) : x^2 = y^2, x, y \in S\}$
+> 自反性：对于所有$x \in S$，都有$x^2 = x^2$，所以$(x, x) \in R$。
+> 对称性：对于所有$x, y \in S$，$x^2 = y^2 \Rightarrow y^2 = x^2 \Rightarrow (y, x) \in R$。
+> 传递性：对于所有$x, y, z \in S$，都有$(x, y) \in R$，$(y, z) \in R \Rightarrow x^2 = y^2, y^2 = z^2 \Rightarrow x^2 = z^2 \Rightarrow (x, z) \in R$。
+
+> 例四（非等价关系）实数集合$\mathbb{R}$、二元关系"$>$"。
+> 存在$x \in \mathbb{R}$，$x > x$不成立。（非自反）
+> 存在$x, y \in \mathbb{R}$，有$x > y$成立但$y > x$不成立（非对称）。
+> 对于所有$x, y, z \in \mathbb{R}$，都有$x > y, y > z \Rightarrow x > z$。
+
+## 同余
+
+&nbsp;&nbsp;
+$a \equiv b \pmod{n}$：设$n$为正整数，整数$a$和$b$分别模$n$，如果得到相同的余数，就称$a$和$b$在模$n$下满足同余关系（congruence relation），简称同余。
+
+定义（同余关系）：设$a, b, n \in \mathbb{Z}$，$n > 0$，如果$n \mid (a - b)$，就称$a$和$b$在模$n$下同余，记作$a \equiv b \pmod{n}$。
+
+令$a = q_1 n + r_1$, $b = q_2 n + r_2$。有$a - b = (q_1 - q_2) n + (r_1 - r_2) = q n (r_1 - r_2 = 0)$。
+
+性质：$a \equiv b \pmod{n} \Leftrightarrow a = q n + b$, 存在$q \in \mathbb{Z}$。
+
+令$a = q_1 n + r$, $b = q_2 n + r$。
+
+有$a = q_1 n + b - q_2 n$。
+
+$= (q_1 - q_2) n + b$。
+
+$= q n + b$。
+
+$\Rightarrow (a - b) = q n$。
+
+同余运算法则：
+
+$a \equiv b \pmod{n}$：
+
+$a + m \equiv b + m \pmod{n}$，$m \in \mathbb{Z}$。
+
+$a - m \equiv b - m \pmod{n}$，$m \in \mathbb{Z}$。
+
+$ax m \equiv b x m \pmod{n}$，$m \in \mathbb{Z}$。
+
+$a^m \equiv b^m \pmod{n}$，$m \in \mathbb{N}$。
+
+## 乘法逆元
+
+&nbsp;&nbsp;
+> 定义（乘法逆元）：设$a \in \mathbb{Z}$，$n \in \mathbb{N}$，如果$az \equiv 1 \pmod{n}$，称$z$是模$n$下$a$的乘法逆元，记作$a^{-1} = z$。
+> $a$的乘法逆元是$z = a^{-1}$，$z = a^{-1}$的乘法逆元是$a$。
+> $z^{-1} = (a^{-1})^{-1} = a^{(-1) \times (-1)} = a$。
+
+有三点需要注意：
+
+1. 模$n$下互为乘法逆元，一般只考虑比$n$小的。
+
+2. $a$在模$n$内的乘法逆元$a^{-1}$（$1 \leq a^{-1} < n$）是唯一的。
+
+3. 乘法逆元存在的条件：$\gcd(a, n) = 1 \Leftrightarrow$ 模$n$下，$a$有乘法逆元。
+
+> 设$\gcd(a, n) = d$（$d > 1$）。
+> 假设$a^{-1} = b$，则$ab \equiv 1 \pmod{n}$，有$ab = qn + 1$，
+> 即$ab - qn = 1$。
+> 因为$d \mid a$，$d \mid n$，
+> 所以$d \mid 1$，矛盾，假设不成立。
+
+### 求乘法逆元
+
+扩展的欧几里得算法：
+
+设$\gcd(a, n) = 1$
+
+根据裴蜀定理，有
+
+$as + tn = 1$
+
+等式两边模$n$，得
+
+$as \equiv 1 \pmod{n}$
+
+易知，模$n$下$a$的逆元是$s$。
+
+</WordCount>

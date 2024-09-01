@@ -1,0 +1,40 @@
+import WordCount from '../../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+## 怎么在Vercel上部署自己的博客
+
+感谢[愧怍大神](https://kuizuo.cn/docs/docusaurus-deploy)提供的教程。
+
+大神的教程过了两年还是有用的，在这里记录一下自己部署的过程：
+
+首先说域名问题，我使用的方案是Hostinger上买域名修改DNS记录，这样国内国外就都能正常访问了，也不用麻烦的备案手续。
+
+进入Vercel，首先在左边创建一个新项目，把你的项目仓库链接到这个Vercel项目：
+
+![微信截图_20240901204602](https://github.com/user-attachments/assets/ee8e87ac-155e-4e4f-aab0-3511c98c4808)
+
+我们使用的是docusaurus v3，这里无所谓直接选v2（这是因为v2和v3的CI/CD相差不大）
+
+然后Deploy就行了（假如你的仓库是没问题的）。你可以通过查看Deployments里的Build Log去看部署的日志，如果部署成功，你的域名应该就可以访问了。
+
+假如你想改这个CI/CD也可以，打开"Settings"-"General"-"Build & Development Settings"去改原先的命令（如果你是Docusaurus，不override没什么大问题）。
+
+## 自定义域名
+
+假设你已经在某个供应商手上买好了域名，那么打开你项目的"Settings"-"Domains"，添加你的域名。
+
+![微信截图_20240901205307](https://github.com/user-attachments/assets/b9a3e9f1-0a78-4a16-9776-6042316639a3)
+
+你应该在域名服务商那边改DNS（每个人每个需要的记录值都不一样，这里Vercel会提供），因为我是Hostinger，A记录和CNAME记录默认会有一个指向的服务器，直接改掉。
+
+```
+CNEME www cname.vercel-dns.com
+A @ xxx // Vercel提供的值
+```
+
+然后稍微等15-20分钟的域名解析，你就可以访问自己的网站了。
+
+
+
+</WordCount>

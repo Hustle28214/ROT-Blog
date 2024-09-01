@@ -29,12 +29,12 @@ import WordCount from '../../../../src/components/WordCount/WordCount';
 你应该在域名服务商那边改DNS（每个人每个需要的记录值都不一样，这里Vercel会提供），因为我是Hostinger，A记录和CNAME记录默认会有一个指向的服务器，直接改掉。
 
 ```
-CNEME www cname.vercel-dns.com
+CNAME www cname.vercel-dns.com
 A @ xxx // Vercel提供的值
 ```
 
 然后稍微等15-20分钟的域名解析，你就可以访问自己的网站了。
 
-
+用vercel的好处更在于你在本地做了修改，直接提交同步到Github上，vercel这里就会自动刷新、部署。这样你就不需要重复部署，也不依赖于Github Pages。
 
 </WordCount>

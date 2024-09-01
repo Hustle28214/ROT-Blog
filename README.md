@@ -29,13 +29,11 @@ www.rotleyan.site
 🍅 (2024.08.29) Tomato: Depending on react-circular-progressbar, we can create a tomato clock. Besides, we can dive into CHAN mode(Fullscreen supported). 
 
 
-## 😉Install (pnpm)
+## 😉Install (npm)
 ```bash
 git clone https://github.com/Hustle28214/ROT-Blog.git
 cd ROT-Blog
-pnpm install
-pnpm start
-## Or you can use npm or yarn
+## Plz use npm or yarn
 npm install
 npm run build
 npm run start

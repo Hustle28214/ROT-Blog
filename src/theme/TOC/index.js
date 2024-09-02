@@ -32,6 +32,7 @@ export default function TOC({ className, ...props }) {
         <div className={styles.tocFooter}>
           <p>本文字数：{stats.wordCount} 字</p>
           <p>预计阅读时间：{stats.readingTime} 分钟</p>
+          <a href="https://github.com/Hustle28214/ROT-Blog/issues">有问题？请向我提出issue</a>
         </div>
       </div>
     </div>

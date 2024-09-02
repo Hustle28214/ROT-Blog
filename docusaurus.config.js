@@ -178,8 +178,18 @@ const config = {
             
           },
           {to: '/blog', label: '📝随笔', position: 'right'},
-          {to: '/todolist', label: '📂待办', position: 'right'},
-          {to: '/tomato', label: '🍅番茄', position: 'right'},
+          {  
+            
+            label:'🔧工具',
+            position:'right',
+            items: [
+              
+                {to: '/todolist', label: '📂待办',},
+                {to: '/tomato', label: '🍅番茄',},
+            
+            ],
+          },
+          
           {to: '/link', label: '🏄冲浪', position: 'right'},        
           {
             to: '/intro', label: '✨关于', position: 'right'
@@ -188,8 +198,8 @@ const config = {
             href: 'https://github.com/Hustle28214',
             label: 'GitHub',
             position: 'right',
-            src: 'img/githubBlur.svg',
-            srcDark: 'img/githubDark.svg',
+            src: './static/img/githubBlur.svg',
+            srcDark: './static/img/githubDark.svg',
           },  
 
           {

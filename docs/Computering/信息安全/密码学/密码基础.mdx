@@ -1,0 +1,157 @@
+import WordCount from '../../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+> 练习网站：https://cryptohack.org/courses/
+
+## 1. Introduction to CryptoHack
+
+### 入站的凯撒密码
+
+比如说有个密码：
+YXKXKX OBRKFLK CXAB OXQB
+凯撒密码是用的位移的原理。这个密码前移23位（或者后移3位）即可解密。比如说Y，在字母表里前移23位得到B，，所以总体解密得到：
+BANANA REUNION FADE RATE
+
+
+
+### scripts
+
+这个要告诉我们的原则是解密常用写脚本的方式。运行即可。
+```python
+#!/usr/bin/env python3
+import sys
+# import this
+
+if sys.version_info.major == 2:
+    print("You are running Python 2, which is no longer supported. Please update to Python 3.")
+
+ords = [81, 64, 75, 66, 70, 93, 73, 72, 1, 92, 109, 2, 84, 109, 66, 75, 70, 90, 2, 92, 79]
+
+print("Here is your flag:")
+print("".join(chr(o ^ 0x32) for o in ords))
+```
+得到结果：
+```python
+Here is your flag:
+crypto{z3n_0f_pyth0n}
+```
+
+### ASCII
+
+得到了一串ASCII码串，提示我们可以用chr()函数去写脚本。ASCII码就是数字对应的字符，可以对表。那么我们写一个简单的脚本运行：
+```python
+# ASCII 码列表
+ascii_codes = [99, 114, 121, 112, 116, 111, 123, 65, 83, 67, 73, 73, 95, 112, 114, 49, 110, 116, 52, 98, 108, 51, 125]
+
+# 将 ASCII 码转换为字符并连接成字符串
+decoded_string = ''.join(chr(code) for code in ascii_codes)
+
+print(decoded_string)
+```
+
+得到结果：
+```python
+crypto{ASCII_pr1nt4bl3}
+```
+
+附ASCII码的表[1]:
+
+![ASCII-Table-wide](https://github.com/user-attachments/assets/7fac9d30-f446-4b12-bf2a-d8786d68807b)
+
+
+### HEX
+
+十六进制字符串的转换：
+```python
+# 十六进制字符串
+hex_string = '63727970746f7b596f755f77696c6c5f62655f776f726b696e675f776974685f6865785f737472696e67735f615f6c6f747d'
+
+# 将十六进制字符串转换为字节
+byte_data = bytes.fromhex(hex_string)
+
+# 将字节数据解码为字符串
+decoded_string = byte_data.decode('utf-8')
+
+print(decoded_string)
+```
+结果：
+```python
+crypto{You_will_be_working_with_hex_strings_a_lot}
+```
+
+### Base64
+
+Base64是一种编码方式。
+```python
+import base64
+
+# 十六进制字符串
+hex_string = '72bca9b68fc16ac7beeb8f849dca1d8a783e8acf9679bf9269f7bf'
+
+# 将十六进制字符串解码为字节
+byte_data = bytes.fromhex(hex_string)
+
+# 使用 base64.b64encode() 对字节进行 Base64 编码
+base64_encoded = base64.b64encode(byte_data)
+
+# 将 Base64 编码的字节转换为字符串
+base64_encoded_str = base64_encoded.decode('utf-8')
+
+print(base64_encoded_str)
+```
+结果：
+```python
+crypto/Base+64+Encoding+is+Web+Safe/
+```
+
+### 复合暴力破解
+
+pycryptodome是一个非常强大的包。
+
+```bash
+pip install pycryptodome
+```
+
+```python
+from Crypto.Util.number import long_to_bytes
+long_to_bytes(11515195063862318899931685488813747395775516287289682636499965282714637259206269).decode()
+```
+
+结果：
+```python
+crypto{3nc0d1n6_4ll_7h3_w4y_d0wn}
+```
+
+### XOR
+```python
+def xor_string_with_int(s, key):
+    # 对于每个字符，将其 Unicode 编码值与 key 进行异或操作，然后转换回字符
+    xor_result = ''.join(chr(ord(char) ^ key) for char in s)
+    return xor_result
+
+# 原始字符串和异或键
+original_string = 'label'
+key = 13
+
+# 使用自定义的 xor 函数进行异或操作
+new_string = xor_string_with_int(original_string, key)
+
+# 打印结果
+print("New string:", new_string)
+
+# 如果需要提交格式为 crypto{new_string}
+flag = f"crypto{{{new_string}}}"
+print("Flag:", flag)
+```
+结果：
+```python
+crypto{aloha}
+```
+
+
+## References
+
+[1].  ZZT32, Usha.Table of ASCII values.\[M/OL\](2010-05-21)\[2024-09-03\].https://simple.m.wikipedia.org/wiki/File:ASCII-Table-wide.svg
+
+</WordCount>

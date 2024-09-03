@@ -52,8 +52,241 @@ C++主要是通过建立类这个数据类型来体现封装性。使用的时�
 
 #### 多态性
 
-多态是面向对象程序设计里面比较难理解的点，首先，它是通过函数重载、模板和虚函数等概念去实现的。多态性的话，写着写着可能理解的更多一些：比如说你想
+多态是面向对象程序设计里面比较难理解的点，首先，它是通过函数重载、模板和虚函数等概念去实现的。多态性的话，写着写着可能理解的更多一些：比如说你想开发一个图形绘制程序，你有一个基类 Shape，它定义了一个纯虚函数 draw()，然后你有两个派生类 Circle 和 Rectangle，它们都重写了 draw() 函数。
 
+有了多态你就可以在不知道具体的形状类型的情况下绘制不同的图形。
+
+```cpp
+#include <iostream>
+#include <vector>
+
+// 基类
+class Shape {
+public:
+    virtual void draw() const = 0; // 纯虚函数
+    virtual ~Shape() {} // 虚析构函数
+};
+
+// 派生类 Circle
+class Circle : public Shape {
+public:
+    void draw() const override {
+        std::cout << "Drawing a Circle" << std::endl;
+    }
+};
+
+// 派生类 Rectangle
+class Rectangle : public Shape {
+public:
+    void draw() const override {
+        std::cout << "Drawing a Rectangle" << std::endl;
+    }
+};
+
+int main() {
+    // 创建一个存放 Shape 指针的向量
+    std::vector<Shape*> shapes;
+
+    // 向向量中添加不同类型的 Shape 对象
+    shapes.push_back(new Circle());
+    shapes.push_back(new Rectangle());
+
+    // 通过多态调用 draw 方法
+    for (const auto& shape : shapes) {
+        shape->draw(); // 根据实际对象类型调用相应的 draw 方法
+    }
+
+    // 释放内存
+    for (auto& shape : shapes) {
+        delete shape;
+    }
+
+    return 0;
+}
+```
+
+多态是指不同的对象调用相同名称的函数，并可导致完全不同的行为。
+
+#### 继承性
+
+继承相对于多态更好理解，因为确如其名，这里的继承就是一种“资产”或者说“属性”的继承。继承是指一个类具有另一个类的属性和行为，这个类既具有另一个类的全部特征，又具有自身的独有特征。
+
+C++中，这个类被称为**派生类**，被继承的类被称为基类。
+
+假设你要写一个商城系统，但是需要写不同的商品类型。你需要在“日用品”里划分一个小类比如说“护肤品”，但是你不想共有的属性写两次。这个时候，你就可以使用继承：
+
+```cpp
+#include <iostream>
+#include <string>
+// 事实上你应该写一个商品的基类
+class Product {
+protected:
+    std::string name;
+    double price;
+    std::string description;
+
+public:
+    Product(const std::string& name, double price, const std::string& description)
+        : name(name), price(price), description(description) {}
+
+    virtual void displayInfo() const {
+        std::cout << "Name: " << name << ", Price: " << price << ", Description: " << description << std::endl;
+    }
+
+    virtual ~Product() = default;  // Virtual destructor for proper cleanup of derived classes
+};
+// 日用品类，":" 是继承符，从公有类 Product 继承
+class DailyGoods : public Product {
+protected:
+    std::string usageInstructions;
+
+public:
+    DailyGoods(const std::string& name, double price, const std::string& description, const std::string& usageInstructions)
+        : Product(name, price, description), usageInstructions(usageInstructions) {}
+
+    void displayInfo() const override {
+        Product::displayInfo();
+        std::cout << "Usage Instructions: " << usageInstructions << std::endl;
+    }
+};
+// 护肤品类
+class Skincare : public DailyGoods {
+private:
+    std::string ingredients;
+    std::string skinType;
+
+public:
+    Skincare(const std::string& name, double price, const std::string& description, const std::string& usageInstructions,
+             const std::string& ingredients, const std::string& skinType)
+        : DailyGoods(name, price, description, usageInstructions), ingredients(ingredients), skinType(skinType) {}
+
+    void displayInfo() const override {
+        DailyGoods::displayInfo();
+        std::cout << "Ingredients: " << ingredients << ", Skin Type: " << skinType << std::endl;
+    }
+};
+int main() {
+    Skincare skincareProduct(
+        "Hydrating Serum",
+        199.99,
+        "A hydrating serum that replenishes skin moisture.",
+        "Apply to the face after cleansing.",
+        "Hyaluronic Acid, Vitamin C",
+        "All"
+    );
+
+    skincareProduct.displayInfo();
+
+    return 0;
+}
+```
+
+这样当你想操作一些精确到护肤品但又不是整个日用品类别的价格调整，就非常方便。继承也体现了独立性的设计思想。
+
+
+
+## 1.2 程序设计概述
+
+程序设计的方法有两种：
+
+1. 结构化程序设计
+2. 面向对象程序设计
+
+### 1.2.1 结构化程序设计
+
+结构化程序设计的主要思想是先把问题分解为几个小问题，并逐步求精解。它是建立在Bohm、Jacopini证明的结构定理的基础上。结构定理指出：任何程序逻辑都可以用顺序、选择和循环3种基本结构来表示。
+
+1. 顺序结构：
+
+<Mermaid
+  value={`
+  graph LR;
+    输入-->语句1;
+    语句1-->语句2;
+    语句2-->输出;
+   `}
+/>
+
+2. 选择结构：
+
+<Mermaid
+  value={`
+  graph LR;
+    输入-->选择条件;
+    选择条件-->|是|语句1;
+    选择条件-->|否|语句2;
+    语句1-->输出;
+    语句2-->输出;
+   `}
+/>  
+
+3. 循环结构：
+
+<Mermaid
+  value={`
+  graph LR;
+    输入-->循环条件;
+    循环条件-->|是|语句1;
+    语句1-->循环条件;
+    循环条件-->|否|输出;
+   `}
+/>
+
+结构化程序设计方法的主要特征:
+
+1. 自顶向下，逐步求精。先从问题的总体目标开始，层层分解细化
+2. 独立功能，单出、入口。这种模块只用到了3种基本结构，作为编码原则。
+
+
+### 1.2.2 面向对象程序设计
+
+面向对象程序设计是把数据和处理数据的过程当做一个整体，相互依存，不可分割，这个整体就是对象。对象可以是人们要进行研究的任何事物，对象不仅能表示具体的事物，还可以是抽象的规则、计划或事件。
+
+面向对象程序设计是以“对象”为中心进行分析、设计，让对象形成解决目标问题的基本构件，回答“做什么”、“怎么做”的问题。过程是将问题空间划分为一系列对象的集合，然后将对象集合进行分类抽象，一些有相同属性行为的对象被抽象为一个类，类还可以抽象为派生类。继承可以实现基类和派生类之间的联系，形成结构层次。
+
+面向对象程序设计倾向于对现实世界的描述（参考Java的崛起），发展十分迅速，也逐步深入进了软件开发流程。
+
+## 1.3 C、C++与Visual C++
+
+### 1.3.1 C++与C
+
+C++本身不应该说是独立于C的另一门语言。事实上，C++是C的一个扩展，是C的超集，虽然不止是引入了新的扩展包和类这个概念，但任何合法的C程序也都是合法的C++程序。尽管如此，C++本身的体量就可以当做一门新语言学习。
+
+C和C++的扩展名不一样，其次，标准输入流和输出流也不一样。在C中，输入和输出通常是调用函数，而C++中可以通过使用标准输入流、输出流来完成。
+
+### 1.3.2 C++与Visual C++    
+
+这个我相信不用太多的解释，本质上是标准规范和开发环境的区别。目前常用的版本是Visual C++ 6.0。Visual C++可以看成是一种C++编译器，它把C++编译成可执行文件。
+
+编译的大概过程是源程序-编译器-.obj中间文件-可执行文件。
+
+## 1.4 C++程序开发环境
+
+### 1.4.1 基本概念
+
+- 程序：为了使计算机能按照人们的意志工作，就要根据问题的要求，编写相应的程序。程序是一组计算机可以识别和执行的指令，每一条指令使计算机执行特定的操作。
+
+- 源程序：一种计算机的代码，它是按照一定的程序设计语言规范书写的。C++源程序文件的扩展名为.cpp。
+
+- 目标程序：又称为“目的程序”，源程序经过翻译加工以后所生成的机器码集合。目标程序尽管已经是机器指令，但是还不能运行。目标程序可以用机器语言表示（因此也称之为“目标代码”），也可以用汇编语言或其他中间语言表示。C++目标程序文件的扩展名为.obj。
+
+- 可执行程序：因为目标程序还没有解决函数调用问题，需要将各个目标程序与库函数连接，才能形成完整的可在操作系统下独立执行的程序，即可执行程序。可执行程序扩展名为.exe。
+
+- 翻译程序：用来把源程序翻译为目标程序的程序。对翻译程序来说，源程序作为输入，经过翻译程序的处理，输出的是目标程序。
+
+翻译程序有3种不同类型：汇编程序、编译程序和解释程序。
+
+1. 汇编程序：将汇编语言书写的源程序翻译成由机器指令和其他信息组成的目标程序。因此，用汇编程序编写的源程序先要经过汇编程序的加工，变为等价的目标程序。
+
+2. 编译程序：如果源程序使用的是高级程序设计语言，经过翻译程序加工生成目标程序，那么该翻译程序就称为“编译程序”。所以，高级语言编写的源程序要在计算机上运行，通常首先要经过编译程序加工生成机器语言表示的目标程序。目标程序用的是汇编语言，因此还要经过一次汇编程序的加工。
+
+3. 解释程序：其结构可分为解释模块和运行模块两个主要模块。前者按源程序动态执行顺序逐个输入语句，并对每个语句分析与解释，包括语法、语义的检验、生成中间代码及错误信息的处理。后者是运行语句的翻译代码，输出中间或最终结果。
+
+编译程序与解释程序的不同在于前者生成目标代码而后者不需这么做。
+
+前者的代码的执行速度比后者快，后者则是更侧重于人机交互。
+
+### 1.4.2 C++程序开发过程
 
 
 

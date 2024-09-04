@@ -152,6 +152,75 @@ int main() {
 
 并行快速傅里叶变换是斯坦福CS315b的一个课设题目。
 
+> CS315b：https://web.stanford.edu/class/cs315b/
+
+> FFT软件包：https://sjplimp.github.io//docs/fft/README.html#_cch3_931359462
+
+
+```cpp
+#include <iostream>
+#include <vector>
+#include <complex>
+#include <cmath>
+
+// 使用标准复数类型
+typedef std::complex<double> Complex;
+typedef std::vector<Complex> CArray;// 存储复数数据的动态数组
+
+// 基于Cooley-Tukey算法，适用于长度为2的幂次的序列
+// 递归实现FFT
+void fft(CArray &arr, bool invert) {
+    int n = arr.size();
+    if (n <= 1) return;
+
+    // 分割数组
+    CArray even(n / 2), odd(n / 2);
+    for (int i = 0; i < n / 2; ++i) {
+        even[i] = arr[i * 2];
+        odd[i] = arr[i * 2 + 1];
+    }
+
+    // 递归调用FFT
+    fft(even, invert);
+    fft(odd, invert);
+
+    // 合并结果
+    double angle = 2 * M_PI / n * (invert ? -1 : 1);
+    Complex w(1), wn(cos(angle), sin(angle));
+    for (int i = 0; i < n / 2; ++i) {
+        Complex t = w * odd[i];
+        Complex u = even[i];
+        arr[i] = u + t;
+        arr[i + n / 2] = u - t;
+        w *= wn;
+    }
+}
+
+int main() {
+    // 示例数据
+    CArray data = {1, 1, 1, 1};
+
+    // 打印原始数据
+    std::cout << "Input data:\n";
+    for (const auto &x : data) {
+        std::cout << x << " ";
+    }
+    std::cout << "\n";
+
+    // 执行FFT
+    fft(data, false);
+
+    // 打印FFT结果
+    std::cout << "FFT result:\n";
+    for (const auto &x : data) {
+        std::cout << x << " ";
+    }
+    std::cout << "\n";
+
+    return 0;
+}
+```
+
 
 
 </WordCount>

@@ -3,10 +3,135 @@ sidebar_position: 2
 ---
 
 import WordCount from '../../../src/components/WordCount/WordCount.jsx';
+import Mermaid from '@theme/Mermaid';
 
 <WordCount>
 
+理解并掌握**卷积积分**与**卷积和**的概念与相关性质；掌握**LTI系统的性质**；
+
 ## 2.1 离散时间LTI系统：卷积和
+
+离散单位冲激函数$\delta[n]$
+
+$$ 
+\delta[n] = \begin{cases} 1, & n=0 \\ 0, & n\neq 0 \end{cases} 
+$$
+
+移位的单位冲激函数$\delta[n-k]$
+
+$$ 
+\delta[n-k] = \begin{cases} 1, & n=k \\ 0, & n\neq k \end{cases} 
+$$
+
+对于任意的激励信号$x[n]$可以表示成**单位冲激序列的加权和**，即：
+
+$$
+x[n] = ...x[-1]\delta[n+1] + x[0]\delta[n] + x[1]\delta[n-1] + ... = \sum_{k=-\infty}^{+\infty}x[k]\delta[n-k]
+$$
+
+1. 单位冲激响应(Unit Impulse Response )
+
+注意：单位冲激响应是系统的**零状态响应**
+
+2. LTI 系统的卷积和 (Convolution Sum of LTI System)
+
+时不变性
+
+线性（齐次性）：
+
+$$ 
+x[m]\delta[n-m] \rightarrow x[m]h[n-m]
+$$
+
+线性（累加性）：
+
+$$
+x[n] = \sum_{k=-\infty}^{+\infty}a_kx[n-k] \rightarrow y[n] = \sum_{k=-\infty}^{+\infty}x[k]h[n-k]
+$$
+
+卷积和：
+
+$$
+y[n] = x[n]*h[n]
+$$
+
+$$
+= \sum_{k=-\infty}^{+\infty}x[k]h[n-k]
+$$
+
+自变量变换：$n \rightarrow k$
+
+1. 反折
+
+$$
+h[k] \rightarrow h[-k]
+$$
+
+2. 时移
+
+$$
+h[k] \rightarrow h[k-a]
+$$
+
+3. 相乘
+
+$$
+h[k] \rightarrow h[k]\delta[a-k]
+$$
+
+4. 求和
+
+$$ 
+h[k] \rightarrow \sum_{j=-\infty}^{+\infty}h[k-j]\delta[j]
+$$
+
+即：反折-时移-相乘-求和
+
+还可以使用：
+
+1. 图解法
+2. 解析法
+3. 多项式的乘、除法求解
+:::warning
+![微信截图_20240905150437](https://github.com/user-attachments/assets/98ff4dca-fa1d-437a-af80-a46e5a5cdcee)
+:::
+
+<details>
+    <summary>思路</summary>
+
+![微信截图_20240905150550](https://github.com/user-attachments/assets/4c354a0d-9356-49e1-b701-d47f185961dc)
+![微信截图_20240905150757](https://github.com/user-attachments/assets/01726629-5c58-4f78-8aa1-08a33d3b12da)
+![微信截图_20240905150838](https://github.com/user-attachments/assets/de783cb1-89d5-4b40-bf16-9f2113a41720)
+![微信截图_20240905150923](https://github.com/user-attachments/assets/d5490c84-13dc-4206-bca3-e19ae5d97f14)
+![微信截图_20240905151326](https://github.com/user-attachments/assets/63236fc9-68d8-4187-ae09-3e3ba9d48b46)
+
+</details>
+
+解析式法：
+
+对于能够写成比较简洁的表达式的离散函数，可以通过定义求出卷积和。
+
+例：
+
+$$ 
+x[n] = 2^nu[-n], h[n] = u[n]
+$$
+
+求：
+
+$$ 
+y[n] = x[n]*h[n]
+$$
+
+但是这种函数不容易看出卷积和的上下限。一般还是要图解。
+
+<details>
+    <summary>思路</summary>
+    
+![微信截图_20240905151808](https://github.com/user-attachments/assets/b574401b-65c7-45f7-a020-6da83c66d38d)
+
+
+</details>
 
 ## 2.2 连续时间线性时不变系统： 卷积积分
 

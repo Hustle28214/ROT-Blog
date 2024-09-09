@@ -1,0 +1,134 @@
+import WordCount from '../../../../src/components/WordCount/WordCount';
+import Mermaid from '@theme/Mermaid';
+
+<WordCount>
+
+## 3.1 标识符
+
+标识符是程序设计语言中用来表示变量、常量、函数、类等名称的符号。命名函数需要避开这些标识符。
+
+### 3.1.1 C++的保留字
+
+保留字即系统预定义的标识符，编程时不能用作其他用途。
+
+- 基本的数据类型关键字
+  - void
+  - int
+  - char
+  - float
+  - double
+  - bool
+
+- 类型修饰关键字
+  - long
+  - short
+  - signed
+  - unsigned
+
+- 布尔型字面值
+  - true
+  - false
+
+- 非常重要的变量声明修饰符
+  - const
+  - inline
+
+- 存储类别关键字
+  - auto
+  - static
+  - extern
+  - register
+
+- 控制结构关键字
+  - for
+  - while
+  - if
+  - else
+  - do
+
+- switch语句关键字
+  - switch
+  - case
+  - default
+
+- 路径跳转关键字
+  - break
+  - continue
+  - return
+  - goto
+
+- 动态创建变量关键字
+  - new
+  - delete
+
+- 长度运算符
+  - sizeof
+
+- 复合类型关键字
+  - class
+  - struct
+  - enum
+  - union
+  - typedef
+
+- 与类成员相关关键字
+  - this
+  - friend
+  - virtual
+  - mutable
+  - explicit
+  - operator
+
+- 派生类继承方式
+  - private
+  - protected
+  - public
+
+- 模板
+  - template
+  - typename
+
+- 命名空间
+  - namespace
+  - using
+
+- 异常处理
+  - catch
+  - throw
+  - try
+
+- 各种操作符的替代名
+  - and
+  - and_eq
+  - bitand
+  - bitor
+  - compl
+  - not
+  - not_eq
+  - or
+  - or_eq
+  - xor
+  - xor_eq
+
+- 其他不常用的
+  - asm
+  - export
+  - typeid
+  - volatile
+
+### 3.1.2 C++的标识符命名规则
+
+命名规则存在一些硬规则和软规则，硬规则是不能过编译，软规则是人为约束。
+
+1. 标识符名称不能以数字开头，但可以包含数字。
+2. 标识符名称不能包含空格。
+3. 标识符名称不能包含特殊字符，如：`!`、`@`、`#`、`$`、`%`、`^`、`&`、`*`、`(`、`)`、`-`、`+`、`=`、`~`、`|`、`\`、`:`、`;`、`'`、`"`
+4. 标识符名称不能包含中文。
+5. 一般来说，C++编译器肯定能识别前31个字符。所以标识符的长度建议不要超过31个字符
+6. 程序中不要出现名字完全相同的局部变量和全局变量，容易使人误解
+7. 尽量避免名字中出现数字编号，如Value1,Value2等
+8. 变量和参数用以小写字母开头的单词开头，若由多个单词组成则后面单词首字母大写，变量名字推荐采用“名词”或“形容词+名词”形式
+9. 类名和函数名以大写字母开头的单词组合而成，全局函数名字推荐使用“动词”或“动词+名词”（动宾词组）。类的成员函数应使用“动词”。被省略的名词就是对象本身。
+
+
+</WordCount>

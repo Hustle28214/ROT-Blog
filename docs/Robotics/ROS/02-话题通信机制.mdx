@@ -97,7 +97,268 @@ int main(int argc, char **argv[])
    }
 }
 ```
-### 2.2.1 接收方Listener
+### 2.2.2 接收方Listener
 
+```cpp
+#include "ros/ros.h"
+#include "std_msgs/String.h"
+#include <sstream>
+
+void chatterCallback(const std_msgs::String::ConstPtr& msg)
+{
+    ROS_INFO("我听见你说: [%s]", msg->data.c_str()); // 输出接收到的消息
+}
+
+int main(int argc, char **argv)
+{
+    setlocale(LC_ALL, ""); // 设置中文编码
+    ros::init(argc, argv, "listener"); //初始化listener节点(命名唯一)
+    ros::NodeHandle nh;// 实例化ROS句柄
+    // 创建订阅者
+    ros::Subscriber sub = nh.subscribe<std_msgs::String>("chatter",10,doMsg);
+    // 处理订阅的消息（回调函数）
+    ros::spin();
+    return 0;
+}
+"
+```
+
+### 2.2.3 配置CMakeLists.txt
+
+```cpp
+add_executable(talker src/talker.cpp) // 编译talker
+add_executable(listener src/listener.cpp) // 编译listener
+
+target_link_libraries(Hello_pub
+  ${catkin_LIBRARIES}
+) // 链接库
+target_link_libraries(Hello_sub
+  ${catkin_LIBRARIES}
+) // 链接库
+```
+
+
+### 2.2.4 执行
+
+1. 启动roscore
+2. 启动talker
+3. 启动listener
+
+## 2.3 话题通信自定义msg
+
+在ROS通信协议中，还需要注意msg（数据），ROS通过std_msgs封装了一些原生的数据类型，比如：String、Int32、Int64、Char、Bool、Empty...
+
+这些数据一般只包含一个data字段，结构的单一意味着功能上的局限性，当传输一些复杂的数据，std_msgs本身提供的描述性就有点弱，这时，需要自定义消息类型。
+
+msgs只是简单的文本文件，每行具有字段类型和字段名称，可以使用的字段类型：
+- int8, int16, int32, int64(uint*)
+- float32, float64
+- string
+- time, duration
+- other msg files
+- variable-length array[] and fixed-length array[C]
+
+ROS中还有一种特殊类型：```Header```这个标头包含时间戳和ROS中常用的坐标帧信息.
+
+需求：创建自定义消息，该消息包含人的信息：姓名、身高、年龄等。
+
+流程：
+
+1. 按照固定格式创建msg文件
+2. 编辑配置文件
+3. 编译运行（中间文件）
+
+
+###  2.3.1 创建msg文件
+
+功能包下新建msg目录，添加文件Person.msg
+```cpp
+string name
+uint16 age
+float64 height
+```
+
+### 2.3.2 编辑配置文件
+package.xml中添加编译依赖与执行依赖
+```cpp
+<build_depend>message_generation</build_depend>
+<exec_depend>message_runtime</exec_depend>
+```
+CMakeLists.txt编辑 msg 相关配置
+```cpp
+find_package(catkin REQUIRED COMPONENTS
+  roscpp
+  rospy
+  std_msgs
+  message_generation
+)
+// 配置 msg 源文件
+add_message_files(
+  FILES
+  Person.msg
+)
+// 生成消息时依赖于 std_msgs
+generate_messages(
+  DEPENDENCIES
+  std_msgs
+)
+// 执行时依赖
+catkin_package(
+#  INCLUDE_DIRS include
+#  LIBRARIES demo02_talker_listener
+  CATKIN_DEPENDS roscpp rospy std_msgs message_runtime
+#  DEPENDS system_lib
+)
+```
+
+### 2.3.4 编译运行
+
+编译后的中间文件查看:
+
+C++需要调用的中间文件(.../工作空间/devel/include/PACKAGE_NAME/MSG_NAME.h)
+
+Python 需要调用的中间文件(.../工作空间/devel/lib/python3/dist-packages/包名/msg)
+
+后续调用相关msg，从这些中间文件调用。
+
+## 2.4 话题通信自定义msg调用（C++）
+
+:::warning
+需求：
+编写发布订阅实现，要求发布方以10Hz的频率发布自定义消息，订阅方订阅自定义消息并将消息内容打印输出。
+:::
+
+:::tip
+回顾三要素：发布方，接收方，数据
+回顾实现流程：
+1. 编写发布方实现
+2. 编写接收方实现
+3. 编辑配置文件
+4. 编译运行
+:::
+
+
+
+### 2.4.1 vscode配置
+
+为了方便代码提示以及避免误抛异常，需要先配置 vscode，将前面生成的 head 文件路径配置进 c_cpp_properties.json 的 includepath属性：
+
+```cpp
+{
+    "configurations": [
+    {
+        "browse":{
+            "databaseFilename": "",
+            "limitSymbolsToIncludedHeaders": true,
+        }
+        "includePath": [
+            "/opt/ros/noetic/include/**"，
+            "/usr/include/**"
+            "/xxx/yy工作空间/devel/include/**"//配置head文件
+            "name":ROS,
+            "intelliSenseMode": "gcc-x64",
+            "compilerPath": "/usr/bin/gcc",
+            "cStandard": "c11",
+            "cppStandard": "c++17"
+        ]
+    }    
+    ],
+    "version": 4
+}
+```
+
+### 2.4.2 编写发布方实现
+
+```cpp
+#include "ros/ros.h"
+#include "demo02_talker_listener/Person.h"
+
+int main(int argc, char **argv)
+{
+    setlocale(LC_ALL, ""); // 设置中文编码
+    ros::init(argc, argv, "talker"); //初始化talker节点(命名唯一)
+    ros::NodeHandle nh;// 实例化ROS句柄
+    // 创建发布者对象
+    // advertise<数据类型>("话题名称",队列长度)
+    ros::Publisher pub = nh.advertise<demo02_talker_listener::Person>("chatter_person",1000);
+    demo02_talker_listener::Person p;
+    p.name = "八戒";
+    p.age = 800;
+    p.height = 5.5;
+
+    ros::Rate r(1);
+    while (ros::ok())
+    {
+        pub.publish(p);
+        p.age += 1;
+        ROS_INFO("我叫:%s,今年%d岁,高%.2f米", p.name.c_str(), p.age, p.height);
+
+        r.sleep();
+        ros::spinOnce();
+    }
+   return 0;
+}
+```
+
+### 2.4.3 编写接收方实现
+
+```cpp
+#include "ros/ros.h"
+#include "demo02_talker_listener/Person.h"
+
+void doMsg(const demo02_talker_listener::Person::ConstPtr &msg)
+{
+    ROS_INFO("我:%s,今年%d岁,%.2f米", msg->name.c_str(), msg->age, msg->height);
+}
+
+int main(int argc, char **argv)
+{
+    setlocale(LC_ALL, "");
+    // 初始化节点
+    ros::init(argc, argv, "listener");
+    // 创建句柄
+    ros::NodeHandle nh;
+    // 创建一个Listener的对象
+    ros::Subscriber sub = nh.subscribe<demo02_talker_listener::Person>("chatter_person", 1000, doMsg);
+    ros::spin();
+    return 0;
+}
+```
+
+### 2.4.4 配置CMakeLists.txt
+
+需要添加add_dependencies用以设置所依赖的消息相关的中间文件。
+
+```cpp
+add_executable(person_talker src/person_talker.cpp)
+add_executable(person_listener src/person_listener.cpp)
+
+add_dependencies(person_talker ${catkin_EXPORTED_TARGETS})
+add_dependencies(person_listener ${catkin_EXPORTED_TARGETS})
+
+target_link_libraries(person_talker ${catkin_LIBRARIES})
+target_link_libraries(person_listener ${catkin_LIBRARIES})
+```
+
+### 2.4.5 编译运行
+1. 启动roscore
+2. 启动发布节点
+3. 启动订阅节点
+
+## 2.5 服务通信理论模型
+
+ROS Master 负责保管 Server 和 Client 注册的信息，并匹配话题相同的 Server 与 Client ，帮助 Server 与 Client 建立连接，连接建立后，Client 发送请求信息，Server 返回响应信息。
+
+### 2.5.1 Server注册
+
+Server启动之后，通过RPC在ROS Master中注册自身信息，其中包含提供的服务的名称，ROS Master会将节点的注册信息加入到注册表中。
+ 
+### 2.5.2 Client注册
+
+Client启动后，也会通过RPC在ROS Master中注册自身信息，其中包含请求的服务的名称，ROS Master会将节点的注册信息加入到注册表中。
+
+### 2.5.3 ROS Master匹配
+
+ROS Master根据注册表中的信息匹配Server和Client，并通过RPC向Client发送Server的TCP地址信息。
 
 </WordCount>

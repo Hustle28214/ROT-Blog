@@ -3,8 +3,41 @@ import WordCount from '../../../src/components/WordCount/WordCount';
 <WordCount>
 
 
-## 1. 
+## Linux Shell
 
+### Linux Shell
+
+Linux Shell 主要提供以下两种功能：
+- 解释用户在命令行提示符下输入的命令
+- 编写 Shell 脚本，实现高级管理功能
+
+Shell 两种执行命令的方式：
+
+- 第一种，交互式。用户每输入一条命令，Shell 就解释执行一条
+- 第二种，批处理式。需要事先编写一个 Shell 脚本，其中包含若干条命令，让 shell 一次将这些命令执行完，编写 Shel 脚本的过程就是 Shell 编程
+
+shell 脚本是解释执行的，不需要编译，shel 程序从脚本中一行一行读取并执行这些命令相当于一个用户把脚本中的命令一行一行敲到 shell提示符下执行。
+
+### Shell script
+
+Shell 脚本是一个文本文件，shel 脚本编程无需编译器，也不需要集成开发环境，一般使用文本编辑器即可，首选的编辑器是 Vim 或 Emacs，在桌面环境中可直接使用图形化编辑器 gedit 或kate
+
+Shel 脚本编写的“Hello world”：
+
+```bash
+sudo touch hello
+sudo gedit hello
+```
+
+```bash
+#!/bin/bash
+echo "Hello World!"
+```
+
+注解。
+- “#!”指定 shell 脚本的运行环境, 声明该脚本使用哪个 shell 程序运行; 如果没有指定，则以当前正在执行的 shell 来解释执行
+- 以“#”开头的行是注释行，shell 在执行时会忽略“#”之后的所有内容
+- echo 命令用来显示字符串信息
 
 
 

@@ -14,6 +14,8 @@ import WordCount from '../../../src/components/WordCount/WordCount';
 
 这样的连接建立之后，发布者可以发布消息，且发布的消息会被订阅者订阅。
 
+## 2.1 话题通信的概念
+
 ### 2.1.1 发布者的注册
 
 发布者启动之后，会通过RPC在Masterzhub注册自己，同时会注册自己发布的话题（名称）。Master会将节点的注册信息加入注册表。
@@ -47,5 +49,55 @@ Subscriber根据上一步返回的消息，拿到确认了拿到地址了，这�
 我感觉这个协议很像TCP的那套握手挥手，事实上前五步都是在使用RPC协议，最后两步使用了TCP协议。
 
 需要注意的是发布者和订阅者之间没有“先有鸡后有蛋”的讲究，也就是不考虑启动顺序；发布者和订阅者都可以有多个；连接建立之后，Master就不再重要（做了个媒），关闭Master也可以照常通信。
+
+
+## 2.2 C++实现话题通信
+
+ROS master不需要实现了，而且连接的建立也已经被封装了。所以现在回想ROS的话题通信，还剩下发布方和接收方，以及流通的“货币”————数据。
+
+实现流程一般是如下框架：
+1. 编写发布方实现
+2. 编写接收方实现
+3. 编辑配置文件
+4. 编译运行
+
+### 2.2.1 发布方Talker
+
+```cpp
+# include "ros/ros.h"
+# include "std_msgs/String.h"
+# include <sstream> //读取字符串并且处理
+
+int main(int argc, char **argv[])
+{
+    setlocale(LC_ALL, ""); // 设置中文编码
+    ros::init(argc, argv, "talker"); //初始化talker节点
+    ros::NodeHandle nh; //创建节点句柄
+    ros::Publisher chatter_pub = nh.advertise<std_msgs::String>("chatter", 1000); //创建发布者
+    
+    std_msgs::String msg;// 动态组织数据
+    std::string msg_front = "Hello 你好！";
+    int count = 0; // 消息计数器
+    
+    ros::Rate r(10); //设置循环频率
+
+
+    while (ros::ok())
+    {
+        std::stringstream ss;
+        ss << msg_front << count;
+        msg.data = ss.str(); //将数据组织成字符串
+        
+        chatter_pub.publish(msg); //发布消息
+        ROS_INFO("%s", msg.data.c_str()); //打印消息
+        r.sleep(); //循环频率
+        count++; //消息计数器
+
+        ros::spinOnce(); //处理回调函数
+   }
+}
+```
+### 2.2.1 接收方Listener
+
 
 </WordCount>

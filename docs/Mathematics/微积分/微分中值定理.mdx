@@ -314,11 +314,33 @@ $f(x)$表示成$x-x_0$的$n$次多项式+$R_n(x)$，$f(x) = f(x_0)+f'(x_0)$
 $$
 f(x) = f(x_0)+ f'(x_0)(x-x_0) + \frac{f''(x_0)}{2!}(x-x_0)^2 + \cdots + \frac{f^{(n)}(x_0)}{n!}(x-x_0)^n + R_n(x)
 $$
-
+拉格朗日型余项：
 $$
 R_n(x) = \frac{f^{(n+1)}(x_0)}{(n+1)!}(x-x_0)^{n+1} + \cdots
 $$
 
+$$
+|R_n(x)| \leq \frac{M|x-x_0|^{n+1}}{(n+1)!} x \rightarrow x_0
+$$
 
+马克劳林公式：
+
+$$
+f(x)=f(0)+f'(0)(x) + \frac{f''(0)}{2!}(x)^2 + \cdots + \frac{f^{(n)}(0)}{n!}(0)^n
+$$
+
+$f(x)=e^x$，$n$阶马克劳林公式：
+
+$$
+f'(x) = f''(x) = \cdots = f^{(n)}(x) = e^x
+$$
+
+$$
+f'(0) = f''(0) = \cdots = f^{(n)}(0) = e^0 = 1
+$$
+
+$$
+e^x = 1 + x + \frac{x^2}{2!} + \cdots + \frac{x^n}{n!}
+$$
 
 </WordCount>

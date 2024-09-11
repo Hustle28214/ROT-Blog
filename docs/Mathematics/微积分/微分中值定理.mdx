@@ -200,4 +200,125 @@ plt.show()
 
 证明：$\forall x_1,x_2. \delta \in (x_1,x_2)$
 
+$$
+f(x_1)-f(x_2) = f'(\delta)(x_1-x_2) = 0
+$$
+
+$$
+f(x_1) = f(x_2), f(x) = C
+$$
+
+## 柯西中值定理
+
+$$
+\begin{cases}
+    x=\varphi(t) \\ 
+    y=\phi(t) 
+\end{cases}
+$$
+
+$$
+\frac{dy}{dx} = \frac{\frac{dy}{dt}}{\frac{dx}{dt}} = \frac{\phi'(t)}{\varphi'(t)}
+$$
+
+使$t = \delta$，至少有一点$\delta(a<\delta<b)$
+$$
+\frac{\phi'(\delta)}{\varphi'(\delta)} = \frac{\phi(b)-\phi(a)}{\varphi(b)-\varphi(a)}
+$$
+
+
+柯西中值定理：若$f(x)$和$F(x)$
+
+1. [a,b]连续
+2. 在(a,b)内可导
+3. $\forall x \in (a,b)$，$F'(x) \neq 0$
+
+
+则至少$\exists \delta \in(a,b)$, 
+$$
+\frac{f'(\delta)}{F'(\delta)}=\frac{f(b)-f(a)}{F(a)-F(b)}
+$$
+
+柯西中值定理相较来说更加一般.
+
+```python
+import numpy as np
+import matplotlib.pyplot as plt
+
+# 定义函数 f(x) 和 g(x)
+def f(x):
+    return np.sin(x)
+
+def g(x):
+    return x
+
+# 生成 x 数据
+x = np.linspace(0, 2 * np.pi, 400)
+y_f = f(x)
+y_g = g(x)
+
+# 端点
+a, b = 0, 2 * np.pi
+fa, fb = f(a), f(b)
+ga, gb = g(a), g(b)
+
+# 找到导数比值符合柯西中值定理的点
+from scipy.optimize import minimize_scalar
+
+def mean_value_condition(x):
+    return (np.cos(x) / 1) - (fb - fa) / (gb - ga)
+
+result = minimize_scalar(mean_value_condition, bounds=(a, b), method='bounded')
+x0 = result.x
+y0_f = f(x0)
+y0_g = g(x0)
+
+# 绘制函数图像
+plt.figure(figsize=(10, 6))
+
+# 绘制 f(x) 和 g(x)
+plt.plot(x, y_f, label='$f(x) = \sin(x)$', color='blue')
+plt.plot(x, y_g, label='$g(x) = x$', color='red')
+
+# 标记端点 a 和 b
+plt.plot(a, fa, 'bo', label='$f(a)$, $g(a)$')
+plt.plot(b, fb, 'bo')
+plt.plot(a, ga, 'ro')
+plt.plot(b, gb, 'ro')
+
+# 标记点 x0
+plt.plot(x0, y0_f, 'go')  # 对应 f(x)
+plt.plot(x0, y0_g, 'go')  # 对应 g(x)
+plt.text(x0, y0_f + 0.5, '$x_0$', fontsize=12, ha='center')
+
+# 绘制导数比值的条件
+plt.axhline(y=f(x0) / g(x0), color='gray', linestyle='--')
+
+# 设置图形属性
+plt.title('示意图：柯西中值定理')
+plt.xlabel('$x$')
+plt.ylabel('$f(x)$ 和 $g(x)$')
+plt.legend()
+plt.grid(True)
+plt.show()
+```
+
+![Figure_1](https://github.com/user-attachments/assets/97f877e6-06ae-4fe1-a800-382ca2cd092d)
+
+## 泰勒定理
+
+定理：
+
+$f(x)$表示成$x-x_0$的$n$次多项式+$R_n(x)$，$f(x) = f(x_0)+f'(x_0)$
+
+$$
+f(x) = f(x_0)+ f'(x_0)(x-x_0) + \frac{f''(x_0)}{2!}(x-x_0)^2 + \cdots + \frac{f^{(n)}(x_0)}{n!}(x-x_0)^n + R_n(x)
+$$
+
+$$
+R_n(x) = \frac{f^{(n+1)}(x_0)}{(n+1)!}(x-x_0)^{n+1} + \cdots
+$$
+
+
+
 </WordCount>

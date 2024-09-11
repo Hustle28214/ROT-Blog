@@ -1,47 +1,59 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-# 定义函数 f(x)
+# 定义函数 f(x) 和 g(x)
 def f(x):
-    return np.sin(x)  # 选择一个简单的正弦函数
+    return np.sin(x)
+
+def g(x):
+    return x
 
 # 生成 x 数据
 x = np.linspace(0, 2 * np.pi, 400)
-y = f(x)
+y_f = f(x)
+y_g = g(x)
 
 # 端点
 a, b = 0, 2 * np.pi
 fa, fb = f(a), f(b)
+ga, gb = g(a), g(b)
 
-# 找到导数为零的点
+# 找到导数比值符合柯西中值定理的点
 from scipy.optimize import minimize_scalar
 
-def neg_f_prime(x):
-    return -np.cos(x)  # 负导数
+def mean_value_condition(x):
+    return (np.cos(x) / 1) - (fb - fa) / (gb - ga)
 
-result = minimize_scalar(neg_f_prime, bounds=(a, b), method='bounded')
+result = minimize_scalar(mean_value_condition, bounds=(a, b), method='bounded')
 x0 = result.x
-y0 = f(x0)
+y0_f = f(x0)
+y0_g = g(x0)
 
 # 绘制函数图像
-plt.figure(figsize=(8, 6))
-plt.plot(x, y, label='$f(x) = \sin(x)$', color='blue')
+plt.figure(figsize=(10, 6))
+
+# 绘制 f(x) 和 g(x)
+plt.plot(x, y_f, label='$f(x) = \sin(x)$', color='blue')
+plt.plot(x, y_g, label='$g(x) = x$', color='red')
 
 # 标记端点 a 和 b
-plt.plot(a, fa, 'ro', label='$f(a) = f(b)$')
-plt.plot(b, fb, 'ro')
+plt.plot(a, fa, 'bo', label='$f(a)$, $g(a)$')
+plt.plot(b, fb, 'bo')
+plt.plot(a, ga, 'ro')
+plt.plot(b, gb, 'ro')
 
-# 标记导数为零的点 x0
-plt.plot(x0, y0, 'go')  # 极值点
-plt.text(x0, y0 + 0.5, '$x_0$', fontsize=12, ha='center')
+# 标记点 x0
+plt.plot(x0, y0_f, 'go')  # 对应 f(x)
+plt.plot(x0, y0_g, 'go')  # 对应 g(x)
+plt.text(x0, y0_f + 0.5, '$x_0$', fontsize=12, ha='center')
 
-# 绘制切线（导数为零）
-plt.axhline(y0, color='gray', linestyle='--')
+# 绘制导数比值的条件
+plt.axhline(y=f(x0) / g(x0), color='gray', linestyle='--')
 
 # 设置图形属性
-plt.title('Lagrange mean value theorem')
+plt.title('Cauchy mean value theorem')
 plt.xlabel('$x$')
-plt.ylabel('$f(x)$')
+plt.ylabel('$f(x)$ 和 $g(x)$')
 plt.legend()
 plt.grid(True)
 plt.show()

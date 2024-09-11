@@ -68,13 +68,132 @@ plt.show()
 <details>
 <summary>答案</summary>
 
-$x\in U(x_0), f(x)\leq f(x_0), x_0+\Delta x \in U(x_0), f(x_0+\Delta x) \leq f(x_0)$
+对于$x\in U(x_0)$, $f(x)\leq f(x_0)$, 有很小的$\Delta x$使得$x_0+\Delta x \in U(x_0), f(x_0+\Delta x) \leq f(x_0)$
 
+要想证明$f'(x_0)=0$，可以研究$f'(x_0)$的定义。
+
+$$
+f'_{-}(x_0)=\lim_{\Delta x \to 0^{-}}\frac{f(x+\Delta x)-f(x_0)}{\Delta x} \geq 0
+$$
+$$
+f'_{+}(x_0)=\lim_{\Delta x \to 0^{+}}\frac{f(x+\Delta x)-f(x_0)}{\Delta x} \leq 0
+$$
+在$x_0$处可导代表着左右可导，所以上面两个式子成立的时候也就只能是他们相等的时候。
+
+故$f'(x_0)=0$.
 </details>
 
+驻点：导数为0的点。但是它可能不是最大值也不是最小值点。
 
 ## 罗尔定理
 
+$f(x)$满足：
 
+1. 在[a,b]连续
+2. 在(a,b)内可导
+3. $f(a)=f(b)$，则至少$\exists x_0\in(a,b), f'(x_0)=0$
+
+```python
+import numpy as np
+import matplotlib.pyplot as plt
+
+# 定义函数 f(x)
+def f(x):
+    return (x - 1)**2 - 1  # 选择一个简单的二次函数
+
+# 生成 x 数据
+x = np.linspace(-2, 4, 400)
+y = f(x)
+
+# 绘制函数图像
+plt.figure(figsize=(8, 6))
+plt.plot(x, y, label='$f(x) = (x - 1)^2 - 1$', color='blue')
+
+# 标记端点 a 和 b
+a, b = 0, 2
+fa, fb = f(a), f(b)
+plt.plot(a, fa, 'ro', label='$f(a) = f(b)$')
+plt.plot(b, fb, 'ro')
+
+# 标记极值点 x0
+x0 = 1
+y0 = f(x0)
+plt.plot(x0, y0, 'go')  # 极值点
+plt.text(x0, y0 + 0.5, '$x_0$', fontsize=12, ha='center')
+
+# 绘制切线（导数为零）
+plt.axhline(y0, color='gray', linestyle='--')
+
+# 设置图形属性
+plt.title('示意图：罗尔定理')
+plt.xlabel('$x$')
+plt.ylabel('$f(x)$')
+plt.legend()
+plt.grid(True)
+plt.show()
+```
+![Figure_1](https://github.com/user-attachments/assets/7660027e-9f56-4586-b6fc-f95f7ce4acf3)
+
+## 拉格朗日中值定理
+
+$f(x)$满足：
+1. 在[a,b]连续
+2. 在(a,b)内可导
+3. $f(a)=f(b)$，则至少$\exists x_0\in(a,b), f'(x_0)(b-a)=f(b)-f(a)$
+
+
+```python
+import numpy as np
+import matplotlib.pyplot as plt
+
+# 定义函数 f(x)
+def f(x):
+    return np.sin(x)  # 选择一个简单的正弦函数
+
+# 生成 x 数据
+x = np.linspace(0, 2 * np.pi, 400)
+y = f(x)
+
+# 端点
+a, b = 0, 2 * np.pi
+fa, fb = f(a), f(b)
+
+# 找到导数为零的点
+from scipy.optimize import minimize_scalar
+
+def neg_f_prime(x):
+    return -np.cos(x)  # 负导数
+
+result = minimize_scalar(neg_f_prime, bounds=(a, b), method='bounded')
+x0 = result.x
+y0 = f(x0)
+
+# 绘制函数图像
+plt.figure(figsize=(8, 6))
+plt.plot(x, y, label='$f(x) = \sin(x)$', color='blue')
+
+# 标记端点 a 和 b
+plt.plot(a, fa, 'ro', label='$f(a) = f(b)$')
+plt.plot(b, fb, 'ro')
+
+# 标记导数为零的点 x0
+plt.plot(x0, y0, 'go')  # 极值点
+plt.text(x0, y0 + 0.5, '$x_0$', fontsize=12, ha='center')
+
+# 绘制切线（导数为零）
+plt.axhline(y0, color='gray', linestyle='--')
+
+# 设置图形属性
+plt.title('Lagrange mean value theorem')
+plt.xlabel('$x$')
+plt.ylabel('$f(x)$')
+plt.legend()
+plt.grid(True)
+plt.show()
+```
+
+![Figure_1](https://github.com/user-attachments/assets/464a996b-1425-499b-85ec-049a18ad568e)
+
+要想证明拉格朗日中值定理，可以做一个线性替换.也就是替换坐标系.
 
 </WordCount>

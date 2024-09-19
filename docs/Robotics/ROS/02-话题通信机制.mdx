@@ -367,6 +367,91 @@ Client根据信息匹配使用TCP与Server建立网络连接，并发送请求�
 
 ### 2.5.5 Server发送响应
 
-Server接收、解析请求的数据
+Server接收、解析请求的数据，把响应结果返回给Client。
+
+## 2.6 服务通信自定义srv
+
+srv文件内的可用数据类型与msg文件一致，且定义srv实现流程与自定义msg实现流程类似，
+
+### 2.6.1 定义srv文件
+
+srv文件内的可用数据类型与msg文件一致，且定义srv实现流程与自定义msg实现流程类似：
+
+功能包下新建srv目录，添加文件xxx.srv：
+```cpp
+int32 a;
+int32 b;
+
+int32 sum;# 服务响应数据
+```
+### 2.6.2 编辑配置文件
+
+package.xml中添加编译依赖与执行依赖
+```xml
+<build_depend>message_generation</build_depend>
+<exec_depend>message_runtime</exec_depend>
+```
+CMakeLists.txt中添加编译依赖与执行依赖
+```cpp
+find_package(catkin REQUIRED COMPONENTS
+    message_generation
+    roscpp
+    rospy
+    std_msgs
+)
+# 必须有std_msgs，否则编译会报错
+```
+
+```cpp
+add_service_files(
+    FILES
+    AddInts.srv
+)
+```
+
+### 2.6.3 编译
+
+编译之后的中间文件：
+c++: xxx.h
+python: srv
+
+## 2.7 服务通信自定义srv调用(C++)
+
+### 2.7.1 vscode配置
+
+```json
+{
+    "configurations": [
+        {
+            "browse": {
+                "databaseFilename": "",
+                "limitSymbolsToIncludedHeaders": true
+            },
+            "includePath": [
+                "/opt/ros/noetic/include/**",
+                "/usr/include/**",
+                "/xxx/yyy工作空间/devel/include/**" //配置 head 文件的路径 
+            ],
+            "name": "ROS",
+            "intelliSenseMode": "gcc-x64",
+            "compilerPath": "/usr/bin/gcc",
+            "cStandard": "c11",
+            "cppStandard": "c++17"
+        }
+    ],
+    "version": 4
+}
+```
+
+### 2.7.2 服务端
+
+```cpp
+#include "ros/ros.h"
+#include "demo03_server_client/AddInts.h"
+
+```
+
+
+
 
 </WordCount>

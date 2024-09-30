@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { CircularProgressbar, buildStyles } from 'react-circular-progressbar';
 import 'react-circular-progressbar/dist/styles.css'; // Import the styles
-import rainSound from '../../mp3/rain.mp3'; // Provide the correct path
+import rainSound from '../../mp3/music.mp3'; // Provide the correct path
 import birdSound from '../../mp3/bird.mp3';
 import './Button.css'; // 引入按钮样式
 import './ProgressBar.css'; // 引入进度条样式

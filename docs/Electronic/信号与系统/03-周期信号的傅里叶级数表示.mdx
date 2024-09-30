@@ -1,0 +1,40 @@
+import WordCount from '../../../src/components/WordCount/WordCount.jsx';
+import Mermaid from '@theme/Mermaid';
+
+<WordCount>
+
+## 4.1 非周期信号的表示——连续时间傅立叶变换 连续时间傅立叶变换 
+
+### 4.1.1 非周期信号傅立叶变换表示的导出
+
+对下面的连续时间周期方波：
+
+$$
+x(t) = \begin{cases}
+1, & |t| < T_1 \\
+0, & T_1 < |t| < T/2
+\end{cases}
+$$
+
+其傅里叶级数是：
+
+$$
+x(t) = \frac{2sink_0\omega_0T_1}{k\omega_0T}
+$$
+
+:::tip
+回顾第三章的内容，试推导求出其傅里叶级数。
+:::
+
+假设一个具有有限持续期的非周期函数x(t):
+$$
+x(t) = \begin{cases}
+≠0, & |t| < T_1 \\
+0, & |t| > T_1
+\end{cases}
+$$
+
+用周期延拓的方法构造出一个**周期函数**$\tilde{x}(t)$
+
+
+</WordCount>

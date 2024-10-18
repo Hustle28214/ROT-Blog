@@ -206,5 +206,9 @@
   "sidebar.tutorialSidebar.category.机电传动控制": {
     "message": "机电传动控制",
     "description": "The label for category 机电传动控制 in sidebar tutorialSidebar"
+  },
+  "sidebar.tutorialSidebar.category.Finance": {
+    "message": "经济与金融学",
+    "description": "The label for category Finance in sidebar tutorialSidebar"
   }
 }

@@ -1,0 +1,96 @@
+import WordCount from '../../src/components/WordCount/WordCount';
+
+<WordCount>
+本文介绍关于机器人视触觉传感器的相关入门内容。
+
+## 视触觉传感器的原理
+
+### Tactip: 标记物位置 & 光度立体法
+
+Tactip的凸起阵列模拟了人类皮肤，类似于人类的神经突触。如果用这些传感器去接触其他物体，上面的形变会被相机捕捉到，光学成像后送到卷积神经网络去处理，提取表面的状态和接触力。
+
+![](https://github.com/user-attachments/assets/d30d2b84-f69e-4e24-957c-fea84fb54568)
+
+Tactip还有半球形的设计，类似于上图，可以通过LED照明相机获取形变特征（特征剪切形变场）。
+
+开源地址：https://softroboticstoolkit.com/tactip/fabrication
+
+### Gelsight & Digit 系列：多光源投射
+
+![](https://github.com/user-attachments/assets/f612199e-d1cd-4d4e-8538-3e739a20d5a6)
+
+这种传感器比较常见，在一些实验室或者展会上展出的夹爪都有多光源投射型传感器的身影。
+
+如果说上述传感器是依靠下图方式成像，那么多光源投射传感器就是用不同颜色（能量）的LED光源投射到表面上。通常，使用红绿蓝三色光源。
+
+![202012181608257483781133](https://github.com/user-attachments/assets/2a2e7356-4691-464c-866c-e1076f14b76d)
+
+用相机识别出来的是触觉图像中局部强度的变化。
+
+### Tac3D：伪双目
+
+将虚拟双目技术应用于触觉传感器。
+
+怎么理解虚拟双目技术？
+
+![3-Figure3-1](https://github.com/user-attachments/assets/82d60d82-57f6-48a4-8555-389dbbeef331)
+
+
+虚拟双目技术（Virtual Binocular Technology）是一种模拟人类双目视觉系统来增强计算机视觉和图像处理能力的技术。人类的眼睛通过左右两个视角的差异来感知深度，从而实现立体视觉。虚拟双目技术模仿这一过程，通过创建两个虚拟的摄像头视角，计算出图像之间的视差，从而推断出场景的三维结构和物体之间的距离。
+
+## 制作：以Tactip为范例的视触觉传感器
+
+感谢Tactip开源！开源地址在上文。
+
+![](https://github.com/user-attachments/assets/007d4455-a2f9-4f2e-b399-9c4e9a485466)
+
+3D打印件分为4个部件：
+
+Tip: https://softroboticstoolkit.com/files/sorotoolkit/files/tip.zip
+
+Ring & Plug : http://sandbox.softroboticstoolkit.com/files/srtsandbox/files/ringplug_stl.zip
+
+Body: https://softroboticstoolkit.com/files/sorotoolkit/files/body_stl_1.zip
+
+Mount: https://softroboticstoolkit.com/files/sorotoolkit/files/camera_mount_stl_1.zip
+
+![](https://github.com/user-attachments/assets/e1fcea66-cd34-4b55-8cbc-456d182c914b)
+
+这是它的图纸，可以自己魔改：
+
+SolidWorks CAD files: https://softroboticstoolkit.com/files/sorotoolkit/files/tactip_cad_files_0.zip
+
+skin（也就是最重要的阵列），官方告诉你要去邮箱联系他们买。为了保持精确，建议找他们买，但注意官网的邮箱链接已经失效，需要再找一下他们现在正确的联系方式。
+
+## 制作：以DIGIT 为范例的视触觉传感器
+
+这一家也是开源的。
+
+gh地址: https://github.com/facebookresearch/digit-design.git
+
+
+![digit-render](https://github.com/user-attachments/assets/0d9d5253-fa13-49f9-8de3-002e868dcdf7)
+
+想要复刻这一款多光源投射型传感器，需要购买正确型号的螺丝+丝印+CNC+3D打印件+相机+LED模组。
+
+自制文档：https://github.com/facebookresearch/digit-design/blob/main/DIGIT/DIGIT_Quick_Start_Guide.pdf
+
+## 控制算法
+
+一般有PID、强化学习、GAN、模仿学习、逆强化学习等的方法。
+
+通过PID可以实现触觉伺服。
+
+## 机器人触觉和灵巧操作
+
+### 单指
+
+仿真：https://github.com/ac-93/tactile_gym
+
+### 二指夹爪
+
+### 多指灵巧手
+
+Isaacsim & Isaacgym
+
+</WordCount>

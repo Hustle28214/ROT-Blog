@@ -1,0 +1,53 @@
+import WordCount from '../../../src/components/WordCount/WordCount';
+
+
+
+<WordCount>
+## 链式法则
+
+:::tip
+试从$\frac{dx}{dy}=\frac{1}{y'}$导出：
+
+(1)$\frac{d^2x}{dy^2}=-\frac{y''}{(y')^3}$
+
+(2)$\frac{d^3x}{dy^3}=\frac{3(y''')^2-y'y'''}{(y')^5}$
+:::
+
+<details>
+<summary>答案</summary>
+
+(1) 由题干得，$\frac{dx}{dy}=\frac{1}{y'}$
+
+可以用针对复合函数求导的链式法则去思考这题的解法。
+
+对题干的这个条件$\frac{dx}{dy}$求导，也就是对$\frac{1}{y'}$求导了，
+
+此时可以得$\frac{d\frac{dx}{dy}}{dy}=\frac{d}{dy}(\frac{1}{y'})$，
+
+所以看得出来，左边就是对$\frac{1}{y'}$求导。
+
+这样的话，这个结果就是$\frac{d}{dy}(\frac{1}{y'})=\frac{1}{dx}(\frac{1}{y'})\frac{dx}{dy}=-\frac{y''}{y'^2}(\frac{1}{y'})$
+
+这样就得到了结果。
+
+（我感觉应该比较好理解，首先为啥要用链式法则，就是因为$\frac{d}{dy}(\frac{1}{y'})$不能直接求导，因为y'并非对y的函数，而仍然是y对x的函数。换句话说，y'间接依赖于x。后面这一步就是商的导数法则）
+
+
+(2) 第二题和第一题很相像，
+
+就还是链式法则来求：
+
+因为第一题已经证实了$\frac{d^2x}{dy^2}=-\frac{y''}{(y')^3}$
+
+所以再对$\frac{d^2x}{dy^2}$求一次导，然后乘一次$\frac{dx}{dy}$，也就是$\frac{1}{y'}$
+
+可以算出来$\frac{d^3x}{dy^3}=\frac{3(y''')^2-y'y'''}{(y')^5}$
+
+
+
+
+
+
+</details>
+
+</WordCount>

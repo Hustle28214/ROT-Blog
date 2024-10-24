@@ -151,9 +151,58 @@ end
 位宽大于1，wire/reg可声明为向量的形式：
 ``` Verilog
 wire [2:0] data; // 声明一个3位的wire型变量
+wire [8:2]     addr ;     
 reg [0:31] data1; // 声明一个32位的reg型变量
 ```
 
+对于上面的向量，可以指定某一位或若干相邻位，作为其他逻辑使用，
 
+``` Verilog
+wire [9:0]     data_low = data1[0:9] ;
+addr_temp[3:2] = addr[8:7] + 1'b1 ;
+```
+支持可变的向量域选择:
+```Verilog
+module variable_slice_example #(parameter WIDTH = 32, parameter START = 8, parameter STOP = 15) (
+    input wire [WIDTH-1:0] data_in,  // 输入数据
+    output wire [STOP-START:0] data_out  // 输出选择的域
+);
+    // 使用可变的向量域选择
+    assign data_out = data_in[STOP:START];
+
+endmodule
+
+module top;
+    reg [31:0] data1;                  // 32位输入数据
+    wire [STOP-START:0] output_data;  // 输出信号
+
+    // 定义选择参数
+    parameter START = 8;
+    parameter STOP = 15;
+
+    // 实例化 variable_slice_example，动态选择数据域
+    variable_slice_example #(.WIDTH(32), .START(START), .STOP(STOP)) slice_instance (
+        .data_in(data1),
+        .data_out(output_data)
+    );
+
+    initial begin
+        // 测试输入
+        data1 = 32'hAABBCCDD;  // 输入测试数据
+        
+        // 等待一段时间观察输出
+        #10;
+        
+        // 打印结果
+        $display("data1 = %h", data1);       // 显示输入数据
+        $display("output_data = %h", output_data);  // 输出选择的域
+        
+        // 结束仿真
+        $finish;
+    end
+endmodule
+```
+
+###
 
 </WordCount>

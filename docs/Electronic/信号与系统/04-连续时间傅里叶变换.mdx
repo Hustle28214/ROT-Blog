@@ -217,7 +217,131 @@ $$
 
 ### 4.1.3 连续时间傅里叶变换的举例
 
+典型信号的傅里叶变换：
+
+(1) 单边指数信号：
+
+$$
+x_1(t)=e^{-at} a>0 \Longrightarrow X_1(j\omega)=\frac{1}{a+j\omega}
+$$
+$$
+x_2(t)=e^{-at} a<0 \Longrightarrow X_2(j\omega)=\frac{1}{a-j\omega}
+$$
+
+(2) 双边指数信号：
+
+$$
+x(t)=e^{-a|t|} a>0 \Longrightarrow X(j\omega)=\frac{2a}{a^2+\omega^2}
+$$
+
+(3) 矩形脉冲：
+
+$$
+x(t)=\begin{cases}
+1, & |t|<=T_1
+0, & |t|>T_1
+\end{cases}
+$$
+
+$$
+X(j\omega)=2\frac{sin\omega T_1}{\omega}=2T_1Sa(\omega T_1)
+$$
+
+(4)含有奇异函数的傅里叶变换
+
+1. 单位冲激函数和常数
+$$
+x(t)=\delta(t) \Longrightarrow X(j\omega)=\int^{infty}_{-\infty}\delta(t)e^{-j\omega t}dt=e^{-j\omega t}|_{t=0}=1
+$$
+
+2. 符号函数$sgn(t)$
+$$
+sgn(t)=\begin{cases}
+1, & t>0
+-1, & t<0
+0, & t=0
+\end{cases}
+$$
+
+$$
+x(t)=sgn(t) \Longrightarrow X(j\omega)=\frac{2}{j\omega}
+$$
+
+3. 单位阶跃信号$u(t)$
+
+$$
+u(t)=\frac{1}{2}[1+sgn(t)]
+$$
+
+$$
+x(t)=u(t) \Longrightarrow X(j\omega)=\pi\delta(\omega)+\frac{1}{j\omega}
+$$
+
+4. 指数信号$e^{j\omega_0t}$
+
+$$
+x(t)=e^{j\omega_0t} \Longrightarrow X(j\omega)=2\pi\delta{j(\omega-\omega_0)}
+$$
+
+$$
+F\{cos\omega_0 t\} = \frac{1}{2}F{e^{j\omega_0t}+e^{-j\omega_0t}}=\pi\delta(\omega-\omega_0)+\pi\delta(\omega+\omega_0)
+$$
+
+$$
+F\{sin\omega_0 t\} = \frac{1}{2j}F{e^{j\omega_0t}-e^{-j\omega_0t}}=j\pi\delta(\omega+\omega_0)-j\pi\delta(\omega-\omega_0)
+$$
+
+## 4.2 周期信号的傅里叶变换
+
+将周期信号转换为傅里叶级数：
+
+$$
+x(t)=\sum_{k=-\infty}^{\infty}a_k e^{jk\omega_0t}
+$$
+$$
+x(t)=e^{j\omega_0t} \Longrightarrow X(j\omega) = 2\pi\delta(\omega-\omega_0)
+$$
+
+故：
+$$
+X(j\omega) = \sum_{k=-\infty}^{\infty}2\pi a_k\delta(\omega-k\omega_0)
+$$
+
+一个傅立叶级数系数为${a_k}$的周期信号的傅立叶变换，是出现在成谐波关系的频率kω_0 上的一串**冲激函数**，冲激函数的面积是对应傅立叶系数的2π倍。
+
+![微信截图_20241024210801](https://github.com/user-attachments/assets/1ddbdfd2-5bb4-483c-a2bc-95e872be75d9)
+
+该信号的傅立叶级数是
+
+$$
+a_k = \frac{1}{T}\int_{-\frac{T}{2}}^{\frac{T}{2}} \delta(t)e^{-jk\omega_0t}dt = \frac{1}{T}
+$$
+
+周期脉冲串的傅里叶变换
+
+$$
+X(j\omega) = \frac{2\pi}{T}\sum_{k=-\infty}^{\infty}\delta(\omega - k\omega_0)
+$$
+
+## 4.3 连续时间傅立叶变换性质
+
+### 4.3.1 线性
+
+### 4.3.2 时移
+
+### 4.3.3 共轭及共轭对称
+
+### 4.3.4 微分与积分
+
+### 4.3.5 时间与频率的尺度变换
+
+### 4.3.6 对偶
+
+### 4.3.7 频移
+
+### 4.3.8 帕斯瓦尔定理
 
 
+## 4.4 卷积性质
 
 </WordCount>

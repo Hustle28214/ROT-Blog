@@ -2,4 +2,222 @@
 import WordCount from '../../../src/components/WordCount/WordCount.jsx';
 
 <WordCount>
+
+
+对周期信号而言，这些复指数基本信号构造单元全是成谐波关系的；而对非周期信号而言，它们则是在频率上无限小地靠近的。
+
+因此作为线性组合表示所取的形式是一个积分，而并非求和。
+
+这种表示中，得到的系数谱成为**傅里叶变换**。
+
+而利用这些系数将信号表示为复指数信号线性组合的综合积分式本身称为**傅里叶逆变换**。
+
+## 4.1 非周期信号的表示——连续时间傅立叶变换
+
+### 4.1.1 非周期信号傅立叶变换表示的导出
+
+对下面的连续时间周期方波：
+
+$$
+x(t) = \begin{cases}
+1, & |t| < T_1 \\
+0, & T_1 < |t| < T/2
+\end{cases}
+$$
+
+其傅里叶级数是：
+
+$$
+x(t) = \frac{2sin k_0 \omega_0T_1}{k\omega_0T}
+$$
+
+:::tip
+回顾第三章的内容，试推导求出其傅里叶级数。
+:::
+
+假设一个具有有限持续期的非周期函数x(t):
+$$
+x(t) = \begin{cases}
+≠0, & |t| < T_1 \\
+0, & |t| > T_1
+\end{cases}
+$$
+
+用周期延拓的方法构造出一个**周期函数**$\tilde{x}(t)$
+
+周期延拓：非周期序列构成周期序列的过程。
+
+以L为周期，进行周期延拓，则有：
+
+$$
+\tilde{x}(t)=\sum^{\infty}_{k=-\infty}x(t+kL)
+$$
+
+周期函数$\tilde{x}(t)$的傅里叶级数表示：
+
+$$
+\tilde{x}(t)=\sum^{\infty}_{k=-\infty}a_ke^{jk\omega_0t}
+$$
+
+$$
+a_k=\frac{1}{T} \int^{T/2}_{-T/2}\tilde{x}(t)e^{-jk\omega_0t}dt
+$$
+
+由于
+
+$$
+\tilde{x}(t)=\begin{cases}
+=x(t),|t|<T_1
+=0,T_1<|t|<T
+\end{cases}
+$$
+
+所以
+
+$$
+a_k=\frac{1}{T} \int^{T/2}_{-T/2}\tilde{x}(t)e^{-jk\omega_0t}dt=\frac{1}{T} \int^{T/2}_{-T/2}x(t)e^{-jk\omega_0t}dt
+$$
+
+
+即
+
+$$
+Ta_k=\int^{T/2}_{-T/2}x(t)e^{-jk\omega_0t}dt
+$$
+
+$$
+X(j\omega)=\lim_{T\to\infty}Ta_k=\lim_{T\to\infty}\int^{T/2}_{-T/2}x(t)e^{-jk\omega_0t}dt
+$$
+
+$$
+T \rightarrow \infty \Longrightarrow \begin{cases}
+
+\omega_0 \rightarrow d\omega
+
+k\omega_0 \rightarrow \omega
+
+Ta_k 变成连续函数
+\end{cases}
+$$
+
+即
+
+$$
+X(j\omega)=\int^{\infty}_{-\infty}x(t)e^{-j\omega t}dt
+$$
+
+$X(j\omega)$是原函数x(t)的**频谱密度函数**，简称**频谱函数**。
+
+$$
+a_k =\frac{1}{T}X(j\omega)|_{\omega=k\omega_0}=\frac{1}{T}X(jk\omega_0)
+$$
+
+$$
+\tilde{x}(t)=\sum^{\infty}_{k=-\infty}a_ke^{jk\omega_0t}=\sum^{\infty}_{k=-\infty}\frac{1}{T}X(jk\omega_0)e^{jk\omega_0t}
+$$
+
+由于$\omega_0=\frac{2\pi}{T}$，则：
+
+$$
+\tilde{x}(t)=\frac{1}{2\pi}\sum^{\infty}_{k=-\infty}X(jk\omega_0)e^{jk\omega_0t}\omega_0
+$$
+
+$$
+T \rightarrow \infty \Longrightarrow \begin{cases}
+
+\omega_0 \rightarrow d\omega
+
+k\omega_0 \rightarrow \omega
+
+\sum \rightarrow \int
+
+\tilde{x}(t) \rightarrow x(t)
+
+\end{cases}
+$$
+
+$$
+x(t)=\lim_{T \to \infty} \tilde{x}(t)=\lim_{T \to \infty} \frac{1}{2\pi}\sum^{\infty}_{k=-\infty}X(jk\omega)e^{jk\omega t}\omega_0
+$$
+
+$$
+=\frac{1}{2\pi}\int^{\infty}_{-\infty}X(jk\omega)e^{jk\omega t}d\omega
+$$
+
+
+
+### 4.1.2 傅里叶变换的收敛
+
+书中的原话是"$x(t)$的傅立叶变换是否存在的条件应该和傅立叶级数是否收敛所要求的那一组条件一样"。
+
+由：
+$$
+X(j\omega)=\int^{\infty}_{-\infty}x(t)e^{-j\omega t}dt
+$$
+
+令$\tilde{x}(t)$表示将$X(j\omega)$代入上式所得到的信号，
+
+可推导出：
+
+$$
+\tilde{x}(t)=\frac{1}{2\pi}\int^{\infty}_{-\infty}X(jk\omega)e^{jk\omega t}d\omega
+$$
+
+现在的任务是证明$\tilde{x}(t)$在某个条件下是$x(t)$的真正表示。
+
+如果$x(t)$能量有限，也即$x(t)$平方可积，因而，
+
+$$
+\int^{\infty}_{-\infty}|x(t)|^2dt<\infty
+$$
+
+可以保证$X(j\omega)$是有限的，即
+
+$$
+X(j\omega)=\int^{\infty}_{-\infty}x(t)e^{-j\omega t}dt
+$$
+
+是收敛的。
+
+现在用$e(t)$表示$\tilde{x}(t)$和$x(t)$之间的误差，即$e(t)=\tilde{x}(t)-x(t)$
+
+则
+
+$$
+\int^{\infty}_{-\infty}|e(t)|^2dt=0
+$$
+
+回顾这两个式子与周期信号的两个对应式子，
+
+$$
+\int_{T}|x(t)|^2dt < \infty
+$$
+
+$$
+\int_{T}|e(t)|^2dt = 0 
+$$
+
+是对得上的。
+
+因此，若$x(t)$能量有限，那么虽然$x(t)$和它的傅里叶表示$\tilde{x}(t)$在个别点上或许有明显的不同，但是在能量上没有任何的差别。
+
+狄里赫利条件保证了$\tilde{x}(t)$在任何其他的$t$上都等于$x(t)$，而在不连续点处$\tilde{x}(t)$等于$x(t)$在不连续点两边值的平均值。（当然，除去那些不连续点）
+
+1. $x(t)$绝对可积，即
+
+$$
+\int^{\infty}_{-\infty}|x(t)|dt<\infty
+$$
+
+2. 在任何有限区间内，$x(t)$只有有限个最大值和最小值。
+
+3. 在任何有限区间内，$x(t)$有有限个不连续点，并且在每个不连续点都必须是有限值。因此，本身是连续的或者只有有限个不连续点的绝对可积信号都存在傅里叶变换。
+
+但冲激函数的引入将会改变我们的一些固有看法。
+
+### 4.1.3 连续时间傅里叶变换的举例
+
+
+
+
 </WordCount>

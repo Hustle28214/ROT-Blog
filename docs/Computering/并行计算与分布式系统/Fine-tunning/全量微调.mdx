@@ -14,6 +14,10 @@ import WordCount from '../../../../src/components/WordCount/WordCount.jsx';
 
 ## LoRA(Low-Rank Adaptation)微调
 
+PAPER: https://arxiv.org/abs/2106.09685
+
+Video: https://www.youtube.com/watch?v=DhRoTONcyZE
+
 通过在预训练模型中引入一个额外的低秩矩阵，并使用特定任务的数据来微调这个矩阵，达到LoRa微调的效果。
 
 在预训练模型的基础上，增加一个可训练的线性层（两个矩阵组成），在微调过程中只更新该线性层的参数。

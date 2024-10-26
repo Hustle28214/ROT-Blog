@@ -122,19 +122,19 @@ $$
 成谐波关系的复指数信号集: $\Phi_k(t)=\{e^{jk\omega_0t}\}$
 
 $$
-\Phi_k(t)=\{e^{jk\omega_0t}, e^{j2\omega_0t}, e^{j3\omega_0t}, ...\}
+\Phi_k(t)=\{e^{jk\omega_0t}, e^{j2\omega_0t}, e^{j3\omega_0t}, ... \}
 $$
-
+基波分量:
 $$
-e^{j\omega_0t},e^{-j\omega_0t}: 基波分量 $T=\frac{2\pi}{\omega_0}$
+e^{j\omega_0t}, e^{-j\omega_0t}  T=\frac{2\pi}{\omega_0}
 $$
-
+二次谐波分量:
 $$
-e^{j2\omega_0t},e^{-j2\omega_0t}: 二次谐波分量 $T=\frac{2\pi}{2\omega_0}$
+e^{j2\omega_0t},e^{-j2\omega_0t}  T=\frac{2\pi}{2\omega_0}
 $$
-
+N次谐波分量:
 $$
-e^{jN\omega_0t},e^{-jN\omega_0t}: N次谐波分量 $T=\frac{2\pi}{N\omega_0}$
+e^{jN\omega_0t},e^{-jN\omega_0t} T=\frac{2\pi}{N\omega_0}
 $$
 
 每个信号周期：$\frac{2\pi}{|k\omega_0|}$
@@ -154,7 +154,7 @@ $$
 例：
 
 $$
-x(t)=cos\omega_0t=\\frac{1}{2}(e^{j\omega_0t}+e^{-j\omega_0t})
+x(t)=cos\omega_0t=\frac{1}{2}(e^{j\omega_0t}+e^{-j\omega_0t})
 $$
 
 $$
@@ -176,5 +176,699 @@ $$
 **频谱图**其实就是将随频率的分布表示出来，即$a_k-\omega$的关系。由于**信号的频谱完全代表了信号**，研究它的频谱就等于研究信号本身。因此，这种表示信号的方法称为**频域表示法**。
 
 傅里叶分析实质上是一种**频域分析方法**，当信号被**分解成各次谐波**以后，我们就可以从**频域**来分析处理问题。
+
+幅度谱：$|a_k|=\sqrt{Re\{a_k\}^2+Im\{a_k\}^2}$ 反映谐波分量的幅值随谐波频率的变换。
+
+相位谱：$∠a_k=tg^{-1}\frac{Im\{a_k\}}{Re\{a_k\}}$ 反映谐波分量相位随谐波频率的变换情况。
+
+例：
+
+$$
+x(t)=sin(\omega_0 t)
+$$
+将$x(t)$展成$x(t)=\sum^{\infty}_{-\infty}a_ke^{jk\omega_0 t}$，并确定$a_k$
+
+$$
+x(t)=\frac{e^{j\omega_0t}-e^{-j\omega_0t}}{2j}
+$$
+
+$$
+a_1=\frac{1}{2j} a_{-1}=-\frac{1}{2j}
+$$
+
+$$
+x(t)=1+sin(\omega_0t)+2cos(\omega_0t)+cos(2\omega_0t+\frac{\pi}{4})
+$$
+将$x(t)$展成$x(t)=\sum^{\infty}_{-\infty}a_ke^{jk\omega_0 t}$，并确定$a_k$
+
+
+解：
+
+$$
+x(t)=1+\frac{e^{j\omega_0t}-e^{-j\omega_0t}}{2j}+2*\frac{e^{j\omega_0t}-e^{-j\omega_0t}}{2}+\frac{e^{j\frac{\pi}{4}}}{2}e^{j2\omega_0t}+\frac{e^{-j\frac{\pi}{4}}}{2}e^{-j2\omega_0t}
+$$
+
+$$
+a_0=1
+$$
+
+$$
+a_1=\frac{1}{2j}+1
+$$
+
+$$
+a_{-1}=\frac{-1}{2j}+1
+$$
+
+$$
+a_2=\frac{e^{j\frac{\pi}{4}}}{2}
+$$
+
+$$
+a_{-2}=\frac{e^{-j\frac{\pi}{4}}}{2}
+$$
+
+### 3.3.3 实信号的傅里叶级数表示
+
+若$x(t)$是实信号：
+
+$$
+x(t)=x^{*}(t)
+$$
+
+
+$$
+x^{*}(t)=[\sum^{\infty}_{k=-\infty}a_k^{*}e^{jk\omega_0t}]^{*}=\sum^{\infty}_{k=-\infty}a_{-k}^{*}e^{jk\omega_0t}=\sum^{\infty}_{k=-\infty}a_ke^{jk\omega_0t}
+$$
+
+或：
+
+$$
+a_{-k}=a^{*}_k
+$$
+
+$$
+a^{*}_k=a_{-k}
+$$
+
+$$
+x(t)=\sum^{\infty}_{k=-\infty}a_ke^{jk\omega_0t}=\sum^{-1}_{k=-\infty}+a_0+\sum^{\infty}_{k=1}a_ke^{jk\omega_0t}
+$$
+
+$$
+=a_0+\sum^{\infty}_{k=1}(a_{-k}e^{jk\omega_0t}+a_ke^{jk\omega_0t})
+$$
+
+$$
+=a_0+\sum^{\infty}_{k=1}((a_{k}e^{jk\omega_0t})^{*}+a_ke^{jk\omega_0t})
+$$
+
+$$
+=a_0+2\sum^{\infty}_{k=1}Re\{a_ke^{jk\omega_0t}\}
+$$
+
+若令$a_k=A_ke^{j\theta_k}$，则有：
+$$
+x(t)=a_0+2\sum^{\infty}_{k=1}Re\{A_ke^{j\theta_k}e^{jk\omega_0t}\}
+$$
+
+$$
+=a_0+2\sum^{\infty}_{k=1}Re\{A_ke^{j\theta_k+jk\omega_0t}\}
+$$
+
+得傅里叶级数的三角函数表达式：
+
+$$
+=a_0+2\sum^{\infty}_{k=1}A_kcos(\theta_k+k\omega_0t)
+$$
+
+### 3.3.4 连续时间傅里叶级数系数的确定
+
+如果周期信号$x(t)$可以表示为傅里叶级数
+
+$$
+x(t)=\sum^{\infty}_{k=-\infty}a_ke^{jk\omega_0t}
+$$
+
+则有：
+
+$$
+x(t)e^{-jn\omega_0t}=\sum^{\infty}_{k=-\infty}a_ke^{j(k-n)\omega_0t}
+$$
+
+对两边同时在一个周期内积分，有
+
+$$
+\int_{0}^{T}x(t)e^{-jn\omega_0t}dt=\sum^{\infty}_{k=-\infty}a_k\int_{0}^{T}e^{j(k-n)\omega_0t}dt
+$$
+
+$$
+\int^{T}_{0}e^{j(k-n)\omega_0t}dt=\begin{cases}
+0 , k \neq n \\
+T , k=n
+\end{cases}
+$$
+
+$$
+\int^T_{0}x(t)e^{jn\omega_0t}dt=a_nT
+$$
+
+即：
+$$
+a_n=\frac{1}{T}\int^T_0x(t)e^{-jn\omega_0t}dt
+$$
+
+在确定此积分时，只要积分区间是**一个周期**即可，对积分区间的起止并无特别要求，因此可表示为
+
+$$
+a_k=\frac{1}{T}\int^{T}_{0}x(t)e^{-jkt\omega_0}dt
+$$
+
+$$
+a_0=\frac{1}{T}\int^T_0x(t)dt
+$$
+
+$a_0$是信号在一个周期的平均值，通常称直流分量。 
+
+傅里叶级数：
+
+$$
+x(t)=\sum_{k=-\infty}^{\infty}a_ke^{jkt\omega_0}
+$$
+
+傅里叶级数系数：
+
+$$
+a_k=\frac{1}{T}\int^T_0x(t)e^{-jkt\omega_0}dt
+$$
+
+例：$x(t)=\sum_{k=-\infty}^{\infty}\delta(t-kT)$
+
+求其傅里叶级数表达式。
+
+$$
+a_k=\frac{1}{T}\int^{T^{-}}_{0^{-}}\delta(t)e^{-jk\omega_0t}dt=\frac{1}{T}
+$$
+
+$$
+x(t)=\frac{1}{T}\sum_{k=-\infty}^{\infty}e^{jkt\omega_0}
+$$
+
+### 3.3.5 周期性矩形脉冲信号的频谱
+
+![微信截图_20241026183751](https://github.com/user-attachments/assets/cf2b4b37-5ca9-4827-8e5c-9e37c232fe86)
+
+![微信截图_20241026183838](https://github.com/user-attachments/assets/6dec8e69-ae79-4e87-b28e-eb68ebed0059)
+
+![微信截图_20241026184343](https://github.com/user-attachments/assets/eb93293a-c6bb-4da0-99e5-aea9b2b7cec4)
+
+![微信截图_20241026184409](https://github.com/user-attachments/assets/30ff29e3-8257-417b-b75f-3e41cabf6928)
+
+周期性矩形脉冲信号的频谱特征：
+
+❖ **离散性**
+
+频谱是离散频谱
+
+❖ **谐波性**
+
+谱线是在基波频率的整数倍上出现
+
+❖ **收敛性**
+
+各次谐波的振幅随谐波次数的增大而逐渐减少
+
+## 3.4 连续时间傅里叶级数的收敛
+
+### 3.4.1 傅里叶级数是对信号的最佳近似
+
+$$
+x(t)=\sum_{n=-\infty}^{\infty}c_n\ e^{j\omega_0nt}
+$$
+
+$$
+x_N(t)=\sum_{n=-N}^{N}\tilde{a}_n\ e^{j\omega_0nt}
+$$
+
+$$
+e_N(t)=x(t)-x_N(t)
+$$
+
+$$
+=\sum_{n=-\infty}^{\infty}c_n\ e^{j\omega_0nt}-\sum_{n=-N}^{N}\tilde{a}_n\ e^{j\omega_0nt}
+$$
+
+$$
+=\sum_{n=-\infty}^{\infty}c_n\ e^{j\omega_0nt}
+$$
+
+其中：
+$$
+c_n=\begin{cases}
+a_n-\tilde{a}_n & -N \leq n \leq N \\
+a_n & |n|>N
+\end{cases}
+$$
+
+以均方误差作为衡量误差的准则，其均方误差为:
+
+$$
+E_N=\int_T |e_N(t)|^2dt
+$$
+
+$$
+=\int_T \sum_{n=-\infty}^{\infty}c_n\ e^{j\omega_0nt}dt \sum_{k=-\infty}^{\infty}c_k^{*}e^{-jk\omega_0t}dt
+$$
+
+$$
+=\sum^{\infty}_{k=-\infty}\sum_{n=-\infty}^{\infty}c_kc_n^{*}\int_Te^{jk\omega_0t}e^{-jn\omega_0t}dt
+$$
+
+$$
+=T\sum^{\infty}_{k=-\infty}c_kc_k^{*}
+$$
+
+$$
+=T[\sum^{N}_{k=-N}|a_k-\tilde{a}_k|^2+\sum_{|k|>N}|a_k|^2]
+$$
+
+要使均方误差最小，需使：
+
+$$
+a_k=\tilde{a}_k
+$$
+
+因此，当周期信号用有限项傅立叶级数展开近似时，实际上它是最小均方近似。
+
+**结论：在均方误差最小的准则下，傅里叶级数是对周期信号的最佳近似.**
+
+### 3.4.2 傅里叶级数的收敛
+
+第一组条件：
+
+1. 平方可积条件：$\int_T|x(t)|^2dt<\infty$
+2. $x(t)$在**一个周期内能量有限**，$a_k$一定存在。
+
+Dirichlet条件：
+
+(1) $\int_T|x(t)|dt<\infty$, 在任何周期内信号绝对可积。
+(2) 在任何有限区间内，只有有限个极值点，且极值为有限值。
+(3) 在任何有限区间内，只有有限个第一类间断点。
+
+这两组条件都是傅里叶级数收敛的**充分条件**。
+
+用傅里叶级数表示周期信号具有相当的**普遍适用性**。
+
+![微信截图_20241026192508](https://github.com/user-attachments/assets/da8d7f24-b00d-4642-a52a-151e6d61d2c5)
+
+### 3.4.3 Gibbs现象
+
+用有限项傅里叶级数表示有间断点的信号时，在间断点附近不可避免的会出现**振荡**和**超量**。超量的幅度不会随所取项数的增加而减小。只是随着项数的增多，振荡频率变高，并向间断点处压缩，从而使它所占有的**能量**减少 。
+
+![微信截图_20241026192839](https://github.com/user-attachments/assets/0853f3cc-54b3-4114-8b04-403f8e498499)
+
+## 3.5 连续时间傅里叶级数（CFS）
+
+### 3.5.1  线性
+
+若$x(t)$和$y(t)$都是以T为周期的信号，且
+
+$$
+x(t) \Leftrightarrow a_k
+$$
+
+$$
+y(t) \Leftrightarrow b_k
+$$
+
+则
+
+$$
+Ax(t)+By(t) \Leftrightarrow C_k=Aa_k+Bb_k
+$$
+
+若$x(t)$是以T为周期的信号，且
+
+$$
+x(t) \Leftrightarrow a_k
+$$
+
+### 3.5.2 反转
+
+$$
+x(-t) \Leftrightarrow b_k=a_{-k}
+$$
+
+### 3.5.3 时移
+
+$$
+x(t-t_0) \Leftrightarrow b_k=a_ke^{-j\omega_0kt_0}
+$$
+
+### 3.5.4 尺度变换
+
+$$
+x(at) \Leftrightarrow b_k=a_k
+$$
+
+### 3.5.5 相乘
+
+若$x(t)$和$y(t)$都是以T为周期的信号，且
+
+$$
+x(t) \Leftrightarrow a_k
+$$
+
+$$
+y(t) \Leftrightarrow b_k
+$$
+
+$$
+x(t)y(t) \Leftrightarrow \sum^{\infty}_{l=-\infty}a_lb_{k-l}=a_k*b_k
+$$
+
+### 3.5.6 共轭对称
+
+$$
+x^*(t) \Leftrightarrow a_{-k}^*
+$$
+
+由此可推得，对实信号有
+
+$$
+x(t)=x^*(t) a_{-k}=a_{k}^*
+$$
+
+若$x(t)$为实偶函数: $a_k$为实偶
+若$x(t)$为实奇函数: $a_k$为虚奇
+
+
+### 3.5.7 微分
+
+$$
+\frac{dx(t)}{dt} \Leftrightarrow jk\omega_0a_k
+$$
+
+### 3.5.8 Parseval 定理
+
+$$
+\frac{1}{T}\int_T|x(t)|^2dt=\sum_{k=-\infty}^{\infty}|a_k|^2
+$$
+
+一个周期信号的**平均功率**就等于**它所有谐波分量的平均功率之和**.
+
+:::warning
+对一信号 x(t) 给出以下信息:
+1. $x(t)$ 是实的且为奇函数；
+2. $x(t)$ 是周期的，周期 $T=2$ ，傅立叶系数为$a_k$；
+3. 对$|k|>1$,$a_k=0$；
+4. $\frac{1}{2}\int_0^2|x(t)|^2dt=1$
+确定该信号.
+:::
+
+<details>
+    <summary>答案</summary>
+    
+    1. a_k是虚奇
+    2. $\omega_0=\pi$
+    3. $a_k$仅有$a_0$、$a_1$、$a_{-1}$其余为0。$a_0=0$
+    4. 由帕斯瓦尔定理：$\frac{1}{2}\int_2|x(t)|^2dt=\sum_{k=-\infty}^{\infty}|a_k|^2$
+    
+    $\sum_{\infty}^{k=-\infty}|a_k|^2=a_0^2+a_1^2+a_{-1}^2=1$
+
+    $a_1=±\frac{\sqrt{2}}{2}j$
+
+    $a_{-1}=∓\frac{\sqrt{2}}{2}j$
+
+    $x(t)=\sqrt{2}sin \pi t$或者$x(t)=-\sqrt{2}sin \pi t$
+
+
+</details>
+
+## 3.6 离散时间周期信号的傅立叶级数表示
+
+### 3.6.1 成谐波关系的复指数信号的线性组合
+
+周期为$N$的周期信号$x[n]$: $x[n]=x[n+N]$
+
+正交的离散时间复指数信号集合:
+
+$$
+(1) \phi_k[n]=e^{jk\omega_0n}=e^{j\frac{2\pi}{N}kn}, k=0,±1,±2,\cdots
+$$
+
+$$
+(2) \sum_{n=<N>}\Phi_k[n]\Phi^*_r[n]=\sum_{n=<N>}e^{j(k-r)\omega_0n}
+$$
+
+$$
+=\begin{cases}
+N, & k=r\\
+0, & k\neq r
+\end{cases}
+$$
+
+### 3.6.2 周期信号傅立叶级数表示的确定
+
+周期信号$x[n]$的傅立叶级数展开式为：
+
+$$
+x[n]=\sum_{k=-\infty}^{\infty}a_ke^{j\frac{2\pi}{N}kn}=\sum_{k=-\infty}^{\infty}a_ke^{jk\omega_0n}
+$$
+
+通过正交性确定系数$a_k$:
+
+$$
+x[n]e^{-jr\omega_0n}=\sum_{k=<N>}a_ke^{j(k-r)\omega_0n}
+$$
+
+$$
+\sum_{k=<N>}x[n]e^{-jr\omega_0n}=\sum_{n=<N>}\sum_{k=<N>}a_ke^{j(k-r)\omega_0n}
+$$
+
+$$
+a_r=\frac{1}{N}\sum_{n=<N>}x[n]e^{-jr\omega_0n}
+$$
+
+傅里叶级数变换对：
+
+$$
+\begin{cases}
+x[n]=\sum_{k=<N>}a_ke^{jk\omega_0n} \\
+a_k=\frac{1}{N}\sum_{n=<N>}x[n]e^{-jk\omega_0n}
+\end{cases}
+$$
+:::warning
+例：
+
+$$
+x[n]=cos\frac{\pi}{3}n
+$$
+
+$$
+y(n)=sin[\frac{2\pi n}{3}]cos[\frac{\pi n}{2}]
+$$
+
+分别求$x[n] \rightarrow a_k$ 、$y(n) \rightarrow b_k$
+:::
+
+<details>
+    <summary>解</summary>
+
+    (1)
+    $a_k=\frac{}{}$, $N=\frac{2\pi}{\frac{\pi}{3}}=6$
+
+    $$
+    cos{\frac{\pi}{3}}n=\frac{1}{2}(e^{\frac{\pi}{3}j}n+e^{-\frac{\pi}{3}j}n)
+    $$
+
+    $$
+    a_1=\frac{1}{2}
+    $$
+
+    $$
+    a_5=a_{-1}=\frac{1}{2}
+    $$
+
+    $$
+    a_k=\begin{cases}
+    \frac{1}{2} & k=rN+1, rN+5\\ 
+    0 & \text{otherwise}
+    \end{cases}
+    $$
+
+    (2)
+
+    $$
+    y(n)=sin(\frac{2\pi n}{3})cos(\frac{\pi n}{2})
+    $$
+
+    $$
+    x[n] = \frac{1}{2j}(e^{j\frac{2\pi}{3}n}-e^{-j\frac{2\pi}{3}n})\frac{1}{2}(e^{-j\frac{\pi}{2}n}+e^{j\frac{\pi}{2}n})
+    $$
+
+    $$
+    =\frac{1}{4j}(e^\frac{7\pi n}{6}+e^\frac{5\pi n}{6}-e^\frac{\pi n}{6}-e^\frac{7\pi n}{6})
+    $$
+
+    $$
+    =\frac{1}{4j}(e^\frac{7\pi 2n}{12}+e^\frac{5\pi 2n}{12}-e^\frac{\pi 2n}{12}-e^\frac{7\pi 2n}{12})
+    $$
+
+    $$
+    =\begin{cases}
+    \frac{1}{4j} & k=rN+1, rN+7\\
+    -\frac{1}{4j} & k=rN+5, rN+11\\
+    0 & others
+    \end{cases}
+    $$
+
+
+</details>
+
+### 3.6.3 周期性方波序列的频谱
+
+![微信截图_20241026215949](https://github.com/user-attachments/assets/ac2d1924-7579-4bdb-bbee-c130033438b4)
+
+![微信截图_20241026220027](https://github.com/user-attachments/assets/f30d9001-7082-4f9e-99e3-51f0774eee2f)
+
+![微信截图_20241026220103](https://github.com/user-attachments/assets/5a6a79cb-8951-49ed-a32f-403102c51a18)
+
+周期序列的频谱也具有**离散性、谐波性**，当在区间$-\pi-\pi$考查时 ，也具有**收敛性**。不同的是，离散时间周期信号的频谱具有**周期性**
+
+DFS是一个有限项的级数，确定的关系式也是有限项的和式，因而**不存在收敛问题**，也不会产生Gibbs现象。
+
+## 3.7 DFS的性质
+
+1. 差分
+
+$$
+x[n]\leftrightarrow a_k
+$$
+
+$$
+x[n]-x[n-n_0] \leftrightarrow (1-e^{-jk\omega_0n_0})a_k
+$$
+
+2. 相乘
+
+$$
+x[n] \leftrightarrow a_k
+$$
+
+$$
+y[n] \leftrightarrow b_k
+$$
+
+周期卷积：
+
+$$
+x[n]y[n] \leftrightarrow c_k=\sum_{m<N>}a_m b_{k-m}
+$$
+
+3. Paseval定理
+
+$$
+x[n] \leftrightarrow a_k
+$$
+
+$$
+\frac{1}{N}\sum_{n=<N>}|x[n]|^2=\sum_{k=<N>}|a_k|^2
+$$
+
+左边是信号在一个周期内的平均功率，右边是信号的各次谐波的总功率。
+
+**一个周期信号的平均功率**等于它的**所有谐波分量的功率之和**。 
+
+
+:::tip
+例：现对一信号$x[n]$给出以下信息：
+
+1. $x[n]$是实的且为偶函数;
+2. $x[n]$的周期$N=10$，傅里叶系数为$a_k$;
+3. $a_11=5$;
+4. $\frac{1}{10}\sum^{9}_{n=0}|x[n]|^2=50$
+
+证明：$x[n]=Acos(Bn+C)$, 给出A、B和C的值.
+:::
+
+<details>
+    <summary>解</summary>
+
+    1. $a_k$为实偶
+
+    2. $\omega_0=\frac{2\pi}{10}=\frac{\pi}{5}$
+
+    3. $a_{-1}=a_9=5$
+
+    4. $\sum_{n=\<N\>}|a_k|^2=50$ 
+
+    $$
+    a_k=\begin{cases}
+    5 & k=1,9\\
+    0 & others
+    \end{cases}
+    $$
+
+    $$
+    x[n]=5e^{j\frac{\pi}{5}n}+5e^{j\frac{9\pi}{5}}=5e^{j\frac{\pi}{5}n}+5e^{-j\frac{9\pi}{5}}=10cos(\frac{\pi}{5}n)
+    $$
+
+
+
+</details>
+
+### 周期信号频谱的主要特点
+
+- 不管是连续时间还是离散时间，**周期信号**的频谱都是**离散频谱**，即只在该周期信号重复频率$ω_0$($2π/T$或$2π/N$)的整数倍频谱点上，才出现谱线。
+
+- **连续时间周期信号**一般包含有**无穷多条谱线**；而**离散周期序列**的频谱尽管也可以画成无穷多条谱线，但是只有**顺序的N条谱线才是有效的**。
+
+- 周期愈短，频谱越稀疏；周期愈长，频谱愈密。
+
+- 实际的周期信号一般都为实周期信号，**实周期信号**的傅立叶级数系数是**共轭对称**的。
+
+## 3.8 傅里叶级数与LTI
+
+LTI 系统对复指数信号所起的作用只是给**输入信号**加权了一个相应的**特征值**。
+
+在连续时间情况下，LTI系统的输入是$x(t)=e^{st}$, 那么输出是$y(t)=H(s)e^{st}$。
+
+在离散时间情况下，LTI系统的输入是$x[n]=z^n$,那么输出是$y[n]=H(z)z^n$。
+
+对连续时间系统，$H(s)=\int^{\infty}_{-\infty}h(t)e^{-st}dt$
+
+对离散时间系统，$H(z)=\sum^{\infty}_{n=-\infty}h[n]z^{-n}$
+
+上两式为系统的**系统函数**。
+
+![微信截图_20241026224512](https://github.com/user-attachments/assets/3a737825-1e62-4501-bb0a-accea39b85fc)
+
+:::warning
+![微信截图_20241026224527](https://github.com/user-attachments/assets/fe906dfd-bf0a-4438-97ae-58f231213910)
+:::
+
+## 3.9 滤波
+
+滤波：改变一个信号中各频率分量的相对大小，或者全部消除某些频率分量的过程。
+
+频率成形滤波器：用于改变频谱形状的线性时不变系统。
+
+频率选择性滤波器: 基本无失真的通过某些频率, 而显著地衰减掉或消除掉另一些频率的系统。
+
+### 3.9.1 频率成形滤波器
+
+改变频谱形状的线性时不变系统.
+
+微分滤波器：$H(j\omega)=j\omega$
+
+### 3.9.2 频率选择滤波器
+W
+专门设计成基本上无失真地通过某些频率，而显著地衰减或者消除另一些频率的系统.
+
+**低通滤波器**：通过低频，而衰减或阻止较高频率的滤波器。
+
+**高通滤波器**：通过高频，而衰减或阻止较低频率的滤波器。
+
+**带通滤波器**：通过某一频带范围频率，而衰减掉既高于又低于所要通过的这段频带的滤波器。
+
+:::info
+一连续时间理想低通滤波器s ，其频率响应是:
+$H(j\omega)=\begin{cases}
+1 & |\omega| \leq 100 \\
+0 & |\omega| > 100
+\end{cases}$
+$
+当该滤波器的输入是基波周期$T=π/6$和傅立叶级数系数$a_k$的信号时，发现有
+$x(t) \rightarrow y(t)=x(t)$
+问对于什么样的$k$值，才保证$a_k=0$?
+:::
+
+<details>
+    <summary>解</summary>
+
+    $T=\frac{\pi}{6}$, 
+
+</details>
 
 </WordCount>

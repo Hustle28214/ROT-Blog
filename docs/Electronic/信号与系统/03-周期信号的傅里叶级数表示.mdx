@@ -3,6 +3,74 @@ import Mermaid from '@theme/Mermaid';
 
 <WordCount>
 
+## 3.1 历史回顾
+
+傅里叶的两个最重要的贡献：
+
+❖ “周期信号都可以表示为成谐波关系的正弦信号的加权和”——傅里叶的第一个主要论点
+
+❖ “非周期信号都可以用正弦信号的加权积分来表示”——傅里叶的第二个主要论点
+
+## 3.2 LTI系统对复指数信号的响应
+
+❖ 考查LTI系统对复指数信号$e^{st}$和$z^n$的响应：
+
+$$
+e^{st} \Longrightarrow h(t) \Longrightarrow y(t)
+$$
+$$
+z^n \Longrightarrow h[n] \Longrightarrow y[n]
+$$
+$$
+y(t) \Leftrightarrow H(s) e^{st} 
+$$
+$$
+y[n] \Leftrightarrow H(z) z^n
+$$
+可见LTI系统对复指数信号的响应是很容易求得的。这说明$e^{st}$和$z^n$符合对单元信号的第一项要求。
+
+**特征函数与特征值**
+
+❖ 如果系统对某一信号的响应只不过是该信号乘以一个常数，则称该信号是这个系统的**特征函数**。系统对该信号加权的常数称为系统与特征函数相对应的**特征值**。
+
+结论：
+
+❖ 复指数函数$e^{st}$、$z^n$是一切LTI系统的特征函数。$H(s)、$H(z)$分别是LTI 系统与复指数信号相对应的特征值。
+
+$$
+H(s) = \int^{\infty}_{-\infty} e^{-st} h(t) dt
+$$
+
+$$
+H(z) = \sum^{\infty}_{n=-\infty} z^{-n} h[n]
+$$
+
+对时域的任何一个信号$x(t)$, 若能将其表示为下列形式：
+
+$$
+x(t) = a_1e^{s_1t}+a_2e^{s_2t}+\cdots+a_ne^{s_nt}
+$$
+
+利用系统的齐次性与叠加性
+
+由于 $e^{s_1t} \rightarrow H(s_1)e^{s_1t}$、 $e^{s_2t} \rightarrow H(s_2)e^{s_2t}$、 $e^{s_3t} \rightarrow H(s_3)e^{s_3t}$
+
+所以有
+
+$$
+x(t) \rightarrow y(t)=a_1H(s_1)e^{s_1t} + a_2H(s_2)e^{s_2t}+a_3H(s_3)e^{s_3t}
+$$
+
+即：
+
+$$
+x(t) = \sum_{k}a_ke^{s_kt} \Longrightarrow y(t) = \sum_{k}a_kH(s_k)e^{s_kt}
+$$
+
+$$
+x[n] = \sum_{k}a_kz_k^{n} \Longrightarrow y[n] = \sum_{k}a_kH(z_k)z_k^{n}
+$$
+
 
 
 </WordCount>

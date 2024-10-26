@@ -71,6 +71,110 @@ $$
 x[n] = \sum_{k}a_kz_k^{n} \Longrightarrow y[n] = \sum_{k}a_kH(z_k)z_k^{n}
 $$
 
+Example:
 
+已知：
+
+$$
+x(t) \rightarrow y(t)=x(t-3)
+$$
+
+问：
+$$
+(1) x(t)=e^{j2t} \Longrightarrow y(t)=?
+$$
+$$
+(2) x(t)=cos4t+cos7t \Longrightarrow y(t)=?
+$$
+
+$$
+x(t) \Longrightarrow y(t)=x(t-3) \Longrightarrow h(t) = \delta(t-3)
+$$
+
+$$
+H(s) = \int^{\infty}_{-\infty}\delta(t-3)e^{-st}dt = e^{-3s}
+$$
+
+$$
+(1) x(t)=e^{j2t} \Longrightarrow y(t)= H(j2)e^{j2t}
+$$
+
+$$
+(2) x(t) = cos4t+cos7t=\frac{1}{2}e^{j4t}+\frac{1}{2}e^{-j4t}+\frac{1}{2}e^{j7t}+\frac{1}{2}e^{-j7t}
+$$
+
+$$
+\rightarrow LTI y(t)=\frac{1}{2}H(j4)e^{j4t}+\frac{1}{2}H(-j4)e^{-j4t}+\frac{1}{2}H(j7)e^{j7t}+\frac{1}{2}H(-j7)e^{-j7t}
+$$
+
+$$
+=\frac{1}{2}e^{j4(t-3)}+\frac{1}{2}e^{-j4(t-3)}+\frac{1}{2}e^{j7(t-3)}+\frac{1}{2}e^{-j7(t-3)}
+$$
+
+$$
+=cos4(t-3)+cos7(t-3)
+$$
+
+## 3.3 连续时间周期信号的傅里叶级数表示
+
+### 3.3.1 连续时间傅里叶级数
+
+成谐波关系的复指数信号集: $\Phi_k(t)=\{e^{jk\omega_0t}\}$
+
+$$
+\Phi_k(t)=\{e^{jk\omega_0t}, e^{j2\omega_0t}, e^{j3\omega_0t}, ...\}
+$$
+
+$$
+e^{j\omega_0t},e^{-j\omega_0t}: 基波分量 $T=\frac{2\pi}{\omega_0}$
+$$
+
+$$
+e^{j2\omega_0t},e^{-j2\omega_0t}: 二次谐波分量 $T=\frac{2\pi}{2\omega_0}$
+$$
+
+$$
+e^{jN\omega_0t},e^{-jN\omega_0t}: N次谐波分量 $T=\frac{2\pi}{N\omega_0}$
+$$
+
+每个信号周期：$\frac{2\pi}{|k\omega_0|}$
+
+公共周期：$\frac{2\pi}{|\omega_0|}$
+
+如果将该信号集中所有的信号线性组合起来，
+
+有**傅里叶级数**：
+
+$$
+x(t)=\sum_{k=-\infty}^{\infty} a_ke^{jk\omega_0t}
+$$
+
+它揭示了：**连续时间周期信号可以分解成无数多个复指数谐波分量**。
+
+例：
+
+$$
+x(t)=cos\omega_0t=\\frac{1}{2}(e^{j\omega_0t}+e^{-j\omega_0t})
+$$
+
+$$
+=\frac{1}{2}e^{j\omega_0t}+\frac{1}{2}e^{-j\omega_0t}
+$$
+
+该信号中，有两个谐波分量，$a_{±1}=\frac{1}{2}$为相应分量的加权因子，即傅立叶系数
+
+### 3.3.2 频谱（Spectral）的概念
+
+信号集$\Phi_k(t)$中的每一个信号，除了成谐波关系外，每个信号随时间 信号随时间t的变化规律都是一样的，差别的变化规律都是一样的，差别**仅仅是频率**不同。
+
+在傅里叶级数中，各个信号分量（谐波分量）间的区别也仅仅是**幅度**（可以是复数）和**频率**不同。因此，可以**用一根线段来表示某个分量的幅度**，用**线段的位置表示相应的频率**.
+
+![微信截图_20241026161618](https://github.com/user-attachments/assets/e26d0338-0d0d-457c-941e-ea23eb1a872c)
+
+![微信截图_20241026160703](https://github.com/user-attachments/assets/5aea5f6a-2b8f-44f8-9f67-1ae6b19020f7)
+
+**频谱图**其实就是将随频率的分布表示出来，即$a_k-\omega$的关系。由于**信号的频谱完全代表了信号**，研究它的频谱就等于研究信号本身。因此，这种表示信号的方法称为**频域表示法**。
+
+傅里叶分析实质上是一种**频域分析方法**，当信号被**分解成各次谐波**以后，我们就可以从**频域**来分析处理问题。
 
 </WordCount>

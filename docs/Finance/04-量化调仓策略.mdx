@@ -1,0 +1,184 @@
+import WordCount from '../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+## 1. 衡量投资组合的收益率
+
+### 1.1 投资组合收益率的计算方法
+
+投资组合的收益率是指投资组合在一定时间内的总体收益率。投资组合的收益率可以通过加权平均每个资产的收益率来计算。
+
+则投资组合的收益率为：
+
+$$
+w_1 \times r_1 + w_2 \times r_2 + ... + w_n \times r_n 
+$$
+
+其中，权重 wi 表示资产i在投资组合中的占比，满足
+$$
+w1 + w2 + ... + wn = 1
+$$
+
+投资组合的收益率是衡量投资组合表现的重要指标，它可以帮助投资者评估投资组合的回报水平。
+
+### 1.2 投资组合的绝对收益率和相对收益率
+
+投资组合的收益率不仅取决于投资组合本身的表现，还取决于市场的整体表现。
+
+在比较投资组合的收益率时，需要将其与市场平均收益进行比较，以便更好地评估投资组合的表现。
+
+因此，衡量投资组合的收益率通常使用两种指标：
+
+**绝对收益率**和**相对收益率**。
+
+1. 绝对收益率是指投资组合的实际收益与初始投资金额之间的比率。
+
+例如，如果你的投资组合初始投资金额为 10000 元，最终实现的收益为 12000 元，则绝对收益率为 (12000 - 10000) / 10000 = 0.2，即 20%。
+
+2. 相对收益率是指投资组合的实际收益与市场平均收益之间的比率。
+
+例如，如果你的投资组合实现的收益为 12000 元，而市场平均收益为 10000 元，则相对收益率为 (12000 - 10000) / 10000 = 0.2，即 20%。
+
+
+## 2. 如何衡量投资组合的风险
+
+### 2.1 风险的定义
+
+**风险**是指在未来可能发生的不确定性事件所带来的潜在损失。
+
+投资的风险越高，意味着投资者可能面临更大的损失，但同时也可能获得更高的回报。
+
+### 2.2 投资组合的风险
+
+投资组合的风险是指投资组合在未来可能出现的损失或波动的程度。
+
+投资组合的风险通常由其波动性、损失概率和损失幅度等因素来衡量。
+
+### 2.3 衡量投资组合的风险
+
+1. **方差和标准差**：方差和标准差是衡量投资组合波动性的常用指标。方差是每个资产收益率与平均收益率之差的平方的平均值，标准差是方差的平方根。
+
+方差：$\sigma^2 = \frac{1}{n}\sum_{i=1}^{n}(x_i - \mu)^2$
+
+标准差：$\sigma = \sqrt{\frac{1}{n}\sum_{i=1}^{n}(x_i - \mu)^2}$
+
+其中，$x_i$ 表示第 i 个数据点，$\mu$ 表示所有数据点的平均值，$n$ 表示数据点的数量。
+
+```python
+import numpy as np
+
+def portfolio_volatility(weights, returns):
+    """
+    计算投资组合的波动性（标准差）
+    :param weights: 投资组合中每个资产的权重
+    :param returns: 每个资产的收益率
+    :return: 投资组合的标准差
+    """
+    portfolio_return = np.dot(weights, returns)
+    portfolio_volatility = np.sqrt(np.dot(weights.T, np.dot(np.cov(returns), weights)))
+    return portfolio_volatility
+```
+
+
+2. **Beta 系数**：Beta 系数是衡量投资组合相对于市场整体波动的指标，用投资组合与市场组合的协方差与市场组合的方差的比值计算。
+
+$$
+   \beta_{i}=\frac{\operatorname{Cov}\left(r_{i}, r_{m}\right)}{\operatorname{Var}\left(r_{m}\right)}
+$$
+
+Beta 系数为 1 表示投资组合的波动与市场整体波动相同，小于 1 表示波动小于市场整体波动，大于 1 表示波动大于市场整体波动。  
+
+Beta 系数的计算方法是将资产或投资组合的收益率与市场指数的收益率进行回归分析，得到回归系数即为 Beta 系数。Beta 系数越高，表示资产或投资组合的风险越高，但同时也可能获得更高的回报。
+   
+Beta 系数的计算可以使用统计软件或在线工具进行。
+
+3. **Value at Risk（VaR）**：VaR 是衡量投资组合在一定置信水平下的最大可能损失的指标。
+
+令 $\alpha \in(0,1)$ 而 $F_{L}$ 为事件 $L$ 的分布函数，则 VaR 如下
+
+$$
+   \operatorname{VaR}_{\alpha}(L)==\inf \left\{y \in \mathbb{R} \mid F_{L}(y) \geq \alpha\right\}
+$$
+   
+即 VaR 是满足使损失不超过 y 的概率大于等于 $\alpha$ 的最小的 y 值.
+
+VaR 的计算方法有多种，其中最常用的是历史模拟法、蒙特卡罗模拟法和正态分布法。历史模拟法是基于历史数据进行模拟，蒙特卡罗模拟法是基于随机模拟进行模拟，正态分布法是基于正态分布进行模拟。
+
+4. **Conditional Value at Risk（CVaR）[^1]**：CVaR 是 VaR 的扩展，它衡量的是在 VaR 损失超过一定阈值时的平均损失。
+
+即在一定的置信水平 1-α 上，测算出损失超过 VaR 值的条件期望值
+
+$$
+\operatorname{CVaR}_{1-\alpha}=-\frac{\int_{0}^{1-\alpha} \operatorname{VaR}_{\alpha}(L) d r}{1-\alpha}
+$$
+
+## 3. 最优化方法计算投资组合的最佳仓位
+
+如何分配资金？
+
+### 3.1 等权重
+
+在没有任何信息或者偏好时，等权重是最简单的办法，即赋予组合中每个证券相同的权重，意味着我们视每个证券具有同等的重要性。
+$$
+\omega_{i}=\frac{1}{N}
+$$
+
+常常作为比较基准。
+
+### 3.2 市值加权
+
+市值加权，根据定义，对于选出的股票，按照其市值加权，即
+
+$$
+\omega_{i}=C a p_{i} / \sum_{i} C a p_{i} \\
+C a p_{i} 为股票 i 的市值
+$$
+
+市值加权不需要频繁调仓，往往流动性也最强；不过，市值加权会给与高估值股票过多权重，给与低估值股票过少权重，因此结果在一些结构性行情下可能并不占优。
+
+### 3.3 最小方差组合
+
+在组合优化中，我们常常用历史收益率的方差最为代理变量，追求组合整体的方差最小，数学表达为，
+
+$$
+\operatorname{Min} \ \sigma_{\mathrm{p}}=\omega^{\prime} \Sigma \omega \\
+\Rightarrow \ \omega \propto \Sigma ^{-1} \mathbf{1}
+$$
+
+### 3.4 最大分散度
+
+最大分散度优化，该方法的数学表达为：
+
+$$
+\operatorname{Max} \quad D(w)=\frac{\omega^{\prime} \sigma}{\sqrt{\omega^{\prime} \Sigma \omega}} \\
+\Rightarrow \ \omega \propto \Sigma^{-1} \sigma
+$$
+
+目标函数被称为分散比率，分母为组合波动率，分子为成分的波动率加权平均。该方法最大化资产线性加权波动率与投资组合波动率的比值，故称为最大分散化资产配置组合。
+
+### 3.5 风险平价
+
+风险平价（Risk Parity）从风险的角度进行均衡配置，以追求所有证券对组合的风险贡献相同。
+
+定义所谓的边际风险贡献，即每增加 1 单位证券$i$的权重 $\omega_{i}$ 所引起的组合整体风险的变化，
+
+$$
+\begin{aligned} M R C_{i}=\frac{\partial \sigma_{p}}{\partial \omega_{i}} & =\frac{\omega_{i} \sigma_{i}^{2}+\sum_{j \neq i} \omega_{j} \rho_{i j} \sigma_{i} \sigma_{j}}{\sigma_{p}} \\ & =\frac{\sum_{j=1}^{N} \omega_{j} \rho_{i j} \sigma_{i} \sigma_{j}}{\sigma_{p}} \\ & =\frac{\rho_{i p} \sigma_{i} \sigma_{p}}{\sigma_{p}} \\ & =\left(\frac{\rho_{i p} \sigma_{i}}{\sigma_{p}}\right) \sigma_{p} \\ & =\beta_{i} \sigma_{p}\end{aligned}
+$$
+其中 $\beta_{i}$ 表示证券 $i$ 收益率相对于投资组合收益率的 $\beta$ 系数；
+定义了证券的边际风险贡献后，乘以其权重我们既可以得到风险贡献，
+$$
+\mathrm{RC}_{\mathrm{i}}=\omega_{\mathrm{i}} \times M R C_{i}=\omega_{\mathrm{i}} \frac{\partial \sigma_{\mathrm{p}}}{\partial \omega_{i}}
+$$
+由 Risk Parity 的定义有，
+$$
+\mathrm{RC}_{\mathrm{i}}=\mathrm{RC}_{\mathrm{j}} \\
+\Rightarrow  \omega_{i} \frac{\partial \sigma_{p}}{\partial \omega_{i}}=\omega_{j} \frac{\partial \sigma_{p}}{\partial \omega_{j}}, \quad \forall i, j \\
+$$
+因此，风险平价组合的目标函数为，
+$$
+\operatorname{Min} \sum_{i=1}^{N} \sum_{j=1}^{N}\left(R C_{i}-R C_{j}\right)^{2} \\
+\Rightarrow \quad \omega_{i} \propto \frac{1}{\beta_{i}}
+$$
+
+</WordCount>

@@ -2,4 +2,312 @@
 import WordCount from '../../../src/components/WordCount/WordCount.jsx';
 
 <WordCount>
+
+## 6.0 引言
+
+首先，复习一下LTI系统的描述方法：
+
+1. 时域特性（卷积）
+2. 频域特性（系统频率响应）
+
+在系统的分析和设计中，需要**将时域和频域特性联系起来并给以权衡考虑**。
+
+:::info
+为什么说同时考虑时域和频域特性呢？
+
+
+:::
+
+## 6.1 傅立叶变换的模和相位表示
+
+复习一下信号$x(t)$的傅里叶变换：
+
+$$
+X(j\omega) = |X(j\omega)|e^{j∠X(j\omega)}
+$$
+
+$|X(j\omega)|$：幅度频谱
+
+$∠X(j\omega)$：相位频谱
+
+是幅度重要还是相位重要？
+
+
+:::tip
+
+大多数情况下，**幅度重要**。
+
+如果幅值已经接近0，相位改变多少都没有用。
+
+但针对具体问题还是需要具体分析。
+
+:::
+
+假如有
+
+$$
+x(t)=1+\frac{1}{2}cos(2\pi t+\Phi_1)+cos(4\pi t+\Phi_2)+\frac{2}{3}cos(6\pi t+\Phi_3)
+$$
+
+绘制该信号：
+
+```matlab
+t = 0:0.01:10;
+x = 1 + 0.5*cos(2*pi*t) + cos(4*pi*t) + 2/3*cos(6*pi*t);
+plot(t,x);
+grid on;
+xlabel('t');
+ylabel('x(t)');
+title('信号x(t)');
+```
+
+对于复杂图像，相位会更重要。比如在边缘检测里面，都是在相位图上做的。
+
+![](https://github.com/user-attachments/assets/00e40667-ec54-4607-a054-183c302ee7b6)
+
+分析幅频和相频都可以化为看图问题。
+
+## 6.2 LTI系统频率响应的模和相位表示
+
+系统特性：
+
+冲激响应：
+$$
+h(t) \Leftrightarrow H(j\omega) = |H(j\omega)|e^{j∠H(j\omega)}
+$$
+
+频率响应：
+
+$$
+H(j\omega) = \frac{Y(j\omega)}{X(j\omega)}
+$$
+
+将$H(jw)$进行Fourier逆变换可以得到$h(t)$。
+
+幅度响应：
+$$
+|H(j\omega)|
+$$
+
+相位响应：
+$$
+∠H(j\omega)
+$$
+
+:::warning
+
+某LTI 系统的幅频响应和相频响应如图所示。
+
+若系统的激励为：
+
+$$
+x(t)=2+cos(5 t)+4cos(10 t)
+$$
+
+求系统的响应。
+
+![](https://github.com/user-attachments/assets/8824df5b-610e-4fc4-afd5-c1b43547cce6)
+
+:::
+
+<details>
+<summary>点击查看答案</summary>
+
+看图，回忆公式：
+
+$$
+H(j\omega) = |H(j\omega)|e^{j∠H(j\omega)}
+$$
+
+将$x(t)$转换为傅立叶级数的形式：
+
+$$
+x(t) = 2+\frac{4}{2}(e^{j5t}+e^{-j5t})+\frac{4}{2}(e^{j10t}+e^{-j10t})
+$$
+
+根据特征函数特征值的概念：
+
+$$
+y(t)=2H(0)+2(H(j5)e^{j5t}+H(-j5)e^{-j5t})+2(H(j10)e^{j10t}+H(-j10)e^{-j10t})
+$$
+
+$$
+H(0)=1
+$$
+$$
+H(j5)=\frac{1}{2e^{-j\frac{\pi}{2}}}
+$$
+$$
+H(-j5)=\frac{1}{2e^{j\frac{\pi}{2}}}
+$$
+$$
+H(j10)=0
+$$
+$$
+H(-j10)=0
+$$
+
+$$
+y(t)=2+e^{-j\frac{\pi}{2}}e^{j5t}+e^{j\frac{\pi}{2}}e^{-j5t}
+$$
+
+故：
+
+$$
+=2+e^{j(5t-\frac{\pi}{2})}+e^{j(5t+\frac{\pi}{2})}
+$$
+
+</details>
+
+### 6.2.1 线性和非线性相位（Linear and Nonlinear Phase）
+
+线性相位:
+
+$$
+∠H(j\omega) = k\omega
+$$
+
+非线性相位:
+
+$$
+∠H(j\omega) = Nonlinear function
+$$
+
+Example:
+
+$$
+y(t)=x(t-t_0)
+$$
+
+$$
+H(j\omega) = e^{-j\omega}
+$$
+
+$$
+∠H(j\omega)=-\omega t_0 (Linear Phase)
+$$
+
+效果: **线性相位**意味着**信号传输无失真**。
+
+### 6.2.2 群时延（Group Delay）
+
+定义：
+
+$$
+τ(\omega) = \frac{d}{d\omega} ∠H(j\omega)
+$$
+
+Example:
+
+$$
+y(t)=x(t-t_0)
+$$
+
+$$
+H(j\omega) = e^{-j\omega}
+$$
+
+$$
+∠H(j\omega)=-\omega t_0
+$$
+$$
+τ(\omega)=t_0 (signal delay)
+$$
+
+### 6.2.3 对数模和波特图（Log-Magnitude and Bod Plots）
+
+幅度频谱:
+
+$$
+|H(j\omega)|-\omega
+$$
+
+$$
+20log_10|H(j\omega)|-log_10{\omega}
+$$
+
+相位频谱:
+
+$$
+∠H(j\omega) - \omega
+$$
+
+$$
+∠H(j\omega) - log_10{\omega}
+$$
+
+波特图举例：
+
+![](https://github.com/user-attachments/assets/c1a51578-aab9-41cb-951e-f30df29e7745)
+:::warning
+例：对如下系统的频率响应，绘制出波特图的直线近似。
+
+$$
+H(j\omega)=40\frac{j\omega+0.1}{j\omega+40}
+$$
+:::
+<details>
+
+<summary>解：</summary>
+
+$$
+20lg|H(j\omega)| = 20lg40 +20lg|(j\omega+0.1)|-20|(j\omega+40)|
+$$
+
+$$
+20lg|H(j\omega)| = \begin{cases}
+-20 & \omega << 0.1 \\
+20lg\omega & 0.1 << \omega << 40 \\
+32 & \omega >> 40
+\end{cases}
+$$
+
+</details>
+
+## 6.3 理想频率选择性滤波器的时域特性
+
+(1)低通滤波器：
+
+1. 连续时间：
+$$
+H(j\omega)=\begin{cases}
+1 & |\omega| \leq \omega_c \\
+0 & |\omega| > \omega_c
+\end{cases}
+$$
+
+$$
+h(t)=\frac{sin(\omega_c t)}{\pi t}
+$$
+
+2. 离散时间：
+$$
+H(j\omega)=\begin{cases}
+1 & |\omega| \leq \omega_c \\
+0 & |\omega|< \omega_c \leq \pi
+\end{cases}
+$$
+
+$$
+h[n]=\frac{sin(\omega_c n)}{\pi n}
+$$
+
+![](https://github.com/user-attachments/assets/09fcaba3-811c-496f-9272-9deb9bb8969e)
+
+![](https://github.com/user-attachments/assets/c41c35d4-8f10-49bf-b615-9ce641ada676)
+
+![](https://github.com/user-attachments/assets/c62bea6b-aa5b-4157-8a0e-fa225429eccc)
+
+![](https://github.com/user-attachments/assets/9dae9a8e-215f-47b9-a0aa-806f0996a4cb)
+
+## 6.4 非理想滤波器的时域和频域特性讨论
+
+低通滤波器的基本参数:
+
+![](https://github.com/user-attachments/assets/0d82cda9-271f-4e79-a0fe-0c9b8e9b3e5f)
+
+![](https://github.com/user-attachments/assets/bc90be0e-961c-464c-bc73-d96fca5ebe1d)
+
+![](https://github.com/user-attachments/assets/de8205b3-fd06-4a81-b97e-406d8307514e)
+
 </WordCount>

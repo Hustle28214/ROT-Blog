@@ -1,0 +1,113 @@
+import WordCount from '../../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+## 硬件接线
+
+## YOLO v5
+
+一个终端启动摄像头：
+```bash
+roslaunch astra_camera astra_pro.launch
+```
+另一个终端启动YOLO v5:
+```bash
+roslaunch rikibot_yolov5 rikibot_yolov5.launch
+```
+YOLOv5都是封装好了训练好了的，cuda报错不用管。
+
+## 多机通讯
+
+通过同网段实现通信，需要改一下环境变量配置文件。
+
+.bashrc:
+```bash
+export ROS_MASTER = http://172.20.10.12:11311 # 本机IP地址，端口是固定的11311，具体根据网络ip改
+export ROS_HOSTNAME = 172.20.10.12 
+``` 
+
+Ubuntu里面怎么看小车IP地址？
+```bash
+ip a # 查询IP地址
+```
+然后看inet那一行（除了环回测试地址），就是需要的IP地址。
+
+用虚拟机需要设置网络为桥接模式。
+
+总的来说，需要以下步骤：
+
+1. 手机开热点，电脑和小车同时连这个热点，保证两个机子都在同一无线网下。
+2. 改虚拟机网络为桥接。
+3. 用``ip a``查询IP地址，小车和虚拟机都查。
+4. 改虚拟机的``.bashrc``文件，设置ROS_MASTER_URI和ROS_HOSTNAME。
+```bash
+export ROS_MASTER_URI=http://小车的ip地址:11311
+export ROS_HOSTNAME=虚拟机的ip地址(不加http://)
+```
+然后用SSH测试一下：
+虚拟机开一个终端：
+```bash
+ssh gj@小车的ip地址
+# 密码是buct
+```
+然后可以拔掉键盘和鼠标。
+
+开三个终端ssh。
+
+## 底盘测试
+
+在虚拟机里面开好五个终端（四个连接ssh完毕）。
+
+第一个键入：
+```bash
+roslaunch rikibot bringup.launch
+# 成功了就会实时更新消息
+```
+第二个终端启动一个键盘控制节点：
+```bash
+rosrun teleop+twist_ketboard teleop_twist_keyboard.py
+```
+这样的话就可以像控制小海龟一样控制车全向行驶，控制方向键是UIO JKL MN。
+
+## SLAM建图
+
+第三个终端开SLAM建图节点，小车自带一个gmapping 包:
+ ```bash
+roslaunch rikibot lidar_slam.launch
+# 出现Registering First Scan 即为启动成功
+```
+
+第四个不连接SSH的虚拟机本地终端启动rviz：
+```bash
+rviz
+```
+打开Rviz什么也没有，这个时候点File-Open Config，打开gj_ws/src/rikibot_project/rikibot/rviz/slam.rviz
+
+导入小车的激光雷达以及SLAM地图信息。
+
+此时光标点击一下（其实不点也行？）第二个键盘控制节点的终端，车到处走，就可以建图。
+
+## 地图保存
+
+第五个连接着SSH的终端进行地图保存的操作
+```bash
+cd ~/gj_ws/src/rikibot_project/rikibot/maps # 切换到地图保存的文件夹
+ls # 看看有没有map.sh，用于保存地图
+./map.sh
+# 出现Done即为保存完整
+```
+
+建的地图放在了``~/gj_ws/src/rikibot_project/rikibot/maps``里面，格式是pgm和yaml文件，可以打开确认一下。
+
+## 底盘launch文件解读
+
+进入``~/gj_ws/src/rikibot_project/rikibot/launch``，找到``bringup.launch``文件。
+
+找到group标签：
+
+![微信截图_20241111013159](https://github.com/user-attachments/assets/bb58faab-8068-4d12-a9dd-7ad695b59fb9)
+
+
+
+
+</WordCount>

@@ -109,6 +109,14 @@ ls # 看看有没有map.sh，用于保存地图
 
 惯性测量单元（IMU）：有两种型号，默认是MPU6050，根据imu_type这个参数选择（应该不用改了）。
 
-底下的node标签中的程序
+底下的node标签中的程序包imu_calib是校正程序，程序包hfi没提供不用管，cmm_type是通讯模式（默认是serial串口通信）。
+
+节点imu_filter_madgwick是imu滤波程序。节点riki_base_node是底盘控制程序。
+
+static_transform_publisher是静态坐标变换程序（发布者节点）。
+
+ekf_localization_node是里程计信息发布者程序，并且包含了滤波和校正功能。
+
+最后的param标签是加载小车urdf模型到服务器中。
 
 </WordCount>

@@ -119,4 +119,16 @@ ekf_localization_node是里程计信息发布者程序，并且包含了滤波�
 
 最后的param标签是加载小车urdf模型到服务器中。
 
+## 多点导航
+
+参考以下launch文件：
+
+```bash
+cd ~/gj_ws/src/rikibot_project/rikibot/launch #文件路径
+roslaunch rikibot_navigation navigate.launch
+# 其中, show_mark.py就是源码，路径是~/gj_ws/src/rikibot_project/rikibot/script/show_mark.py
+```
+
+根据建图的地址，设置导航目标。
+
 </WordCount>

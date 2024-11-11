@@ -18,6 +18,18 @@ YOLOv5都是封装好了训练好了的，cuda报错不用管。
 
 ## 多机通讯
 
+:::info
+
+免键盘可以连接手机热点，去ubuntu里的设置-网络-热点网络旁边的小齿轮看ip地址，其实不需要ip a。
+
+而且不需要桥接也可以。
+
+举个例子我手机开好热点，虚拟机的ip是192.168.131.136, 小车是192.168.43.142。
+
+那我就直接在虚拟机里面开个终端ssh gj@192.168.43.142就可以了。目前看来不需要export也行
+
+:::
+
 通过同网段实现通信，需要改一下环境变量配置文件。
 
 .bashrc:
@@ -52,6 +64,7 @@ ssh gj@小车的ip地址
 ```
 然后可以拔掉键盘和鼠标。
 
+
 开三个终端ssh。
 
 ## 底盘测试
@@ -65,9 +78,18 @@ roslaunch rikibot bringup.launch
 ```
 第二个终端启动一个键盘控制节点：
 ```bash
-rosrun teleop+twist_ketboard teleop_twist_keyboard.py
+rosrun teleop_twist_keyboard teleop_twist_keyboard.py
 ```
 这样的话就可以像控制小海龟一样控制车全向行驶，控制方向键是UIO JKL MN。
+
+:::danger
+实际Debug的时候，一定要注意开下位机，我为什么这么说呢，如果你是接联想电源充着电做的话，那下位机（似乎）是不工作的，所以最好是充好电了，然后再去开小车的总控开关debug。
+
+否则，就会出现以下情景：
+
+![微信截图_20241111160430](https://github.com/user-attachments/assets/8611e15c-83ad-48bc-aba8-908420c14c0d)
+
+:::
 
 ## SLAM建图
 

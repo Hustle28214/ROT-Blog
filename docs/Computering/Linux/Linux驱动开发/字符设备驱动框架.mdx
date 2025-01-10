@@ -150,10 +150,25 @@ ulimit -n
 
 ### open打开文件
 
+```c
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+
+int open(const char *pathname, int flags);
+int open(const char *pathname, int flags, mode_t mode);
+```
+:::info
+types.h是指定了各种基本数据类型：
+
+- off_t：表示文件偏移量的类型。
+- pid_t：表示进程ID的类型。
+- uid_t 和 gid_t：表示用户ID和组ID的类型。
+- size_t：表示对象的大小，通常用于 sizeof 运算符和内存管理函数。
 
 
-
-
+stat.h提供文件状态相关的结构和宏定义，主要定义了 struct stat 结构，该结构包含了文件的各种属性，如文件类型、权限、所有者、大小、时间戳等。
+:::
 
 
 ## Reference

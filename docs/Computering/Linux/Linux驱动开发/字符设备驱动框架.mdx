@@ -16,7 +16,7 @@ import WordCount from '../../../../src/components/WordCount/WordCount';
 
 应用程序和驱动程序应当是分离的，它们的编译也应当是独立的。应用程序运行在操作系统之上，有操作系统支持，应用程序处于用户态，而驱动程序处于内核态。
 
-## 库函数
+## 1. 库函数
 
 我们移植项目经常会遇见.so文件，这个.so文件就是库函数，库函数就是应用层使用的函数库，以动态.so库文件的形式提供，存放在lib之下。
 
@@ -79,7 +79,7 @@ int main(int argc,char **argv){
 
 一个实际项目下需要管理成百上千的.c源文件。要保证他们之间正常的互相工作不是一件容易的事，所幸我们可以使用cmake来进行管理和编译，而不需要耗费大量的时间编写Makefile。
 
-## 文件IO
+## 2. 文件IO
 
 ### 简单的示例
 
@@ -243,6 +243,118 @@ int fd = open("/home/gufei/hello", O_RDWR | O_CREAT, S_IRWXU | S_IRGRP | S_IROTH
 if (-1 == fd)
 return fd;
 ```
+
+### write 写文件
+
+调用 write 函数可向打开的文件写入数据，其函数原型如下所示:
+```c
+#include <unistd.h> 
+ssize_t write(int fd, const void *buf, size_t count);
+```
+
+函数参数和返回值含义如下：
+
+- fd: 文件描述符
+- buf: 写入的数据缓冲区
+- count: 写入的数据长度
+- 返回值：如果成功将返回写入的字节数（0 表示未写入任何字节），如果此数字小于 count 参数，这不是错误，譬如磁盘空间已满，可能会发生这种情况；如果写入出错，则返回-1。
+
+从文件的哪个位置开始进行读写操作？IO操作所对应的位置偏移量，读写操作都是从文件的当前位置偏移量处开始，当前位置偏移量可以通过lseek函数设置。
+
+默认情况下，当前位置偏移量是0，即文件起始位置。当调用read、write函数完成读写操作，当前位置偏移量也会向后移动对应字节数。
+
+
+
+### read读文件
+
+调用read函数可从打开的文件中读取数据，函数原型：
+
+```c
+#include <unistd.h>
+ssize_t read(int fd, void *buf, size_t count);
+```
+
+如果读取成功将返回读取到的字节数。实际读取到的字节数可能会小于 count 参数指定的字节数，也有可能会为 0。实际读取到的字节数少于要求读取的字节数，如在到达文件末尾之前有30个字节的数据，而要求读取100个字节，则read读取成功只能返回30，而下一次再调用read读，将返回0。
+
+### close关闭文件
+
+close可以关闭一个已经打开的文件。
+```c
+#include <unistd.h>
+int close(int fd)
+```
+
+close可以显式关闭文件，但当一个进程终止时，内核会自动关闭它打开的所有文件，这是隐式的关闭文件。
+
+但我们应当显式关闭不再需要的文件描述符。这是一个好习惯。
+
+## lseek
+
+对于每个打开的文件，系统都会记录它的读写位置偏移量，我们也把这个读写位置偏移量称为读写偏移量，记录了文件当前的读写位置。
+
+读写偏移量用于指示 ``read()``或 ``write()``函数操作时文件的起始位置，会以相对于文件头部的位置偏移量来表示，文件第一个字节数据的位置偏移量为 0。
+
+```c
+#include <unistd.h>
+#include <sys/types.h>
+/* 调用 lseek 函数需要包含<sys/types.h>和<unistd.h>两个头文件 */
+off_t lseek(int fd, off_t offset, int whence);
+```
+
+``lseek()``函数的参数 ``fd`` 是文件描述符， ``offset`` 是偏移量， ``whence`` 是偏移量类型， ``whence`` 的取值可以是 ``SEEK_SET``、``SEEK_CUR``、``SEEK_END``。
+
+```c
+#define SEEK_SET 0
+#define SEEK_CUR 1
+#define SEEK_END 2  
+```
+
+offset可以为正，也可以为负。正数表示向文件尾部偏移，负数表示向文件头部偏移。
+
+- SEEK_SET: 读写偏移量将指向 offset 字节位置处（从文件头部开始算）
+- SEEK_CUR: 读写偏移量将指向当前位置加上 offset 字节位置处
+- SEEK_END: 读写偏移量将指向文件尾部加上 offset 字节位置处
+
+执行成功将返回从文件头部开始到读写偏移量的距离，执行失败返回-1。
+
+示例：
+
+1. 将读写位置移动到文件开头处：
+
+```c
+off_t off = lseek(fd, 0, SEEK_SET);
+if(off == -1)
+    return -1;
+```
+
+2. 将读写位置移动到文件尾部处：
+
+```c
+off_t off = lseek(fd, 0, SEEK_END);
+if(off == -1)
+    return -1;
+```
+
+3. 将读写位置移动到文件当前位置的指定偏移量处：
+
+```c
+off_t off = lseek(fd, 10, SEEK_SET); /* 偏移量为10 */
+if(off == -1)
+    return -1;
+```
+
+4. 获取当前读写位置偏移量:
+
+```c
+off_t off = lseek(fd, 0, SEEK_CUR);
+if(off == -1)
+    return -1;
+```
+
+
+## 3. 文件IO进阶
+
+
 
 ## Reference
 

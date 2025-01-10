@@ -170,6 +170,79 @@ types.h是指定了各种基本数据类型：
 stat.h提供文件状态相关的结构和宏定义，主要定义了 struct stat 结构，该结构包含了文件的各种属性，如文件类型、权限、所有者、大小、时间戳等。
 :::
 
+flags参数：
+
+- O_RDONLY：只读方式打开文件。
+- O_WRONLY：只写方式打开文件。
+- O_RDWR：读写方式打开文件。
+- O_CREAT：如果文件不存在，则创建该文件。
+- O_DIRECTORY：如果 pathname 参数指向的不是一个目录，则调用 open 失败。
+- O_EXCL：和 O_CREAT 配合使用，如果文件已经存在，则返回错误。
+- O_TRUNC：如果文件存在且为只读文件，则返回错误。如果文件存在且为只
+- O_NOFOLLOW：：如果 pathname 参数指向的是一个符号链接，将不对其进行解引用，直接返回错误。
+
+```c
+open("./src_file",O_RDONLY) //单个标志
+open("./src_file",O_RDONLY|O_NOFOLLOW) //多个标志组合
+```
+
+此参数用于指定新建文件的访问权限，只有当 flags 参数中包含 O_CREAT 或 O_TMPFILE 标志时才有效（O_TMPFILE 标志用于创建一个临时文件）。
+
+最高权限表示方法：111111111（二进制表示）、777（八进制表示）、511（十进制表示）。
+
+不同的宏定义表示不同的权限：
+
+- S_IRUSR：表示当前用户具有读取权限。
+- S_IWUSR：表示当前用户具有写入权限。
+- S_IXUSR：表示当前用户具有执行权限。
+- S_IRGRP：表示当前用户组具有读取权限。
+- S_IWGRP：表示当前用户组具有写入权限。
+- S_IXGRP：表示当前用户组具有执行权限。
+- S_ISUID：set-user-ID，特殊权限
+- S_ISGID：set-group-ID，特殊权限
+- S_ISVTX：sticky，特殊权限
+
+这些宏既可以单独使用，也可以通过位或运算将多个宏组合在一起，譬如：
+```bash
+S_IRUSR | S_IWUSR | S_IROTH
+```
+
+返回值：成功将返回文件描述符，文件描述符是一个非负整数；失败将返回-1。
+
+(1) 使用 open 函数打开一个已经存在的文件（例如当前目录下的 app.c 文件），使用只读方式打开：
+
+```c
+int fd = open("app.c", O_RDONLY);
+if (fd == -1) {
+    return fd;
+}
+```
+
+(2) 使用 open 函数打开一个已经存在的文件（例如当前目录下的 app.c 文件），使用可读可写方式打开：
+```c
+int fd = open("app.c", O_RDWR);
+if (fd == -1) {
+    return fd;
+}
+```
+
+(3) 使用 open 函数打开一个指定的文件（譬如/home/dengtao/hello），使用可读可写方式,如果该文件是一个符号链接文件，则不对其进行解引用，直接返回错误：
+```c
+int fd = open("/home/gufei/hello", O_RDWR | O_NOFOLLOW);
+if (fd == -1) {
+    return fd;
+}
+```
+
+(4)使用 open 函数打开一个指定的文件（譬如/home/dengtao/hello），如果该文件不存在则创建该文件，创建该文件时，将文件权限设置如下：
+- 文件所属者拥有读、写、执行权限；
+- 同组用户与其他用户只有读权限。
+- 使用可读可写方式打开：
+```c
+int fd = open("/home/gufei/hello", O_RDWR | O_CREAT, S_IRWXU | S_IRGRP | S_IROTH);
+if (-1 == fd)
+return fd;
+```
 
 ## Reference
 

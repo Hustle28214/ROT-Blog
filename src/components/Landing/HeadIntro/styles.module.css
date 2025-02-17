@@ -1,0 +1,194 @@
+/* hero */
+.hero {
+    height: calc(100vh - 60px);
+    width: 100%;
+    max-width: 100%;
+    margin: 0;
+    display: grid;
+    grid-template-columns: 8fr 11fr;
+    align-items: center;
+    position: relative;
+    letter-spacing: 0.04em;
+    padding: 0;
+    background-color: transparent; 
+}
+
+.intro {
+    padding: 4rem 16rem;
+    position: relative;
+    z-index: 10;
+    background-color: transparent; 
+}
+
+.intro > p {
+    margin: 1.5rem 0;
+    color: #6e7b8c;
+    text-align: justify;
+    font-size: 1rem;
+    line-height: 1.5rem;
+    letter-spacing: -0.04em;
+    text-shadow: 0 0 #8c99ab;
+}
+
+.hero_text {
+    font-size: calc(1.6em + 1.5vw);
+}
+
+.name {
+    --lighting-size: 300px;
+    --lighting-color: var(--ifm-color-primary);
+    --lighting-highlight-color: var(--ifm-color-primary-lightest);
+
+    background-image: radial-gradient(
+        var(--lighting-highlight-color),
+        var(--lighting-color),
+        var(--lighting-color)
+    );
+    background-size: var(--lighting-size) var(--lighting-size);
+    background-repeat: no-repeat;
+    background-position-x: calc(
+        var(--x) - var(--mouse-x) - calc(var(--lighting-size) / 2)
+    );
+    background-position-y: calc(
+        var(--y) - var(--mouse-y) - calc(var(--lighting-size) / 2)
+    );
+    background-color: var(--lighting-color);
+    color: transparent;
+    background-clip: text;
+}
+
+.background {
+    position: relative;
+    width: 100%;
+    height: 90%;
+    display: grid;
+    place-items: center;
+    align-items: start;
+    z-index: 5;
+    background-color: transparent; 
+}
+
+.background svg {
+    width: 80%;
+    height: auto;
+}
+
+.circle {
+    position: absolute;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(to right, rgba(150, 255, 244, 0.81), rgba(0, 71, 252, 0.81));
+    border-radius: 50%;
+    opacity: 0.3;
+    filter: blur(80px);
+    z-index: -1;
+}
+
+.box {
+    position: absolute;
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    background: transparent;
+    color: transparent;
+    backdrop-filter: blur(2px);
+    box-shadow: inset 1px 1px 5px rgba(255, 255, 255, 0.3), 0 0 5px rgba(0, 0, 0, 0.2);
+    border-radius: 12px;
+    padding: 2rem;
+    width: 14rem;
+    height: 14rem;
+}
+
+.buttons {
+    display: block; /* 使每个按钮独占一行 */
+    border: 2px solid #4db8ff; /* 线框颜色 */
+    border-radius: 50px; /* 圆角 */
+    background-color: transparent;
+    color: #4db8ff; /* 文字颜色 */
+    font-family: DreamHanSansCN;
+    font-size: 14px; /* 减小字体大小 */
+    text-align: center;
+    cursor: pointer;
+    padding: 8px 16px;
+    transition: background-color 0.3s, border-color 0.3s;
+    margin: 10px 0; /* 每行之间有间距 */
+    position: relative;
+    top: 10px;
+  }
+  
+  .buttons:hover {
+    background-color: #ffffff; /* 鼠标悬停时的背景颜色 */
+    border-color: #26c1f0; /* 鼠标悬停时的边框颜色 */
+    color: #1989ac;
+  }
+
+  /* 对底部按钮容器的样式 */
+
+
+  [data-theme="dark"]  .buttons:hover {
+    background-color: transparent; /* 鼠标悬停时的背景颜色 */
+    border-color: #ffde25; /* 鼠标悬停时的边框颜色 */
+    color: #ffde25;
+  }
+
+@media (max-width: 1000px) {
+    .hero {
+        display: grid;
+        grid-template-columns: 1fr;
+        grid-template-rows: max-content minmax(0, max-content);
+        align-items: start;
+        height: auto;
+    }
+
+    .intro {
+        padding: 0;
+        padding-top: 16rem;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .background {
+        width: 100%;
+        justify-self: center;
+        padding-top: 16rem;
+        height: 100%;
+        display: grid;
+        place-items: center;
+    }
+
+    .background svg {
+        width: 90%;
+        height: auto;
+    }
+
+    .box {
+        width: 12rem;
+        height: 12rem;
+    }
+}
+
+@media (max-width: 570px) {
+    .hero {
+        height: auto;
+    }
+
+    .background {
+        padding-top: 8rem;
+    }
+
+    .background svg {
+        width: 100%;
+        height: auto;
+    }
+
+    .box {
+        width: 8rem;
+        height: 8rem;
+    }
+
+    .intro {
+        padding-top: 8rem;
+    }
+}

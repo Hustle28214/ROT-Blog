@@ -15,7 +15,7 @@ const announcementBarContent = `正在施工中🚧`
 /** @type {import('@docusaurus/types').Config} */
 const config = {
   title: '烟雨夜灯。',
-  tagline: '桃李春风一杯酒，江湖夜雨十年灯。',
+  tagline: '江湖夜雨十年灯',
   favicon: 'img/leyan_Logo.ico',
   
   
@@ -63,6 +63,7 @@ const config = {
         },
         
         blog: {
+          
           showReadingTime: true,
           // Please change this to your repo.
           // Remove this to remove the "edit this page" links.

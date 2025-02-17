@@ -53,7 +53,7 @@ body {
 
 /* 暗模式下背景色 */
 [data-theme='dark'] body {
-  background-color: var(--ifm-background-color);
+  background-color: transparent;
 }
 
 body {

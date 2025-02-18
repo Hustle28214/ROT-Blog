@@ -9,7 +9,7 @@ import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 
 
-const announcementBarContent = `正在施工中🚧`
+const announcementBarContent = `2025新年快乐🎉`
 
 
 /** @type {import('@docusaurus/types').Config} */

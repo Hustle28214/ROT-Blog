@@ -1,0 +1,184 @@
+import WordCount from '../../../src/components/WordCount/WordCount';
+
+<WordCount>
+## 1. 基本操作 
+
+> 博主版本为R2022b，可能略有出入。
+
+命令行输入simulink或者菜单栏都可以打开Simulink。
+
+以搭建一个平衡车模型为目标，我们简单介绍一下怎么搭建一个基本的模型，以及一些基本的变换。
+
+刚开始我们可以选Blank Model。初始化后我们会看到有一些基本的设置。
+
+### 1.1 World Settings
+
+![Image](https://github.com/user-attachments/assets/c221ff6f-a263-45d0-8fe9-97e82540ed85)
+
+以上是世界设置（world settings），我们单击可以选中某个模块，双击更改设置。Conn1是连接到外部的接口。
+
+我们双击Solver Configuration，可以更改 solver 的设置。
+
+![Image](https://github.com/user-attachments/assets/37b0203e-1f12-4866-9cd7-53814d7d0009)
+
+这个设置基本不用动。但是为了熟悉整个系统，我们来看每一个选项：
+
+1. Equation Formulation : 可选时间或频率/时间。指定求解器怎么处理正弦变量。简单点说，如果这是一个线性/线性变化的系统，可以选频率/时间，此时采用可变步长求解，并且自动寻找标称频率，仿真速度会快一点。选时间的话，步长会被限制。
+2. Index reduction method : 非线性索引缩减方法。入门默认导数替换（Derivative replacement），如果默认的DR在动态状态选择问题求解失败了，可以换投影（Projection），不复杂、不庞大的系统也可以选None。
+3. Start simulation from steady state : 是否从稳态开始模拟。默认是关闭的，也可以勾选打开，类似于Adams的是否从平衡状态开始。看需求。
+4. Consistency tolerance : 一致性容差（容忍度）。报错不收敛时可以改大一些。
+5. Use Local Solver : 是否使用本地求解器。默认是关闭的，可以打开。打开之后可以选三个，Backward Euler抑制振荡，Trapezoidal捕获振荡，Partitioning分而治之。稳定选第一个，速度快选第三个。然后输入采样时间。
+6. Use fixed-cost runtime consistency iterations : 指定瞬态初始化的非线性和模式迭代次数。到这就比较高级了，默认是关闭的，关闭状态下系统默认选用更稳健更慢的算法求解。选择上一个选项后会打开这个选项，但也可以勾掉。
+7. Linear Algebra : 指定求解矩阵的方式。auto是自动，sparse视为稀疏矩阵，full视为满矩阵，默认是auto。
+8. Delay memory budget : 指定最大的延迟内存预算。默认是1024KB。超出此值会报错。看自己的内存资源自由指定。
+9. Apply filtering at 1-D/3-D connections when needed: 默认开启。这就是说要是有多体块接入进来了，求导就需要增加导数了，开着就行。
+
+接着是World Frame，指定世界。没有任何设置。
+
+最后是Mechanism Configuration，可以指定重力。需要注意的是重力是以一个1x3矩阵的方式指定的，代表作用的方向，你还可以指定其单位。默认作用在z坐标竖直向下，值为-9.80665m/s^2。也可以指定无重力或者随时间变化。重力是比较重要的，改的比较多，假如是造车的时候，我们需要统一好坐标系，指定正确的重力方向。此外，Joint Mode Transition（关节模式转换）可以指定非线性迭代次数。
+
+
+
+
+### 1.2 添加模块
+
+在进行下一步操作之前我们首先打开搜索工具条。
+
+![Image](https://github.com/user-attachments/assets/43a0e88c-fc6b-42ab-90ea-a8e8028cedd5)
+
+双击界面就能唤醒工具条。如果我们要搜索模块，先点击左边的模块。
+
+![Image](https://github.com/user-attachments/assets/5b0a89e9-56fb-4596-974b-b3968218e646)
+
+我们首先可以创建一条杆子。搜索Brick Solid。
+
+![Image](https://github.com/user-attachments/assets/26ee47ca-4bf9-44d2-b265-fa68f1ddfd4a)
+
+我们来看其中的属性设置。
+
+1. 几何部分，指定维度，也就是长宽高。可以指定单位。
+2. 导出整个几何属性。仿真的时候可以选。
+3. 惯性设置。可以指定从几何计算（这样的话就假定均质了），也可以指定质心。可以指定基于质量、密度。可以选单位。
+4. 渲染设置。可以指定颜色和光度。
+5. 显示用于连接到其他块的参考帧端口，看连了哪些别的块，开着就行。
+
+然后我们添加两个轮子。
+
+此时我们要搜索Cylindrical Solid。
+
+![Image](https://github.com/user-attachments/assets/5963889d-55e9-475d-8bdf-eaf82dfb4a3a)
+
+和方块的设置除了基本几何属性基本一样，此时我们指定半径和高度。
+
+此外我们需要添加胎皮，这里直接重合几何中心，并使得黄色胎心半径小于胎皮，略高于胎皮就行。
+
+![Image](https://github.com/user-attachments/assets/aa1ee50d-633e-49a6-a763-501a3a485bd7)
+
+我们连接胎心和胎皮即可：
+
+![Image](https://github.com/user-attachments/assets/4a0da4ec-6954-4ac2-88d8-402a4388ed13)
+
+
+
+那么到目前，我们就已经有了一个基本的平衡车的材料：用一根杆子连接的双轮。
+
+我们要知道，机器人学最核心的就是坐标变换这件事。那么平衡车也是如此。刚刚建模的时候，默认建模的坐标系是世界坐标系，但是很明显我们不可能轮子朝上使得车轮行走。我们需要把轮子立起来。
+
+此时的变换，几何中心是不变的。那么我们可以想见，这个变换应该是原先的z轴作为x轴，也就是绕y轴旋转90度。两个轮子都执行相同的操作。
+
+记住这一点。但在建立这个系统的时候，我们选择x轴作为重力坐标系，所以此时并不做任何操作。
+
+
+将我们的杆子与两轮连接。此时我们会发现两轮重合在杆子的几何中心。我们需要将两个轮子分开，安装到杆子的两头去。
+
+并为杆子添加一个Weld Joint（焊接关节），用以固定轮子：
+
+![Image](https://github.com/user-attachments/assets/6e4b3012-0b9b-4596-8598-3e3519b357c1)
+
+
+
+我们需要Rigid Transform去完成这个平移变换。沿杆子的两头就是沿z轴平移，所以我们添加变换模块后，选择平移下的标准坐标系，各沿+Z、-Z来平移100mm。
+
+![Image](https://github.com/user-attachments/assets/7c87167b-44d3-4408-a5fc-13f4dfe20d45)
+
+
+
+至此，这个子系统就建立好了。
+
+![Image](https://github.com/user-attachments/assets/03f070ba-892c-404a-8bdf-062d30581c81)
+
+点击仿真菜单的运行按钮，就可以看到这个子系统在仿真中运行了。
+
+下面是建好的模型，你可以在左手边点选模块，就可以看到属性，但仿真窗口是不可以更改属性的。
+
+![Image](https://github.com/user-attachments/assets/964d36c4-7a46-408f-a18f-4db7f1c95394)
+
+### 1.3 添加驱动
+
+我们首先建立一个底盘。复制两份底盘，作为三层板。
+
+![Image](https://github.com/user-attachments/assets/f05459db-6abc-46d6-ab03-ebaaa4796985)
+
+由于是三层板，我们将板子连接后，对其中两层做平移变换，各自沿+Z轴平移150mm和250mm。
+
+![Image](https://github.com/user-attachments/assets/cc0bd40a-a256-4f96-8d0d-4b2acbdab850)
+
+然后建立四条支撑筋。选择笛卡尔坐标系，输入图中参数，x轴/y轴分别+-,++,-+,+-，分别和主通路连接起来。我们框选这四个支撑筋，添加为一个子系统，比较方便看。
+
+![Image](https://github.com/user-attachments/assets/6da4ea5f-3d67-4589-84c2-26802be1ec76)
+
+重点是为系统添加驱动。
+
+搜索External Force and Torque（外部力与扭矩），添加到中间的板子上（接线在几何变换的后头）。此时我们的施力方向是前进方向，也就是Y轴，勾选y轴。
+
+搜索step，添加微小扰动。
+
+想要观察我们的量添加的如何，搜索scope，添加示波器，观察输出。如果对仿真结果不满意，可以微改阶跃时间。
+
+别忘了添加模拟量-物理量的转换器，因为我们添加的阶跃始终只是一个模拟量。你可以搜索Simulink-PS Converter。如图所示：
+
+![Image](https://github.com/user-attachments/assets/473bf40b-8eda-4ea6-8d49-49a549a46fc9)
+
+### 1.4 添加约束
+
+既然是平衡车，我们需要添加一个用于测试的地板。地板选择方块即可，记得做坐标系转换。此时需要添加旋转，我们选择旋转序列，也就是先沿xx轴转再沿xx轴转这个道理。此时选写[90 0 0]deg即可。并且地板由于几何中心，初始会卡在车子上，所以要做平移转换，使得地板在轮子下方。我们选择往下也就是向X轴的负方向平移42mm。择绕Y轴转90度，那么直接找一个Y-X-Y填
+
+![Image](https://github.com/user-attachments/assets/f35c211d-0743-4b31-be4b-7159b366645c)
+
+
+我们为系统添加来自地板的摩擦力。
+
+![Image](https://github.com/user-attachments/assets/f7ae0912-fd6a-4432-8894-f3de65e97520)
+
+我们需要将车身和车轮添加为一个机器人关节，也就是6-DOF的关节，搜索6-DOF Joint，连接，暂不需要设置任何参数；
+
+为车身添加一个旋转变换，使得其竖直：
+
+
+![Image](https://github.com/user-attachments/assets/847cecd9-2670-42d6-a226-648ed6a9a9d1)
+
+并且为整车添加一个旋转，使得其能正常立住：
+
+![Image](https://github.com/user-attachments/assets/afa19984-c562-4acf-80ae-a4e2af7e4f0d)
+
+正常来说，车子运动存在阻尼，也就是说不可能完全是一个摆，而是运动会随着时间变化，运动趋势逐渐减小。此时我们需要添加一个Revolute Joint，添加阻尼系数为0.001（也可以自己根据材料改）。
+
+![Image](https://github.com/user-attachments/assets/bf2cd235-3940-4d27-a27e-b1fe6b24706c)
+
+这样的话，基本的运行就可以实现了。
+
+![Image](https://github.com/user-attachments/assets/7f5862a8-3b80-4a8e-a2e6-72128e72b89e)
+
+## 2. 控制方式
+
+事实上我们做到这里还不算真正的simulink，我们需要一些更深入的控制理论知识来完善整个倒立摆系统，比如说PID控制等等。
+
+
+
+
+## References
+
+[1]. HE-峰.首发——如何做轮腿机器人仿真（第一期）.\[M/OL\](2024-07-26)\[2024-02-18\].https://www.bilibili.com/video/BV1AS42197jb/?share_source=copy_web&vd_source=8b2bc57e71349607b55c9fde6b078ebd
+
+
+</WordCount>

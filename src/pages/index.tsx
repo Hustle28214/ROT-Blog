@@ -14,8 +14,10 @@ export default function Home() {
     return (
         <Layout title={tagline} description={description}>
             <main>
-                <HeadIntro />  
-                <Particles  className="absolute inset-0" quantity={100} ease={80} color="#ffffff" refresh/>
+                
+                <HeadIntro></HeadIntro>  
+                <Particles  className="absolute inset-0 -z-10" quantity={100} ease={80} color="#ffffff" refresh/>
+                
             </main>
         </Layout>
     )

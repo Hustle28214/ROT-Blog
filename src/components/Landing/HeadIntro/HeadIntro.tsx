@@ -58,7 +58,7 @@ function HeadGreet() {
 
 export default function HeadIntro() {
     return (
-        <motion.div className={styles.hero}>
+        <motion.div className={styles.hero} style={{ backgroundColor: 'transparent' }}>
             <div className={styles.intro}>
                 <HeadGreet />
                 <motion.p custom={2} initial="hidden" animate="visible" variants={variants} className="max-lg:px-4">

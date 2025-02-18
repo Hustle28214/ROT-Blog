@@ -1,0 +1,202 @@
+import WordCount from '../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+在给机器人确定最优杆长的时候发现了Pyslvs，这是一个非常好用的基于Python的机械设计软件。在国内目前还不是很出名，其官方文档也比较简洁，故我认为可以总结一下Pyslvs的使用方法。
+
+## 1. 安装介绍
+
+> 成功环境：Win10，Python 3.10.12，Pyslvs 22.07.0，Qt5 5.15.0
+
+> 文档：[Pyslvs-UI](https://pyslvs-ui.readthedocs.io/en/latest/index.html)
+
+安装命令：
+```bash
+pip install pyslvs-ui
+# Extras
+pip install pyslvs-ui[slvs,scipy]
+```
+
+唤醒命令：
+```bash
+python -m pyslvs_ui
+```
+
+打开界面如图所示：
+
+![Image](https://github.com/user-attachments/assets/ccaba6e8-1fcd-41c2-b5e9-68ff31d8efa0)
+
+
+## 2. 界面操作
+
+Pyslvs主要分为一个菜单栏，一个左下角的分组栏，一个右下角的操作栏和四个大的板块，分别是Mechanism、Inputs、Synthesis、Project。
+
+“Shift”和“Ctrl”键将决定连续选择的行为。“Shift”键将更新选择为并。“Ctrl”键将取消选择交集，更新相对补码。
+
+“Ctrl+A”和“Esc”键可以分别选择和取消选择所有实体。单击空白区域而不按住“Shift”和“Ctrl”键也可以取消选择所有实体。
+
+使用“Shift”键加上滚动鼠标滚轮可以切换选项卡和选择模式。
+
+### 2.1 操作栏
+
+底部显示了当前光标位置和FPS。
+
+最右下角显示了当前画布上的自由度总数。
+
+可以通过滚轮缩放，拖动滚轮更改视图。默认为查看模式，也就是仅查看不能拖动点。你也可以右下角更改模式：
+
+<img width="217" alt="Image" src="https://github.com/user-attachments/assets/f200278e-699f-4d37-9cc5-c1fa5616f063" />
+
+Translate就是平移模式，此时按住点可以实现以相同的光标偏移量移动点。Rotate就是旋转模式，此时按住点可以实现围绕原点（0,0）移动点。Reflect就是翻转模式，此时点击点就会绕原点翻转。
+
+<img width="215" alt="Image" src="https://github.com/user-attachments/assets/24068049-10d5-4c08-82f5-28766e0cb7f0" />
+
+选中某个点，垂直和水平对齐可以快速更改点的垂直/水平位置，也就是x轴坐标和y轴坐标。
+
+可以打开左边的栅格模式，这样就能实现栅格化的移动。
+
+### 2.2 Mechanism
+
+首先是Point部分。
+
+右键空白区域添加新的点，在右边的坐标系中框选或者点选都能删除点，Ctrl+Z撤销：
+
+![Image](https://github.com/user-attachments/assets/0767696e-9904-498a-adae-acb893f5adae)
+
+你可以指定点的颜色，点的类型、点的位置和点的连接。
+
+点的类型分为R、RP、P，“R”表示旋转（可旋转）关节。“P”表示棱柱关节。“RP”指旋转棱柱关节。
+
+简单来说，就是旋转副R、平移副P、旋转+平移（圆柱副）RP。
+
+![Image](https://github.com/user-attachments/assets/5d42ac8c-5a17-45b1-b2fc-a9a014f4c8cb)
+
+你可以直接指定点的坐标，也可以通过高级设置来指定点的位置。
+
+你还可以通过指定与两点的距离，指定正反方向来确定一个点。
+
+![Image](https://github.com/user-attachments/assets/2e233a69-a33c-46d3-9327-ea92d8ee4bc5)
+
+然后是Link部分。
+
+你可以在左手边的空白区域新增连接。在刚刚的点的部分，你可以添加ground(固定)连接，代表这个点固定。
+
+![Image](https://github.com/user-attachments/assets/ff676b82-0dd9-416a-a90b-274acd247e6c)
+
+像图中这个类似霍肯连杆的机构，就是固定了0,1两个点作为基座。
+
+这个连接情况会导致点2/3/4之间的三个连接杆长固定，所以3.4是同心圆标记。
+
+接下来是Calculation部分。
+
+![Image](https://github.com/user-attachments/assets/f839d37f-263d-4630-ba9e-9480a658f520)
+
+这显示了所使用的计算方法，比如点边角等等，便于核对固定杆长等。注意，Calculation是不允许修改的，属于求解结果。
+
+### 2.3 Inputs
+
+接下来是仿真部分。做简单的杆长分析，学到这里就可以了。
+
+![Image](https://github.com/user-attachments/assets/c33f5204-10cc-402d-9cdc-cc3b29c945aa)
+
+#### 旋转关节R
+
+Base Points作为本次运动坐标系的原点，Driver Points驱动点是矢量。如上图所示，选中左边的路径，点下面的开始按钮可以开始轨迹仿真，属于动态分析。需要停止复位则点下一个复位键。
+
+输入右边的角度，可以指定转多少角度，属于静态分析。
+
+#### 平移关节（P）或圆柱关节（RP）
+
+“Base Point”和“Driver Point”是输入对中的同一点。将“偏移”值设置为引脚和槽之间的距离。
+
+接下来看Analysis部分：
+
+![Image](https://github.com/user-attachments/assets/b1f71ce3-01a5-4035-845e-03de01bf1b3c)
+
+双击Auto Review，此为整体分析，分析的是画布上所有的点的路径数据，此时弹窗点击"Save"可以保存我们的数据。数据以点集形式保存为csv。
+
+想要更粗/细的点，可以在右上方的“Interval”中输入步长角度。
+
+旁边的两个键：
+
+1. Refresh，更新数据
+2. DupLicate，复制一份数据的副本。
+
+底下有一个回收键，可以删除不想要的数据组。
+
+下面的栏目可以针对某个点分析，此处我们以2点为例，分析其位置和速度。
+
+首先选中Point 2，如果想要只显示点2的轨迹，可以点击“Show Only"，想要显示所有轨迹则点“Show All"。
+
+然后我们可以导出点2的轨迹，Comma-Seperate Values是用空格隔开的坐标集：
+
+```
+0,0
+0.1,0.1
+```
+
+Array-Like则是矩阵形式：
+```
+[0,0],
+[0.1,0.1]
+```
+
+![Image](https://github.com/user-attachments/assets/8abc9325-5769-4287-bfd6-d005de60d9f8)
+
+看到Plot，我们可以选笛卡尔坐标系或者极坐标系。或者选择相对某个点建立坐标系。
+
+下面的栏目可以勾选需要分析的参数，比如你要分析位置和速度变化你就选这两项，然后点击“Plot”。
+
+点击“Vector Animation"，可以进行向量模拟。
+
+![Image](https://github.com/user-attachments/assets/fc4f30e4-8632-4157-ac49-3c1b8e3697c4)
+
+### 2.4 Synthesis
+
+将现有的机构再利用是Pyslvs的一大核心亮点。Synthesis由三大部分组成，分别是结构合成，集合和优化器。
+
+这一部分是图论的应用，没有学习这一部分理论的可以依据作者的推荐去学习：https://pyslvs-ui.readthedocs.io/en/latest/references/#cite
+
+如果不学习，也不妨碍基本的使用。
+
+#### Structure Synthesis
+
+
+
+![Image](https://github.com/user-attachments/assets/0ef4bba6-11bf-4636-a080-ac666bf33f99)
+
+
+### 2.5 Project
+
+这一部分基本上是与外部的导入和导出。
+
+![Image](https://github.com/user-attachments/assets/b59936b8-2f2a-4908-8157-3be8d6263232)
+
+导入Background可以导入背景图片，方便对照。
+
+![Image](https://github.com/user-attachments/assets/47201040-c6d2-4b74-aabd-adc691dad6e8)
+
+在导入部分，点第一个尺子和笔的按钮，可以导入一个机构运动的实例。
+
+![Image](https://github.com/user-attachments/assets/4d7c0a59-0016-4fa4-8bd7-1435626fc399)
+
+点击下面的PMKS，需要按该语法来导入想要的关节。
+> About PMKS: https://designengrlab.github.io/PMKS/
+
+
+Project Overview，预览整个项目：
+
+![Image](https://github.com/user-attachments/assets/bc91585e-a578-4ab1-8fd4-594e3aba387d)
+
+Mechanism Expression，机械表达式：
+
+![Image](https://github.com/user-attachments/assets/536e5e9f-6d1e-4f15-a5e0-daf008e196f9)
+
+
+你可以选择导出为不同的格式。
+
+最下方是操作记录，记录每一次你的操作，随项目一起保存。
+
+
+
+</WordCount>

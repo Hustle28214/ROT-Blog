@@ -53,6 +53,23 @@ mapping = {
     "Lava Hot":5
 }
 ```
+```python
+import pandas as pd
+# 读取数据
+df = pd.read_csv("../input/train.csv")
+# 取*ord_2*列，并使用映射将类别转换为数字
+df.loc[:, "*ord_2*"] = df.*ord_2*.map(mapping)
+```
+```python
+# 映射前的数值计数
 
-
+df.*ord_2*.value_counts()
+Freezing 142726
+Warm 124239
+Cold           97822
+Boiling Hot    84790
+Hot            67508
+Lava Hot       64840
+Name: *ord_2*, dtype: int64
+```
 </WordCount>

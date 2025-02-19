@@ -1,0 +1,1085 @@
+import WordCount from '../../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+## 1. 认识分类变量
+
+分类变量/特征是指任何特征类型，可分为两⼤类:
+- 无序
+- 有序
+
+**无序变量**是指两个或两个以上类别的变量，类别没有任何相关顺序。例如，如果将性别分为两组，即男性和⼥性，则可将其视为名义变量。
+**有序变量**是指两个或两个以上类别的变量，其中每个类别都有顺序。例如，如果将教育程度分为“小学”、“初中”、“高中”、“大学”等，则可将其视为序数变量。
+
+就定义⽽⾔，我们也可以将分类变量分为⼆元变量，即只有两个类别的分类变量。有些⼈甚⾄把分类变量称为 "循环 "变量。周期变量以 "周期 "的形式存在，例如⼀周中的天数： 周⽇、周⼀、周⼆、周三、周四、周五和周六。周六过后，⼜是周⽇。这就是⼀个循环。另⼀个例⼦是⼀天中的⼩时数，如果我们将它们视为类别的话。
+
+分类变量有很多不同的定义，很多⼈也谈到要根据分类变量的类型来处理不同的分类变量。不过，我认为没有必要这样做。所有涉及分类变量的问题都可以⽤同样的⽅法处理。
+
+开始之前，我们需要⼀个数据集（⼀如既往）。要了解分类变量，最好的免费数据集之⼀是 Kaggle分类特征编码挑战赛中的 cat-in-the-dat 。共有两个挑战，我们将使⽤第⼆个挑战的数据，因为它⽐前⼀个版本有更多变量，难度也更⼤。
+
+数据集由各种分类变量组成：
+- ⽆序
+- 有序
+- 循环
+- ⼆元
+
+目标变量对于学习分类变量来说并不十分重要，但最终我们将建立一个端到端模型，因此我们需要看图2的目标变量分布。目标是偏斜的，因此，对于这个二元分类问题来说，最好的指标是ROC曲线下面积（AUC）。我们也可以使用精确度和召回率，但AUC结合了这两个指标。因此，AUC是评估方法的最好选择。
+
+总体⽽⾔，有：
+- 5个⼆元变量
+- 10个⽆序变量
+- 6个有序变量
+- 2个循环变量
+- 1个⽬标变量
+
+让我们看看数据集中的ord_2特征。它包括6个不同的类别：
+- 冰冻
+- 温暖
+- 寒冷
+- 较热
+- 热
+- 非常热
+
+因此，我们需要转换为文本数据，我们很容易能联想到**字典**能够帮助我们完成这一份任务。
+
+```python
+# 映射字典
+mapping = {
+    "Freezing":0,
+    "Warm":1,
+    "Cold":2,
+    "Boiling Hot":3,
+    "Hot":4,
+    "Lava Hot":5
+}
+```
+
+## 2. 标签编码
+
+```python
+import pandas as pd
+# 读取数据
+df = pd.read_csv("../input/train.csv")
+# 取*ord_2*列，并使用映射将类别转换为数字
+df.loc[:, "*ord_2*"] = df.*ord_2*.map(mapping)
+```
+```bash
+# 映射前的数值计数
+
+df.*ord_2*.value_counts()
+Freezing 142726
+Warm 124239
+Cold           97822
+Boiling Hot    84790
+Hot            67508
+Lava Hot       64840
+Name: *ord_2*, dtype: int64
+```
+这种分类变量的编码⽅式被称为标签编码（Label Encoding）我们将每个类别编码为⼀个数字标签。
+
+我们也可以使用``scikit-learn``中的``LabelEncoder``进行编码。
+
+```python
+import pandas as pd
+from sklearn import preprocessing
+# 读取数据
+df = pd.read_csv("../input/train.csv")
+# 将缺失值填充为"NONE"
+df.loc[:, "*ord_2*"] = df.*ord_2*.fillna("NONE")
+# LabelEncoder编码
+lbl_enc = preprocessing.LabelEncoder()
+# 转换数据
+df.loc[:, "*ord_2*"] = lbl_enc.fit_transform(df.*ord_2*.values)
+```
+
+你会看到我使⽤了 ``pandas`` 的 ``fillna``。原因是 ``scikit-learn`` 的 ``LabelEncoder`` ⽆法处理 NaN 值，⽽ord_2 列中有 NaN 值。
+
+我们可以在许多基于树的模型中直接使⽤它：
+- 决策树
+- 随机森林
+- 提升树
+或任何⼀种提升树模型
+- XGBoost
+- GBM
+- LightGBM
+这种编码⽅式不能⽤于线性模型、⽀持向量机或神经⽹络，因为它们希望数据是标准化的。
+
+
+对于这些类型的模型，我们可以对数据进⾏⼆值化（binarize）处理。
+
+```bash
+Freezing   → 0 → 0 0 0
+
+Warm       → 1 → 0 0 1
+
+Cold       → 2 → 0 1 0
+
+Boiling Hot→ 3 → 0 1 1
+
+Hot        → 4 → 1 0 0
+
+Lava Hot   → 5 → 1 0 1
+```
+
+这只是将类别转换为数字，然后再转换为⼆值化表⽰。这样，我们就把⼀个特征分成了三个（在本例中）特征（或列）。如果我们有更多的类别，最终可能会分成更多的列。
+
+如果我们⽤稀疏格式存储⼤量⼆值化变量，就可以轻松地存储这些变量。稀疏格式不过是⼀种在内存中存储数据的表⽰或⽅式，在这种格式中，你并不存储所有的值，⽽只存储重要的值。在上述⼆进制变量的情况中，最重要的就是有 1 的地⽅。
+
+很难想象这样的格式，但举个例⼦就会明⽩。
+
+假设上⾯的数据帧中只有⼀个特征： ``ord_2`` 。
+```bash
+Index Feature
+
+0 Warm
+
+1 Hot
+
+2 Lava hot
+```
+⽬前，我们只看到数据集中的三个样本。让我们将其转换为⼆值表⽰法，即每个样本有三个项⽬。
+这三个项⽬就是三个特征。
+```bash
+Index Feature_0 Feature_1 Feature_2
+
+0 0 0 1
+
+1 1 0 0
+
+2 1 0 1
+```
+因此，我们的特征存储在⼀个有 3 ⾏ 3 列（3x3）的矩阵中。矩阵的每个元素占⽤ 8 个字节。因此，
+
+这个数组的总内存需求为 8x3x3 = 72 字节。
+
+我们还可以使⽤⼀个简单的 python 代码段来检查这⼀点。
+```python
+import numpy as np
+example = np.array(
+ [
+   [0, 0, 1],
+   [1, 0, 0],
+   [1, 0, 1]
+ ]
+)
+print(example.nbytes)
+```
+
+注：应当打印出72，但打印出来36.此时矩阵的每个元素占用4个字节。
+
+这段代码将打印出 72，就像我们之前计算的那样。但我们需要存储这个矩阵的所有元素吗？如前所述，我们只对 1 感兴趣。0 并不重要，因为任何与 0 相乘的元素都是 0，⽽ 0 与任何元素相加或相减也没有任何区别。只⽤ 1 表⽰矩阵的⼀种⽅法是某种字典⽅法，其中键是⾏和列的索引，值是 1。
+```
+(0, 2)  1
+
+(1, 0)  1
+
+(2, 0)  1
+
+(2, 2)  1
+```
+这样的符号占⽤的内存要少得多，因为它只需存储四个值（在本例中）。使⽤的总内存为 8x4 = 32 字节。任何 numpy 数组都可以通过简单的 python 代码转换为稀疏矩阵。
+```python
+import numpy as np
+from scipy import sparse
+example = np.array(
+ [
+   [0, 0, 1],
+   [1, 0, 0],
+   [1, 0, 1]
+ ]
+)
+sparse_example = sparse.csr_matrix(example)
+print(sparse_example.data.nbytes)
+```
+
+```python
+print(
+  sparse_example.data.nbytes +
+  sparse_example.indptr.nbytes +
+  sparse_example.indices.nbytes
+)
+```
+
+注：打印出48.
+
+这将打印出 64 个元素，仍然少于我们的密集数组。遗憾的是，我不会详细介绍这些元素。你可以在scipy ⽂档中了解更多。当我们拥有更⼤的数组时，⽐如说拥有数千个样本和数万个特征的数组，⼤⼩差异就会变得⾮常⼤。例如，我们使⽤基于计数特征的⽂本数据集。（实际上运行是48个元素）
+
+```python
+import numpy as np
+from scipy import sparse
+n_rows = 10000
+n_cols = 100000
+# 生成符合伯努利分布的随机数组，维度为[10000, 100000]
+example = np.random.binomial(1, p=0.05, size=(n_rows, n_cols))
+print(f"Size of dense array: {example.nbytes}")
+# 将随机矩阵转换为稀疏矩阵
+sparse_example = sparse.csr_matrix(example)
+print(f"Size of sparse array: {sparse_example.data.nbytes}")
+full_size = (
+  sparse_example.data.nbytes +
+  sparse_example.indptr.nbytes +
+  sparse_example.indices.nbytes
+)
+
+print(f"Full size of sparse array: {full_size}")
+```
+
+因此，密集阵列需要 \~8000MB 或⼤约 8GB 内存。⽽稀疏阵列只占⽤ 399MB 内存。
+
+这就是为什么当我们的特征中有⼤量零时，我们更喜欢稀疏阵列⽽不是密集阵列的原因。
+
+请注意，稀疏矩阵有多种不同的表⽰⽅法。这⾥我只展⽰了其中⼀种（可能也是最常⽤的）⽅法。深⼊探讨这些⽅法超出了本书的范围，因此留给读者⼀个练习。
+
+尽管⼆值化特征的稀疏表⽰⽐其密集表⽰所占⽤的内存要少得多，但对于分类变量来说，还有⼀种转换所占⽤的内存更少。这就是所谓的 **"独热编码"**。
+
+## 3. 独热编码
+
+独热编码也是⼀种⼆值编码，因为只有 0 和 1 两个值。但必须注意的是，它并不是⼆值表⽰法。我们
+可以通过下⾯的例⼦来理解它的表⽰法。
+
+假设我们⽤⼀个向量来表⽰ ord_2 变量的每个类别。这个向量的⼤⼩与 ord_2 变量的类别数相同。在
+这种特定情况下，每个向量的⼤⼩都是 6，并且除了⼀个位置外，其他位置都是 0。让我们来看看这
+个特殊的向量表。
+```bash
+Freezing 0 0 0 0 0 1
+
+Warm 0 0 0 0 1 0
+
+Cold 0 0 0 1 0 0
+
+Boiling Hot 0 0 1 0 0 0
+
+Hot 0 1 0 0 0 0
+
+Lava Hot 1 0 0 0 0 0
+```
+我们看到向量的⼤⼩是 1x6，即向量中有6个元素。这个数字是怎么来的呢？如果你仔细观察，就会发现如前所述，有6个类别。在进⾏独热编码时，向量的⼤⼩必须与我们要查看的类别数相同。每个向量都有⼀个 1，其余所有值都是 0。现在，让我们⽤这些特征来代替之前的⼆值化特征，看看能节省多少内存。
+
+如果你还记得以前的数据，它看起来如下：
+```bash
+Index Feature
+
+0 Warm
+
+1 Hot
+
+2 Lava hot
+```
+每个样本有3个特征。但在这种情况下，独热向量的⼤⼩为 6。因此，我们有6个特征，⽽不是3个。
+```
+Index F_0 F_1 F_2 F_3 F_4 F_5
+
+0 0 0 0 0 1 0
+
+1 0 1 0 0 0 0
+
+2 1 0 1 0 0 0
+```
+因此，我们有 6 个特征，⽽在这个 3x6 数组中，只有 3 个1。使⽤ numpy 计算⼤⼩与⼆值化⼤⼩计算脚本⾮常相似。你需要改变的只是数组。让我们看看这段代码:
+
+```python
+import numpy as np
+from scipy import sparse
+example = np.array(
+ [
+   [0, 0, 0, 0, 1, 0],
+   [0, 1, 0, 0, 0, 0],
+   [1, 0, 0, 0, 0, 0]
+ ]
+)
+print(f"Size of dense array: {example.nbytes}")
+sparse_example = sparse.csr_matrix(example)
+print(f"Size of sparse array: {sparse_example.data.nbytes}")
+full_size = (
+  sparse_example.data.nbytes +
+  sparse_example.indptr.nbytes +
+  sparse_example.indices.nbytes
+)
+print(f"Full size of sparse array: {full_size}")
+```
+
+我们可以看到，密集矩阵的⼤⼩远远⼤于⼆值化矩阵的⼤⼩。不过，稀疏数组的⼤⼩要更⼩。让我们⽤更⼤的数组来试试。在本例中，我们将使⽤ scikit-learn 中的 OneHotEncoder 将包含 1001 个类别的特征数组转换为密集矩阵和稀疏矩阵。
+```python
+import numpy as np
+from sklearn import preprocessing
+
+# 生成符合均匀分布的随机整数，维度为[1000000, 10000000]
+example = np.random.randint(1000, size=1000000)
+
+# 独热编码，非稀疏矩阵
+# 独热编码函数sparse参数已经改变：Added in version 1.2: sparse was renamed to sparse_output
+ohe = preprocessing.OneHotEncoder(sparse_output=False)
+# 将随机数组展平
+ohe_example = ohe.fit_transform(example.reshape(-1, 1))
+print(f"Size of dense array: {ohe_example.nbytes}")
+# 独热编码，稀疏矩阵
+ohe = preprocessing.OneHotEncoder(sparse_output=True)
+# 将随机数组展平
+ohe_example = ohe.fit_transform(example.reshape(-1, 1))
+print(f"Size of sparse array: {ohe_example.data.nbytes}")
+full_size = (
+  ohe_example.data.nbytes +
+  ohe_example.indptr.nbytes +
+  ohe_example.indices.nbytes
+)
+print(f"Full size of sparse array: {full_size}")
+```
+结果：
+```bash
+Size of dense array: 8000000000
+Size of sparse array: 8000000
+Full size of sparse array: 16000004
+```
+
+
+这⾥的密集阵列⼤⼩约为 8GB，稀疏阵列为 8MB。如果可以选择，你会选择哪个？在我看来，选择很简单，不是吗？
+
+这三种⽅法（标签编码、稀疏矩阵、独热编码）是处理分类变量的最重要⽅法。不过，你还可以⽤很多其他不同的⽅法来处理分类变量。将分类变量转换为数值变量就是其中的⼀个例⼦。
+
+假设我们回到之前的分类特征数据（原始数据中的 cat-in-the-dat-ii）。在数据中， ord_2 的值为“热”的 id 有多少？
+
+我们可以通过计算数据的形状（shape）轻松计算出这个值，其中 ord_2 列的值为 Boiling Hot 。
+```python
+In [X]: df[df.ord_2 == "Boiling Hot"].shape
+Out[X]: (84790, 25)
+```
+我们可以看到，有 84790 条记录具有此值。我们还可以使⽤ pandas 中的 groupby 计算所有类别的该
+值。
+```python
+In [X]: df.groupby(["ord_2"])["id"].count()
+Out[X]:
+ord_2
+Boiling Hot  84790
+Cold 97822
+Freezing 142726
+Hot 67508
+Lava Hot 64840
+Warm 124239
+Name: id, dtype: int64
+```
+如果我们只是将 ord_2 列替换为其计数值，那么我们就将其转换为⼀种数值特征了。我们可以使⽤
+``pandas`` 的 ``transform`` 函数和 ``groupby`` 来创建新列或替换这⼀列。
+```python
+In [X]: df.groupby(["ord_2"])["id"].transform("count")
+Out[X]:
+0   67508.0
+
+1   124239.0
+
+2   142726.0
+
+3   64840.0
+
+4   97822.0
+
+...
+
+599995 142726.0
+
+599996  84790.0
+
+599997 142726.0
+
+599998 124239.0
+
+599999  84790.0
+
+Name: id, Length: 600000, dtype: float64
+```
+你可以添加所有特征的计数，也可以替换它们，或者根据多个列及其计数进⾏分组。例如，以下代码通过对 ord_1 和 ord_2 列分组进⾏计数。
+```python
+In [X]: df.groupby(
+...:  [
+...:   "ord_1",
+...:   "ord_2"
+...:  ]
+...: )["id"].count().reset_index(name="count")
+Out[X]:
+ord_1   ord_2 count
+
+0 Contributor Boiling Hot 15634
+
+1 Contributor   Cold 17734
+
+2 Contributor  Freezing 26082
+
+3 Contributor   Hot 12428
+
+4 Contributor  Lava Hot 11919
+
+5 Contributor   Warm 22774
+
+6  Expert Boiling Hot 19477
+
+7  Expert   Cold 22956
+
+8  Expert  Freezing 33249
+
+9  Expert   Hot 15792
+
+10  Expert  Lava Hot 15078
+
+11  Expert   Warm 28900
+
+12 Grandmaster Boiling Hot 13623
+
+13 Grandmaster   Cold 15464
+
+14 Grandmaster  Freezing 22818
+
+15 Grandmaster   Hot 10805
+
+16 Grandmaster  Lava Hot 10363
+
+17 Grandmaster   Warm 19899
+
+18  Master Boiling Hot 10800
+```
+请注意，我已经从输出中删除了⼀些⾏，以便在⼀⻚中容纳这些⾏。这是另⼀种可以作为功能添加的计数。您现在⼀定已经注意到，我使⽤ id 列进⾏计数。不过，你也可以通过对列的组合进⾏分组，对其他列进⾏计数。
+
+还有⼀个⼩窍⻔，就是从这些分类变量中创建新特征。你可以从现有的特征中创建新的分类特征，⽽且可以毫不费⼒地做到这⼀点。
+```python
+In [X]: df["new_feature"] = (
+
+...:  df.ord_1.astype(str)
+
+...:  + "_"
+
+...:  + df.ord_2.astype(str)
+
+...: )
+```
+
+```python
+In [X]: df.new_feature
+
+Out[X]:
+
+0    Contributor_Hot
+
+1    Grandmaster_Warm
+
+2     nan_Freezing
+
+3     Novice_Lava Hot
+
+4    Grandmaster_Cold
+
+     ...
+
+599999 Contributor_Boiling Hot
+
+Name: new_feature, Length: 600000, dtype: object
+```
+
+在这⾥，我们⽤下划线将 ``ord_1`` 和 ``ord_2`` 合并，然后将这些列转换为字符串类型。请注意，``NaN`` 也会转换为字符串。不过没关系。我们也可以将``NaN`` 视为⼀个新的类别。这样，我们就有了⼀个由这两个特征组合⽽成的新特征。您还可以将三列以上或四列甚⾄更多列组合在⼀起。
+```python
+In [X]: df["new_feature"] = (
+
+...:  df.ord_1.astype(str)
+
+ ...:  + "_"
+
+...:  + df.ord_2.astype(str)
+
+...: + "_"
+
+ ...: + df.ord_3.astype(str)
+
+ ...: )
+```
+```python
+In [X]: df.new_feature
+
+Out[X]:
+
+0 Contributor_Hot_c
+
+1 Grandmaster_Warm_e
+
+2 nan_Freezing_n
+
+3 Novice_Lava Hot_a
+
+4  Grandmaster_Cold_h
+
+   ...
+599999 Contributor_Boiling Hot_b
+
+Name: new_feature, Length: 600000, dtype: object
+```
+
+## 4. 尝试结合类别
+
+那么，我们应该把哪些类别结合起来呢？这并没有⼀个简单的答案。这取决于您的数据和特征类型。
+
+⼀些领域知识对于创建这样的特征可能很有⽤。但是，如果你不担⼼内存和 CPU 的使⽤，你可以采⽤⼀种贪婪的⽅法，即创建许多这样的组合，然后使⽤⼀个模型来决定哪些特征是有⽤的，并保留它们。我们将在本书稍后部分介绍这种⽅法。
+
+⽆论何时获得分类变量，都要遵循以下简单步骤：
+
+- 填充 NaN 值（这⼀点⾮常重要！）。
+- 使⽤ scikit-learn 的 LabelEncoder 或映射字典进⾏标签编码，将它们转换为整数。如果没有填充
+NaN 值，可能需要在这⼀步中进⾏处理
+
+- 创建独热编码。是的，你可以跳过⼆值化！
+- 建模！我指的是机器学习。
+
+在分类特征中处理 NaN 数据⾮常重要，否则您可能会从 scikit-learn 的 LabelEncoder 中得到臭名昭著的错误信息：
+```bash
+ValueError: y 包含以前未⻅过的标签： [nan, nan, nan, nan, nan, nan, nan, nan, nan, nan, nan, nan, nan, nan]
+```
+
+这仅仅意味着，在转换测试数据时，数据中出现了 NaN 值。这是因为你在训练时忘记了处理它们。处理 NaN 值的⼀个简单⽅法就是丢弃它们。虽然简单，但并不理想。NaN 值中可能包含很多信息，如果只是丢弃这些值，就会丢失这些信息。在很多情况下，⼤部分数据都是 NaN 值，因此不能丢弃NaN 值的⾏/样本。处理 NaN 值的另⼀种⽅法是将其作为⼀个全新的类别。这是处理 NaN 值最常⽤的⽅法。如果使⽤ ``pandas``，还可以通过⾮常简单的⽅式实现。
+
+请看我们之前查看过的数据的 ord_2 列。
+
+```python
+In [X]: df.ord_2.value_counts()
+
+Out[X]:
+
+Freezing 142726
+
+Warm 124239
+
+Cold   97822
+
+Boiling Hot  84790
+
+Hot    67508
+
+Lava Hot  64840
+
+Name: ord_2, dtype: int64
+```
+填⼊ NaN 值后，就变成了
+```python
+In [X]: df.ord_2.fillna("NONE").value_counts()
+
+Out[X]:
+
+Freezing 142726
+
+Warm 124239
+
+Cold   97822
+
+Boiling Hot  84790
+
+Hot    67508
+
+Lava Hot  64840
+
+NONE   18075
+
+Name: ord_2, dtype: int64
+```
+哇！这⼀列中有 18075 个 NaN 值，⽽我们之前甚⾄都没有考虑使⽤它们。增加了这个新类别后，类别总数从 6 个增加到了 7 个。这没关系，因为现在我们在建⽴模型时，也会考虑 NaN。相关信息越多，模型就越好。
+
+假设 ord_2 没有任何 NaN 值。我们可以看到，这⼀列中的所有类别都有显著的计数。其中没有 "罕⻅"类别，即只在样本总数中占很⼩⽐例的类别。现在，让我们假设您在⽣产中部署了使⽤这⼀列的模型，当模型或项⽬上线时，您在 ord_2 列中得到了⼀个在训练中不存在的类别。在这种情况下，模型管道会抛出⼀个错误，您对此⽆能为⼒。如果出现这种情况，那么可能是⽣产中的管道出了问题。如果这是预料之中的，那么您就必须修改您的模型pipeline，并在这六个类别中加⼊⼀个新类别。
+
+这个新类别被称为 **"罕⻅"** 类别。罕⻅类别是⼀种不常⻅的类别，可以包括许多不同的类别。您也可以尝试使⽤近邻模型来 "预测" 未知类别。请记住，如果您预测了这个类别，它就会成为训练数据中的⼀个类别。
+
+当我们有⼀个如图 3 所⽰的数据集时，我们可以建⽴⼀个简单的模型，对除 "f3 "之外的所有特征进⾏训练。这样，你将创建⼀个模型，在不知道或训练中没有 "f3 "时预测它。我不敢说这样的模型是否能带来出⾊的性能，但也许能处理测试集或实时数据中的缺失值，就像机器学习中的其他事情⼀样，不尝试⼀下是说不准的。
+
+如果你有⼀个固定的测试集，你可以将测试数据添加到训练中，以了解给定特征中的类别。这与半监督学习⾮常相似，即使⽤⽆法⽤于训练的数据来改进模型。这也会照顾到在训练数据中出现次数极少但在测试数据中⼤量存在的稀有值。你的模型将更加稳健。
+
+很多⼈认为这种想法会过度拟合。可能过拟合，也可能不过拟合。有⼀个简单的解决⽅法。如果你在设计交叉验证时，能够在测试数据上运⾏模型时复制预测过程，那么它就永远不会过拟合。这意味着第⼀步应该是分离折叠，在每个折叠中，你应该应⽤与测试数据相同的预处理。假设您想合并训练数据和测试数据，那么在每个折叠中，您必须合并训练数据和验证数据，并确保验证数据集复制了测试集。在这种特定情况下，您必须以这样⼀种⽅式设计验证集，使其包含训练集中 "未⻅" 的类别:
+
+```python
+import pandas as pd
+from sklearn import preprocessing
+# 读取训练集
+train = pd.read_csv("/input/cat_train.csv")
+# 读取测试集
+test = pd.read_csv("../input/cat_test.csv")
+# 将测试集"target"列全部置为-1
+test.loc[:, "target"] = -1
+# 将训练集、测试集沿行拼接
+data = pd.concat([train, test]).reset_index(drop=True)
+# 将除"id"和"target"列的其他特征列名取出
+features = [x for x in train.columns if x not in ["id", "target"]]
+# 遍历特征
+for feat in features:
+# 标签编码
+lbl_enc = preprocessing.LabelEncoder()
+# 将空值替换为"NONE",并将该列格式变为str
+temp_col = data[feat].fillna("NONE").astype(str).values
+# 转换数值
+data.loc[:, feat] = lbl_enc.fit_transform(temp_col)
+# 根据"target"列将训练集与测试集分开
+train = data[data.target != -1].reset_index(drop=True)
+test = data[data.target == -1].reset_index(drop=True)
+```
+
+当您遇到已经有测试数据集的问题时，这个技巧就会起作⽤。必须注意的是，这⼀招在实时环境中不
+起作⽤。例如，假设您所在的公司提供实时竞价解决⽅案（RTB）。RTB 系统会对在线看到的每个⽤
+⼾进⾏竞价，以购买⼴告空间。这种模式可使⽤的功能可能包括⽹站中浏览的⻚⾯。我们假设这些特
+征是⽤⼾访问的最后五个类别/⻚⾯。在这种情况下，如果⽹站引⼊了新的类别，我们将⽆法再准确预
+测。在这种情况下，我们的模型就会失效。这种情况可以通过使⽤ "未知 "类别来避免。
+
+在我们的 cat-in-the-dat 数据集中， ord_2 列中已经有了未知类别。
+```python
+In [X]: df.ord_2.fillna("NONE").value_counts()
+
+Out[X]:
+
+Freezing 142726
+
+Warm 124239
+
+Cold 97822
+
+Boiling Hot 84790
+
+Hot 67508
+
+Lava Hot 64840
+
+NONE 18075
+
+Name: ord_2, dtype: int64
+```
+我们可以将 "NONE "视为未知。因此，如果在实时测试过程中，我们获得了以前从未⻅过的新类别，
+我们就会将其标记为 "NONE"。
+
+这与⾃然语⾔处理问题⾮常相似。我们总是基于固定的词汇建⽴模型。增加词汇量就会增加模型的⼤
+⼩。像 BERT 这样的转换器模型是在 ~30000 个单词（英语）的基础上训练的。因此，当有新词输⼊
+时，我们会将其标记为 UNK（未知）。
+
+因此，您可以假设测试数据与训练数据具有相同的类别，也可以在训练数据中引⼊罕⻅或未知类别，
+以处理测试数据中的新类别。
+
+让我们看看填⼊ NaN 值后 ord_4 列的值计数：
+```python
+In [X]: df.ord_4.fillna("NONE").value_counts()
+
+Out[X]:
+
+N 39978
+
+P 37890
+
+Y 36657
+
+A 36633
+
+R 33045
+
+U 32897
+
+.
+.
+.
+K 21676
+
+I 19805
+
+NONE 17930
+
+D 17284
+
+F 16721
+
+W 8268
+
+Z 5790
+
+S 4595
+
+G 3404
+
+V 3107
+
+J 1950
+
+L 1657
+
+Name: ord_4, dtype: int64
+```
+我们看到，有些数值只出现了⼏千次，有些则出现了近 40000 次。NaN 也经常出现。请注意，我已
+经从输出中删除了⼀些值。
+
+现在，我们可以定义将⼀个值称为 "罕⻅（rare） "的标准了。⽐⽅说，在这⼀列中，稀有值的要求是
+计数⼩于 2000。这样看来，J 和 L 就可以被标记为稀有值了。使⽤ pandas，根据计数阈值替换类别
+⾮常简单。让我们来看看它是如何实现的。
+```python
+In [X]: df.ord_4 = df.ord_4.fillna("NONE")
+
+In [X]: df.loc[
+
+...: df["ord_4"].value_counts()[df["ord_4"]].values < 2000,
+
+...: "ord_4"
+
+...: ] = "RARE"
+
+In [X]: df.ord_4.value_counts()
+
+Out[X]:
+
+N 39978
+
+P 37890
+
+Y 36657
+
+A 36633
+
+R 33045
+
+U 32897
+
+M 32504
+
+.
+.
+.
+B 25212
+
+E 21871
+
+K 21676
+
+I 19805
+
+NONE 17930
+
+D 17284
+
+F 16721
+
+W 8268
+
+Z 5790
+
+S 4595
+
+RARE 3607
+
+G 3404
+
+V 3107
+
+Name: ord_4, dtype: int64
+```
+我们认为，只要某个类别的值⼩于 2000，就将其替换为罕⻅。因此，现在在测试数据时，所有未⻅
+过的新类别都将被映射为 "RARE"，⽽所有缺失值都将被映射为 "NONE"。
+
+这种⽅法还能确保即使有新的类别，模型也能在实际环境中正常⼯作。
+
+现在，我们已经具备了处理任何带有分类变量问题所需的⼀切条件。让我们尝试建⽴第⼀个模型，并逐步提⾼其性能。
+
+在构建任何类型的模型之前，交叉检验⾄关重要。我们已经看到了标签/⽬标分布，知道这是⼀个⽬标偏斜的⼆元分类问题。因此，我们将使⽤ ``StratifiedKFold`` 来分割数据。
+```python
+import pandas as pd
+from sklearn import model_selection
+if __name__ == "__main__":
+    # 读取数据文件
+    df = pd.read_csv("../input/cat_train.csv")
+    # 添加"kfold"列，并置为-1
+    df["kfold"] = -1
+    # 打乱数据顺序，重置索引
+    df = df.sample(frac=1).reset_index(drop=True)
+    # 将目标列取出
+    y = df.target.values
+    # 分层k折交叉检验
+    kf = model_selection.StratifiedKFold(n_splits=5)
+    for f, (t_, v_) in enumerate(kf.split(X=df, y=y)):
+    # 区分折叠
+    df.loc[v_, 'kfold'] = f
+    # 保存文件
+    df.to_csv("../input/cat_train_folds.csv", index=False)
+```
+
+现在检查新的折叠csv，查看每个折叠的样本数：
+
+```python
+In [X]: import pandas as pd
+In [X]: df = pd.read_csv("../input/cat_train_folds.csv")
+In [X]: df.kfold.value_counts()
+Out[X]:
+4 120000
+3 120000
+2 120000
+1 120000
+0 120000
+Name: kfold, dtype: int64
+```
+
+所有折叠都有$600000/5=120000$个样本，证明我们的工作是顺利的。
+
+现在，我们还可以检查每个折叠的⽬标分布。
+
+```python
+In [X]: df[df.kfold==0].target.value_counts()
+Out[X]:
+0 97536
+1 22464
+Name: target, dtype: int64
+In [X]: df[df.kfold==1].target.value_counts()
+Out[X]:
+0 97536
+1 22464
+Name: target, dtype: int64
+In [X]: df[df.kfold==2].target.value_counts()
+Out[X]:
+0 97535
+1 22465
+Name: target, dtype: int64
+In [X]: df[df.kfold==3].target.value_counts()
+Out[X]:
+0 97535
+1 22465
+Name: target, dtype: int64
+In [X]: df[df.kfold==4].target.value_counts()
+Out[X]:
+0 97535
+1 22465
+Name: target, dtype: int64
+```
+
+每个折叠中，⽬标的分布都是⼀样的.
+
+建立一个最简单的模型之一：对所有数据进⾏独热编码并使⽤逻辑回归。
+
+```python
+import pandas as pd
+from sklearn import linear_model
+from sklearn import metrics
+from sklearn import preprocessing
+def run(fold):
+# 读取分层k折交叉检验数据
+df = pd.read_csv("../input/cat_train_folds.csv")
+# 取除"id", "target", "kfold"外的其他特征列
+features = [
+f for f in df.columns if f not in ("id", "target", "kfold")
+]
+那么，发⽣了什么呢？
+我们创建了⼀个函数，将数据分为训练和验证两部分，给定折叠数，处理 NaN 值，对所有数据进⾏
+单次编码，并训练⼀个简单的逻辑回归模型。
+当我们运⾏这部分代码时，会产⽣如下输出：
+# 遍历特征列表
+for col in features:
+# 将空值置为"NONE"
+df.loc[:, col] = df[col].astype(str).fillna("NONE")
+# 取训练集（kfold列中不为fold的样本，重置索引）
+df_train = df[df.kfold .. fold].reset_index(drop=True)
+# 取验证集（kfold列中为fold的样本，重置索引）
+df_valid = df[df.kfold .. fold].reset_index(drop=True)
+# 独热编码
+ohe = preprocessing.OneHotEncoder()
+# 将训练集、验证集沿行合并
+full_data = pd.concat([df_train[features], df_valid[features]], axis=0)
+ohe.fit(full_data[features])
+# 转换训练集
+x_train = ohe.transform(df_train[features])
+# 转换测试集
+x_valid = ohe.transform(df_valid[features])
+# 逻辑回归
+model = linear_model.LogisticRegression()
+# 使用训练集训练模型
+model.fit(x_train, df_train.target.values)
+# 使用验证集得到预测标签
+valid_preds = model.predict_proba(x_valid)[:, 1]
+# 计算auc指标
+auc = metrics.roc_auc_score(df_valid.target.values, valid_preds)
+print(auc)
+if __name__ == "__main__":
+# 运行折叠0
+run(0)
+```
+
+:::tip
+刚刚发生的事情：数据分为训练和验证两部分，给定折叠数，处理 NaN 值，对所有数据进⾏单次编码，并训练⼀个简单的逻辑回归模型。
+:::
+产生输出：
+```python
+python ohe_logres.py
+/home/abhishek/miniconda3/envs/ml/lib/python3.7/site-
+packages/sklearn/linear_model/_logistic.py:939: ConvergenceWarning: lbfgs
+failed to converge (status=1):
+STOP: TOTAL NO. of ITERATIONS REACHED LIMIT.
+Increase the number of iterations (max_iter) or scale the data as shown
+in:
+https://scikit-learn.org/stable/modules/preprocessing.html.
+Please also refer to the documentation for alternative solver options:
+https://scikit-learn.org/stable/modules/linear_model.html#logistic-
+regression
+extra_warning_msg=_LOGISTIC_SOLVER_CONVERGENCE_MSG)
+0.7847865042255127
+```
+
+逻辑回归似乎没有收敛到最⼤迭代次数。这个问题是因为我们还没有调整参数。AUC此时为0.785。
+
+运⾏所有折叠：
+
+```python
+model = linear_model.LogisticRegression()
+model.fit(x_train, df_train.target.values)
+valid_preds = model.predict_proba(x_valid)[:, 1]
+auc = metrics.roc_auc_score(df_valid.target.values, valid_preds)
+print(f"Fold = {fold}, AUC = {auc}")
+if __name__ == "__main__":
+# 循环运行0~4折
+for fold_ in range(5):
+run(fold_)
+```
+
+
+打印出：
+
+```python
+python -W ignore ohe_logres.py
+Fold = 0, AUC = 0.7847865042255127
+Fold = 1, AUC = 0.7853553605899214
+Fold = 2, AUC = 0.7879321942914885
+Fold = 3, AUC = 0.7870315929550808
+Fold = 4, AUC = 0.7864668243125608
+```
+
+## 5. 标签编码
+
+我们看到，AUC 分数在所有褶皱中都相当稳定。平均 AUC 为 0.78631449527。对于我们的第⼀个模型来说相当不错！
+
+很多⼈在遇到这种问题时会⾸先使⽤基于树的模型，⽐如随机森林。在这个数据集中应⽤随机森林时，我们可以使⽤标签编码（label encoding），将每⼀列中的每个特征都转换为整数，⽽不是之前讨论过的独热编码。
+```python
+# 使⽤ scikit-learn 中的随机森林，并取消了独热编码
+import pandas as pd
+from sklearn import ensemble
+from sklearn import metrics
+from sklearn import preprocessing
+def run(fold):
+df = pd.read_csv("../input/cat_train_folds.csv")
+features = [f for f in df.columns if f not in ("id", "target", "kfold") ]
+for col in features:
+df.loc[:, col] = df[col].astype(str).fillna("NONE")
+for col in features:
+# 标签编码
+lbl = preprocessing.LabelEncoder()
+lbl.fit(df[col])
+df.loc[:, col] = lbl.transform(df[col])
+df_train = df[df.kfold == fold].reset_index(drop=True)
+df_valid = df[df.kfold == fold].reset_index(drop=True)
+x_train = df_train[features].values
+x_valid = df_valid[features].values
+# 随机森林模型
+model = ensemble.RandomForestClassifier(n_jobs=-1)
+model.fit(x_train, df_train.target.values)
+valid_preds = model.predict_proba(x_valid)[:, 1]
+auc = metrics.roc_auc_score(df_valid.target.values, valid_preds)
+print(f"Fold = {fold}, AUC = {auc}")
+if __name__ == "__main__":
+for fold_ in range(5):
+run(fold_)
+```
+随机森林模型在没有任何超参数调整的情况下，表现要⽐简单的逻辑回归差很多。
+
+但这不意味着，随机森林模型比逻辑回归模型更好，事实上，随机森林的耗时更久，而且会损失AUC。这是一把双刃剑。
+
+尝试在稀疏的独热编码数据上运⾏随机森林，会耗费大量的时间。但是我们可以使用奇异值分解来减少稀疏的独热编码矩阵：
+
+```python
+# 对全部数据进⾏独热编码，然后⽤训练数据和验证数据在稀疏矩阵上拟合 scikit-learn 的TruncatedSVD
+# 将⾼维稀疏矩阵减少到 120 个特征，然后拟合随机森林分类器
+import pandas as pd
+from scipy import sparse
+from sklearn import decomposition
+from sklearn import ensemble
+from sklearn import metrics
+from sklearn import preprocessing
+def run(fold):
+df = pd.read_csv("../input/cat_train_folds.csv")
+features = [f for f in df.columns if f not in ("id", "target", "kfold")]
+for col in features:
+df.loc[:, col] = df[col].astype(str).fillna("NONE")
+df_train = df[df.kfold == fold].reset_index(drop=True)
+df_valid = df[df.kfold == fold].reset_index(drop=True)
+# 独热编码
+ohe = preprocessing.OneHotEncoder()
+full_data = pd.concat([df_train[features], df_valid[features]], axis=0)
+ohe.fit(full_data[features])
+x_train = ohe.transform(df_train[features])
+x_valid = ohe.transform(df_valid[features])
+# 奇异值分解
+svd = decomposition.TruncatedSVD(n_components=120)
+full_sparse = sparse.vstack((x_train, x_valid))
+svd.fit(full_sparse)
+x_train = svd.transform(x_train)
+x_valid = svd.transform(x_valid)
+model = ensemble.RandomForestClassifier(n_jobs=-1)
+model.fit(x_train, df_train.target.values)
+valid_preds = model.predict_proba(x_valid)[:, 1]
+auc = metrics.roc_auc_score(df_valid.target.values, valid_preds)
+print(f"Fold = {fold}, AUC = {auc}")
+if __name__ == "__main__":
+for fold_ in range(5):
+run(fold_)
+```
+输出：
+```python
+python ohe_svd_rf.py
+Fold = 0, AUC = 0.7064863038754249
+Fold = 1, AUC = 0.706050102937374
+Fold = 2, AUC = 0.7086069243167242
+Fold = 3, AUC = 0.7066819080085971
+Fold = 4, AUC = 0.7058154015055585
+```
+
+结果不尽人意，这个问题的最优解应该是用逻辑回归和独热编码。
+
+我们可以尝试另一种算法：XGBoost：
+
+```python
+# 使⽤标签编码数据
+import pandas as pd
+import xgboost as xgb
+from sklearn import metrics
+from sklearn import preprocessing
+def run(fold):
+df = pd.read_csv("../input/cat_train_folds.csv")
+features = [f for f in df.columns if f not in ("id", "target", "kfold") ]
+for col in features:
+df.loc[:, col] = df[col].astype(str).fillna("NONE")
+for col in features:
+# 标签编码
+lbl = preprocessing.LabelEncoder()
+lbl.fit(df[col])
+df.loc[:, col] = lbl.transform(df[col])
+df_train = df[df.kfold == fold].reset_index(drop=True)
+df_valid = df[df.kfold == fold].reset_index(drop=True)
+x_train = df_train[features].values
+x_valid = df_valid[features].values
+# XGBoost模型
+# XGBoost 的默认最⼤深度（max_depth）是 3，此处修改为7
+# 估计器数量（n_estimators）从 100 改成了 200
+model = xgb.XGBClassifier(
+n_jobs=-1,
+max_depth=7,
+n_estimators=200)
+model.fit(x_train, df_train.target.values)
+valid_preds = model.predict_proba(x_valid)[:, 1]
+auc = metrics.roc_auc_score(df_valid.target.values, valid_preds)
+print(f"Fold = {fold}, AUC = {auc}")
+if __name__ == "__main__":
+for fold_ in range(5):
+      run(fold_)
+```
+
+得分：
+```python
+python lbl_xgb.py
+Fold = 0, AUC = 0.7656768851999011
+Fold = 1, AUC = 0.7633006564148015
+Fold = 2, AUC = 0.7654277821434345
+Fold = 3, AUC = 0.7663609758878182
+Fold = 4, AUC = 0.764914671468069
+```
+
+明显比随机森林要高很多。
+
+
+
+
+
+</WordCount>

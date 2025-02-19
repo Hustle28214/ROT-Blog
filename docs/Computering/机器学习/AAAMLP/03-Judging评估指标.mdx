@@ -1,0 +1,856 @@
+import WordCount from '../../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+## 1. 评估指标的认识
+
+在分类问题和回归问题中我们都遇到了很多不同类型的指标，例如，在分类问题中，最常用的指标是：
+
+1. 精准率（P,Precision）：它用于衡量模型的**查准性能**，正确预测的样本中，预测为正的样本的比例。
+2. 召回率（R,Recall）：它用于衡量模型的**查全性能**，预测为正的样本中，实际为正的样本的比例。
+3. F1-score(F1)：精准率和召回率的调和平均值。
+4. 准确率（Accuracy）：预测正确的样本的比例。
+5. AUC: ROC曲线下面积。
+6. 对数损失（Log Loss）
+7. k精准率(P@k)：top-k准确率分数，用于衡量模型在前 k 个预测结果中的正确率。
+8. k平均精率：上一条基础上取平均。
+9. k均值平均精确率:评估了信息检索系统在返回前K个结果时的平均性能，是一个比较全面且常用的指标
+
+在回归问题中，最常用的指标是：
+
+1. 平均绝对误差（MAE,Mean Absolute Error）：预测值与真实值之间的平均绝对误差。
+2. 均方误差（MSE,Mean Squared Error）：预测值与真实值之间的均方误差。
+3. 均方根误差（RMSE,Root Mean Squared Error）：预测值与真实值之间的均方根误差。
+
+```python
+# 计算准确率
+
+l1 = [0,1,1,1,0,0,0,1]
+l2 = [0,1,0,1,0,1,0,0]
+
+def accuracy(y_true, y_pred):
+    # 正确预测数初始化一个简单计数器
+    correct_counter = 0
+    # 遍历y_true, y_pred中所有元素
+    # zip函数接受多个元组，返回他们组成的列表
+    for yt, yp in zip(y_true, y_pred):
+        if yt == yp:
+            # 如果预测标签与真实标签相同，则增加计数器
+            correct_counter += 1
+    # 返回正确率，正确标签数/总标签数
+    return correct_counter / len(y_true)
+
+# 使用scikit-learn计算准确率
+# In [X]: from sklearn import metrics
+#     ...: l1 = [0,1,1,1,0,0,0,1]
+#     ...: l2 = [0,1,0,1,0,1,0,0]
+#     ...: metrics.accuracy_score(l1, l2)
+# Out[X]: 0.625
+
+```
+
+```python
+# def true_positive(y_true, y_pred):
+#     # 初始化真阳性样本计数器
+#     tp = 0
+#     # 遍历y_true, y_pred中所有元素
+#     for yt, yp in zip(y_true, y_pred):
+#         if yt  == 1 and yp == 1:
+#             tp += 1
+#     # 返回真阳性样本数
+#     return tp
+# def true_negative(y_true, y_pred):
+#     # 初始化真阴性样本计数器
+#     tn = 0
+#     # 遍历y_true, y_pred中所有元素
+#     for yt, yp in zip(y_true, y_pred):
+#         # 若真实标签为负，预测标签也为负，计数器增加
+#         if yt == 0 and yp == 0:
+#             tn += 1
+#     # 返回真阴性样本数
+#     return tn
+
+def false_positive(y_true, y_pred):
+    # 初始化假阳性样本计数器
+    fp = 0
+    # 遍历y_true，y_pred中所有元素
+    for yt, yp in zip(y_true, y_pred):
+        # 若真实标签为负类但预测标签为正类，计数器增加
+        if yt == 0 and yp == 1:
+            fp += 1
+    return fp
+
+def false_negative(y_true, y_pred):
+    # 初始化假阴性样本计数器
+    fn = 0
+    # 遍历y_true，y_pred中所有元素
+    for yt, yp in zip(y_true, y_pred):
+        # 若真实标签为正类但预测标签为负类，计数器增加
+        if yt == 1 and yp == 0:
+            fn += 1
+    return fn
+```
+
+## 2. 实现精确率
+
+```python
+#实现精确率：精确率的定义是$Precision = \frac{TP}{TP+FP}$
+
+def true_positive(y_true, y_pred):
+    # 初始化真阳性样本计数器
+    tp = 0
+    # 遍历y_true，y_pred中所有元素
+    for yt, yp in zip(y_true, y_pred):
+        # 若真实标签为正类且预测标签也为正类，计数器增加
+        if yt == 1 and yp == 1:
+            tp += 1
+    return tp
+
+def true_negative(y_true, y_pred):
+    # 初始化真阴性样本计数器
+    tn = 0
+    # 遍历y_true，y_pred中所有元素
+    for yt, yp in zip(y_true, y_pred):
+        # 若真实标签为负类且预测标签也为负类，计数器增加
+        if yt == 0 and yp == 0:
+            tn += 1
+    # 返回真阴性样本数
+    return tn
+```
+
+```python
+# In [X]: l1 = [0,1,1,1,0,0,0,1]
+#     ...:l2 = [0,1,0,1,0,1,0,0]
+# In [X]:precision(l1,l2)
+# Out[X]: 0.6666666666666666
+```
+
+这样，精确率的定义可以写为：
+$$
+AccuracyScore = (TP+TN)/(TP+TN+FP+FN)
+$$
+
+```python
+def accuracy_v2(y_true, y_pred):
+  # 真阳性样本数
+  tp = true_positive(y_true, y_pred)
+  # 假阳性样本数
+  fp = false_positive(y_true, y_pred)
+  # 假阴性样本数
+  fn = false_negative(y_true, y_pred)
+  # 真阴性样本数
+  tn = true_negative(y_true, y_pred)
+  # 准确率
+  accuracy_score = (tp + tn) / (tp + tn + fp + fn)
+  return accuracy_score
+```
+
+```python
+# In [X]: l1 = [0,1,1,1,0,0,0,1]
+#  ...: l2 = [0,1,0,1,0,1,0,0]
+# In [X]: accuracy(l1, l2)
+# Out[X]: 0.625
+# In [X]: accuracy_v2(l1, l2)
+# Out[X]: 0.625
+# In [X]: metrics.accuracy_score(l1, l2)
+# Out[X]: 0.625
+```
+
+精确率的定义是$Precision = TP/(TP+FP)$
+
+假设我们在新的偏斜数据集上建⽴了⼀个新模型，我们的模型正确识别了 90 张图像中的 80 张⾮⽓胸图像和 10 张图像中的 8 张⽓胸图像。因此，我们成功识别了 100 张图像中的 88 张。因此，准确率为 0.88 或 88%。
+
+但是，在这 100 张样本中，有 10 张⾮⽓胸图像被误判为⽓胸，2 张⽓胸图像被误判为⾮⽓胸。因此，我们有
+
+```
+TP : 8
+TN: 80
+FP: 10
+FN: 2
+```
+精确率为 8 / (8 + 10) = 0.444。
+
+这意味着我们的模型在**识别阳性样本（⽓胸）时有 44.4% 的正确率**。
+
+```python
+def precision(y_true, y_pred):
+    # 真阳性样本数
+    tp = true_positive(y_true, y_pred)
+    # 假阳性样本数
+    fp = false_positive(y_true, y_pred)
+    # 精确率
+    precision = tp / (tp + fp) if (tp + fp) > 0 else 0
+    return precision
+```
+
+## 3. 实现召回率
+
+接下来我们可以看召回率。
+
+召回率：
+$$
+Recall = \frac{TP}{TP+FN}
+$$
+
+```python
+# 召回率：$Recall = \frac{TP}{TP+FN}$
+
+
+def recall(y_true, y_pred):
+    # 真阳性样本数
+    tp = true_positive(y_true, y_pred)
+    # 假阴性样本数
+    fn = false_negative(y_true, y_pred)
+    # 召回率
+    recall = tp / (tp + fn) if (tp + fn) > 0 else 0
+    return recall
+
+recall(l1,l2)
+```
+
+结果：
+
+```python
+0.5
+```
+
+刚刚调用recall函数应该输出0.5。
+
+```python
+# 先假设有两个列表：
+y_true = [0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0]
+y_pred = [0.02638412, 0.11114267, 0.31620708,0.0490937,0.0191491,0.17554844,0.15952202, 0.03819563,0.11639273,0.079377,0.08584789, 0.39095342,0.27259048, 0.03447096,0.04644807,0.03543574,0.18521942, 0.05934905,0.61977213,0.33056815]
+
+# y_true是我们的目标值，而y_pred是样本被赋值为1的概率值，
+# 因此，现在我们要看的是预测中的概率，而不是预测值。（大多数情况下，预测值的计算阈值为0.5）
+```
+
+```python
+precisions = []
+recalls = []
+thresholds = [0.0490937 , 0.05934905, 0.079377,0.08584789, 0.11114267, 0.11639273,0.15952202, 0.17554844, 0.18521942,0.27259048, 0.31620708, 0.33056815,0.39095342, 0.61977213]
+
+# 遍历预测阈值
+for i in thresholds:
+    # 若样本为正类（1）的概率大于阈值，为1，否则为0
+    temp_prediction = [1 if x>= i else 0 for x in y_pred]
+    # 计算精确率
+    p = precision(y_true, temp_prediction)
+    # 计算召回率
+    r = recall(y_true, temp_prediction)
+    # 加入精确率列表
+    precisions.append(p)
+    # 加入召回率列表
+    recalls.append(r)
+```
+
+我们可以绘制精确率-召回率曲线看看：
+
+```python
+# 绘制精确率-召回率曲线
+import matplotlib.pyplot as plt
+# 创建画布
+plt.figure(figsize = (7,7))
+
+# x轴为召回率，y轴为精确率
+plt.plot(recalls,precisions)
+
+# 添加x轴标签，字体大小为15
+plt.xlabel('Recall',fontsize = 15)
+
+# 添加y轴标签，字条大小为15
+plt.ylabel('Precision',fontsize = 15)
+```
+
+```
+Text(0, 0.5, 'Precision')
+```
+
+因为我们只有20个样本，其中只有3个是阳性样本，所以这样的精确率-召回率曲线是正常显示的，在大量的数据面前它才能和互联网上的精确率-召回率曲线相仿。选择一个既能提供良好精确率又能提供召回值的阈值是比较困难的，阈值过高，真阳性的数量就会减少，而假阴性的数量就会增加。这会降低召回率，但精确率得分会很高。阈值降得太低，误报会大量增加，精确率也会降低。
+
+**精确率和召回率的范围都是从 0 到 1，越接近 1 越好**。
+
+F1 分数是精确率和召回率的综合指标。它被定义为精确率和召回率的简单加权平均值（调和平均值）。如果我们⽤ P 表⽰精确率，⽤ R 表⽰召回率，那么 F1 分数可以表⽰为：
+$$
+F1\_Score = 2*PR/(P+R)
+$$
+
+$$
+F1\_Score = 2*(TP)/(2TP+FN+FP)
+$$
+
+实现F1分数：
+
+```python
+# 计算f1_score
+
+def f1(y_true,y_pred):
+    p = precision(y_true, y_pred)
+    r = recall(y_true,y_pred)
+    score = 2*p*r/(p+r)
+    return score
+
+
+y_true = [0, 0, 0, 1, 0, 0, 0, 0, 0, 0,1, 0, 0, 0, 0, 0, 0, 0, 1, 0]
+y_pred = [0, 0, 1, 0, 0, 0, 1, 0, 0, 0,1, 0, 0, 0, 0, 0, 0, 0, 1, 0]
+f1(y_true,y_pred)
+```
+
+得到：
+```
+0.5714285714285715
+```
+TPR(真阳性率)：$TPR = \frac{TP}{TP+FN}$
+
+TPR或者召回率也被称为灵敏度。
+而FPR（假阳性率）：$FPR = \frac{FP}{FP+TN}$
+
+1-FPR被称为特异性或真阴性率或TNR。其中最重要的只有TPR和FPR。
+
+实现TPR：
+
+```python
+# 计算TPR
+def tpr(y_true, y_pred):
+    # 真阳性率，与召回率计算公式一致
+    return recall(y_true, y_pred)
+
+# 计算FPR
+def fpr(y_true, y_pred):
+    # 假阳性样本数
+    fp = false_positive(y_true, y_pred)
+    # 真阴性样本数
+    tn =true_negative(y_true, y_pred)
+# 返回假阳性率
+    return fp / (fp + tn)
+```
+
+```python
+# 只计算TPR和FPR
+
+# 初始化真阳性率列表
+tpr_list = []
+# 初始化假阳性率列表
+fpr_list = []
+# 真实样本标签
+y_true = [0, 0, 0, 0, 1, 0, 1,0, 0, 1, 0, 1, 0, 0, 1]
+# 预测样本为正类（1）的概率
+y_pred = [0.1, 0.3, 0.2, 0.6, 0.8, 0.05,0.9, 0.5, 0.3, 0.66, 0.3, 0.2,0.85, 0.15, 0.99]
+
+# 预测阈值
+thresholds = [0, 0.1, 0.2, 0.3, 0.4, 0.5,0.6, 0.7, 0.8, 0.85, 0.9, 0.99, 1.0]
+
+# 遍历预测阈值
+for thresh in thresholds:
+    # 样本为正类（1）的概率大于阈值，为1，否则为0
+    temp_pred = [1 if p > thresh else 0 for p in y_pred]
+    # 计算真阳性率
+    temp_tpr = tpr(y_true,temp_pred)
+    # 计算假阳性率
+    temp_fpr = fpr(y_true,temp_pred)
+    # 将真阳性率加入列表
+    tpr_list.append(temp_tpr)
+    # 将假阳性率加入列表
+    fpr_list.append(temp_fpr)
+    
+# 绘制ROC曲线
+plt.plot(fpr_list, tpr_list, marker='o')
+plt.xlabel('False Positive Rate')
+plt.ylabel('True Positive Rate')
+plt.title('ROC Curve')
+
+# 或者使用scikit-learn库
+from sklearn import metrics
+metrics.roc_auc_score(y_true, y_pred)
+```
+
+结果：
+```python
+0.8300000000000001
+```
+
+## 4. 关于AUC
+
+我们这样审视AUC结果：
+
+- AUC = 1 意味着您拥有⼀个完美的模型。⼤多数情况下，这意味着你在验证时犯了⼀些错误，应该重新审视数据处理和验证流程。如果你没有犯任何错误，那么恭喜你，你已经拥有了针对数据集建⽴的最佳模型。
+
+- AUC = 0 意味着您的模型⾮常糟糕（或⾮常好！）。试着反转预测的概率，例如，如果您预测正类的概率是 p，试着⽤ 1-p 代替它。这种 AUC 也可能意味着您的验证或数据处理存在问题。
+
+- AUC = 0.5 意味着你的预测是随机的。因此，对于任何⼆元分类问题，如果我将所有⽬标都预测为 0.5，我将得到 0.5 的 AUC。
+
+- AUC 值介于 0 和 0.5 之间，意味着你的模型⽐随机模型更差。⼤多数情况下，这是因为**你颠倒了类别**。 如果您尝试反转预测，您的 AUC 值可能会超过 0.5。接近 1 的 AUC 值被认为是好值。
+
+计算了概率和AUC之后，需要对测试集进行预测。
+
+如果需要概率，前面已经提及了概率的计算方法。需要类别，则需要选择一个阈值。
+
+$Prediction =  Probability > Threshold$
+
+预测是一个只包含二元变量的新列表。如果概率大于或等于给定的阈值，则预测中的一项为1，否则为0.
+
+我们可以使用**ROC曲线**来选择这个阈值。ROC曲线会说明阈值对假阳性率和真阳性率的影响，进而影响假阳性和真阳性。
+
+1. 假阳性率（FPR） = 假阳性 / (假阳性 + 真阴性)
+2. 真阳性率（TPR） = 真阳性 / (真阳性 + 假阴性)
+
+那么，阈值是如何影响真阳性和假阳性的值呢？
+
+```python
+# 真阳性样本数列表
+tp_list = []
+# 假阳性样本数列表
+fp_list = []
+# 真实标签
+y_true = [0, 0, 0, 0, 1, 0, 1,0, 0, 1, 0, 1, 0, 0, 1]
+# 预测样本为正类(1)的概率
+y_pred = [0.1, 0.3, 0.2, 0.6, 0.8, 0.05, 0.9, 0.5, 0.3, 0.66, 0.3, 0.2, 0.85, 0.15, 0.99]
+# 阈值列表
+thresholds = [0, 0.1, 0.2, 0.3, 0.4, 0.5,0.6, 0.7, 0.8, 0.85, 0.9, 0.99, 1.0]
+
+# 遍历预测阈值
+for thresh in thresholds:
+    # 预测样本为正类(1)的概率大于阈值
+    pred_pos = [1 if y >= thresh else 0 for y in y_pred]
+    # 预测样本为正类(1)的概率大于阈值且真实标签为正类(1)
+    temp_tp = true_positive(y_true, temp_pred)
+    # 预测样本为正类(1)的概率大于阈值且真实标签为负类(0)
+    temp_fp = false_positive(y_true, temp_pred)
+    # 加入真阳性样本数列表
+    tp_list.append(temp_tp)
+    # 加入假阳性样本数列表
+    fp_list.append(temp_fp)
+```
+
+大多数情况下，ROC曲线左上角的值应该是一个相当不错的阈值。
+
+对比表格和ROC曲线，发现0.6的阈值相当不错，不会丢失大量的真阳性结果，假阳性结果也不会大量涌现。
+
+AUC 是业内⼴泛应⽤于偏斜⼆元分类任务的指标，也是每个⼈都应该了解的指标。⼀旦理解了AUC 背后的理念（如上⽂所述），也就很容易向业界可能会评估您的模型的⾮技术⼈员解释它了。
+
+学习 AUC 后，你应该学习的另⼀个重要指标是对数损失。对于⼆元分类问题，我们将对数损失定义为：
+
+$$
+LogLoss  = -target*log(p) - (1-target)*log(1-p)
+$$
+
+其中，目标值为0或1，预测值为样本属于类别1的概率。
+
+对数损失与AUC的含义相同，但是对数损失更易理解，因为对数损失是一个负数。对于数据集中的多个样本，所有样本的对数损失只是所有单个对数损失的平均值。需要记住的⼀点是，对数损失会对不正确或偏差较⼤的预测进⾏相当⾼的惩罚，也就是说，对数损失会对⾮常确定和⾮常错误的预测进⾏惩罚。
+
+对数损失越小，模型预测的概率就越接近目标值。
+
+```python
+import numpy as np
+def log_loss(y_true, y_proba):
+    # 极小值，防止0做分母
+    epsilon = 1e-15
+    # 对数损失列表
+    loss =[]
+    # 遍历y_true和y_pred
+    for yt,yp in zip(y_true,y_proba):
+        # 限制yp范围，最小为epsilon，最大为1-epsilon
+        yp = np.clip(yp,epsilon,1-epsilon)
+        # 计算对数损失
+        temp_loss = -1*yt*np.log(yp)-(1-yt)*np.log(1-yp)
+        # 加入列表
+        loss.append(temp_loss)
+    return np.mean(loss)
+
+# 您可以将其与scikit-learn进行比较
+
+y_true = [0, 0, 0, 0, 1, 0, 1,0, 0, 1, 0, 1, 0, 0, 1]
+y_proba = [0.1, 0.3, 0.2, 0.6, 0.8, 0.05,0.9, 0.5, 0.3, 0.66, 0.3, 0.2,0.85, 0.15, 0.99]
+from sklearn import metrics
+metrics.log_loss(y_true, y_proba)
+```
+
+得到：``0.49882711861432294``
+
+对数损失的实现很容易。解释起来似乎有点困难。你必须记住，对数损失的惩罚要⽐其他指标⼤得多。在处理对数损失时，你需要⾮常⼩⼼；任何不确定的预测都会产⽣⾮常⾼的对数损失。
+
+我们之前讨论过的⼤多数指标都可以转换成多类版本。这个想法很简单。以精确率和召回率为例。我们可以计算多类分类问题中每⼀类的精确率和召回率。
+有三种不同的计算⽅法，有时可能会令⼈困惑。假设我们⾸先对精确率感兴趣。我们知道，精确率取决于真阳性和假阳性。
+
+- **宏观平均精确率（Macro-averaged precision）**：分别计算所有类别的精确率然后求平均值
+- **微观平均精确率（Micro-averaged precision）**：计算所有类别的精确率，然后计算它们的加权平均值。
+- **加权精确率（Weighted precision）**：计算所有类别的精确率，然后计算它们的加权平均值。加权平均值是每个类别的权重的乘积。
+
+
+```python
+# 实现宏观平均精确率
+import numpy as np
+def macro_precision(y_true, y_pred):
+    # 种类数
+    num_classes = len(np.unique(y_true))
+    # 初始化
+    precision = 0
+    # 遍历每一类
+    for class_ in range(num_classes):
+        # 若真实标签为class_为1，否则为0
+        temp_true = [1 if i == class_ else 0 for i in y_true]
+        # 若预测标签为class_为1，否则为0
+        temp_pred = [1 if i == class_ else 0 for i in y_pred]
+        # 真阳性样本数
+        tp = true_positive(temp_true, temp_pred)
+        # 假阳性样本数
+        fp = false_positive(temp_true, temp_pred)
+        # 计算精确度
+        temp_precision = tp / (tp + fp)
+        # 各类精确率相加
+        precision += temp_precision
+    # 计算平均值
+    precision /= num_classes
+    return precision
+
+# 实现微观平均精确率
+def micro_precision(y_true, y_pred):
+    num_classes = len(np.unique(y_true))
+    # 初始化
+    tp = 0
+    fp = 0
+    # 遍历每类
+    for class_ in range(num_classes):
+        # 真实标签为class_为1，否则为0
+        temp_true = [1 if i == class_ else 0 for i in y_true]
+        # 预测标签为class_为1，否则为0
+        temp_pred = [1 if i == class_ else 0 for i in y_pred]
+        # 真阳性样本数
+        tp = true_positive(temp_true, temp_pred)
+        # 假阳性样本数
+        fp = false_positive(temp_true, temp_pred)
+    #精确率
+    temp_precision = tp / (tp + fp)
+    return temp_precision
+
+# 实现加权精确率
+from collections import Counter
+import numpy as np
+def weighted_precision(y_true, y_pred):
+    # 类别数
+    num_classes = len(np.unique(y_true))
+    # 初始化
+    precision = 0
+    # 遍历每类
+    for class_ in range(num_classes):
+        # 真实标签为class_为1，否则为0
+        temp_true = [1 if i == class_ else 0 for i in y_true]
+        # 预测标签为class_为1，否则为0
+        temp_pred = [1 if i == class_ else 0 for i in y_pred]
+        # 真阳性样本数
+        tp = true_positive(temp_true, temp_pred)
+        # 假阳性样本数
+        fp = false_positive(temp_true, temp_pred)
+        # 精确率
+        precision = tp / (tp + fp)
+        # 分配权重
+        weighted_precision = class_counts[class_] * temp_precision
+        # 加权精确率求和
+        precision += weighted_precision
+    # 计算平均精确率
+    overall_precision = precision / len(y_true)
+    return overall_precision
+
+```
+
+
+```python
+# 多类别的召回率指标，精确率和召回率取决于真阳性。假阳性和假阴性，而F1则取决于精确率和召回率。
+
+import numpy as np
+from collections import Counter
+def weighted_f1(y_true, y_pred):
+    # 种类数
+    num_classes = len(np.unique(y_true))
+    # 统计各种类样本数
+    class_counts = Counter(y_true)
+    # 初始化F1值
+    temp_f1 = 0
+    # 遍历0~（种类数-1）
+    for class_ in range(num_classes):
+        # 若真实标签为class_为1，否则为0
+        y_true_class = [1 if label == class_ else 0 for label in y_true]
+        # 预测标签为class_为1，否则为0
+        y_pred_class = [1 if label == class_ else 0 for label in y_pred]
+        # 计算精确率
+        p = precision(temp_true,temp_pred)
+        # 计算召回率
+        r = recall(temp_true,temp_pred)
+        # 若精确率+召回率不为0，计算F1值
+        if p + r != 0:
+            temp_f1 += 2 * p * r / (p + r) * class_counts[class_]
+        # 否则直接为0
+        else:
+            temp_f1 = 0
+        # 根据样本数分配权重
+        weighted_f1 = class_counts[class_]*temp_f1
+        # 加权f1值相加
+        f1 += weighted_f1
+    # 计算加权平均F1值
+    overall_f1 = f1 / len(y_true)
+    return overall_f1
+
+```
+
+## 5. 计算混淆矩阵
+
+
+因此，我们已经为多类问题实现了精确率、召回率和 F1。同样，您也可以将 AUC 和对数损失转换为多类格式。这种转换格式被称为 one-vs-all。这⾥我不打算实现它们，因为实现⽅法与我们已经讨论过的很相似。
+
+在⼆元或多类分类中，看⼀下混淆矩阵也很流⾏。不要困惑，这很简单。混淆矩阵只不过是⼀个包含 TP、FP、TN 和 FN 的表格。使⽤混淆矩阵，您可以快查看有多少样本被错误分类，有多少样本被正确分类。也许有⼈会说，混淆矩阵应该在本章很早就讲到，但我没有这么做。如果了解了 TP、FP、TN、FN、精确率、召回率和 AUC，就很容易理解和解释混淆矩阵了。让我们看看图 7 中⼆元分类问题的混淆矩阵。
+
+我们可以看到，混淆矩阵由 TP、FP、FN 和 TN 组成。我们只需要这些值来计算精确率、召回率、F1 分数和 AUC。有时，⼈们也喜欢把 FP 称为第⼀类错误，把 FN 称为第⼆类错误。
+
+```python
+from sklearn import metrics
+import matplotlib.pyplot as plt
+import seaborn as sns
+# 真实样本标签
+y_true = [0, 1, 2, 0, 1, 2, 0, 2, 2]
+# 预测样本标签
+y_pred = [0, 2, 1, 0, 2, 1, 0, 0, 2]
+# 计算混淆矩阵
+cm = metrics.confusion_matrix(y_true, y_pred)
+# 创建画布
+plt.figure(figsize=(10, 10))
+# 创建方格
+cmap = sns.cubehelix_palette(50, hue=0.05, rot=0, light=0.9, dark=0,
+as_cmap=True)
+# 规定字体大小
+sns.set(font_scale=2.5)
+# 绘制热图
+sns.heatmap(cm, annot=True, cmap=cmap, cbar=False)
+# y轴标签，字体大小为20
+plt.ylabel('Actual Labels', fontsize=20)
+# x轴标签，字体大小为20
+plt.xlabel('Predicted Labels', fontsize=20)
+```
+
+```
+Text(0.5, 57.249999999999986, 'Predicted Labels')
+```
+
+## 6. 多标签分类问题
+
+到目前为止，我们已经解决了二元分类和多元分类的度量问题，接下来我们将讨论**多标签分类问题**。在多标签分类中，每个样本都可能与⼀个或多个类别相关联。这类问题的⼀个简单例⼦就是要求你预测给定图像中的不同物体。
+
+图 9 显⽰了⼀个著名数据集的图像⽰例。请注意，该数据集的⽬标有所不同，但我们暂且不去讨论它。我们假设其⽬的只是预测图像中是否存在某个物体。在图 9 中，我们有椅⼦、花盆、窗⼾，但没有其他物体，如电脑、床、电视等。因此，⼀幅图像可能有多个相关⽬标。这类问题就是多标签分类问题。
+
+这类分类问题的衡量标准有些不同。⼀些合适的 最常⻅的指标有：
+- k精确率（P@k）
+- k平均精确率（AP@k）
+- k均值平均精确率（MAP@k）
+- 对数损失（Log loss）
+
+k精确率（P@k）与前面的精确率并不相同。当我们有一个给定的样本的原始类别列表和同一个样本的预测类别列表，那么k精确率的定义就是**预测列表中仅考虑k个预测结果的命中数除以k**。
+
+```python
+# 计算p@k
+def pk(y_true, y_pred, k):
+    # 如果k为0，消除计算错误
+    if k== 0:
+        return 0
+    # 取预测标签前k个
+    y_pred = y_pred[:k]
+    # 预测标签转为集合
+    pred_set = set(y_pred)
+    # 真实标签转为集合
+    true_set = set(y_true)
+    # 预测标签集合与真实标签集合取交集，intersection函数返回交集（由python本身提供）
+    common_values = pred_set.intersection(true_set)
+    # 计算准确率
+    acc = len(y_pred & y_true) / len(y_pred)
+    return acc
+
+# 计算ap@k
+def apk(y_true, y_pred, k):
+    # 初始化p@k列表
+    pk_list = []
+    # 遍历1-k
+    for i in range(1, k+1):
+        # 计算p@k
+        pk_list.append(pk(y_true, y_pred, i))
+        # 如果p@k为0，结束计算
+    if len(pk_list) == 0:
+        return 0
+    # 计算ap@k
+    apk = sum(pk_list) / len(pk_list)
+    return apk
+
+# 计算map@k
+def mapk(y_true, y_pred, k):
+    apk_list = []
+    for i in range(len(y_true)):
+        apk_list.append(apk(y_true[i], y_pred[i], k=k))
+    mapk = sum(apk_list) / len(apk_list)
+    return mapks
+```
+```python
+# p@k和ap@k的不同实现方式，actual是真实标签列表,predicted是预测标签列表
+def apk(actual,predicted,k=10):
+    # 若预测标签长度大于k
+    if len(predicted)>k:
+        # 截取前k个预测标签，你需要除k，为了保证符合统计学意义，所以取前k个
+        predicted=predicted[:k]
+    score = 0.0
+    num_hits = 0.0 # 正确预测出的标签个数
+
+    for i,p in enumerate(predicted):
+        if p in actual and p not in predicted[:i]:
+            num_hits += 1.0
+            score += num_hits / (i+1.0)
+
+    if not actual:
+        return 0.0
+    return score / min(len(actual),k)
+```
+
+现在，我们来看看多标签分类的对数损失。这很容易。您可以将⽬标转换为⼆元分类，然后对每⼀列使⽤对数损失。最后，你可以求出每列对数损失的平均值。这也被称为平均列对数损失。当然，还有其他⽅法可以实现这⼀点，你应该在遇到时加以探索。
+
+我们现在可以说已经掌握了所有⼆元分类、多类分类和多标签分类指标，现在我们可以转向回归指标。
+回归中最常⻅的指标是误差（Error）。误差很简单，也很容易理解。
+
+$$
+Error = True Value - Predicted Value
+$$
+
+绝对误差（Absolute Error）只是上述误差的绝对值。
+
+$$
+Absolute Error = |True Value - Predicted Value|
+$$
+
+平方误差（Squared Error）是绝对误差的平方。
+
+$$
+Squared Error = (True Value - Predicted Value)^2
+$$
+
+平方根误差（Root Squared Error）是平方误差的平方根。
+
+$$
+Root Squared Error = \sqrt{(TrueValue - PredictedValue)^2}
+$$
+
+平方根误差是最常⻅的指标，因为其值越⼩，说明预测值与真实值越接近。
+
+
+接下来我们讨论平均绝对误差（MAE）：
+
+```python
+# 平均绝对误差，所有绝对误差的平均值
+
+import numpy as np  
+def mean_absolute_error(y_true, y_pred):
+    # 初始化误差
+    error = 0.0
+    # 遍历真实值和预测值
+    for yt,yp in zip(y_true,y_pred):
+        # 计算误差
+        error += np.abs(yt-yp)
+    # 返回均值
+    return error/len(y_true)
+
+# 均方误差
+def mean_squared_error(y_true, y_pred):
+    # 初始化误差
+    error = 0
+    for yt,yp in zip(y_true,y_pred):
+        # 计算误差
+        error += (yt-yp)**2
+    # 计算均方误差
+    return error/len(y_true)
+
+# 平方对数误差
+def mean_squared_log_error(y_true, y_pred):
+    # 初始化误差
+    error = 0
+    for yt,yp in zip(y_true,y_pred):
+        # 计算误差
+        error += (np.log(yt+1)-np.log(yp+1))**2
+    # 计算均方误差
+    return error/len(y_true)
+
+# 百分比误差
+def mean_percentage_error(y_true, y_pred):
+    # 初始化误差
+    error = 0
+    for yt,yp in zip(y_true,y_pred):
+        # 计算误差
+        error += (yt-yp)/yt
+    # 计算均方误差
+    return error/len(y_true)
+
+# 平均绝对百分比误差
+def mean_absolute_percentage_error(y_true, y_pred):
+    # 初始化误差
+    error = 0
+    for yt,yp in zip(y_true,y_pred):
+        # 计算误差
+        error += np.abs((yt-yp)/yt)
+    # 计算平均绝对百分比误差
+    return error/len(y_true)
+```
+回归的最⼤优点是，只有⼏个最常⽤的指标，⼏乎可以应⽤于所有回归问题。与分类指标相⽐，回归指标更容易理解。
+
+## 7. 判定系数
+
+让我们来谈谈另⼀个回归指标 R^2（R⽅），也称为判定系数。
+
+简单地说，R ⽅表⽰模型与数据的拟合程度。R ⽅接近 ``1.0`` 表⽰模型与数据的拟合程度相当好，⽽接近 ``0`` 则表⽰模型不是那么好。当模型只是做出荒谬的预测时，R ⽅也可能是负值。
+
+R⽅的计算公式是：
+
+$$
+R^2 = 1 - \frac{\sum_{i=1}^{n}(y_i - \hat{y_i})^2}{\sum_{i=1}^{n}(y_i - \bar{y})^2}
+$$
+
+其中，$y_i$是第 ``i`` 个观测值，$\hat{y_i}$ 是第 ``i``个观测值的模型预测值，$\bar{y} $是所有观测值的平均值。
+
+```python
+# 判定系数
+def r2(y_true, y_pred):
+    # 计算平均真实值
+    mean_true_value = np.mean(y_true)
+    # 初始化平方误差
+    numerator = 0
+    denominator = 0
+    # 遍历y_true和y_pred
+    for i in range(len(y_true)):
+        # 计算平方误差
+        numerator += (y_true[i] - y_pred[i]) ** 2
+        denominator += (y_true[i] - mean_true_value) ** 2
+    # 计算R2
+    r2 = 1 - numerator / denominator
+    return r2   
+```
+
+## 8. 二次加权卡帕
+
+其中⼀个应⽤相当⼴泛的指标是⼆次加权卡帕，也称为 QWK。它也被称为科恩卡帕。QWK 衡量两个 "评分 "之间的 "⼀致性"。评分可以是 0 到 N 之间的任何实数，预测也在同⼀范围内。⼀致性可以定义为这些评级之间的接近程度。因此，它适⽤于有 N 个不同类别的分类问题。如果⼀致度⾼，分数就更接近 1.0。Cohen's kappa 在 scikit-learn 中有很好的实现，关于该指标的详细讨论超出了本书的范围。
+
+您可以调用```metrics.cohen_kappa_score(y_true, y_pred, weights="quadratic")```来尝试实现。
+
+另一个重要的指标是马修相关指数（MCC）。
+MCC 是一个介于 -1 和 1 之间的值，它表示两个变量之间的相关性。如果 MCC 值接近 1，则两个变量是强相关的；如果 MCC 值接近 -1，则两个变量是强不相关的。MCC 是一个很好的指标，因为它不考虑类别的顺序。
+
+MCC的计算公式是：
+
+$$
+MCC =\frac{(TP * TN - FP * FN) } {{\sqrt((TP + FP) * (TP + FN) * (TN + FP) * (TN + FN))}}
+$$
+
+你可以使用 scikit-learn 中的 ```metrics.matthews_corrcoef(y_true, y_pred)``` 函数来计算 MCC。
+
+```python
+# 实现MCC
+
+def mcc(y_true, y_pred):
+    tp = true_positive(y_true, y_pred)
+    fn = false_negative(y_true, y_pred)
+    fp = false_positive(y_true, y_pred)
+    tn = true_negative(y_true, y_pred)
+    return (tp * tn - fp * fn) / (np.sqrt((tp + fp) * (tp + fn) * (tn + fp) * (tn + fn)))
+```
+
+</WordCount>

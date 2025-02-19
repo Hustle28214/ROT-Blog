@@ -14,7 +14,7 @@ const announcementBarContent = `2025新年快乐🎉`
 
 /** @type {import('@docusaurus/types').Config} */
 const config = {
-  title: '烟雨夜灯。',
+  title: 'Leyan',
   tagline: '江湖夜雨十年灯',
   favicon: 'img/leyan_Logo.ico',
   

@@ -1,0 +1,96 @@
+import WordCount from '../../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+## 1. 从MNIST数据集开始
+
+```python
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import seaborn as sns
+from sklearn import datasets
+from sklearn import manifold
+%matplotlib inline
+
+# 还记得吗，matplotlib和seaborn绘图，
+# 使用numpy处理数值数组，
+# 使用pandas从数值数组创建数据帧，
+# 使用scikit-learn获取数据并执行t-SNE。
+
+# 什么是t-SNE?
+# t-SNE (t-distributed stochastic neighbor embedding) 是一种非线性降维技术，用于可视化高维数据。t-SNE可以将高维数据映射到一个低维空间（通常是2维或3维），同时保持数据点之间的局部结构关系。
+
+# 导⼊后，我们需要下载数据并单独读取，或者使⽤ sklearn 的内置函数来提供 MNIST 数据集。
+
+
+# 什么是MNIST数据集？MNIST 数据集是一个常用的手写数字识别数据集，经常用于测试和比较机器学习算法的性能。该数据集包含了大量的手写数字图像，每张图像都是28x28像素的灰度图像，表示从0到9的数字。
+
+data = datasets.fetch_openml('mnist_784',version = 1, return_X_y = True) 
+# datasets里的fetch_openml方法接受参数见：https://scikit-learn.org/stable/modules/generated/sklearn.datasets.fetch_openml.html
+# sklearn中提供许多的数据集，您可以调用mnist_784，如果提供了名字时，您需要提供版本号version，return_X_y如果为True，则返回(data,target)而不是Bunch对象；
+# 什么是bunch? bunch是一个非常优雅轻便的数据结构，b = Bunch(name="Alice", age=30)，调用时形如b.name，而（data,target）则是返回元组
+pixel_values, targets = data # 进行解包操作，获取pixel_values和targets
+targets = targets.astype(int) # targets = targets.astype(int)的作用是将名为 targets 的变量中的数据类型转换为整数类型 (int)。
+
+# astype是由numpy提供的一个转换数据类型的方法。
+
+single_image = pixel_values.iloc[1].values.reshape(28, 28)
+# 订正源代码：方法更新，应该使用iloc来获取整一列的数据
+
+# cmap='gray'指定了“灰色”的颜色映射
+```
+
+结果:
+```
+<matplotlib.image.AxesImage at 0x201f574feb0>
+```
+
+![Image](https://github.com/user-attachments/assets/9eeaa609-170d-4b3a-aec1-3debae516d77)
+
+## 2. 创建t-SNE变换
+
+
+```python
+# ！！！最重要的一步：创建t-SNE变换
+tsne = manifold.TSNE(n_components = 2, random_state = 42)
+# manifold提供了TSNE数据降维方法，而在这里的一步是提纲挈领的参数设置。指定了降维后的数据集维度为2，设置随机种子数为42，这里的随机数种子并没有特别的含义。
+# TSNE接收的参数：请见 https://scikit-learn.org/stable/modules/generated/sklearn.manifold.TSNE.html
+transformed_data = tsne.fit_transform(pixel_values.iloc[:3000, :])
+# 对这个变换进行降维操作：选取数据集中的前3000个样本进行处理，: 表示全部维度的数据；fit_transform方法表示tsne.fit_transform() 方法对选取的数据进行拟合和转换操作，将数据从高维空间降至二维空间；
+# 此处存在对源代码的订正，使用了新的iloc方法
+# 转换后的数据是一个3000x2形状的数组，即3000行2列
+```
+
+```python
+# 将数据转换为pandas数据帧, x和y是t-SNE分解的两个维度，target是实际数字。
+tsne_df = pd.DataFrame(np.column_stack((transformed_data, targets[:3000])), columns=["x", "y", "targets"])
+
+tsne_df.loc[:, "targets"] = tsne_df["targets"].astype(int)
+# tsne_df = tsne_df.assign(targets=tsne_df["targets"].astype(int))
+# 这一步是为了转换类型
+```
+:::warning
+```bash
+C:\Users\xieyu\AppData\Local\Temp\ipykernel_15460\2990085286.py:4: DeprecationWarning: In a future version, `df.iloc[:, i] = newvals` will attempt to set the values inplace instead of always setting a new array. To retain the old behavior, use either `df[df.columns[i]] = newvals` or, if columns are non-unique, `df.isetitem(i, newvals)`
+  tsne_df.loc[:, "targets"] = tsne_df["targets"].astype(int)
+```
+如您出现了上述报错，您可以换为注释中更安全的写法，这是由于pandas不准备在未来版本中支持源代码写法
+:::
+
+## 3. 绘制散点图
+
+```python
+grid = sns.FacetGrid(tsne_df, hue="targets", height=8)
+# 绘制散点图
+grid.map(plt.scatter, "x", "y").add_legend()
+# 绘制坐标轴
+```
+
+```bash
+<seaborn.axisgrid.FacetGrid at 0x201f56df670>
+```
+
+![Image](https://github.com/user-attachments/assets/b82ef9ed-1f1b-43d1-95c0-e9b7ada959bf)
+
+</WordCount>

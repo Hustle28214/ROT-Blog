@@ -1,0 +1,368 @@
+import WordCount from '../../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+## 1. 分割数据集
+
+为了实现一个良好的机器学习模型，我们需要掌握交叉验证的方法，这是检验一个模型是否为优秀的机器学习模型的关键。
+
+我们从经典数据集————红葡萄酒质量数据集开始。
+
+```python
+import pandas as pd
+df = pd.read_csv("winequality-red.csv")
+
+# 这个数据集您可以在https://www.kaggle.com/datasets/uciml/red-wine-quality-cortez-et-al-2009?resource=download找到
+# 根据红葡萄酒的不同属性值，我们可以预测红葡萄酒的质量，这个问题可以被视为分类问题，或者回归问题。
+
+# 简单起见，作者先把它当做分类问题处理：
+
+# 观察这个数据集，总共有6种质量值，所以我们将所有质量值映射到0-5之间。
+
+# 为了实现这种映射，我们可以创建一个映射字典：
+
+quality_mapping = {
+    3:0,
+    4:1,
+    5:2,
+    6:3,
+    7:4,
+    8:5
+}
+
+# 使用pandas提供的map函数以及任何字典来转换给定列中的值为字典中的值
+
+df.loc[:,"quality"] = df.quality.map(quality_mapping)
+
+# 作者认为，分类不应该一开始就用神经网络。我们从决策树开始，这样更简单，并且我们能够可视化结果：
+
+# 我们可以将数据分为两部分，这个数据集有1599个样本，我们保留1000个样本用于训练，599个样本作为一个单独的集合。
+
+# 用frac = 1的sample方法来打乱dataframe
+# 由于打乱后索引会改变，所以我们重置索引
+
+df = df.sample(frac=1).reset_index(drop=True)
+
+# 选取前1000行(pandas的head方法)训练(62.5%)
+
+df_train = df.head(1000)
+
+# 选取最后的599行(pandas的tail方法)作为测试/验证数据(37.5%)
+
+df_test = df.tail(599)
+```
+
+## 2.训练决策树模型
+
+```python
+# 使用scikit-learn训练一个决策树模型
+
+from sklearn import tree
+from sklearn import metrics
+
+# 初始化一个决策树分类器，设置最大深度为3
+
+clf = tree.DecisionTreeClassifier(max_depth = 3)
+
+# 选择想要训练模型的列
+# 作为模型的特征
+
+cols = ['fixed acidity',
+        'volatile acidity',
+        'citric acid',
+        'residual sugar',
+        'chlorides',
+        'free sulfur dioxide',
+        'total sulfur dioxide',
+        'density',
+        'pH',
+        'sulphates',
+        'alcohol']
+        
+# 训练模型:fit方法接受的参数：Feature(X), Label(Y)
+
+clf.fit(df_train[cols],df_train.quality)
+```
+
+
+
+
+- 固定酸度（fixed acidity）
+- 挥发性酸度（volatile acidity）
+- 柠檬酸（citric acid）
+- 残留糖（residual sugar）
+- 氯化物（chlorides）
+- 游离⼆氧化硫（free sulfur dioxide）
+- ⼆氧化硫总量（total sulfur dioxide）
+- 密度（density）
+- PH 值（pH）
+- 硫酸盐（sulphates）
+- 酒精（alcohol）
+
+## 3. 测试模型准确性
+
+```python
+# 训练过后，我们开始测试模型准确性
+# 在训练集上生成预测
+train_predictions = clf.predict(df_train[cols])
+
+# 在测试集上生成预测
+
+test_predictions = clf.predict(df_test[cols])
+
+# 计算训练数据集上预测的准确性
+train_accuracy = metrics.accuracy_score(df_train.quality, train_predictions)
+
+# 计算测试数据集上预测的准确性
+
+test_accuracy = metrics.accuracy_score(df_test.quality, test_predictions)
+
+# accuracy_score函数接受参数：https://scikit-learn.org/stable/modules/generated/sklearn.metrics.accuracy_score.html
+
+# 此处为真实标签和预测标签
+
+
+print(train_accuracy)
+print(test_accuracy)
+```
+
+
+结果：
+```
+0.609
+0.5358931552587646
+```
+
+打印出来的训练和测试的准确率是会变的，这与原文有一些出入，但训练和测试的准确率的相差变化不大。
+
+## 4. 绘图
+
+```python
+import matplotlib
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# 导入matplotlib和seaborn用于绘图
+
+matplotlib.rc('xtick',labelsize = 20)
+matplotlib.rc('ytick',labelsize = 20)
+
+# 确保图表直接在笔记本内显示
+
+%matplotlib inline
+
+# 初始化用于存储训练和测试准确度的列表
+# 从50%的准确度开始
+
+train_accuracies = [0.5]
+test_accuracies = [0.5]
+
+# 遍历不同的树的深度值
+for depth in range(1,25):
+    # 初始化模型
+    clf = tree.DecisionTreeClassifier(max_depth = depth)
+    cols = [
+    'fixed acidity', 'volatile acidity', 'citric acid',
+    'residual sugar',
+        'chlorides',
+        'free sulfur dioxide',
+        'total sulfur dioxide',
+        'density',
+        'pH',
+        'sulphates',
+        'alcohol']
+    # 在给定特征上拟合模型
+    clf.fit(df_train[cols],df_train.quality)
+    # 创建训练和测试预测
+    train_predictions = clf.predict(df_train[cols])
+    # 计算训练和测试准确度
+    train_accuracy = metrics.accuracy_score(df_train.quality, train_predictions)
+    test_accuracy = metrics.accuracy_score(df_test.quality, test_predictions)
+    # 添加准确度到列表
+    train_accuracies.append(train_accuracy)
+    test_accuracies.append(test_accuracy)
+
+plt.figure(figsize=(10,5))
+sns.set_style("whitegrid")
+plt.plot(train_accuracies, label = "train accuracy")
+plt.plot(test_accuracies, label = "test accuracy")
+plt.legend(loc = "upper left", prop ={'size':15})
+plt.xticks(range(0,26,5))
+plt.xlabel("max_depth", size = 20)
+plt.ylabel("accuracy", size = 20)
+plt.show()
+```
+
+原文为最大深度为14时，测试数据的得分最高，但这里的测试集数据得分变动非常不明显，可能是与方法和参数的更新有关。最大深度增加，决策树模型对训练数据的学习效果越来越好，测试数据的性能并不提高。
+
+此即为**过拟合**，在训练集上完全拟合，但在测试集上表现不好，意味着模型的泛化能力较差。这种方法虽然在测试集上表现为准确率基本不变，但当不算提高训练损失时，测试损失也在增加，这也符合过拟合，而且这是非常常见的。
+
+每当我们训练一个神经网络时，都必须在训练期间监控训练集和测试集的损失。用非常大的网络来处理一个非常小的数据集（样本数非常少），此时训练集和测试集的损失都会减少。但是，在某个时刻，测试损失会达到最小值；之后，训练损失进一步减少，测试损失也会开始增加。必须在验证损失达到最小值时停止训练。
+
+这符合**奥卡姆剃刀原理**。
+
+## 5. 交叉验证
+
+是时候介绍交叉检验了，它是建立一个良好的机器学习模型的最关键步骤（也许是2017年的说法）。什么是交叉检验？
+
+交叉检验是评估模型性能的常用方法。交叉检验是使用训练数据集来训练模型，然后使用测试数据集来评估模型性能。*一轮交叉验证包括将数据样本划分为互补子集，对一个子集（称为训练集）执行分析，并在另一个子集（称为验证集或测试集）上验证分析结果。为了减少可变性，在大多数方法中，使用不同的分区执行多轮交叉验证，并且在这些回合中验证结果被组合（例如，平均）以估计最终的预测模型。（引自：维基百科）*作者使用了暂留集(hold-out set)这种方法：**在一部分上训练模型，然后在另一部分上检查其性能**。这也是交叉检验的一种。
+
+选择正确的交叉检验取决于所处理的数据集。在一个数据集上适用的交叉检验并不一定就适合别的数据集。
+
+有几种交叉检验技术最为流行和广泛使用：
+
+- k折交叉检验
+- 分层k折交叉检验
+- 留一交叉检验
+- 分组k折交叉检验
+
+交叉检验是将训练数据分层几个部分，在一部分上训练模型，在其余部分上测试。
+
+### 5.1 k折交叉检验
+
+得到一个数据集来构建机器学习模型时，可以把他们分为两个不同的集：训练集和验证集。训练集用来训练模型，验证集用来评估模型。实际上很多人会用第三个集：测试集，在下述代码中只使用两个集。
+
+我们可以将数据分为k个互不关联的不同集合，即所谓的k折交叉验证。
+
+注意，交叉验证非常强大，**几乎所有类型的数据集**都可以使用此流程。
+
+```python
+# 使用scikit-learn的KFold方法将任何数据分割成k个相等的部分，每个样本分配一个从0到k-1的值。
+# 导入 pandas 和 scikit-learn 的 model_selection 模块
+import pandas as pd 
+from sklearn import KFold
+if __name__ == '__main__':
+    # 训练数据为train.csv
+    df =pd.read_csv("train.csv")
+    # 创建一个名为kfold的新列，并用 -1 填充
+    df["kfold"] = -1
+    # 接下来的步骤是随机打乱数据的行，reset_index种 drop=True 表示丢弃原来的索引
+    # frac=1 表示打乱所有行
+    df = df.sample(frac=1).reset_index(drop=True)
+    # 从model_selection模块初始化kfold类，n_splits=5 表示将数据分割成5份（折叠次数）
+    kf = model_selection.KFold(n_splits=5)
+    # 填充新的Kfold列
+    for fold,(trn_,val_) in enumerate(kf.split(X=df)):
+        df.loc[val_,'kfold'] = fold
+    # 保存到csv文件,index=False表示不保存索引(无行名)
+    df.to_csv("train_folds.csv",index=False)
+```
+
+
+### 5.2 分层 k 折交叉检验
+
+如果有一个偏斜的二元分类数据集，其中正样本占90%，负样本只占10%，就不应使用随机k折交叉，这时简单的k折交叉检验可能会导致折叠样本全部为负样本。此时，分层k折交叉检验就能派上用场，它能保持每个折中标签比例不变。这样就能保持正样本为90%，负样本为10%不变了。
+
+修改创建k折交叉检验的代码核心：将model_selection.KFold 更改为 model_selection.StratifiedKFold ，并在 kf.split(...) 函数中指定要
+分层的⽬标列。
+
+以一个分类问题举例：
+
+```python
+# 假设csv里有一列名为target：
+
+from sklearn import model_selection
+if __name__ == '__main__':
+    # 训练数据存到train.csv
+    df = pd.read_csv('train.csv')
+    # 添加一个新列kfold，并用-1初始化
+    df["kfold"] = -1
+    # 随机打乱数据行
+    df = df.sample(frac=1).reset_index(drop = True)
+    # 获取目标变量
+    y = df.target.values
+    # 初始化 5折交叉验证
+    kf = model_selection.StratifiedKFold(n_splits = 5)
+    # 使用StratifiedKFold对象的split方法来获取训练和验证索引
+    for f,(t_,v_) in enumerate(kf.split(X=df,y=y)):
+        df.loc[v_,'kfold'] = f
+    # 保存包含kfold列的新csv
+    df.to_csv("train_folds.csv",index = False)
+```
+
+标签分布情况：
+
+```python
+# 对于葡萄酒数据集，标签的分布情况：
+b = sns.countplot(x = 'quality', data =df)
+b.set_xlabel("quality",fontsize = 20)
+b.set_ylabel("count", fontsize= 20)
+```
+
+### 5.3 暂留交叉检验
+
+标准分类问题可以直接选择分层k折交叉检验。
+
+但遇到数据量很大的情况，我们可以选择**暂留交叉检验**。创建保持结果的过程与分层k折交叉检验相同，对于非常大的样本量的数据集，我们可以创建更大倍数的折叠，保留其中一个折叠作为保留样本。这意味着，我们将有10w个样本被保留，始终在这个样本集上计算损失、准确率和其他指标。
+
+暂留交叉检验对于时间序列数据的处理也非常有用。
+
+我们转向回归问题，回归问题的好处在于，除了分层k折交叉检验之外，我们可以在回归问题上使用上述所有交叉检验技术。
+
+这也就是说我们不能直接使用分层k折交叉检验，但可以用一些方法稍微改变问题，从而在回归问题中使用分层k折交叉检验。
+
+大多数的情况下，**简单的k折交叉检验**适用于任何回归问题。但如果我们发现目标分布不一致，就可以使用分层k折交叉检验。
+
+要在回归问题中使用K折交叉检验，我们必须先**将目标划分为若干个分层**，然后再以**处理分类问题的相同方式**使用**分层k折交叉检验**。
+
+选择合适的分层数有几种选择， 如果样本量很大，就不需要考虑分层的数量，分为10或20层即可；如果样本数不多，则可以使用Sturge's Rule这样的简单规则来计算适当的分层数。
+
+$NumberofBins = 1 + log2(N)$
+
+其中N是数据集的样本数。
+
+```python
+# 制作一个回归数据集样本，并尝试应用分层k折交叉检验：
+
+import numpy as np
+import pandas as pd
+from sklearn import datasets
+from sklearn import model_selection
+
+# 创建分折(folds)函数
+def create_folds(data):
+    # 创建一个新列叫做kfold，并用-1来填充
+    data["kfold"] = -1
+
+    # 随机打乱数据的行
+    data = data.sample(frac=1).reset_index(drop=True)
+
+    # 应用Sturge's Rule计算分层数：
+    num_bins = int(np.floor(1+np.log2(len(data))))
+
+    # 使用pandas的cut函数进行目标变量(target)的分箱
+    data.loc[:,"bins"] = pd.cut(data["target"],bins = num_bins, labels = False)
+
+    # 初始化StratifiedKFold类
+    kf = model_selection.StratifiedKFold(n_splits=5)
+
+    # 遍历StratifiedKFold类的对象，并给每条数据分配一个kfold
+    for f,(t_,v_) in enumerate(kf.split(X=data,y=data.bins.values)):
+        data.loc[v_,"kfold"] = f
+
+    # 删除bins列
+    data = data.drop("bins",axis=1)
+
+    # 返回包含folds的数据
+    return datasets
+
+# 主程序
+if __name__ = "__main__":
+    # 创建一个带有15000个样本、100个特征和1个目标变量的样本数据集
+    X,y = datasets.make_regression(n_samples = 15000,n_features = 100,n_targets =1)
+    # 使用numpy数组创建一个数据框
+    df = pd.DataFrame(X,columns = [f"f_{i}" for i in range(X.shape[1])])
+    df.loc[:,"target"] = y
+    # 创建folds
+    df = create_folds(df)
+```
+
+交叉检验是构建机器学习模型的第⼀步，也是最基本的⼀步。如果要做特征⼯程，⾸先要拆分数据。如果要建⽴模型，⾸先要拆分数据。如果你有⼀个好的交叉检验⽅案，其中验证数据能够代表训练数据和真实世界的数据，那么你就能建⽴⼀个具有⾼度通⽤性的好的机器学习模型。
+
+本章介绍的交叉检验类型⼏乎适⽤于所有机器学习问题。不过，你必须记住，交叉检验也在很⼤程度上取决于数据，你可能需要根据你的问题和数据采⽤新的交叉检验形式。
+
+例如，假设我们有⼀个问题，希望建⽴⼀个模型，从患者的⽪肤图像中检测出⽪肤癌。我们的任务是建⽴⼀个⼆元分类器，该分类器接收输⼊图像并预测其良性或恶性的概率。
+
+在这类数据集中，训练数据集中可能有同⼀患者的多张图像。因此，要在这⾥建⽴⼀个良好的交叉检验系统，必须有分层的 k 折交叉检验，但也必须确保训练数据中的患者不会出现在验证数据中。幸运的是，scikit-learn 提供了⼀种称为 GroupKFold 的交叉检验类型。 在这⾥，患者可以被视为组。 但遗憾的是，scikit-learn ⽆法将 GroupKFold 与 StratifiedKFold 结合起来。所以读者需要自己动手实现！
+
+</WordCount>

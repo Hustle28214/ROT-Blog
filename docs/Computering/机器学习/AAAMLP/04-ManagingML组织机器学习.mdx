@@ -1,0 +1,282 @@
+import WordCount from '../../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+## 1. 准备第一个模型
+
+我们终于可以开始构建第一个机器学习模型了！
+
+您可以继续使用Jupyter Notebook，或者使用您选择的其他工具。
+
+项目文件夹应该如下所示：
+
+```bash
+├── data
+│   ├── train.csv
+│   └── test.csv
+├── src
+|   ├── create_folds.py
+|   ├── models.py
+|   ├── inference.py
+|   ├── config.py
+|   ├── model_dispatcher.py
+|   └── train.py
+├── submissions
+│   ├── model_rf.bin
+|   └── model_et.bin
+├── notebooks
+│   ├── exploration.ipynb
+│   └── check_data.ipynb
+├──requirements.txt
+├── README.md
+├── LICENSE
+├── .gitignore
+└── .gitattributes
+```
+
+
+让我们来看看这些⽂件夹和⽂件的内容。
+
+- input/ ：该⽂件夹包含机器学习项⽬的所有输⼊⽂件和数据。如果您正在开发 NLP 项⽬，您可以将embeddings放在这⾥。如果是图像项⽬，所有图像都放在该⽂件夹下的⼦⽂件夹中。
+
+- src/ ：我们将在这⾥保存与项⽬相关的所有 python 脚本。如果我说的是⼀个 python 脚本，即任何 *.py ⽂件，它都存储在 src ⽂件夹中。
+
+- models/ ：该⽂件夹保存所有训练过的模型。
+
+- notebook/ ：所有 jupyter notebook（即任何 *.ipynb ⽂件）都存储在笔记本 ⽂件夹中。
+
+- README.md ：这是⼀个标记符⽂件，您可以在其中描述您的项⽬，并写明如何训练模型或在⽣产环境中使⽤。
+
+- LICENSE ：这是⼀个简单的⽂本⽂件，包含项⽬的许可证，如 MIT、Apache 等。关于许可证的详细介绍超出了本书的范围。假设你正在建⽴⼀个模型来对 MNIST 数据集（⼏乎每本机器学习书籍都会⽤到的数据集）进⾏分类。如果你还记得，我们在交叉检验⼀章中也提到过 MNIST 数据集。所以，我就不解释这个数据集是什么样⼦了。⽹上有许多不同格式的 MNIST 数据集，但我们将使⽤ CSV 格式的数据集。
+
+在这种格式的数据集中，CSV 的每⼀⾏都包含图像的标签和 784 个像素值，像素值范围从 0 到255。数据集包含 60000 张这种格式的图像。
+
+我们可以使⽤ ``pandas`` 轻松读取这种数据格式。
+
+请注意，尽管图 1 显⽰所有像素值均为零，但事实并⾮如此。
+
+## 2. 回忆第一步...?
+
+处理机器学习问题的第⼀步：<mark>确定衡量标准</mark>！
+
+现在，我们可以编写⼀些代码了。我们需要创建 src/ ⽂件夹和⼀些 python 脚本。
+
+请注意，训练 CSV ⽂件位于 input/ ⽂件夹中，名为 ``mnist_train.csv`` 。
+
+对于这样⼀个项⽬，这些⽂件应该是什么样的呢？
+
+⾸先要创建的脚本是 ``create_folds.py``。
+
+这将在 input/ ⽂件夹中创建⼀个名为 ``mnist_train_folds.csv`` 的新⽂件，与 mnist_train.csv 相同。唯⼀不同的是，这个 CSV ⽂件经过了随机排序，并新增了⼀列名为 kfold 的内容。
+
+⼀旦我们决定了要使⽤哪种评估指标并创建了折叠，就可以开始创建基本模型了。这可以在train.py 中完成。
+```python
+import joblib
+import pandas as pd
+from sklearn import metrics
+from sklearn import tree
+
+def run(fold):
+    # 读取数据文件
+    df = pd.read_csv("../input/mnist_train_folds.csv")
+    # 选取df中Kfold列不等于fold的行
+    df_train = df[df.kfold != fold].reset_index(drop=True)
+    # 选取df中Kfold列等于fold的行
+    df_valid = df[df.kfold == fold].reset_index(drop=True)
+    # 训练集输入，删除label列
+    x_train = df_train.drop("label", axis=1).values
+    # 训练集输出，取label列
+    y_train = df_train.label.values
+    # 验证集输入，删除label列
+    x_valid = df_valid.drop("label", axis=1).values
+    # 验证集输出，取label列
+    y_valid = df_valid.label.values
+    # 实例化决策树模型
+    model = tree.DecisionTreeClassifier()
+    # 使用训练集训练模型
+    model.fit(x_train, y_train)
+    # 使用验证集进行预测
+    preds = model.predict(x_valid)
+    # 输出准确率
+    acc = metrics.accuracy_score(y_valid, preds)
+    # 打印fold信息和准确率
+    print(f"Fold: {fold}, Accuracy: {acc}")
+    # 保存模型
+    joblib.dump(model, f"../models/dt_{fold}.bin")
+
+if __name__ == "__main__":
+    # 遍历0到4，依次执行run函数
+    for fold_ in range(5):
+        run(fold_)
+```
+
+之后，您可以在终端调用这个模型。
+```python train.py```
+
+查看训练脚本时，您会发现还有⼀些内容是硬编码的，例如折叠数、训练⽂件和输出⽂件夹。
+
+因此，我们可以创建⼀个包含所有这些信息的配置⽂件：``config.py``。
+
+```bash
+TRAINING_FILE = "../input/mnist_train_folds.csv"
+MODEL_OUTPUT = "../models/"
+```
+
+我们还对训练脚本进⾏了⼀些修改。训练⽂件现在使⽤配置⽂件。这样，更改数据或模型输出就更容易了。
+
+```python
+import os
+import config
+import joblib
+import pandas as pd
+from sklearn import metrics
+from sklearn import tree
+def run(fold):
+  # 使用config中的路径读取数据
+  df = pd.read_csv(config.TRAINING_FILE)
+  df_train = df[df.kfold != fold].reset_index(drop=True)
+  df_valid = df[df.kfold != fold].reset_index(drop=True)
+  x_train = df_train.drop("label", axis=1).values
+  y_train = df_train.label.values
+  x_valid = df_valid.drop("label", axis=1).values
+  y_valid = df_valid.label.values
+  clf = tree.DecisionTreeClassifier()
+  clf.fit(x_train, y_train)
+  preds = clf.predict(x_valid)
+  accuracy = metrics.accuracy_score(y_valid, preds)
+  print(f"Fold={fold}, Accuracy={accuracy}")
+  # 这里引用config的Output路径，即作者说的不同之处之一
+  joblib.dump(clf,os.path.join(config.MODEL_OUTPUT, f"dt_{fold}.bin") )
+if __name__ == "__main__":
+  # 运行每个折叠
+    run(fold=0)
+    run(fold=1)
+    run(fold=2)
+    run(fold=3)
+    run(fold=4)
+```
+
+使用argparse模块，解决内存消耗增加的问题：
+
+```python
+# argparse能够解决内存消耗增加，向训练脚本传递参数
+import argparse
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    # fold 参数
+    parser.add_argument('--fold', type=int, default=0)  
+    # 读取参数
+    args = parser.parse_args()
+    run(fold = args.fold)
+```
+
+创建一个用于运行的SHELL脚本: 
+
+```python
+# 创建shell脚本
+python train.py --fold 0
+python train.py --fold 1
+python train.py --fold 2
+python train.py --fold 3
+python train.py --fold 4
+
+sh run.sh
+```
+## 3. 调度训练脚本
+
+我们现在已经取得了⼀些进展，但如果我们看⼀下我们的训练脚本，我们仍然受到⼀些东西的限制，例如模型。模型是硬编码在训练脚本中的，只有修改脚本才能改变它。因此，我们将创建⼀个新的 python 脚本，名为 ``model_dispatcher.py``。
+
+顾名思义，将调度我们的模型到训练脚本中。
+
+```python
+from sklearn import tree
+models = {
+    # 以gini系数度量的决策树
+    'gini': tree.DecisionTreeClassifier(criterion='gini'),
+    # 以信息熵度量的决策树
+    'entropy': tree.DecisionTreeClassifier(criterion='entropy'),
+    # 以gini系数度量的随机森林
+    'gini_forest': tree.RandomForestClassifier(criterion='gini'),
+    # 以信息熵度量的随机森林
+    'entropy_forest': tree.RandomForestClassifier(criterion='entropy')
+}
+```
+``model_dispatcher.py`` 从 ``scikit-learn`` 中导⼊了 ``tree``，并定义了⼀个字典，其中键是模型的名称，值是模型本⾝。在这⾥，我们定义了两种不同的决策树，⼀种使⽤基尼标准，另⼀种使⽤熵标准。要使⽤ py，我们需要对训练脚本做⼀些修改。
+
+
+```python
+import argparse
+import os
+import joblib
+import pandas as pd
+from sklearn import metrics
+import config
+import model_dispatcher
+def run(fold, model):
+    df = pd.read_csv(config.TRAINING_FILE)
+    df_train = df[df.kfold != fold].reset_index(drop=True)
+    df_valid = df[df.kfold == fold].reset_index(drop=True)
+    x_train = df_train.drop("label", axis=1).values
+    y_train = df_train.label.values
+    x_valid = df_valid.drop("label", axis=1).values
+    y_valid = df_valid.label.values
+    # 根据Model参数选择模型
+    model = model_dispatcher.models[model]
+    model.fit(x_train, y_train)
+    preds = model.predict(x_valid)
+    acc = metrics.accuracy_score(y_valid, preds)
+    print(f"Fold={fold}, Accuracy={acc}")
+    joblib.dump(model, os.path.join(config.MODEL_OUTPUT, f"{model}_{fold}.bin"))
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--fold",
+        type=int
+    )
+    parser.add_argument(
+        "--model",
+        type=str
+    )
+    args = parser.parse_args()
+    run(fold=args.fold, model=args.model)
+```
+
+
+``train.py``有⼏处重⼤改动：
+
+- 导⼊ model_dispatcher
+- 为 ArgumentParser 添加 --model 参数
+- 为 run() 函数添加model参数
+- 使⽤调度程序获取指定名称的模型
+
+
+现在，我们可以使⽤以下命令运⾏脚本：
+```bash
+python train.py --fold 0 --model decision_tree_gini
+```
+
+创建一个随机森林模型：
+
+```python
+from sklearn import ensemble
+from sklearn import tree
+models = {
+    "decision_tree_gini": tree.DecisionTreeClassifier(criterion="gini"),
+    "decision_tree_entropy": tree.DecisionTreeClassifier(criterion="entropy"),
+    # 随机森林模型
+    "random_forest": ensemble.RandomForestClassifier(),
+    
+}
+```
+运行：```python train.py --fold 0 --model rf```
+
+MNIST ⼏乎是每本书和每篇博客都会讨论的问题。但我试图将这个问题转换得更有趣，并向你展⽰如何为你正在做的或计划在不久的将来做的⼏乎所有机器学习项⽬编写⼀个基本框架。有许多不同的⽅法可以改进这个 MNIST 模型和这个框架，我们将在以后的章节中看到。
+
+我使⽤了⼀些脚本，如 ``model_dispatcher.py`` 和 ``config.py`` ，并将它们导⼊到我的训练脚本中。请注意，我没有导⼊ \*，你也不应该导⼊。如果我导⼊了\*，你就永远不会知道模型字典是从哪⾥来的。编写优秀、易懂的代码是⼀个⼈必须具备的基本素质，但许多数据科学家却忽视了这⼀点。
+
+
+如果你所做的项⽬能让其他⼈理解并使⽤，⽽⽆需咨询你的意⻅，那么你就节省了他们的时间和⾃⼰的时间，可以将这些时间投⼊到改进你的项⽬或开发新项⽬中去。
+
+
+</WordCount>

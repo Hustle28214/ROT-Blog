@@ -60,7 +60,7 @@ df = pd.read_csv("../input/train.csv")
 # 取*ord_2*列，并使用映射将类别转换为数字
 df.loc[:, "*ord_2*"] = df.*ord_2*.map(mapping)
 ```
-```python
+```bash
 # 映射前的数值计数
 
 df.*ord_2*.value_counts()
@@ -72,4 +72,9 @@ Hot            67508
 Lava Hot       64840
 Name: *ord_2*, dtype: int64
 ```
+这种分类变量的编码⽅式被称为标签编码（Label Encoding）我们将每个类别编码为⼀个数字标签。
+
+我们也可以使用``scikit-learn``中的``LabelEncoder``进行编码。
+
+
 </WordCount>

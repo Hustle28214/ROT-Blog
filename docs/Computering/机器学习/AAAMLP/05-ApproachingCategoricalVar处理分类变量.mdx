@@ -1078,7 +1078,531 @@ Fold = 4, AUC = 0.764914671468069
 
 明显比随机森林要高很多。
 
+## 6. 尝试做一些特征工程
 
+在进行下一章之前，让我们来尝试一下做特征工程，现在把目光放到这个大数据集[美国成⼈⼈⼝普查数据](https://www.kaggle.com/datasets/abhishek/aaamlp/data)：
+
+我们的任务是为这些人预测⼯资等级。
+
+该数据集有以下⼏列：
+```
+年龄（age）
+⼯作类别（workclass）
+学历（fnlwgt）
+教育程度（education）
+教育程度（education.num）
+婚姻状况（marital.status）
+职业（occupation）
+关系（relationship）
+种族（race）
+性别（sex）
+资本收益（capital.gain）
+资本损失（capital.loss）
+每周⼩时数（hours.per.week）
+原籍国（native.country）
+收⼊（income）
+```
+
+我们倾向于认为收入是比较有用的列。所以我们对收入进行数值统计:
+
+```bash
+In [X]: import pandas as pd
+In [X]: df = pd.read_csv("../input/adult.csv")
+In [X]: df.income.value_counts()
+Out[X]:
+<=50K 24720
+>50K 7841
+```
+
+有 7841 个实例的收⼊超过 5 万美元。这占样本总数的 24%。因此，我们将保持与猫数据集相同的评估⽅法，即 AUC。
+
+我们去掉一些特征试试：
+
+```python
+学历（fnlwgt）
+年龄（age）
+资本收益（capital.gain）
+资本损失（capital.loss）
+每周⼩时数（hours.per.week）
+```
+⽤逻辑回归和独热编码器:
+
+```python
+import pandas as pd
+from sklearn import linear_model
+from sklearn import metrics
+from sklearn import preprocessing
+def run(fold):
+df = pd.read_csv("../input/adult_folds.csv")
+# 需要删除的列
+num_cols = [
+"fnlwgt",
+"age",
+"capital.gain",
+"capital.loss",
+"hours.per.week"
+]
+df = df.drop(num_cols, axis=1)
+# 映射
+target_mapping = {
+">=50K": 0,
+">50K": 1
+}
+# 使用映射替换
+df.loc[:, "income"] = df.income.map(target_mapping)
+# 取除"kfold", "income"列的其他列名
+features = [f for f in df.columns if f not in ("kfold", "income") ]
+for col in features:
+# 将空值替换为"NONE"
+df.loc[:, col] = df[col].astype(str).fillna("NONE")
+# 取训练集（kfold列中不为fold的样本，重置索引）
+df_train = df[df.kfold == fold].reset_index(drop=True)
+# 取验证集（kfold列中为fold的样本，重置索引）
+df_valid = df[df.kfold == fold].reset_index(drop=True)
+# 独热编码
+ohe = preprocessing.OneHotEncoder()
+# 将训练集、测试集沿行合并
+full_data = pd.concat([df_train[features], df_valid[features]], axis=0)
+ohe.fit(full_data[features])
+# 转换训练集
+x_train = ohe.transform(df_train[features])
+# 转换验证集
+x_valid = ohe.transform(df_valid[features])
+# 构建逻辑回归模型
+model = linear_model.LogisticRegression()
+# 使用训练集训练模型
+model.fit(x_train, df_train.income.values)
+# 使用验证集得到预测标签
+valid_preds = model.predict_proba(x_valid)[:, 1]
+# 计算auc指标
+auc = metrics.roc_auc_score(df_valid.income.values, valid_preds)
+print(f"Fold = {fold}, AUC = {auc}")
+if __name__  =="__main__":
+# 运行0~4折
+for fold_ in range(5):
+run(fold_)
+```
+得到：
+
+```bash
+python -W ignore ohe_logres.py
+Fold = 0, AUC = 0.8794809708119079
+Fold = 1, AUC = 0.8875785068274882
+Fold = 2, AUC = 0.8852609687685753
+Fold = 3, AUC = 0.8681236223251438
+Fold = 4, AUC = 0.8728581541840037
+```
+
+这个结果是不错的！现在我们不调整任何超参数，尝试标签编码下的XGBoost：
+
+```python
+import pandas as pd
+import xgboost as xgb
+from sklearn import metrics
+from sklearn import preprocessing
+def run(fold):
+df = pd.read_csv("../input/adult_folds.csv")
+num_cols = [ "fnlwgt",
+"age",
+"capital.gain",
+"capital.loss",
+"hours.per.week"
+]
+df = df.drop(num_cols, axis=1)
+target_mapping = {
+">=50K": 0,
+">50K": 1
+}
+df.loc[:, "income"] = df.income.map(target_mapping)
+features = [f for f in df.columns if f not in ("kfold", "income") ]
+for col in features:
+df.loc[:, col] = df[col].astype(str).fillna("NONE")
+for col in features:
+# 标签编码
+lbl = preprocessing.LabelEncoder()
+lbl.fit(df[col])
+df.loc[:, col] = lbl.transform(df[col])
+df_train = df[df.kfold == fold].reset_index(drop=True)
+df_valid = df[df.kfold == fold].reset_index(drop=True)
+x_train = df_train[features].values
+x_valid = df_valid[features].values
+# XGBoost模型
+model = xgb.XGBClassifier(n_jobs=-1)
+model.fit(x_train, df_train.income.values)
+valid_preds = model.predict_proba(x_valid)[:, 1]
+auc = metrics.roc_auc_score(df_valid.income.values, valid_preds)
+print(f"Fold = {fold}, AUC = {auc}")
+if __name__ == "__main__":
+# 运行0~4折
+for fold_ in range(5):
+run(fold_)
+```
+
+运行代码后:
+
+```bash
+python lbl_xgb.py
+Fold = 0, AUC = 0.8800810634234078
+Fold = 1, AUC = 0.886811884948154
+Fold = 2, AUC = 0.8854421433318472
+Fold = 3, AUC = 0.8676319549361007
+Fold = 4, AUC = 0.8714450054900602
+```
+
+```bash
+# max_depth 增加到 7 和 n_estimators 增加到 200 
+python lbl_xgb.py
+Fold = 0, AUC = 0.8764108944332032
+Fold = 1, AUC = 0.8840708537662638
+Fold = 2, AUC = 0.8816601162613102
+Fold = 3, AUC = 0.8662335762581732
+Fold = 4, AUC = 0.8698983461709926
+```
+
+改善非常不明显，说明⼀个数据集的参数不能移植到另⼀个数据集。
+
+在接下来的章节中，将再次调整参数。现在，我们尝试在不调整参数的情况下将数值特征纳⼊ xgboost 模型：
+
+```python
+import pandas as pd
+import xgboost as xgb
+from sklearn import metrics
+from sklearn import preprocessing
+def run(fold):
+df = pd.read_csv("../input/adult_folds.csv")
+# 加入数值特征
+num_cols = [
+"fnlwgt",
+"age",
+"capital.gain",
+"capital.loss",
+"hours.per.week"]
+target_mapping = {
+">=50K": 0,
+">50K": 1
+}
+df.loc[:, "income"] = df.income.map(target_mapping)
+features = [f for f in df.columns if f not in ("kfold", "income") ]
+for col in features:
+if col not in num_cols:
+# 将空值置为"NONE"
+df.loc[:, col] = df[col].astype(str).fillna("NONE")
+
+for col in features:
+if col not in num_cols:
+# 标签编码
+lbl = preprocessing.LabelEncoder()
+lbl.fit(df[col])
+df.loc[:, col] = lbl.transform(df[col])
+
+df_train = df[df.kfold == fold].reset_index(drop=True)
+df_valid = df[df.kfold == fold].reset_index(drop=True)
+x_train = df_train[features].values
+x_valid = df_valid[features].values
+# XGBoost模型
+model = xgb.XGBClassifier(n_jobs=-1)
+
+model.fit(x_train, df_train.income.values)
+valid_preds = model.predict_proba(x_valid)[:, 1]
+auc = metrics.roc_auc_score(df_valid.income.values, valid_preds)
+print(f"Fold = {fold}, AUC = {auc}")
+if __name__ == "__main__":
+for fold_ in range(5):
+run(fold_)
+```
+
+保留数字列，只是不对其进⾏标签编码。这样，我们的最终特征矩阵就由数字列（原样）和编码分类列组成了。任何基于树的算法都能轻松处理这种混合。
+:::danger
+<mark>在使⽤基于树的模型时，我们不需要对数据进⾏归⼀化处理。</mark>这非常重要！特别是在你使用线性模型（e.g.Logistic）的时候。 
+:::
+结果:
+
+```bash
+python lbl_xgb_num.py
+Fold = 0, AUC = 0.9209790185449889
+Fold = 1, AUC = 0.9247157449144706
+Fold = 2, AUC = 0.9269329887598243
+Fold = 3, AUC = 0.9119349082169275
+Fold = 4, AUC = 0.9166408030141667
+```
+
+提取所有分类列，并创建所有⼆度组合:
+
+```python
+# feature_engineering 函数
+import itertools
+import pandas as pd
+import xgboost as xgb
+from sklearn import metrics
+from sklearn import preprocessing
+def feature_engineering(df, cat_cols):
+    # 生成两个特征的组合
+    combi = list(itertools.combinations(cat_cols, 2))
+    for c1, c2 in combi:
+        df.loc[:, c1 + "_" + c2] = df[c1].astype(str) + "_" + df[c2].astype(str)
+    return df
+def run(fold):
+    df = pd.read_csv("../input/adult_folds.csv")
+    num_cols = [ "fnlwgt",
+    "age",
+    "capital.gain",
+    "capital.loss",
+    "hours.per.week"
+    ]
+    target_mapping = {
+    ">=50K": 0,
+    ">50K": 1
+    }
+    df.loc[:, "income"] = df.income.map(target_mapping)
+    cat_cols = [c for c in df.columns if c not in num_cols and c not in ("kfold",
+    "income")]
+    # 特征工程
+    df = feature_engineering(df, cat_cols)
+    features = [f for f in df.columns if f not in ("kfold", "income")]
+    for col in features:
+        if col not in num_cols:
+            df.loc[:, col] = df[col].astype(str).fillna("NONE")
+    for col in features:
+        if col not in num_cols:
+            lbl = preprocessing.LabelEncoder()
+            lbl.fit(df[col])
+            df.loc[:, col] = lbl.transform(df[col])
+    df_train = df[df.kfold == fold].reset_index(drop=True)
+    df_valid = df[df.kfold == fold].reset_index(drop=True)
+    x_train = df_train[features].values
+    x_valid = df_valid[features].values
+    model = xgb.XGBClassifier(n_jobs=-1)
+    model.fit(x_train, df_train.income.values)
+    valid_preds = model.predict_proba(x_valid)[:, 1]
+    auc = metrics.roc_auc_score(df_valid.income.values, valid_preds)
+    print(f"Fold = {fold}, AUC = {auc}")
+if __name__ == "__main":
+    for fold_ in range(5):
+        run(fold_)
+```
+
+但是这样的处理方法稍显稚嫩。我们应该仔细研究数据，做特征选择。否则会创建大量特征。
+
+上述代码的得分是：
+```bash
+python lbl_xgb_num_feat.py
+Fold = 0, AUC = 0.9211483465031423
+Fold = 1, AUC = 0.9251499446866125
+Fold = 2, AUC = 0.9262344766486692
+Fold = 3, AUC = 0.9114264068794995
+Fold = 4, AUC = 0.9177914453099201
+```
+:::tip
+不改变任何超参数，只增加⼀些特征，我们也能提⾼⼀些折叠得分。
+:::
+
+```bash
+# 将 max_depth 增加到 7 
+python lbl_xgb_num_feat.py
+Fold = 0, AUC = 0.9286668430204137
+Fold = 1, AUC = 0.9329340656165378
+Fold = 2, AUC = 0.9319817543218744
+Fold = 3, AUC = 0.919046187194538
+Fold = 4, AUC = 0.9245692057162671
+```
+看起来我们取得了一点提升。
+
+## 7. 特征编码
+
+从分类特征中进⾏特征⼯程的另⼀种⽅法是使⽤**⽬标编码**。
+
+⽬标编码是⼀种将给定特征中的每个类别映射到其平均⽬标值的技术，但必须始终以交叉验证的⽅式进⾏。
+
+这意味着⾸先要**创建折叠**，然后使⽤这些折叠为数据的不同列创建⽬标编码特征，⽅法与在折叠上拟合和预测模型的⽅法相同。因此，如果您创建了 5 个折叠，您就必须创建 5 次⽬标编码，这样最终，您就可以为每个折叠中的变量创建编码，⽽这些变量并⾮来⾃同⼀个折叠。然后在拟合模型时，必须再次使⽤相同的折叠。未⻅测试数据的⽬标编码可以来⾃全部训练数据，也可以是所有 5 个折叠的平均值。
+
+```python
+import copy
+import pandas as pd
+from sklearn import metrics
+from sklearn import preprocessing
+import xgboost as xgb
+def mean_target_encoding(data):
+    df = copy.deepcopy(data)
+    num_cols = [ "fnlwgt",
+    "age",
+    "capital.gain",
+    "capital.loss",
+    "hours.per.week"]
+    target_mapping = {
+    ">=50K": 0,
+    ">50K": 1
+    }
+    df.loc[:, "income"] = df.income.map(target_mapping)
+    features = [f for f in df.columns if f not in ("kfold", "income") and f not in
+    num_cols]
+    for col in features:
+        if col not in num_cols:
+            df.loc[:, col] = df[col].astype(str).fillna("NONE")
+
+    for col in features:
+        if col not in num_cols:
+            # 标签编码
+            lbl = preprocessing.LabelEncoder()
+            lbl.fit(df[col])
+            df.loc[:, col] = lbl.transform(df[col])
+
+    encoded_dfs = []
+    for fold in range(5):
+        df_train = df[df.kfold == fold].reset_index(drop=True)
+        df_valid = df[df.kfold == fold].reset_index(drop=True)
+        for column in features:
+            # 目标编码
+            mapping_dict = dict(df_train.groupby(column)["income"].mean() )
+            df_valid.loc[:, column + "_enc"] = df_valid[column].map(mapping_dict)
+        encoded_dfs.append(df_valid)
+      encoded_df = pd.concat(encoded_dfs, axis=0)
+      return encoded_df
+
+def run(df, fold):
+    df_train = df[df.kfold == fold].reset_index(drop=True)
+    df_valid = df[df.kfold == fold].reset_index(drop=True)
+    features = [f for f in df.columns if f not in ("kfold", "income") ]
+    x_train = df_train[features].values
+    x_valid = df_valid[features].values
+    model = xgb.XGBClassifier( n_jobs=-1, max_depth=7)
+    model.fit(x_train, df_train.income.values)
+    valid_preds = model.predict_proba(x_valid)[:, 1]
+    auc = metrics.roc_auc_score(df_valid.income.values, valid_preds)
+    print(f"Fold = {fold}, AUC = {auc}")
+if __name__ == "__main__":
+    df = pd.read_csv("../input/adult_folds.csv")
+    df = mean_target_encoding(df)
+    for fold_ in range(5):
+        run(df, fold_)
+```
+
+此时保留了所有的特征，没有删除分类列，并在此基础上添加了⽬标编码特征。
+
+结果：
+```bash
+Fold = 0, AUC = 0.9332240662017529
+Fold = 1, AUC = 0.9363551625140347
+Fold = 2, AUC = 0.9375013544556173
+Fold = 3, AUC = 0.92237621307625
+Fold = 4, AUC = 0.9292131180445478
+```
+
+使⽤⽬标编码时必须⾮常⼩⼼，因为它太容易出现过度拟合。我们使⽤⽬标编码时，最好使⽤某种平滑⽅法或在编码值中添加噪声。 Scikit-learn 的贡献库中有带平滑的⽬标编码。平滑会引⼊某种正则化，有助于避免模型过度拟合。
+
+## 8. 实体嵌入
+
+在实体嵌⼊中，类别⽤向量表⽰。在⼆值化和独热编码⽅法中，我们都是⽤向量来表⽰类别的。
+
+但是，如果类别非常大，就会产生巨大的矩阵，训练成本是庞大的. 所以，我们可以⽤带有浮点值的向量来表⽰它们。
+
+实体嵌入这个技术指的是，每个分类特征都有⼀个嵌⼊层。因此，⼀列中的每个类别现在都可以映射到⼀个嵌⼊层（就像在⾃然语⾔处理中将单词映射到嵌⼊层⼀样）。然后，根据其维度重塑这些嵌⼊层，使其扁平化，然后将所有扁平化的输⼊嵌⼊层连接起来。然后添加⼀堆密集层和⼀个输出层，就⼤功告成了。
+
+![Image](https://github.com/user-attachments/assets/cc458628-748c-4c56-862b-b247ffc82355)
+
+:::tip
+作者这个说法可能不够详细.
+
+
+:::
+
+使⽤ TF/Keras 可以⾮常容易地做到这⼀点。
+
+```python
+import os
+import gc
+import joblib
+import pandas as pd
+import numpy as np
+from sklearn import metrics, preprocessing
+from tensorflow.keras import layers
+from tensorflow.keras import optimizers
+from tensorflow.keras.models import Model, load_model
+from tensorflow.keras import callbacks
+from tensorflow.keras import backend as K
+from tensorflow.keras import utils
+def create_model(data, catcols):
+    # 创建空的输入列表和输出列表，用于存储模型的输入和输出
+    inputs = []
+    outputs = []
+
+    # 遍历分类特征列表中的每个特征
+    for c in catcols:
+        # 计算特征中唯一值的数量
+        num_unique_values = int(data[c].nunique())
+        # 计算嵌入维度，最大不超过50
+        embed_dim = int(min(np.ceil((num_unique_values) / 2), 50))
+        # 创建模型的输入层，每个特征对应一个输入
+        inp = layers.Input(shape=(1,))
+        # 创建嵌入层，将分类特征映射到低维度的连续向量
+        out = layers.Embedding(num_unique_values + 1, embed_dim, name=c)(inp)
+        # 对嵌入层进行空间丢弃（Dropout）
+        out = layers.SpatialDropout1D(0.3)(out)
+        # 将嵌入层的形状重新调整为一维
+        out = layers.Reshape(target_shape=(embed_dim,))(out)
+        # 将输入和输出添加到对应的列表中
+        inputs.append(inp)
+        outputs.append(out)
+    # 使用Concatenate层将所有的嵌入层输出连接在一起
+    x = layers.Concatenate()(outputs)
+    # 对连接后的数据进行批量归一化
+    x = layers.BatchNormalization()(x)
+    # 添加一个具有300个神经元的密集层，并使用ReLU激活函数
+    x = layers.Dense(300, activation="relu")(x)
+    # 对该层的输出进行Dropout
+    x = layers.Dropout(0.3)(x)
+    # 再次进行批量归一化
+    x = layers.BatchNormalization()(x)
+    # 添加另一个具有300个神经元的密集层，并使用ReLU激活函数
+    x = layers.Dense(300, activation="relu")(x)
+    # 对该层的输出进行Dropout
+    x = layers.Dropout(0.3)(x)
+    # 再次进行批量归一化
+    x = layers.BatchNormalization()(x)
+    # 输出层，具有2个神经元（用于二进制分类），并使用softmax激活函数
+    y = layers.Dense(2, activation="softmax")(x)
+    # 创建模型，将输入和输出传递给Model构造函数
+    model = Model(inputs=inputs, outputs=y)
+    # 编译模型，指定损失函数和优化器
+    model.compile(loss='binary_crossentropy', optimizer='adam')
+    # 返回创建的模型
+    return model
+def run(fold):
+    df = pd.read_csv("../input/cat_train_folds.csv")
+    features = [f for f in df.columns if f not in ("id", "target", "kfold") ]
+    for col in features:
+        df.loc[:, col] = df[col].astype(str).fillna("NONE")
+
+    for feat in features:
+        lbl_enc = preprocessing.LabelEncoder()
+        df.loc[:, feat] = lbl_enc.fit_transform(df[feat].values)
+
+    df_train = df[df.kfold == fold].reset_index(drop=True)
+    df_valid = df[df.kfold == fold].reset_index(drop=True)
+    model = create_model(df, features)
+    xtrain = [df_train[features].values[:, k] for k in range(len(features))]
+    xvalid = [df_valid[features].values[:, k] for k in range(len(features)) ]
+    ytrain = df_train.target.values
+    yvalid = df_valid.target.values
+    ytrain_cat = utils.to_categorical(ytrain)
+    yvalid_cat = utils.to_categorical(yvalid)
+    model.fit(xtrain,
+    ytrain_cat,
+    validation_data=(xvalid, yvalid_cat),
+    verbose=1,
+    batch_size=1024,
+    epochs=3
+    )
+    valid_preds = model.predict(xvalid)[:, 1]
+    print(metrics.roc_auc_score(yvalid, valid_preds))
+    K.clear_session()
+if __name__ == "__main__":
+    run(0)
+    run(1)
+    run(2)
+    run(3)
+    run(4)
+```
+这种⽅法效果最好，且还有改进空间，你⽆需担⼼特征⼯程，因为神经⽹络会⾃⾏处理。处理大量分类特征数据集时，绝对值得一试。当嵌⼊⼤⼩与唯⼀类别的数量相同时，我们就可以使⽤独热编码（one-hot-encoding）。
 
 
 

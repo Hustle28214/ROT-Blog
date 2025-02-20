@@ -42,7 +42,7 @@ npm run start
 
 ## 📸Shot
 
-<img width="1471" alt="Live Demo" src="https://github.com/user-attachments/assets/dec3d1fd-7a02-4c24-b748-a1960c3875b1">
+<img width="1471" alt="Live Demo" src="https://github.com/user-attachments/assets/f59aef6b-88b9-4df0-907d-3f9efad2c1ff">
 
 ## 🧾License
 

@@ -4,7 +4,7 @@ import styles from './Card.module.css';
 
 const Card = ({ title, description, href, iconSrc }) => {
   return (
-    <a href={href} className={styles.card}>
+    <a href={href} className={styles.card} target="_blank">
       <div className={styles.cardIcon}>
         {iconSrc && <img src={iconSrc} alt={title} />}
       </div>

@@ -14,8 +14,22 @@ import WordCount from '../../../../src/components/WordCount/WordCount';
 - ⼩时
 - 还有更多
 
+```python
+# 添加'year'列，将 'datetime_column' 中的年份提取出来
+df.loc[:, 'year'] = df['datetime_column'].dt.year
+# 添加'weekofyear'列，将 'datetime_column' 中的周数提取出来
+df.loc[:, 'weekofyear'] = df['datetime_column'].dt.weekofyear
+# 添加'month'列，将 'datetime_column' 中的月份提取出来
+df.loc[:, 'month'] = df['datetime_column'].dt.month
+# 添加'dayofweek'列，将 'datetime_column' 中的星期几提取出来
+df.loc[:, 'dayofweek'] = df['datetime_column'].dt.dayofweek
+# 添加'weekend'列，判断当天是否为周末
+df.loc[:, 'weekend'] = (df.datetime_column.dt.weekday >= 5).astype(int)
+# 添加 'hour' 列，将 'datetime_column' 中的小时提取出来
+df.loc[:, 'hour'] = df['datetime_column'].dt.hour
 ```
 
-```
+
+
 
 </WordCount>

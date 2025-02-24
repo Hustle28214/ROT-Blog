@@ -5,6 +5,72 @@ import Mermaid from '@theme/Mermaid';
 <WordCount>
 
 
+![Image](https://github.com/user-attachments/assets/d425e0c7-b483-4726-bdef-9774aef01d04)
+
+
+
+## 1. 效率测试
+
+### 冷机效率
+
+采用能效比来定义冷机的效率，这被称为制冷系数(coefficient of performance)。
+
+$$
+COP = \frac{Q_c}{W}
+$$
+
+其中，$Q_c$被规定为排出到低温热源的热量。$W$规定为热机做的净功。
+
+### 热机效率
+
+热机的效率e被定义为：
+
+$$
+e = \frac{W}{Q_h}
+$$
+
+其中，$Q_h$为在一段时间内热机从高温热源吸收的热量。
+
+根据热力学第一定律，满足：
+
+$$
+Q_h = Q_c + W
+$$
+
+## 2. 静态电流（微安级）
+
+六位半可直接测.
+ 
+三位半只能测毫安级，我们可以串入一个10k电阻，二极管并联短路，启动后去掉二极管再测量电压，电压/电阻=静态电流。
+
+![Image](https://github.com/user-attachments/assets/90961eb7-459b-42d2-be47-c9e80716226c)
+
+## 3. 输出测试
+
+要进行输出测试，我们需要计算几个指标。
+
+:::info
+输出电压调整率
+
+- 源调整率
+- 负载调整率
+- 温度调整率
+:::
+
+![Image](https://github.com/user-attachments/assets/85e879cf-067f-4662-810a-a9017dafe558)
+
+纹波是指在直流电源上，不希望出现的交流电压变动量。
+
+![Image](https://github.com/user-attachments/assets/7bd75a1e-3411-4ec0-a08c-c9fd761bf758)
+
+
+
+## References
+
+[1]. 亚德诺半导体.【全系列】电源大咖课基础篇：开关电源/LDO/锂电池充电/电源路径/USB供电\[M/OL\]\(2020-11-17\)\[2025-02-24\].https://www.bilibili.com/video/BV195411V7gg/?share_source=copy_web&vd_source=8b2bc57e71349607b55c9fde6b078ebd
+
+[2]. 氵氵氵.4.2 冷机\[M/OL\]\(2022-06-21\)\[2025-02-24\].https://zhuanlan.zhihu.com/p/531711267
+
 
 
 </WordCount>

@@ -1,0 +1,34 @@
+
+import WordCount from '../../../../src/components/WordCount/WordCount.jsx';
+import Mermaid from '@theme/Mermaid';
+
+<WordCount>
+
+## 1. 输出比较简介
+
+OC(Output Compare)输出比较。
+
+输出比较可以通过CNT（CNT计数器）与CCR寄存器值的关系，来对输出电平进行置1、置0或翻转的操作，用于输出一定频率和占空比的PWM波形。
+
+:::tip
+CNT计数器是正向计数器。它只能正向累加。
+
+CCR是捕获/比较寄存器，通常是我们给的一个固定值，正如其名，捕获数值后比较数值，这样就可以捕获CNT的数值并进行比较，看是大了、等于还是小了。
+
+TIM输出比较就是这样来决定置1、置0或翻转输出电平。
+:::
+
+每个高级定时器和通用定时器都拥有4个输出比较通道。
+
+高级定时器的前三个通道额外拥有死区生成和互补输出的功能。
+
+
+## 2. 通用定时器
+
+使用输入捕获时，CCR是作为捕获寄存器；使用输出比较时，CCR是作为比较寄存器。
+
+![Image](https://github.com/user-attachments/assets/d0d7968e-99cc-40d7-9431-fd1dc8ddd228)
+
+
+
+</WordCount>

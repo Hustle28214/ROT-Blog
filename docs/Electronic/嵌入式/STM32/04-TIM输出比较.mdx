@@ -29,6 +29,52 @@ TIM输出比较就是这样来决定置1、置0或翻转输出电平。
 
 ![Image](https://github.com/user-attachments/assets/d0d7968e-99cc-40d7-9431-fd1dc8ddd228)
 
+## 3. PWM简介
+
+PWM（Pulse Width Modulation）是脉冲宽度调制。
+
+在具有**惯性**的系统中，可以通过对一系列脉冲的宽度进行调制，来等效地获得所需要的模拟参量，常应用于电机控速等领域。
+
+PWM参数：
+
+- 频率 $= \frac{1}{T_s}$
+- 占空比 = $\frac{T_{on}}{T_s}$
+- 分辨率 = 占空比变化步距
+
+当上面电平时间长一点，下面的短一点的时候，上面的模拟量占主导；反之则是下面的模拟量占主导。
+
+![Image](https://github.com/user-attachments/assets/31da6858-3417-4463-a12e-afca600eaa0d)
+
+$T_{on}$是高电平的时间，$T_S$是一个时钟周期的时间。$\frac{T_on}{T_S}$为占空比，指的是高电平时间占整个周期的比例。用百分比表示。
+
+占空比决定了等效的模拟电压的大小。占空比越大，等效的模拟电压就趋近于高电平；越小，等效的模拟电压就趋近于低电平。
+
+![Image](https://github.com/user-attachments/assets/d4ccf8cb-1833-4bb2-b28c-287f41916e38)
+
+电机工作也是一个惯性系统。所以直流电机也是可以用PWM调速的。
+
+下图是
+
+![Image](https://github.com/user-attachments/assets/41f610c0-2023-447c-b5a7-dc214655cfb7)
+
+输入是CNT（CNT计数器）与CCR寄存器值的关系，输出是REF的高低电平。
+
+## 4. 输出比较模式
+
+|模式|描述|
+|:---|:---|
+|冻结|CNT=CCR时，REF保持为原状态（可用于定速巡航）|
+|匹配时置有效电平|CNT=CCR时，REF置有效电平|
+|匹配时置无效电平|CNT=CCR时，REF置无效电平|
+|匹配时电平翻转|CNT=CCR时，REF电平翻转|
+|强制为无效电平|CNT与CCR无效，REF强制为无效电平（可用于暂停波形输出）|
+|强制为有效电平|CNT与CCR无效，REF强制为有效电平（可用于暂停波形输出）|
+|PWM模式1|向上计数：CNT\<CCR时，REF置有效电平, CN\>=CCR时，REF置无效电平;向下计数：CNT\>CCR时，REF置无效电平, CN\<=CCR时，REF置有效电平|
+|PWM模式2|向下计数：CNT\<CCR时，REF置无效电平, CN\>=CCR时，REF置有效电平;向下计数：CNT\>CCR时，REF置有效电平, CN\<=CCR时，REF置无效电平|
+
+改变PWM模式1和2，**只是改变了REF电平的极性**。使用PWM1的正极性和PWM2的反极性是一样的效果。
+
+
 
 
 </WordCount>

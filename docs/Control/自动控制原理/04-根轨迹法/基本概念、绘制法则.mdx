@@ -10,6 +10,44 @@ import VideoPlayer from '../../../../src/components/Videoplayer/Videoplayer.jsx'
 
 <VideoPlayer src="//player.bilibili.com/player.html?isOutside=true&aid=811394492&bvid=BV1F34y1h7so&cid=718443513&p=26" />
 <br />
+
+## 4.1 根轨迹法的特点
+
+根轨迹法，是三大分析校正方法之一，它的特点有：
+
+1. 图解，直观形象
+2. 研究当系统中某一参数变化时，系统性能的变化趋势
+3. 近似方法，不十分准确
+
+根轨迹是说：系统某一参数由$0-\infty$变化时，$\lambda$在s平面相应变化所描绘出来的轨迹。
+:::danger
+一定是<mark>闭环</mark>的根轨迹，没有开环根轨迹、闭环根轨迹增益一说！
+:::
+
+04:30：
+
+<details>
+
+<summary>解法</summary>
+
+先写出开环传递函数尾1标准型，在根轨迹法中，习惯把传递函数写成首1标准型。
+
+尾1标准型（开环传递函数）时，K为开环增益；为标准型（闭环传递函数）时，K为闭环增益；
+
+但是，根轨迹增益仅对开环传递函数而言。化为首1标准型时，K\*为根轨迹增益。
+
+这时你会想，诶，那如果把闭环传递函数化为首1标准型，那这个增益不就叫闭环根轨迹增益吗？不是的，没有这么一说。根轨迹增益只对开环而言。
+
+而且根轨迹增益只在根轨迹法研究的过程中用它。
+
+现在要研究闭环极点随着K\*从0到无穷的变化，等价于K从0到无穷的变化。
+
+首先写出闭环传递函数，写出特征多项式，让其等于0。
+
+
+</details>
+
+
 > 2
 
 <VideoPlayer src="//player.bilibili.com/player.html?isOutside=true&aid=811394492&bvid=BV1F34y1h7so&cid=718436798&p=27" />

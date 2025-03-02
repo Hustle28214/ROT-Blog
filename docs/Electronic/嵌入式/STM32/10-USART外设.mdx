@@ -38,10 +38,23 @@ USART中断输出控制，中断申请位就是状态寄存器的各种标志位
 ![Image](https://github.com/user-attachments/assets/ca2120e8-36bd-4603-9359-e9d6f29a33ce)
 
 
+## 3. 波特率发生器
 
+发送器和接收器的波特率由波特率寄存器BRR里的DIV确定。
 
+计算公式：波特率 $ = f_{PCLK2/1} / (16 * DIV)$
 
+![Image](https://github.com/user-attachments/assets/9796ab2a-b089-4524-b6db-e85463a74946)
 
+波特率发生器就是分频器。发生器和接收器的波特率由波特率寄存器BRR里面的DIV（分频系数）确定。
+
+:::tip
+为什么除以16？
+
+因为内部还有一个16倍波特率的采样时钟。输入时钟/DIV等于16倍的波特率。
+:::
+
+在标准库的帮助下，需要多少波特率直接写就可以了。
 
 
 

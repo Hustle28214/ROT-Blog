@@ -1,0 +1,93 @@
+
+import WordCount from '../../../../src/components/WordCount/WordCount.jsx';
+import Mermaid from '@theme/Mermaid';
+
+<WordCount>
+
+## 1. I2C通信
+
+I2C（Inter IC Bus）是由Philips公司开发的一种通用数据总线
+
+两根通信线：SCL（Serial Clock）、SDA（Serial Data）
+
+- 同步，半双工
+- 带数据应答
+- 支持总线挂载多设备（一主多从、多主多从
+
+![Image](https://github.com/user-attachments/assets/d11ee805-a168-41c1-a5b1-781acdf4b0e4)
+
+
+## 2. 硬件电路
+
+所有I2C设备的SCL连在一起，SDA连在一起.
+
+![Image](https://github.com/user-attachments/assets/e41dd3ad-ac8a-4a31-a009-f7a38c68f34c)
+
+一主多从。左边CPU是单片机，作为总线的主机。主机的权利很大，包括，**对SCL线的完全控制**；在空闲状态下，主机还可以主动发起对SDA的控制。只有当从机发送数据和从机应答的时候，主机才会转交SDA的控制权给从机。
+
+右图是被控IC的内部结构。引脚的信号进来，可以通过一个数据缓冲器或者是施密特触发器进行输入。输入对电路没有任何影响，任何设备在任何时刻都可以输入。输出低电平，开关管导通；引脚直接接地，是强下拉；输出高电平，开关管断开；引脚什么都不接，处于浮空状态。如此一来，所有的设备都只能输出低电平。
+
+:::warning
+为避免高电平造成的引脚浮空，此时需要在总线外面SCL和SDA各外置一个上拉电阻。属于弱上拉。
+:::
+
+被控IC是挂载在I2C总线上的从机，可以是姿态传感器、OLED、存储器、时钟模块等。从机的权利很小。对于SCL时钟线，在任何时刻都只能被动的读取，不允许控制SCL线。只有在主机发送读取从机的命令/从机应答后，从机才能短暂地取得SDA的控制权。
+
+:::tip
+主机的SCL可以配置成推挽输出，所有从机的SCL都配置成浮空输入或者上拉输入。数据流向是：主机发送，所有从机接收。
+
+主机的SDA发送的时候是输出，接收的时候是输入。从机的SDA也会在输入和输出之间反复切换。
+:::
+
+:::danger
+但是，如果总线时序没协调好，极有可能发生两个引脚同时处于输出的状态，如果这时正好是一个输出高电平，一个输出低电平，就是电源短路。
+:::
+
+为了避免电源短路的问题，I2C被设计成禁止所有设备输出强上拉的高电平，采用外置若上拉电阻加开漏输出的电路结构。
+
+
+:::info
+**设备的SCL和SDA均要配置成开漏输出模式。**
+
+**SCL和SDA各添加一个上拉电阻，阻值一般为4.7KΩ左右。**
+:::
+
+
+
+
+## 3. I2C时序基本单元
+
+- 起始条件：SCL高电平期间，SDA从高电平切换到低电平
+
+- 终止条件：SCL高电平期间，SDA从低电平切换到高电平
+
+![Image](https://github.com/user-attachments/assets/677de5e2-ec8c-4ee5-bdad-5ed61d539c6f)
+
+
+发送一个字节：SCL低电平期间，主机将数据位依次放到SDA线上（高位先行），然后释放SCL，从机将在SCL高电平期间读取数据位，所以SCL高电平期间SDA不允许有数据变化，依次循环上述过程8次，即可发送一个字节
+
+![Image](https://github.com/user-attachments/assets/3a38e2d1-f5a0-43b7-a95a-b6783011c4c5)
+
+接收一个字节：SCL低电平期间，从机将数据位依次放到SDA线上（高位先行），然后释放SCL，主机将在SCL高电平期间读取数据位，所以SCL高电平期间SDA不允许有数据变化，依次循环上述过程8次，即可接收一个字节（主机在接收之前，需要释放SDA）
+
+![Image](https://github.com/user-attachments/assets/66f675d5-12ba-45b3-ab65-3dbdadb37155)
+
+发送应答：主机在接收完一个字节之后，在下一个时钟发送一位数据，数据0表示应答，数据1表示非应答
+
+接收应答：主机在发送完一个字节之后，在下一个时钟接收一位数据，判断从机是否应答，数据0表示应答，数据1表示非应答（主机在接收之前，需要释放SDA）
+
+![Image](https://github.com/user-attachments/assets/26a60934-59d6-47ba-822a-934aa5b9eb8b)
+
+
+
+## 4. I2C时序
+
+- 指定地址写。
+
+对于指定设备（Slave Address），在指定地址（Reg Address）下，写入指定数据（Data）
+
+![Image](https://github.com/user-attachments/assets/23f54d01-1e79-46b7-8e69-d4fa25965c0b)
+
+
+
+</WordCount>

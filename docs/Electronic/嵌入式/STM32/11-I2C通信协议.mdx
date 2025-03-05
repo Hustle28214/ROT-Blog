@@ -66,7 +66,12 @@ I2C（Inter IC Bus）是由Philips公司开发的一种通用数据总线
 
 发送一个字节：SCL低电平期间，主机将数据位依次放到SDA线上（高位先行），然后释放SCL，从机将在SCL高电平期间读取数据位，所以SCL高电平期间SDA不允许有数据变化，依次循环上述过程8次，即可发送一个字节
 
+第一个字节必须是主机发送的。最开始，SDA是高电平，主机如果想发送0，就拉低SDA到低电平。
+
 ![Image](https://github.com/user-attachments/assets/3a38e2d1-f5a0-43b7-a95a-b6783011c4c5)
+
+
+
 
 接收一个字节：SCL低电平期间，从机将数据位依次放到SDA线上（高位先行），然后释放SCL，主机将在SCL高电平期间读取数据位，所以SCL高电平期间SDA不允许有数据变化，依次循环上述过程8次，即可接收一个字节（主机在接收之前，需要释放SDA）
 
@@ -79,14 +84,41 @@ I2C（Inter IC Bus）是由Philips公司开发的一种通用数据总线
 ![Image](https://github.com/user-attachments/assets/26a60934-59d6-47ba-822a-934aa5b9eb8b)
 
 
-
 ## 4. I2C时序
 
 - 指定地址写。
 
 对于指定设备（Slave Address），在指定地址（Reg Address）下，写入指定数据（Data）
 
-![Image](https://github.com/user-attachments/assets/23f54d01-1e79-46b7-8e69-d4fa25965c0b)
+
+
+![Image](https://github.com/user-attachments/assets/81329733-de71-4077-8b96-c109fbfc6ae4)
+
+- 当前地址读
+
+对于指定设备（Slave Address），在当前地址指针指示的地址下，读取从机数据（Data）
+
+
+![Image](https://github.com/user-attachments/assets/7dbfde28-e5c3-46ae-babb-785850fc7ec9)
+
+- 指定地址读
+
+对于指定设备（Slave Address），在指定地址（Reg Address）下，读取从机数据（Data）
+
+![Image](https://github.com/user-attachments/assets/74e9427e-4864-4b66-a68f-8ea0f401b7dd)
+
+
+
+## 5. MPU6050简介
+
+
+MPU6050是一个6轴姿态传感器，可以测量芯片自身X、Y、Z轴的加速度、角速度参数，通过数据融合，可进一步得到姿态角，常应用于平衡车、飞行器等需要检测自身姿态的场景。
+
+- 3轴加速度计（Accelerometer）：测量X、Y、Z轴的加速度
+
+- 3轴陀螺仪传感器（Gyroscope）：测量X、Y、Z轴的角速度
+
+![Image](https://github.com/user-attachments/assets/04004848-3ee4-4abc-86ee-66eada41457a)
 
 
 

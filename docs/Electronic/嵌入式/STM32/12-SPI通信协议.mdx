@@ -4,9 +4,111 @@ import Mermaid from '@theme/Mermaid';
 
 <WordCount>
 
+## 1. SPI通信
+
+SPI（Serial Peripheral Interface）是由Motorola公司开发的一种通用数据总线
+
+四根通信线：SCK（Serial Clock）、MOSI（Master Output Slave Input）、MISO（Master Input Slave Output）、SS（Slave Select）
+
+同步，全双工
+
+支持总线挂载多设备（一主多从）
+
+![Image](https://github.com/user-attachments/assets/37ac22c5-ed64-416b-9f7e-966854987778)
+
+所有SPI设备的SCK、MOSI、MISO分别连在一起。
+
+主机另外引出多条SS控制线，分别接到各从机的SS引脚。
+
+输出引脚配置为推挽输出，输入引脚配置为浮空或上拉输入。
+
+
+![Image](https://github.com/user-attachments/assets/f7f318e7-f358-48c5-bebf-a2a759d532a8)
+
+
+SPI主从机的寄存器间的数据传递与队列(queue)机制非常相似，时钟提供时，主机寄存器的数据首位通过MOSI线传输到从机寄存器的末位，如果是1就是上升沿，如果是0就是下降沿。转移了首位的数据，数据往前移动一位，这样从机的首位数据就可以通过MISO线进入主机寄存器的末位。如此往复，交换数据。
+
+![Image](https://github.com/user-attachments/assets/efee4708-786a-4667-bc60-828326a78f99)
+
+## 2. SPI时序基本单元
+
+
+### 2.1 起始、终止条件
+
+
+![Image](https://github.com/user-attachments/assets/e81a0352-a197-4767-99c4-c99d8c4eeab1)
+
+### 2.2 模式0
+
+![Image](https://github.com/user-attachments/assets/4a999aa1-d078-4884-aed1-eb5fa31d9ceb)
+
+### 2.3 模式1
+
+
+![Image](https://github.com/user-attachments/assets/375cd8e9-2fe6-4559-80f1-0523840e44eb)
+
+
+### 2.4 模式2
+
+
+![Image](https://github.com/user-attachments/assets/2f5ad421-6596-44b8-b8a4-f4fc8590e6e1)
+
+
+### 2.5 模式3
+
+![Image](https://github.com/user-attachments/assets/fd8b91c4-9143-4e34-8b9b-23ef87affec4)
+
+## 3. SPI时序
+
+![Image](https://github.com/user-attachments/assets/1e2b1cf0-f287-4911-bfa5-f2d8a847fd7a)
+
+![Image](https://github.com/user-attachments/assets/a847f938-c732-4e6a-8b1a-15602d0020af)
+
+![Image](https://github.com/user-attachments/assets/d31e862a-5d72-4aae-8e89-98b8c302cbc8)
+
+
+## 4. SPI外设
+
+STM32内部集成了硬件SPI收发电路，可以由硬件自动执行时钟生成、数据收发等功能，减轻CPU的负担
+
+可配置8位/16位数据帧、高位先行/低位先行
+
+时钟频率： fPCLK / (2, 4, 8, 16, 32, 64, 128, 256)
+
+支持多主机模型、主或从操作
+
+可精简为半双工/单工通信
+
+支持DMA。
+
+兼容I2S协议。
+
+STM32F103C8T6 硬件SPI资源：SPI1、SPI2。
+
+## 5. SPI基本结构
+
+
+![Image](https://github.com/user-attachments/assets/01aea299-a122-4870-a533-d1fd821a1503)
+
+
+![Image](https://github.com/user-attachments/assets/c452cb90-65f7-4e24-8bb8-2073a9d44dba)
 
 
 
+## 6. 主模式全双工传输
 
+### 6.1 连续传输
+
+![Image](https://github.com/user-attachments/assets/a8dc1fcb-5e76-42d6-b525-8f68f7ff3402)
+
+### 6.2 非连续传输
+
+![Image](https://github.com/user-attachments/assets/1b0a33f0-8cae-4153-a71a-80e30c6008a4)
+
+## 7. 软件/硬件波形对比
+
+![Image](https://github.com/user-attachments/assets/f2ba3c31-4704-4a67-a2e0-eca96c268ea7)
+
+![Image](https://github.com/user-attachments/assets/204c0d59-edb7-4e64-8192-67ba58d8efc9)
 
 </WordCount>

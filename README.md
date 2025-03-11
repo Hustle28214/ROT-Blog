@@ -22,7 +22,7 @@ www.rotleyan.site
 
 📂 (2024.08.27) TodoList: Upgrade todoList support. You can choose 3 types of todoList card.
 
-🔗 (2024.08.27) Link: Upgrade Link support. Now we can add link as card in blog. Specially, you can add your favicon by iconSrc.(I tried writing a function to automatically retrieve the href of the favicon, but it didn’t work as well as I expected. Therefore, you shall add the href by yourself.)
+🔗 (2024.08.27) Link: Upgrade Link support. Now we can add link as card in blog. Specially, you can add your favicon by iconSrc.(I tried writing a function to automatically retrieve the href of the favicon, but it didn't work as well as I expected. Therefore, you shall add the href by yourself.)
 
 🔍 (2024.08.28) Search: Depending on [easyops-cn/docusaurus-search-local](https://github.com/easyops-cn/docusaurus-search-local), now full-text search is supported.
 

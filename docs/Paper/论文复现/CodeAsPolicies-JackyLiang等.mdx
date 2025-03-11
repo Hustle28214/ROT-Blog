@@ -1,0 +1,791 @@
+import WordCount from '../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+
+## 1. 摘要 
+
+Abstract—Large language models (LLMs) trained on code-completion have been shown to be capable of synthesizing simple Python programs from docstrings[1].We find that the secode-writing LLMs can be re-purposed to write robot policy code, given natural language commands. Specifically, policy code can express functions
+or feedback loops that process perception outputs (e.g., from object
+detectors [2], [3]) and parameterize control primitive APIs. When
+provided as input several example language commands (formatted
+as comments) followed by corresponding policy code (via few-shot
+prompting), LLMs can take in new commands and autonomously
+re-compose API calls to generate new policy code respectively. By
+chaining classic logic structures and referencing third-party libraries
+(e.g., NumPy, Shapely) to perform arithmetic, LLMs used in this way
+can write robot policies that (i) exhibit spatial-geometric reasoning,
+(ii) generalize to new instructions, and (iii) prescribe precise values
+(e.g., velocities) to ambiguous descriptions (“faster”) depending
+on context (i.e., behavioral commonsense). This paper presents
+Code as Policies: a robot-centric formulation of language model
+generated programs (LMPs) that can represent reactive policies (e.g.,
+impedance controllers), as well as waypoint-based policies (vision-
+based pick and place, trajectory-based control), demonstrated across
+multiple real robot platforms. Central to our approach is prompting
+hierarchical code-gen (recursively defining undefined functions),
+which can write more complex code and also improves state-of-the-
+art to solve 39.8% of problems on the HumanEval [1] benchmark.
+Code and videos are available at https://code-as-policies.github.io
+<details>
+
+<summary>翻译</summary>
+
+经过代码补全任务训练的大型语言模型（LLMs）已被证明能够根据文本注释生成简单的Python程序[1]。我们发现，这些擅长编写代码的LLM可通过重新定位用途，依据自然语言指令生成机器人策略代码。具体而言，策略代码可表述为处理感知输出（如来自目标检测器[2][3]）的函数或反馈回路，并参数化控制原语的应用程序编程接口（API）。当输入多个自然语言指令样例（以注释形式格式化）及其对应策略代码（通过少量示例提示）时，LLM能够接收新指令并自主重组API调用以生成相应的新策略代码。通过链式调用经典逻辑结构及引用第三方库（如NumPy、Shapely）执行算术运算，这种LLM可生成的机器人策略能够：(i) 展现空间几何推理能力；(ii) 泛化至新指令；(iii) 根据上下文（即行为常识）对模糊描述（如"更快"）赋予精确参数值（如速度值）。本文提出"代码即策略"（Code as Policies）框架——一种以机器人为核心的语言模型生成程序（LMPs）表述方式，能够表示反应式策略（如阻抗控制）和基于路径点的策略（视觉抓取放置、轨迹控制），并在多个真实机器人平台上完成验证。本方法的核心在于分层代码生成提示策略（通过递归定义未实现函数），该策略不仅能编写更复杂代码，还将HumanEval基准测试[1]的最优解决率提升至39.8%。
+
+</details>
+
+:::info
+
+机器人策略（Robot Policy）指的是一套系统化的决策逻辑或行为规则，用于控制机器人如何根据感知到的情况（如传感器数据、视觉信息）生成具体的动作指令。
+
+通俗来说，就是**机器人从“所感”导致“所想”，再到“所做”的这一层。**
+
+摘要中指出，原先的研究证明了文本注释可以生成简单的Python程序，而现在该团队的进展是通过自然语言指令也可以生成策略代码。必须指出的是，文本注释和自然语言指令是有区别的，在下文中，
+
+:::
+
+
+
+
+## 2. 引言
+
+Robots that use language need it to be grounded (or situated)
+to reference the physical world and bridge connections between
+words, percepts, and actions [4]. Classic methods ground language
+using lexical analysis to extract semantic representations that
+inform policies [5]–[7], but they often struggle to handle unseen
+instructions. More recent methods learn the grounding end-to-end
+(language to action) [8]–[10], but they require copious amounts
+of training data, which can be expensive to obtain on real robots.
+Meanwhile, recent progress in natural language processing
+shows that large language models (LLMs) pretrained on Internet-
+scale data [11]–[13] exhibit out-of-the-box capabilities [14]–[16]
+that can be applied to language-using robots e.g., planning a
+sequence of steps from natural language instructions [16]–[18]
+without additional model finetuning. These steps can be grounded
+in real robot affordances from value functions among a fixed set
+of skills i.e., policies pretrained with behavior cloning or rein-
+forcement learning [19]–[21]. While promising, this abstraction
+prevents the LLMs from directly influencing the perception-action
+feedback loop, making it difficult to ground language in ways that
+(i) generalize modes of feedback that share percepts and actions
+e.g., from "put the apple down on the orange" to "put the apple
+down when you see the orange", (ii) express commonsense priors
+in control e.g., "move faster", "push harder", or (iii) comprehend
+spatial relationships "move the apple a bit to the left". As a result,
+incorporating each new skill (and mode of grounding) requires
+additional data and retraining – ergo the data burden persists,
+albeit passed to skill acquisition. This leads us to ask: how can LLMs be applied beyond just planning a sequence of skills?
+
+Herein, we find that code-writing LLMs [1], [11], [22] are
+proficient at going further:or chest rating planning,policy logic,and
+control. LLMs trained on code-completion have shown to be capa-
+ble of synthesizing Python programs from docstrings. We find that
+these models can be re-purposed to write robot policy code, given
+natural language commands(formattedascomments).Policycode
+can express functions or feedback loops that process perception
+outputs (e.g., open vocabulary object detectors [2], [3]) and param-
+eterize control primitive APIs (see Fig. 1). When provided with
+several example language commands followed by corresponding
+policy code (via few-shot prompting, in gray), LLMs can take in
+new commands (in green) and autonomously re-compose the API
+calls to generate new policy code (highlighted) respectively:
+
+```python
+# if you see an orange, move backwards.
+if detect_object("orange"):
+    robot.set_velocity(x=-0.1, y=0, z=0)
+# move rightwards until you see the apple.
+while not detect_object("apple"):
+    robot.set_velocity(x=0, y=0.1, z=0)
+```
+
+Code-writing models can express a variety of arithmetic operations
+as well as feedback loops grounded in language. They not only
+generalize to new instructions, but having been trained on billions
+of lines of code and comments, can also prescribe precise values
+(e.g., velocities) to ambiguous descriptions ("faster" and "to the
+left") depending on context –to elicit behavioral commonsense:
+
+```python
+# do it again but faster, to the left, and with a banana.
+while not detect_object("banana"):
+    robot.set_velocity(x=0, y=-0.2, z=0)
+```
+
+Representing code as policies inherits a number of benefits from
+LLMs: not only the capacity to interpret natural language, but also
+the ability to engage in human-robot dialogue and Q&A simply
+by using "say(text)" as an available action primitive API:
+
+```python
+# tell me why you stopped moving.
+robot.say("I stopped moving because I saw a banana.")
+```
+
+We present Code as Policies (CaP): a robot-centric formulation
+of language model generated programs (LMPs) executed on real
+systems. Pythonic LMPs can express complex policies using:
+
+• Classic logic structures e.g., sequences, selection (if/else), and
+loops (for/while) to assemble new behaviors at runtime.
+
+• Third-party libraries to interpolate points (NumPy), analyze and
+generate shapes (Shapely) for spatial-geometric reasoning, etc.
+
+LMPs can be hierarchical: prompted to recursively define new
+functions, accumulate their own libraries over time, and self-
+architectadynamiccodebase.We demonstrate across several robot
+systems that LLMs can autonomously interpret language com-
+mands to generate LMPs that represent reactive low-level policies
+(e.g., PD or impedance controllers), and waypoint-based policies
+(e.g., for vision-based pick and place, or trajectory-based control).
+Our main contributions are: (i) code as policies: a formulation
+of using LLMs to write robot code, (ii) a method for hierarchical
+code-gen that improves state-of-the-art on both robotics and
+standard code-gen problems with 39.8% P@1 on HumanEval
+[1], (iii) a new benchmark to evaluate future language models on
+robotics code-gen problems, and (iv) ablations that analyze how
+CaP improves metrics of generalization [23] and that it abides
+by scaling laws–larger models perform better. Code as policies
+presents a new approach to linking words, percepts, and actions;
+enablingapplicationsinhuman-robotinteraction,butisnotwithout
+limitations. We discuss these in Sec.V.Full prompts and generated
+outputs are in the Appendix, which can be found along with
+additional results, videos, and code at [code-as-policies.github.io](https://code-as-policies.github.io).
+
+
+<details>
+
+<summary>翻译</summary>
+
+为实现与物理世界的交互，依赖语言的机器人需将语言具象化（grounded）——即建立词汇、感知与动作之间的关联[4]。传统方法通过词法分析提取语义表征以指导策略（policies）[5]–[7]，但面对未见指令时表现受限。较新的端到端学习方法（语言直接映射到动作）[8]–[10]虽然能够提升泛化性，却需要大量真实机器人数据进行训练，成本高昂。
+
+与此同时，自然语言处理领域的最新进展表明：通过互联网规模数据预训练的大型语言模型（LLMs） [11]–[13]具备直接应用于语言交互机器人的能力——例如，无需额外微调即可从自然语言指令中规划行为序列[16]–[18]]。这些行为序列可基于固定技能集合（通过行为克隆或强化学习预训练的既定策略[19]–[21]）在真实机器人功能可供性中通过价值函数建立关联。尽管此类方法前景广阔，但抽象分层（LLM仅规划技能调用）隔断了其对感知-动作反馈回路的直接影响，导致以下局限性：
+
+1. 难以泛化共享感知与动作的反馈模式
+
+例如将“将苹果放在橙子上”扩展为“当检测到橙子时放下苹果”需重新设计逻辑。
+
+2. 无法表达控制中的常识性先验
+
+如“更快移动”、“加大推力”需依赖隐含物理知识。
+
+3. 空间关系理解受限
+
+如“将苹果稍微左移”需调用几何计算而非单纯路径规划。
+
+因此，每增加一项新技能（或其关联的具象化模式）均需重新收集数据并整体训练——这虽将数据负担转移至技能获取阶段，但问题本质未变。这引出了核心问题：如何扩展LLMs的应用，使其超越单一技能序列规划？
+
+我们的发现是：擅长代码生成的LLMs\[1\]\[11\]\[22\]可更进一步——能够统筹规划、策略逻辑与控制。代码补全训练的LLMs已可基于文本注释生成Python程序，而本研究证明其可被改造为按自然语言指令（注释形式）编写机器人策略代码。策略代码可定义函数或反馈循环以处理感知输出（如开放词汇物体检测器[2][3]结果）并参数化控制原语API（见图1）。当输入包含多个\<指令-代码\>示例（通过少量示例提示，灰色部分）后，LLM可针对新指令（绿色部分）自主重组API调用生成对应策略代码（高亮部分）：
+
+```python
+# if you see an orange, move backwards.
+if detect_object("orange"):
+    robot.set_velocity(x=-0.1, y=0, z=0)
+# move rightwards until you see the apple.
+while not detect_object("apple"):
+    robot.set_velocity(x=0, y=0.1, z=0)
+```
+
+代码生成模型能够通过语言具象化表达多样化的算术运算与反馈循环。此类模型不仅能够泛化理解新指令，其基于海量代码与注释训练（规模达数十亿行）的特性，还使其可根据上下文环境——例如对"更快"这类模糊描述或"向左轻微移动"等空间语义——动态赋予精确参数值（如速度值、坐标偏移量），从而在控制过程中自然融入行为常识：
+
+```python
+# do it again but faster, to the left, and with a banana.
+while not detect_object("banana"):
+    robot.set_velocity(x=0, y=-0.2, z=0)
+```
+
+:::tip
+这里明确指出该论文所研究的代码生成和决策能力还是依赖于**外部大模型**的，经过测试，用于代码补全的最优LLMs：**Code-Davinci-002**，策略LLMs：gpt-3.5-turbo-instruct（提示词大模型），此外Baseline还使用了text-curie-001 模型。基线方法： CLIPort vs. CaP。
+
+在下文和代码中可以看出本文的重点是**为这个外部大模型编写一套用于多层决策的框架**。
+:::
+
+</details>
+
+## 3. 相关工作
+
+Controlling robots via language has a long history, including
+early demonstrations of human-robot interaction through lexical
+parsing of natural language [5]. Language serves not only as an
+interface for non-experts to interact with robots [24], [25], but also
+as a means to compositionally scale generalization to new tasks[9],
+[17].The literature is vast(we refer to Tellex et al.[4]andLuketina
+etal.[26]for comprehensive surveys),but recent works fall broadly
+into the categories of high-level interpretation (e.g., semantic
+parsing [25], [27]–[32]), planning [14], [17], [18], and low-level
+policies (e.g., model-based [33]–[35], imitation learning [8], [9],
+[36], [37], or reinforcement learning [38]–[42]). In contrast, our
+work focuses on the code generation aspect of LLMs and use the
+generated procedures as an expressive way to control the robot.
+
+Large language models exhibit impressive zero-shot reasoning
+capabilities: from planning [14] to writing math programs [43];
+from solving science problems [44] to using trained verifiers [45]
+for math word problems. These can be improved with prompting
+methods such as Least-to-Most [46], Think-Step-by-Step [15]
+or Chain-of-Thought [47]. Most closely related to this paper are
+works that use LLM capabilities for robot agents without additional
+model training. For example, Huang et al. decompose natural lan-
+guage commands into sequences of executable actions by text com-
+pletion and semantic translation[14],while SayCan[17]generates
+feasible plans for robots by jointly decoding an LLM weighted by
+skill affordances [20] from value functions. Inner Monologue [18]
+expands LLM planning by incorporating outputs from success de-
+tectors or other visual language models and uses their feedback to
+re-plan. Socratic Models [16] uses visual language models to sub-
+stitute perceptual information (in teal) into the language prompts
+that generate plans, and it uses language-conditioned policies e.g.,
+for grasping [36]. The following example illustrates the qualitative
+differences between our approach versus the aforementioned prior
+works. When tasked to "move the coke can a bit to the right":
+
+```python
+LLM Plan [14], [17], [18]
+1. Pick up coke can
+2. Move a bit right
+3. Place coke can
+```
+
+```python
+Socratic Models Plan [16]
+objects = [coke can]
+1. robot.grasp(coke can) open vocab
+2. robot.place_a_bit_right()
+```
+plans generated by prior works assume there exists a skill that
+allows the robot to move an object a bit right.Our approach differs
+in that it uses an LLM to directly generate policy code (plans
+nested within) to run on the robot and avoids the requirement of
+having predefined policies to map every step in the plan:
+
+```python
+Code as Policies (ours)
+while not obj_in_gripper("coke can"):
+    robot.move_gripper_to("coke can")
+robot.close_gripper()
+pos = robot.gripper.position
+robot.move_gripper(pos.x, pos.y+0.1, pos.z)
+robot.open_gripper()
+```
+Our approach (CaP) not only leverages logic structures to specify
+feedback loops, but it also parameterizes (and write parts of)
+low-level control primitives. CaP alleviates the need to collect data
+and train a fixed set of predefined skills or language-conditioned
+policies –which are expensive and often remain domain-specific.
+
+Code generation has been explored with LLMs [1], [48] and
+without [49]. Program synthesis has been demonstrated to be
+capable of drawing simple figures [50] and generating policies
+that solve 2D tasks [51]. We expand on these works, showing that
+(i)code-writing LLMs enable novel reasoning capabilities(e.g.,en-
+coding spatial relationships by leaning on familiarity of third party
+libraries) without additional training needed in prior works [35],
+[36], [52]–[56], and (ii) hierarchical code-writing (inspired by re-
+cursive summarization [57]) improves state-of-the-art code genera-
+tion. We also present a new robotics-themed code-gen benchmark
+to evaluate future language models in the robotics domain.
+
+
+<details>
+
+<summary>翻译</summary>
+
+</details>
+
+## 4. 方法
+
+In this section, we characterize the extent to which pretrained
+LLMs can be prompted to generate code as policies –represented
+as a set of language model programs (LMPs). Broadly, we use the
+term LMP to refer to any program generated by a language model
+and executed on a system. This work investigates Code as Policies,
+a class of LMPs that maps from language instructions to code snip-
+pets that(i)react to perceptual inputs(i.e.,from sensors or modules
+on top of sensors), (ii) parameterize control primitive APIs, and
+(iii) are directly compiled and executed on a robot, for example:
+
+```python
+# stack the blocks in the empty bowl.
+empty_bowl_name = parse_obj('empty bowl')
+block_names = parse_obj('blocks')
+obj_names = [empty_bowl_name] + block_names
+stack_objs_in_order(obj_names=obj_names)
+```
+
+Input instructions are formatted as comments(green),which can be
+provided by humans or written by another LMP. Predicted outputs
+from the LLM ( highlighted ) are expected to be valid Python
+code, generated autoregressively [11], [12]. LMPs are few-shot
+prompted with examples to generate different subprograms that
+may process object detection results,build trajectories,or sequence
+control primitives. LMPs can be generated hierarchically by com-
+posing known functions (e.g., get_obj_names() using perception
+modules) or invoking other LMPs to define undefined functions:
+
+```python
+# define function stack_objs_in_order(obj_names).
+def stack_objs_in_order(obj_names):
+    for i in range(len(obj_names) - 1):
+        put_first_on_second(obj_names[i + 1], obj_names[i])
+```
+
+where ``put_first_on_second`` is an existing open vocabulary pick
+and place primitive (e.g., CLIPort [36]). For new embodiments,
+these active function calls can be replaced with available control
+APIs that represent the action space (e.g., set_velocity ) of
+the agent. Hierarchical code-gen with verbose variable names
+can be viewed as a variant of chain of thought prompting [47]
+via functional programming. Functions defined by LMPs can
+progressively accumulate over time, where new LMPs can
+reference previously constructed functions to expand policy logic.
+
+To execute an LMP, we first check that it is safe to run by
+ensuring there are no import statements, special variables that
+begin with ``__`` , or calls to ``exec`` and ``eval`` . Then, we call Python's
+``exec`` function with the code as the input string and two dictionaries
+that form the scope of that code execution: (i) ``globals`` , containing
+all APIs that the generated code might call, and (ii) ``locals`` , an
+empty dictionary which will be populated with variables and new
+functions defined during ``exec`` . If the LMP is expected to return
+a value, we obtain it from ``locals`` after ``exec`` finishes.
+
+### A. Prompting Language Model Programs
+
+Prompts to generate LMPs contain two elements:
+
+1. Hints e.g., import statements that inform the LLM which APIs
+are available and type hints on how to use those APIs.
+
+```python
+import numpy as np
+from utils import get_obj_names, put_first_on_second
+```
+
+2. Examples are instruction-to-code pairs that present few-shot
+"demonstrations" of how natural language instructions should be
+converted into code. These may include performing arithmetic,
+calling other APIs, and other features of the programming
+language. Instructions are written as comments directly preceding
+a block of corresponding solution code. We can maintain an
+LMP "session" by incrementally appending new instructions and
+responses to the prompt, allowing later instructions to refer back
+to previous instructions, like "undo the last action".
+
+### B. Example Language Model Programs (Low-Level)
+LMPs are perhaps best understood through examples, to
+which the following section builds up from simple pure-Python
+instructions to more complex ones that can complete robot
+tasks. All examples and experiments in this paper, unless
+otherwise stated, use OpenAI Codex code-davinci-002 with
+temperature 0 (i.e., deterministic greedy token decoding). Here,
+the prompt (in gray) starts with a Hint to indicate we are writing
+Python. It then gives one Example to specify the format of the
+return values, to be assigned to a variable called ret_val . Input
+instructions are green, and generated outputs are highlighted:
+
+```python
+# Python script
+# get the variable a.
+ret_val = a
+# find the sum of variables a and b.
+ret_val = a + b
+# see if any number is divisible by 3 in a list called xs.
+ret_val = any(x % 3 == 0 for x in xs)
+```
+
+Third-party libraries. Python code-writing LLMs store
+knowledge of many popular libraries. LMPs can be prompted to
+use these libraries to perform complex instructions without writing
+all of the code e.g., using NumPy to elicit spatial reasoning with
+coordinates. Hints here include import statements, and Examples
+define cardinal directions. Variable names are also important to
+indicate that pts_np and pt_np are NumPy arrays. Operations
+with 2D vectors imply that the points are also 2D. Example:
+
+```python
+import numpy as np
+# move all points in pts_np toward the right.
+ret_val = pts_np + [0.3, 0]
+# move a pt_np toward the top.
+ret_val = pt_np + [0, 0.3]
+# get the left most point in pts_np.
+ret_val = pts_np[np.argmin(pts_np[:, 0]), :]
+# get the center of pts_np.
+ret_val = np.mean(pts_np, axis=0)
+# the closest point in pts_np to pt_np.
+ret_val = pts_np[np.argmin(np.sum((pts_np - pt_np)**2, axis=1))]
+```
+
+First-party libraries. LMPs can also use first-party libraries
+(perception or control primitive APIs) not found in the training
+data if those functions have meaningful names and are provided
+in Hints/Examples. For example (full prompt in B.2):
+
+```python
+from utils import get_pos, put_first_on_second
+...
+# move the purple bowl toward the left.
+target_pos = get_pos('purple bowl') + [-0.3, 0]
+put_first_on_second('purple bowl', target_pos)
+objs = ['blue bowl', 'red block', 'red bowl', 'blue block']
+# move the red block a bit to the right.
+target_pos = get_pos('red block') + [0.1, 0]
+put_first_on_second('red block', target_pos)
+# put the blue block on the bowl with the same color.
+put_first_on_second('blue block', 'blue bowl')
+```
+
+The Hints import two functions for a robot domain: one to obtain
+the 2D position of an object by name (using an open vocabulary
+object detector [2]) and another to put the first object on the
+second target, which can be an object name or a 2D position.
+Note the LMP's ability to adapt to new instructions — the first
+modifies the movement magnitude by using "a bit," while the
+second associates the object with "the same color."
+Language reasoning can be few-shot prompted using code-
+writing LLMs (full prompt in B.1) to e.g., associate object
+names with natural language descriptions ("sea-colored block"),
+categories ("bowls"), or past context ("other block"):
+
+```python
+objs = ['blue bowl', 'red block', 'red bowl', 'blue block']
+# the bowls.
+ret_val = ['blue bowl', 'red bowl']
+# sea-colored block.
+ret_val = 'blue block'
+# the other block.
+ret_val = 'red block
+```
+
+### C. Example Language Model Programs (High-Level)
+Control flows. Programming languages allow using control
+structures such as if-else and loop statements. Previously
+we showed LMPs can express for-loops in the form of list
+comprehensions. Here we show how they can write a while-loop
+can form a simple feedback policy. Note that the prompt (same
+as the one in B.2) does not contain such Examples:
+
+```python
+# while the red block is to the left of the blue bowl, move it to the right 5cm at a time.
+while get_pos('red block')[0] < get_pos('blue bowl')[0]:
+    target_pos = get_pos('red block') + [0.05, 0]
+    put_first_on_second('red block', target_pos)
+```
+
+LMPs can be composed via nested function calls. This allows
+including more few-shot examples into individual prompts to
+improve functional accuracy and scope, while remaining within
+the LLM's maximum input token length. The following (full
+prompt in B.4) generates a response that uses parse_obj , another
+LMP that associates object names with language descriptions:
+
+```python
+objs = ['red block', 'blue bowl', 'blue block', 'red bowl']
+# while the left most block is the red block, move it toward the right.
+block_name = parse_obj('the left most block')
+while block_name == 'red block':
+    target_pos = get_pos(block_name) + [0.3, 0]
+    put_first_on_second(block_name, target_pos)
+    block_name = parse_obj('the left most block')
+```
+
+The parse_obj LMP (full prompt in Appendix B.5):
+
+```python
+objs = ['red block', 'blue bowl', 'blue block', 'red bowl']
+# the left most block.
+block_names = ['red block', 'blue block']
+block_positions = np.array([get_pos(name) for name in block_names])
+left_block_name = block_names[np.argmin(block_positions[:, 0])]
+ret_val = left_block_name
+```
+We describe more on prompt engineering in the Appendix A.
+
+### D. Language Model Programs as Policies
+
+In the context of robot policies, LMPs can compose perception-
+to-control feedback logic given natural language instructions,
+where the high-level outputs of perception model(s) (states)
+can be programmatically manipulated and used to inform the
+parameters of low-level control APIs (actions). Prior information
+about available perception and control APIs can be guided
+through Examples and Hints. These APIs "ground" the LMPs
+to a real-world robot system, and improvements in perception
+and control algorithms can directly lead to improved capabilities
+of LMP-based policies. For example, in real-world experiments
+below, we use recently developed open-vocabulary object
+detection models like ViLD [3] and MDETR [2] off-the-shelf to
+obtain object positions and bounding boxes.
+The benefits of LMP-based policies are threefold: they (i) can
+adapt policy code and parameters to new tasks and behaviors
+specified by unseen natural language instructions, (ii) can
+generalize to new objects and environments by bootstrapping off
+of open-vocabulary perception systems and/or saliency models,
+and (iii) do not require any additional data collection or model
+training. The generated plans and policies are also interpretable
+as they are represented in code, allowing for easy modification
+and reuse. Using LMPs for high-level user interactions inherits
+the benefits of LLMs, including parsing expressive natural
+language with commonsense knowledge, taking prior context
+into account, multilingual capabilities, and engaging in dialog.
+In the experiment section that follows, we demonstrate multiple
+instantiations of LMPs across different robots and different tasks,
+showcasing the approach's flexible capabilities and ease of use.
+
+Results are in Table III. CaP compares competitively to the
+supervised CLIPort baseline on tasks with seen attributes and
+instructions, despite only few-shot prompted with one example
+rollout for each task. With unseen task attributes, CLIPort's
+performance degrades significantly, while LLM-based methods
+retain similar performance. On unseen tasks and attributes, end-
+to-end systems like CLIPort struggle to generalize, and CaP
+outperforms LLM reasoning directly with language(also observed
+in [20]). Moreover, the natural-language planners [14], [16]–[18]
+are not applicable for tasks that require precise numerical spatial-
+geometric reasoning. We additionally show the benefits reasoning
+with code over natural language (both direct question and an-
+swering and Chain of Thought [47]), specifically the ability of the
+former to perform precise numerical computations,in Appendix C.
+
+### E. CaP: Mobile Robot Navigation and Manipulation
+
+In this domain, a robot with a mobile base and a 7 DoF arm is
+tasked to perform navigation and manipulation tasks in real-world
+kitchen. For perception, the LMPs are given object detection APIs
+implemented via ViLD [3]. For actions, the robot is given APIs to
+navigate to locations and grasp objects via both names and coordi-
+nates. Examples of on-robot executions of unseen language com-
+mands are in Fig. 2. This domain shows that CaP can be deployed
+across realistic tasks on different robot systems with different APIs.
+It also illustrates the ability to follow long-horizon reactive com-
+mands with control structures as well as precise spatial reasoning,
+which cannot be easily accomplished by prior works [16], [17],
+[36]. See prompts and additional examples in Appendix J.
+
+## 5. 讨论和限制
+
+CaP generalizes at a specific layer in the robot stack:
+interpreting natural language instructions, processing perception
+outputs, then parameterizing low-dimensional inputs to control
+primitives. This fits into systems with factorized perception
+and control, and it imparts a degree of generalization (acquired
+from pretrained LLMs) without the magnitude of data collection
+needed for end-to-end learning. Our method also inherits LLM
+capabilities unrelated to code writing e.g., supporting instructions
+with non-English languages or emojis (Appendix L). CaP can
+also express cross-embodied plans that perform the same task
+differently depending on the available APIs (Appendix M).
+However, this ability is brittle with existing LLMs, and it may
+require larger ones trained on domain-specific code.
+
+CaP today are restricted by the scope of (i) what the perception
+APIs can describe (e.g., no visual-language models to date can
+describe whether a trajectory is "bumpy" or "more C-shaped"),
+and (ii) which control primitives are available. Only a handful
+of named primitive parameters can be adjusted without over-
+saturating the prompts. CaP also struggle to interpret commands
+that are significantly longer or more complex, or operate at a
+different abstraction level than the given Examples. In the tabletop
+domain, it would be difficult for LMPs to "build a house with the
+blocks," since there are no Examples on building complex 3D
+structures. Our approach also assumes all given instructions are
+feasible, and we cannot tell if a response will be correct a priori.
+
+## 附录
+
+### A. 提示词工程
+
+Using LMPs to reliably complete tasks via code generation
+requires careful prompt engineering. While these prompts do
+not have to be long, they do need to be relevant and specific.
+Here, we discuss a few general guidelines that we followed while
+developing prompts for this paper.
+
+It is very important for prompts to contain code that has no bugs.
+Bugs in the prompt lead to unreliable and incorrect responses.Con-
+versely,if the LMP is writing incorrect code for a given Instruction,
+the prompt engineer should first verify that the prompt, especially
+the Examples most closely related to the Instruction, is bug-free.
+To reduce bugs related to syntax errors, one simple method is
+writing prompts in a code editor with syntax highlighting.
+There are many cases where the prompt contains variables
+or functions whose names are ambiguous. To produce reliable
+responses under these conditions, Examples in the prompt should
+treat these ambiguities consistently. If a variable named point
+is treated as an numpy.ndarray object in one Example and as
+a shapely.geometry.Point object in another, the LMP will not
+be able to “decide" on which convention to use, resulting in
+unreliable responses. Another way to handle ambiguity is by
+providing informal type hints, such as appending _np to variable
+names to indicate its type, or appending it to function names to
+indicate the type of the returned variable. In general, more specific
+variable and function names give more consistent results.
+For using third party libraries, including import statements
+in the prompt may not be necessary, as we found that LMPs
+can generate code that calls NumPy and SciPy without them.
+However, explicit import statements do improve reliability and
+increase the chance of LMPs using those libraries when the need
+arises. For using first party libraries, meaningful function names
+that follow popular conventions (e.g., begin with set_ and get_ )
+and specify return object formats (e.g., get_bbox_xyxy ) induce
+more accurate usages. Import statements in the Hints should
+be formatted as if we were importing functions. For example,
+in Python this means using from utils import function_name
+instead of import function_name . If the latter is used, the LMP
+may treat the imported name as a package, and the generated code
+might write function_name.function_name() .
+One type of LMP failures are related to code generation
+correctness. For example, minor coding mistakes when calling
+internal or external APIs, such as missing arguments, can be
+fixed with an Hint or Example demonstrating the correct usage.
+Incorrect assumptions on variable types can also be fixed in
+similar fashions. Other coding failures may be addressed by
+descriptive function names to encourage appropriate library
+usage ( ```perform_function_with_np()``` ) or succinct code logic ( #
+implement in one line. ) While it is possible to use LLMs to
+edit code and fix bugs (e.g., by using OpenAI's code edit API), in
+our experience this yielded inconsistent results (not always able to
+correct mistakes, and sometimes changed what the function was
+doing), so we did not employ this method in our experiments.
+
+### B. 方法选择的提示词
+
+
+1. Language-based reasoning: Full prompt:
+
+```python
+objs = ['green block', 'green bowl', 'yellow block', 'yellow bowl']
+# the yellow block.
+ret_val = 'yellow block'
+# the blocks.
+ret_val = ['green block', 'yellow block']
+```
+
+2. First-party: Full prompt:
+
+```python
+from utils import get_pos, put_first_on_second
+objs = ['gray block', 'gray bowl']
+# put the gray block on the gray bowl.
+put_first_on_second('gray block', 'gray bowl')
+objs = ['purple block', 'purple bowl']
+# move the purple bowl toward the left.
+target_pos = get_pos('purple bowl') + [-0.3, 0]
+put_first_on_second('purple bowl', target_pos)
+```
+3.  Combining language reasoning, third-party, and first-party libraries.: Full prompt:
+
+```python
+import numpy as np
+from utils import get_pos, put_first_on_second
+objs = ['cyan block', 'cyan bowl', 'pink bowl']
+# put the cyan block in cyan bowl.
+put_first_on_second('cyan block', 'cyan bowl')
+objs = ['gray block', 'silver block', 'gray bowl']
+# place the top most block on the gray bowl.
+names = ['gray block', 'silver block']
+positions = np.array([get_pos(name) for name in names])
+name = names[np.argmax(positions[:,1])]
+put_first_on_second(name, 'gray bowl')
+objs = ['purple block', 'purple bowl']
+# put the purple bowl to the left of the purple block.
+target_pos = get_pos('purple block') + [-0.3, 0]
+put_first_on_second('purple bowl', target_pos)
+```
+4. LMPs can be composed.: Full prompt:
+
+```python
+import numpy as np
+from utils import get_pos, put_first_on_second, parse_obj
+objs = ['yellow block', 'yellow bowl', 'gray block', 'gray bowl']
+# move the sun colored block toward the left.
+block_name = parse_obj('sun colored block')
+target_pos = get_pos(block_name) + [-0.3, 0]
+put_first_on_second(block_name, target_pos)
+objs = ['white block', 'white bowl', 'yellow block', 'yellow bowl']
+# place the block closest to the blue bowl on the other bowl.
+block_name = parse_obj('the block closest to the blue bowl')
+bowl_name = parse_obj('a bowl other than the blue bowl')
+put_first_on_second(block_name, bowl_name)
+```
+
+5. parse_obj prompt.: Full prompt:
+
+```python
+import numpy as np
+from utils import get_pos
+objs = [’brown bowl’, ’green block’, ’brown block’, ’green bowl’]
+# the blocks.
+ret_val = [’brown block’, ’green block’]
+# the sky colored block.
+ret_val = ’blue block’
+objs = [’orange block’, ’cyan block’, ’purple bowl’, ’gray bowl’]
+# the right most block.
+block_names = [’orange block’, ’cyan block’]
+block_positions = np.array([
+                    get_pos(block_name) for block_name in block_names])
+right_block_name = block_names[np.argmax(block_positions[:, 0])]
+ret_val = right_block_name
+```
+
+### C. 代码推理 vs. 自然语言
+
+To investigate how robot-relevant reasoning through LLMs can
+be performed with LMPs rather than with natural language, we
+created a benchmark that consists of two sets of tasks: (i) selecting
+objects in a scene from spatial-geometric descriptions, and (ii)
+selecting position coordinates from spatial-geometric descriptions.
+Object selection has 28 questions with commands such as"find the
+name of the block closest to the blue bowl," where a list of block
+and bowl positions are provided as input context in the prompt.
+Position selection has 23 questions with commands such as
+"interpolate 3 points on a line from the cyan bowl to the blue bowl."
+An LLM-generated answer for position selection is considered
+correct if all coordinates are within 1cm of the ground truth.
+
+We evaluate LMPs against two variants of reasoning with
+natural language: (i) Vanilla, given a description of the setting
+(e.g., list of object positions) and the question, directly outputs
+the answer (e.g., "Q: What is the top-most block?" → "A: red
+block"), and (ii) Chain of Thought (CoT) [47], which performs
+step-by-step reasoning given examples of intermediate steps in
+the prompt (e.g., encouraging the LLM to list out y-coordinates
+of all blocks in the scene before identifying the top-most block).
+
+Results in Table IV show that LMPs achieve accuracies in the
+high 90s, outperforming CoT, which outperforms Vanilla. CoT
+enables LLMs to reason about relations and orders (e.g. which
+coordinate is to the right of another coordinate), but failures occur
+for precise and multi-step numerical computations. By contrast,
+code from LMPs can use Python to perform such computations,
+and they often leverage external libraries to perform more complex
+operations (e.g., NumPy for vector addition). CoT and LMPs are
+not mutually exclusive –it is possible to prompt "step-by-step"
+code-generation to solve more complex tasks via CoT, but this
+is a direction not explored in this work.
+
+### D. CodeGen HumanEval 附加的结果
+
+Here we provide additional results to our HumanEval experi-
+ments. In total, three variants of the bigger Codex model (code-
+davinci-002) are tested. Our approach is Hier. CodeGen + Hier
+Prompts, where the prompt encourages the LLM to call yet-to-be-
+defined functions by including such examples. For comparisons,
+we evaluate against Flat CodeGen + No Prompt, essentially just
+using the LLM directly, and Flat CodeGen + Flat Prompt, for fair
+comparison with flat code-generation, since our hierarchical ap-
+proach has a prompt. The prompts only contain only 2 Examples:
+
+
+
+
+## References
+
+此处指的是调研过程中的参考文献。
+
+
+
+</WordCount>

@@ -1472,6 +1472,45 @@ doing), so we did not employ this method in our experiments.
 
 <summary>翻译</summary>
 
+要利用语言模型生成程序（LMPs）通过代码生成可靠完成任务，需进行谨慎的提示工程。虽然提示的篇幅不需冗长，但必须具有相关性和针对性。本文讨论在开发提示时遵循的若干通用准则：
+
+示例代码质量至关重要。提示中包含的代码必须完全无缺陷。若提示中存在错误，将导致生成不可靠或不正确的响应。反之，若LMP为给定指令编写的代码存在错误，提示工程師应首先验证提示本身（尤其是与指令最相关的示例代码）是否无漏洞。减少语法错误的小技巧：在支持语法高亮的代码编辑器中编写提示。
+
+消除变量与函数名的歧义。当变量名存在多义性时，提示中的示例需保持跨示例的类型一致性。例如：若变量名point在某示例中作为numpy.ndarray类型使用，在另个示例中却作为shapely.geometry.Point类型，LMP将无法确定应采用哪种类型约定，导致结果不可靠。
+
+命名修正技巧：通过以下方式暗示类型信息：
+
+- 为变量名添加后缀（如_np表示NumPy数组类型）
+- 在函数名中标记返回类型（如get_bbox_xyxy()明确边界框坐标格式）
+
+普遍原则是：命名越具体，生成结果越稳定。
+
+第三方与自建库的调用优化
+
+第三方库（如NumPy/SciPy）：
+
+尽管LMP可不依赖显式import语句调用这些库，但包含import numpy as np等声明可提高代码生成的可靠性，并增加模型使用该库的概率。
+
+自建函数库的调用规范：
+
+- 遵循常用命名约定（例如set_/get_前缀）
+- 在函数名中明确返回值格式（例如get_pose_6d()表示返回6自由度位姿）
+- 导入格式必须使用from utils import function_name而非import function_name，否则LMP可能生成function_name.function_name()的错误调用链。
+
+代码错误的调试策略:
+
+API参数缺失或变量类型误用可通过添加示例或提示（Hints）来修复。
+
+引导技巧：
+
+通过函数名驱动功能选择（如perform_filter_with_np()暗示使用NumPy实现过滤）
+
+通过注释限制代码复杂度（如# 用一行代码实现）
+
+<mark>避免自动纠错工具：</mark>
+
+实验中发现，使用LLM自动修复代码（如OpenAI的代码编辑API）会导致结果不稳定（无法保证错误完全修正或意外修改功能逻辑），故未采用此方法。
+
 
 
 </details>
@@ -1633,6 +1672,42 @@ not mutually exclusive –it is possible to prompt "step-by-step"
 code-generation to solve more complex tasks via CoT, but this
 is a direction not explored in this work.
 
+<details>
+
+<summary>翻译</summary>
+
+为探究如何通过语言模型生成程序（LMPs）而非纯自然语言实现机器人相关的推理任务，我们构建了包含两类任务的基准测试集：
+
+(i) 物体选择任务：基于空间几何描述从场景中选取目标物体（共28道问题，指令示例："找到距离蓝色碗最近的积木名称"），输入提示中提供积木和碗的坐标列表作为上下文；
+
+(ii) 位置选择任务：根据几何描述生成坐标点（共23道问题，指令示例："在青色碗至蓝色碗连线上插值3个点"），若所有坐标值与真实值误差在1厘米以内，则认为LLM生成的位置选择答案正确。
+
+对比方法设计：将LMP与两类自然语言推理方法进行对比：
+
+1. 直接输出法（Vanilla）：
+
+给定场景描述（如物体位置列表）与问题，直接输出答案（例如："Q: 最顶部的积木是什么？" → "A: 红色积木"）
+
+2. 思维链推理法（CoT）[47]：
+
+在提示中提供分步推理示例（例如诱导LLM先列举场景中所有积木的Y坐标，再识别最顶部积木）
+
+:::tip
+思维链的应用比较适合接入DeepSeek。
+:::
+
+实验结果（表IV）
+
+LMPs取得接近90%的高准确率，显著优于CoT方法，而CoT优于直接输出法。
+
+CoT使LLM能处理关系与顺序推理（如判断坐标相对方位），但在需精确数值计算的多步骤任务中存在失败案例。
+
+LMPs则通过Python代码生成能力实现数值计算，常借助外部库（如NumPy实现向量加法）完成复杂运算。
+
+CoT与LMPs并非互斥——可结合"分步生成代码"提示策略通过思维链解决更复杂任务，但本文未探索该方向。
+
+</details>
+
 ### D. CodeGen HumanEval 附加的结果
 
 Here we provide additional results to our HumanEval experi-
@@ -1645,6 +1720,154 @@ using the LLM directly, and Flat CodeGen + Flat Prompt, for fair
 comparison with flat code-generation, since our hierarchical ap-
 proach has a prompt. The prompts only contain only 2 Examples:
 
+Prompt for Flat CodeGen:
+
+```python
+prompt_f_gen_flat = ”’
+def get_total(xs: List[float]) -> float:
+"""Find the sum of a list of numbers called xs.
+"""
+return sum(xs)
+# end of function
+def get_abs_diff_between_means(xs0: List[float],
+xs1: List[float]) -> float:
+"""Get the absolute difference between the means of two
+lists of numbers.
+
+m0 = sum(xs0) / len(xs0)
+m1 = sum(xs1) / len(xs1)
+return abs(m0 - m1) # end of function
+```
+
+Prompt for Hierarchical CodeGen:
+
+```python
+def get_total(xs: List[float]) -> float:
+"""Find the sum of a list of numbers called xs.
+"""
+return sum(xs)
+# end of function
+def get_abs_diff_between_means(xs0: List[float],
+xs1: List[float]) -> float:
+"""Get the absolute difference between the means of two lists of
+numbers.
+"""
+m0 = get_mean(xs0)
+m1 = get_mean(xs1)
+return abs(m0 - m1)
+# end of function
+```
+
+Note the only difference in the hierarchical prompt is using a
+yet-to-be-defined function get_mean instead of calculating the
+mean directly. This "allows" the LLM to generate code that also
+call yet-to-be-defined functions.
+
+We report pass rates for when using the most likely outputs
+("greedy", which is done by setting temperature to 0), as well as
+pass rates for at least one solution from sampling various numbers
+of solutions (1, 10, and 100) with temperature set to 0.8, similar
+to those used in prior works [1], [11], [58].
+
+See results in Table II. In all instances hierarchical code
+generation outperforms flat code generation, and the numbers
+achieved are higher than those reported in recent works [1],
+[11], [58] Note that we use code-davinci-002 , while previous
+works use code-davinci-001 , but the relative improvements
+with hierarchical are consistent across the board. Out of the 164
+questions in HumanEval, 6.5% led to hierarchical code generation,
+but of which both Flat CodeGen variants got 44% success, while
+Hier CodeGen code got 56%. While success rate when sampling
+100 responses is above 90% across the board, we note that
+sampling multiple solutions is not practical for LMPs, which need
+to perform tasks in a zero-shot manner without engineering prior
+unit tests. As such, for LMPs we always set temperature to 0 and
+use the most likely output.
+
+<details>
+
+<summary>翻译</summary>
+
+此处提供HumanEval实验的附加结果。我们对大型Codex模型（code-davinci-002）的三种变体进行测试：
+
+实验方法对比
+
+1. 分层式代码生成（Hier. CodeGen + Hier Prompts）
+
+提示设计：鼓励LLM调用未定义函数（通过包含此类调用示例）
+
+2. 平铺式（Flat）代码生成对照组
+
+- Flat CodeGen + No Prompt：直接使用原始模型无提示
+
+- Flat CodeGen + Flat Prompt：使用包含两个完整函数示例的提示代码，直接计算中间值
+
+关键差异：
+
+分层提示与非分层提示唯一区别在于是否允许使用未实现函数（如get_mean()）替代显式计算.
+
+:::tip
+
+:::
+
+
+解码策略：
+
+- 确定性生成（温度=0，贪心解码）：仅取模型最高概率输出
+- 采样生成（温度=0.8，采样次数=1/10/100次）：统计至少一次生成正确的概率
+
+实验结果（见表II）
+
+1. 性能对比
+
+无论解码策略如何，分层生成均优于平铺生成。
+
+分层方法（Hier. CodeGen）代码通过率达56%，平铺方法仅44%（针对需分层生成的6.5%题目子集）。
+
+总体表现超过近期工作[1][11][58]，尽管使用模型版本更新（code-davinci-002 vs. 前作的code-davinci-001）。
+
+2. 采样策略效能
+
+生成100次时，两种方法的成功率均超90%，但这在机器人任务中不实用（LMP需零样本单次生成可靠代码）。
+
+实际部署中，温度恒设为0以获取最高置信度输出，避免随机性风险。
+
+</details>
+
+### E. Robot Code-Generation Benchmark
+1) Example Questions: Here are four types of benchmark questions and their examples:
+
+• Vector operations with Numpy:
+
+```pts = interpolate_pts_np(start, end, n)```
+
+:::info
+这段插值方法的源代码是：
+```
+  {
+    'f_name': 'interpolate_pts_np',
+    'f_sig': 'pts = interpolate_pts_np(start, end, n)',
+    'f_sol': lambda start, end, n: np.linspace(start, end, n),
+    'test_input_args': [(np.random.random(2), np.random.random(2), 3) for _ in range(5)],
+    'test_equiv': np.allclose
+  },
+```
+
+
+:::
+
+
+
+• Simple controls:
+
+```u = pd_control(x_curr, x_goal, x_dot, Kp, Kv)```
+
+• Manipulating shapes with shapely:
+
+```circle = make_circle(radius, center)```
+
+• Using first-party libraries:
+```ret_val = obj_shape_does_not_contain_others(obj_name, other_obj_names)```
 
 
 

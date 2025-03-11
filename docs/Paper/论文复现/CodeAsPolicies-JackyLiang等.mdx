@@ -203,6 +203,37 @@ while not detect_object("banana"):
 在下文和代码中可以看出本文的重点是**为这个外部大模型编写一套用于多层决策的框架**。
 :::
 
+将代码作为策略的表征方式继承了大型语言模型（LLMs）的多项优势：不仅能够解析自然语言指令，还能通过调用简单的基础动作API（如 say(text)），直接实现人机对话与问答交互功能。
+
+```python
+# tell me why you stopped moving.
+robot.say("I stopped moving because I saw a banana.")
+```
+
+本文提出代码即策略（Code as Policies, CaP）：一种面向实机系统、基于语言模型生成程序（Language Model Generated Programs, LMPs）的机器人核心框架。基于Python的LMPs可通过以下方式实现复杂策略：
+
+经典逻辑结构：序列化指令、条件分支（if/else）及循环控制（for/while），动态组合运行时行为。
+
+第三方库调用：利用数值计算库（如NumPy插值）、几何分析库（如Shapely形状生成）实现空间推理等功能。
+
+LMPs支持层级架构：通过递归定义新函数、持续累积自有函数库，可自主构建动态代码基座。我们在多个真实机器人系统上验证，LLMs能自主解析语言指令生成LMPs，其涵盖的能力包含：
+
+反应式底层控制策略：PD控制、阻抗控制等。
+
+基于路径点的策略：如视觉引导抓放、轨迹规划控制等。
+
+主要贡献：
+
+1.代码即策略框架：将LLMs生成代码拓展至机器人领域的形式化模型。
+
+2.分层代码生成方法：在代码生成任务中刷新SOTA（HumanEval基准达39.8%首次通过率[1]）。
+
+3.机器人代码生成评估基准：为未来语言模型的机器人代码生成能力提供量化标准。
+
+4.消融实验验证：分析CaP对泛化性能[23]的提升，并验证其遵循模型规模效应（参数量越大性能越优）。
+
+CaP通过链接语言-感知-动作，开辟了人机交互新路径，但也存在局限性（详见第V节）。完整提示词、生成示例代码及附加结果、视频、源码均发布于合作实验室官网 code-as-policies.github.io。
+
 </details>
 
 ## 3. 相关工作
@@ -293,6 +324,93 @@ to evaluate future language models in the robotics domain.
 
 <summary>翻译</summary>
 
+语言操控机器人技术发展沿革悠久，早期以自然语言词法解析为基础实现人机交互[5]。语言不仅为非专业用户提供控制接口[24][25]，亦被用于通过组合式泛化扩展至新任务[9][17]。相关文献浩繁（详见Tellex等[4]与Luketina等[26]综述），近期研究可归类为：
+
+高层语义解析：从自然语言指令中提取结构化语义（如任务逻辑图）[25][27]–[32]行为规划层：分解指令为技能调用序列[14][17][18]底层策略控制：
+
+1. 基于模型的方法（动力学模型推导控制律）[33]–[35]
+2. 模仿学习（示教数据驱动）[8][9][36][37]
+3. 强化学习（奖励函数优化）[38]–[42]
+
+
+
+本研究创新点聚焦于利用LLMs生成可执行代码直接控制机器人底层，突破传统范式限制。
+
+:::tip
+这里我认为本文强调的创新点确实属于**第四种范式**，原因是利用LLMs生成的代码的方式与传统范式有较大差异。
+
+差异之处在于，LLMs是基于什么生成的代码？我们都知道LLM的输入是自然语言，而生成代码的方式依靠的主要还是LLM这一支所依赖的学习方法，这是一大差异之处。
+
+如果说强化学习和模仿学习是一种思考如何去做的方式，那么大模型的提示（甚至是推理大模型的推理链）方式就是一种不一样的思考方式。为了补足这一思考方式对于精细化、专业化的不足之处，本文提出了逻辑构建和底层控制参数化，还有供以验证的RoboCodeGen基准。
+
+在下文提及了LLMs生成的代码的方式是**自回归方式**，也印证了这一点.
+:::
+
+大型语言模型（LLMs）的零样本推理能力拓展：
+
+多领域研究已证明LLMs具备零样本推理能力：数学程序生成[43]、科学问题解答[44]、训练验证器辅助数学题求解[45]等，且通过提示优化策略（如Least-to-Most[46]、逐步思考[15]、思想链[47]）可进一步提升性能。
+
+机器人领域相关方法对比：
+
+近年研究尝试直接利用LLMs赋能机器人，无须额外微调：
+
+- Huang等[14]: 通过文本补全与语义翻译分解指令为动作序列
+
+- SayCan[17]: 结合技能可供性价值函数进行联合解码生成可行计划
+
+- Inner Monologue[18]: 整合检测器与视觉语言模型反馈实现动态重规划
+
+- Socratic Models[16]: 使用视觉语言模型注入感知信息（青色部分）至规划提示词
+
+示例对比：CaP与传统方法的核心差异：
+
+以“将可乐罐稍向右移”任务为例，不同方法的指令解析结果如下：
+先前方法生成的计划（假设存在预定义技能）
+
+```python
+LLM Plan [14], [17], [18]
+1. Pick up coke can
+2. Move a bit right
+3. Place coke can
+```
+
+```python
+Socratic Models Plan [16]
+objects = [coke can]
+1. robot.grasp(coke can) open vocab
+2. robot.place_a_bit_right()
+```
+假设缺陷：须预先定义place_a_bit_right()等具体技能，导致泛化能力受限。
+
+本研究（Code as Policies, CaP）生成策略代码：
+
+
+```python
+Code as Policies (ours)
+while not obj_in_gripper("coke can"):
+    robot.move_gripper_to("coke can")
+robot.close_gripper()
+pos = robot.gripper.position
+robot.move_gripper(pos.x, pos.y+0.1, pos.z)
+robot.open_gripper()
+```
+
+核心突破：
+
+- 动态逻辑构建：集成反馈循环（如夹爪运动控制）
+
+- 底层控制参数化：直接生成运动学参数（如y轴+0.1米位移）
+
+- 规避预定义技能需求：降低数据收集与域适配成本
+
+
+早前代码生成研究包含基于LLMs[1][48]与非LLMs方法[49]，如生成二维任务策略[51]。本文贡献包括：
+
+- 代码生成新能力验证: 利用第三方库（如Shapely）实现空间几何推理 [优势对比研究：35][36][52]–[56]; **分层式代码生成**（受递归摘要[57]启发）显著提升HumanEval基准至39.8%首次通过率
+- 机器人专用评测基准: 为未来模型在机器人代码生成领域提供量化评估标准
+
+
+
 </details>
 
 ## 4. 方法
@@ -352,6 +470,52 @@ empty dictionary which will be populated with variables and new
 functions defined during ``exec`` . If the LMP is expected to return
 a value, we obtain it from ``locals`` after ``exec`` finishes.
 
+<details>
+
+<summary>翻译</summary>
+
+本章探讨如何通过提示（prompting）使预训练大型语言模型（LLMs）生成代码即策略（Code as Policies）——表现为一组语言模型生成程序（LMPs）。广义上，LMP指代由语言模型生成并在系统上执行的程序。本文研究的CaP类LMPs可将语言指令映射为满足以下特性的代码片段：
+
+- 感知响应性：接收传感器或感知模块（如目标检测器）输入
+- 控制原语参数化：调整底层控制API的参数
+- 可直接编译执行：无须中间层转换，例如：
+```python
+# stack the blocks in the empty bowl.
+empty_bowl_name = parse_obj('empty bowl')
+block_names = parse_obj('blocks')
+obj_names = [empty_bowl_name] + block_names
+stack_objs_in_order(obj_names=obj_names)
+```
+
+输入指令以绿色注释形式提供（可由人类或另一LMP生成），LLM生成的响应代码（高亮部分）需为有效Python代码（基于自回归生成机制[11][12]）。LMPs通过少量示例提示生成不同子程序，实现目标检测结果处理、轨迹构建或控制原语序列化。通过分层生成策略：
+
+- 组合已知函数：如利用感知模块的``get_obj_names()``
+
+- 递归定义未实现函数：通过调用子LMPs填补功能缺口
+
+:::tip
+相当于是说，分层逻辑的功能实现基本都是基于构建更合理的LMP。
+:::
+
+```python
+# define function stack_objs_in_order(obj_names).
+def stack_objs_in_order(obj_names):
+    for i in range(len(obj_names) - 1):
+        put_first_on_second(obj_names[i + 1], obj_names[i])
+```
+其中``put_first_on_second``为预设的开放词汇抓放原语（如CLIPort[36]）。针对新机器人本体，可替换为对应动作空间API（如``set_velocity``）。采用语义化变量名的分层代码生成可视作函数式编程形态的思想链提示[47]。LMPs定义的函数可持续累积，后续代码可引用前期函数扩展策略逻辑。
+
+执行前进行安全检查：禁用危险操作———禁止import语句、双下划线变量及exec/eval调用。
+
+沙箱执行环境：
+1. 调用Python的exec函数执行代码
+2. 通过两个字典界定作用域：
+``globals``：包含所有可调用API的全局命名空间
+``locals``：初始为空，用于存储执行生成的变量与函数
+3. 若需返回值，从执行后locals字典中提取
+
+</details>
+
 ### A. Prompting Language Model Programs
 
 Prompts to generate LMPs contain two elements:
@@ -374,7 +538,32 @@ LMP "session" by incrementally appending new instructions and
 responses to the prompt, allowing later instructions to refer back
 to previous instructions, like "undo the last action".
 
+<details>
+<summary>翻译</summary>
+
+生成LMP的提示包含两类要素：
+
+1. 核心提示元素（Hints）：
+
+- API导入声明：限定模型可用函数库
+
+- 类型提示：引导参数使用规范
+```python
+import numpy as np
+from utils import get_obj_names, put_first_on_second
+```
+
+2. 示例指令-代码对：
+
+- 格式模板：指令以注释前置，代码块紧随其后
+
+- 上下文延续：依会话持续添加新指令与响应，支持引用历史操作（如"撤销上一步"）
+
+</details>
+
+
 ### B. Example Language Model Programs (Low-Level)
+
 LMPs are perhaps best understood through examples, to
 which the following section builds up from simple pure-Python
 instructions to more complex ones that can complete robot
@@ -457,10 +646,89 @@ ret_val = ['blue bowl', 'red bowl']
 # sea-colored block.
 ret_val = 'blue block'
 # the other block.
-ret_val = 'red block
+ret_val = 'red block'
 ```
 
+<details>
+<summary>翻译</summary>
+
+通过示例展现LMPs从基础指令到复杂任务的能力（实验默认使用OpenAI Codex code-davinci-002，温度参数0即确定性生成）。
+
+基础数值操作示例
+提示部分（灰色）起始于Python声明，并通过\<\<示例\>\>定义返回变量规范：
+
+```python
+# Python script
+# get the variable a.
+ret_val = a
+# find the sum of variables a and b.
+ret_val = a + b
+# see if any number is divisible by 3 in a list called xs.
+ret_val = any(x % 3 == 0 for x in xs)
+```
+第三方库调用：空间坐标推理
+
+利用LLM对常见库的知识存储（如NumPy），通过变量命名（pts_np/pt_np）暗示数据结构：
+```python
+import numpy as np
+# move all points in pts_np toward the right.
+ret_val = pts_np + [0.3, 0]
+# move a pt_np toward the top.
+ret_val = pt_np + [0, 0.3]
+# get the left most point in pts_np.
+ret_val = pts_np[np.argmin(pts_np[:, 0]), :]
+# get the center of pts_np.
+ret_val = np.mean(pts_np, axis=0)
+# the closest point in pts_np to pt_np.
+ret_val = pts_np[np.argmin(np.sum((pts_np - pt_np)**2, axis=1))]
+```
+
+自有库调用：语义化机器人操作
+
+结合自主实现的感知与控制API：
+
+
+```python
+from utils import get_pos, put_first_on_second
+...
+# move the purple bowl toward the left.
+target_pos = get_pos('purple bowl') + [-0.3, 0]
+put_first_on_second('purple bowl', target_pos)
+objs = ['blue bowl', 'red block', 'red bowl', 'blue block']
+# move the red block a bit to the right.
+target_pos = get_pos('red block') + [0.1, 0]
+put_first_on_second('red block', target_pos)
+# put the blue block on the bowl with the same color.
+put_first_on_second('blue block', 'blue bowl')
+```
+
+语义推理增强
+
+通过少量示例提示，令LLM关联：
+
+
+```python
+objs = ['blue bowl', 'red block', 'red bowl', 'blue block']
+# the bowls.
+ret_val = ['blue bowl', 'red bowl']
+# sea-colored block.
+ret_val = 'blue block'
+# the other block.
+ret_val = 'red block'
+```
+
+核心机制对比优势
+
+CaP通过层级代码生成将**自然语言直接映射至精确控制参数**（如坐标偏移量），突破传统方法对预定义技能的依赖，在减少数据收集成本的同时实现更高泛化能力。
+
+:::tip
+有必要指出的是Baseline代码还是比较简单的，针对模糊描述，可以构建提示词，baseline的变化程度在0.1、0.15、0.2三个区间内，可以看作是一个模拟，后续需要更细腻的调整可以改进此处代码。
+:::
+
+</details>
+
 ### C. Example Language Model Programs (High-Level)
+
 Control flows. Programming languages allow using control
 structures such as if-else and loop statements. Previously
 we showed LMPs can express for-loops in the form of list
@@ -503,6 +771,51 @@ left_block_name = block_names[np.argmin(block_positions[:, 0])]
 ret_val = left_block_name
 ```
 We describe more on prompt engineering in the Appendix A.
+
+<details>
+
+<summary>翻译</summary>
+
+控制流结构:
+
+编程语言的控制结构（如条件分支、循环）支持构建动态策略。LMPs可生成包含循环逻辑的反馈策略代码。
+
+:::warning
+注意：生成此时所用的提示（与B.2节相同）并未包含此类示例：
+:::
+```python
+# while the red block is to the left of the blue bowl, move it to the right 5cm at a time.
+while get_pos('red block')[0] < get_pos('blue bowl')[0]:
+    target_pos = get_pos('red block') + [0.05, 0]
+    put_first_on_second('red block', target_pos)
+```
+函数嵌套组合: 
+
+通过分层调用LMPs函数，可在单次提示中整合多个示例以提升功能精度与范围（同时受限于模型最大输入长度）。下例（完整提示见附录B.4）的代码生成过程使用了parse_obj（另一LMP，功能为实现语言描述与物体名称的关联解析）：
+
+```python
+objs = ['red block', 'blue bowl', 'blue block', 'red bowl']
+# while the left most block is the red block, move it toward the right.
+block_name = parse_obj('the left most block')
+while block_name == 'red block':
+    target_pos = get_pos(block_name) + [0.3, 0]
+    put_first_on_second(block_name, target_pos)
+    block_name = parse_obj('the left most block')
+```
+
+``parse_obj`` LMP实现细节（完整提示见附录B.5）：
+
+
+```python
+objs = ['red block', 'blue bowl', 'blue block', 'red bowl']
+# the left most block.
+block_names = ['red block', 'blue block']
+block_positions = np.array([get_pos(name) for name in block_names])
+left_block_name = block_names[np.argmin(block_positions[:, 0])]
+ret_val = left_block_name
+```
+
+</details>
 
 ### D. Language Model Programs as Policies
 
@@ -549,6 +862,102 @@ geometric reasoning. We additionally show the benefits reasoning
 with code over natural language (both direct question and an-
 swering and Chain of Thought [47]), specifically the ability of the
 former to perform precise numerical computations,in Appendix C.
+<details>
+
+<summary>翻译</summary>
+
+
+
+在机器人策略的语境下，语言模型生成程序（LMPs）能够根据自然语言指令组合感知到控制的反馈逻辑。感知模型的高层输出（状态）可通过编程方式操作，并用于参数化底层控制API（动作）。通过示例和提示可引导机器人系统关于可用感知与控制API的先验知识。这些API将LMPs具象化到现实世界的机器人系统，而感知与控制算法的改进可直接提升基于LMP的策略能力。例如，下述真实世界实验中，我们直接使用近期开发的开放词汇目标检测模型ViLD[3]和MDETR[2]，以获取物体位置与边界框。
+
+基于LMP的策略具有三重优势：
+
+1. 适应性与泛化能力
+
+可针对未见过自然语言指令描述的新任务与行为调整策略代码与参数，通过开放词汇感知系统或显著性模型引导，泛化至新物体与环境
+
+2. 零数据依赖与可解释性
+
+无需额外数据收集或模型训练，生成的计划与策略以代码形式呈现，易于修改复用
+
+3. 继承LLM的自然语言交互优势
+
+解析含常识性知识的自然语言指令，考虑上下文历史、支持多语言及对话式交互，后续实验展示不同机器人/任务中LMP的实例化，证明该方法的灵活性与易用性。表III结果显示：在涉及已见任务属性的场景中，CaP与监督式基线方法CLIPort性能相当，尽管CaP仅通过单任务单样本提示生成策略；面对未见过任务属性时，CLIPort性能显著下降，而基于LLM的方法保持稳定。对于需精确数值化空间几何推理的任务，自然语言规划方法[14][16][18]无法适用，而CaP通过代码生成能力（详见附录C）展现显著优势。
+
+
+
+
+
+
+</details>
+
+## 5. 实验
+
+### A. Hierarchical LMPs on Code-Generation Benchmarks
+
+The goals of our experiments are threefold: (i) evaluate the
+impact of using hierarchical code generation (across different lan-
+guage models) and analyze modes of generalization, (ii) compare
+Code as Policies (CaP) against baselines in simulated language-
+instructed manipulation tasks, and (iii) demonstrate CaP on differ-
+ent robot systems to show its flexibility and ease-of-use. Additional
+experiments can be found in the Appendix, such as generating
+reactive controllers to balance a cartpole and perform end-effector
+impedance control (Appendix F). The Appendix also contains
+the prompt and responses for all experiments. Videos and Colab
+Notebooks that reproduce these experiments can be found on the
+website. Due to the difficulty of evaluating open-ended tasks and
+a lack of comparable baselines, quantitative evaluations of a robot
+system using CaP is limited to a constrained set of simulated tasks
+in IV-D, while in IV-B, IV-C, and IV-E we demonstrate the system’s
+full range of supported commands without quantitative evaluations.
+
+
+<details>
+
+<summary>总结</summary>
+
+本实验体系旨在验证以下三重核心目标：
+
+1. 分层代码生成效果评估与泛化模式分析
+
+横向对比不同语言模型（LLMs）的分层代码生成能力, 探究代码生成策略对跨任务场景泛化行为的影响机制
+2. 模拟环境下的策略性能对比
+
+在语言驱动的机械臂操控任务中，量化比较**代码即策略（CaP）**与传统基线方法（如CLIPort[36]）的优劣
+3. 跨平台部署验证
+
+通过在不同机器人系统（移动机器人、机械臂等）的实机实验，验证CaP框架的灵活性与易用性.
+
+补充实验与资源详述
+
+附录扩展实验（Appendix F）：
+
+- 生成反应式控制器实现倒立摆平衡
+- 末端执行器阻抗控制策略验证
+
+
+量化评估的局限性说明
+
+由于开放式任务设计的复杂性及领域可比基线方法的缺失，系统性量化评估主要集中于：
+
+- IV-D节: 限定场景的模拟任务性能测试
+而以下章节侧重能力覆盖验证：
+- IV-B节 (逻辑控制泛化)
+- IV-C节 (空间几何推理)
+- IV-E节 (跨本体任务适应性)
+其目标为通过定性案例展示CaP在真实场景中的完整功能范围。
+
+</details>
+
+### B. CaP: Drawing Shapes via Generated Waypoints
+
+
+
+### C. CaP: Pick & Place Policies for Table-Top Manipulation
+
+### D. CaP: Table-Top Manipulation Simulation Evaluations
+
 
 ### E. CaP: Mobile Robot Navigation and Manipulation
 
@@ -564,6 +973,40 @@ It also illustrates the ability to follow long-horizon reactive com-
 mands with control structures as well as precise spatial reasoning,
 which cannot be easily accomplished by prior works [16], [17],
 [36]. See prompts and additional examples in Appendix J.
+
+<details>
+
+<summary>翻译</summary>
+
+:::tip
+感知由专用的大模型ViLD、MDETR完成，可以获取物体的位置和边界框。这里**并不属于LLM的管辖范围**。
+
+包括处理新物体也是应用了开放词汇检测系统（Open-Vocabulary Perception）和显著性模型。
+:::
+
+在此领域，配备移动底盘与7自由度机械臂的机器人在真实厨房环境中执行导航与操作任务。感知层通过ViLD[3]实现目标检测API，动作层提供基于名称/坐标的导航与抓取API。图2展示了未训练语言指令的实机执行示例，例如：
+
+- 长时程反应式指令："若餐桌上的杯子未被清理，则先将其移至水槽再整理餐具"
+- 精密空间推理指令："绕过左侧障碍物，移至右侧台面中央位置抓取勺子"
+
+
+该实验证明：
+
+1. 跨机器人系统部署能力
+CaP可适配不同API的机器人平台（移动导航与机械臂联动）。
+2. 超越先前工作的性能
+传统方法[16][17][36]难以合成含控制结构（如循环判断）的复杂策略, 无法生成依赖数值计算（如坐标差补偿）的精确动作序列
+
+完整提示词与附加案例见附录J。
+
+:::tip
+移动机器人平台选择:
+
+Everyday Robot作为移动机器人平台，演示机械臂为Ur5e，夹爪为Robotiq 2F85 gripper。
+:::
+
+
+</details>
 
 ## 5. 讨论和限制
 
@@ -594,6 +1037,30 @@ blocks," since there are no Examples on building complex 3D
 structures. Our approach also assumes all given instructions are
 feasible, and we cannot tell if a response will be correct a priori.
 
+<details>
+
+<summary>翻译</summary>
+
+CaP在机器人技术栈的特定层级实现泛化：即解析自然语言指令、处理感知输出，进而为控制原语生成低维输入参数。这种方法适用于感知与控制模块解耦的架构，通过预训练LLMs引入泛化能力，同时规避端到端学习所需的海量数据收集。CaP还继承了LLMs的非代码相关能力，例如支持非英语指令或表情符号（附录L），以及根据可用API生成跨本体适应性任务计划（附录M）。然而，这种能力在现有LLMs中较为脆弱，可能需依赖针对领域代码特化的更庞大模型。
+
+当前CaP的局限性主要源于：
+
+1. 感知API的描述范围限制
+
+现有视觉语言模型无法描述轨迹的抽象属性（如“颠簸路径”或“更接近C形的曲线”）。
+
+2. 控制原语功能有限性
+
+若需调节的参数过多（超出命名原语承载范围），将导致提示信息过载。
+
+3. 指令复杂度与抽象层级适配性
+
+面对远超示例复杂度的长指令（如“用积木搭建房屋”），或与给定示例抽象层级不符的任务（如要求定义复杂三维结构），LMPs难以生成有效代码。
+
+此外，CaP默认假设所有输入指令均可行，缺乏对响应正确性的先验判断能力。
+
+</details>
+
 ## 附录
 
 ### A. 提示词工程
@@ -619,7 +1086,7 @@ is treated as an numpy.ndarray object in one Example and as
 a shapely.geometry.Point object in another, the LMP will not
 be able to “decide" on which convention to use, resulting in
 unreliable responses. Another way to handle ambiguity is by
-providing informal type hints, such as appending _np to variable
+providing informal type hints, such as appending \_np to variable
 names to indicate its type, or appending it to function names to
 indicate the type of the returned variable. In general, more specific
 variable and function names give more consistent results.
@@ -664,6 +1131,16 @@ ret_val = 'yellow block'
 ret_val = ['green block', 'yellow block']
 ```
 
+<details>
+
+<summary>注解</summary>
+
+注释如果指的是单个有具体描述的方块，那么输出会是这个具体描述的方块。
+
+如果指的是一组方块，那么输出会是这个群块。（没有限制的话，所有符合block性质的都会被选中）
+
+</details>
+
 2. First-party: Full prompt:
 
 ```python
@@ -671,11 +1148,25 @@ from utils import get_pos, put_first_on_second
 objs = ['gray block', 'gray bowl']
 # put the gray block on the gray bowl.
 put_first_on_second('gray block', 'gray bowl')
+
 objs = ['purple block', 'purple bowl']
 # move the purple bowl toward the left.
 target_pos = get_pos('purple bowl') + [-0.3, 0]
 put_first_on_second('purple bowl', target_pos)
 ```
+
+<details>
+
+<summary>注解</summary>
+
+这里有必要解释一下utils里这两个函数的作用。
+
+首先get_pos函数的作用是获取一个物体在当前场景中的位置。put_first_on_second函数的作用是把一个物体放在另一个物体的上方。
+
+``target_pos = get_pos('purple bowl') + [-0.3, 0]``这里指的是紫色碗的当前位置(x,y坐标)，那么加上\[-0.3,0\]，就是x坐标减去0.3，y坐标不变。
+
+</details>
+
 3.  Combining language reasoning, third-party, and first-party libraries.: Full prompt:
 
 ```python
@@ -695,6 +1186,15 @@ objs = ['purple block', 'purple bowl']
 target_pos = get_pos('purple block') + [-0.3, 0]
 put_first_on_second('purple bowl', target_pos)
 ```
+
+<details>
+
+<summary>注解</summary>
+
+这里的argmax是用来找y坐标最大（所处最高）的那个物体。
+
+</details>
+
 4. LMPs can be composed.: Full prompt:
 
 ```python
@@ -711,6 +1211,14 @@ block_name = parse_obj('the block closest to the blue bowl')
 bowl_name = parse_obj('a bowl other than the blue bowl')
 put_first_on_second(block_name, bowl_name)
 ```
+
+<details>
+
+<summary>注解</summary>
+
+这里的parse_obj扮演的是一个翻译的角色。通过自然语言描述的物体属性（如位置、颜色、类别）转化为具体物体名称或标识符。这里就使用到了**开放词汇检测器**，翻译一个陌生的物体。
+
+</details>
 
 5. parse_obj prompt.: Full prompt:
 

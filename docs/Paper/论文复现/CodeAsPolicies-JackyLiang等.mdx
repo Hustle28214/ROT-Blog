@@ -893,8 +893,6 @@ former to perform precise numerical computations,in Appendix C.
 
 ## 5. 实验
 
-### A. Hierarchical LMPs on Code-Generation Benchmarks
-
 The goals of our experiments are threefold: (i) evaluate the
 impact of using hierarchical code generation (across different lan-
 guage models) and analyze modes of generalization, (ii) compare
@@ -947,6 +945,101 @@ full range of supported commands without quantitative evaluations.
 - IV-C节 (空间几何推理)
 - IV-E节 (跨本体任务适应性)
 其目标为通过定性案例展示CaP在真实场景中的完整功能范围。
+
+</details>
+
+### A. Hierarchical LMPs on Code-Generation Benchmarks
+
+
+We evaluate our code-generation approach on two code-
+generation benchmarks: (i) a robotics-themed RoboCodeGen and
+(ii) HumanEval [1], which consists of standard code-gen problems.
+
+RoboCodeGen: we introduce a new benchmark with 37 func-
+tion generation problems with several key differences from previ-
+ous code-gen benchmarks: (i) it is robotics-themed with questions
+on spatial reasoning (e.g., find the closest point to a set of points),
+geometric reasoning (e.g., check if one bounding box is contained
+in another), and controls (e.g., PD control), (ii) using third-party
+libraries (e.g. NumPy) are both allowed and encouraged, (iii)
+provided function headers have no docstrings nor explicit type
+hints, so LLMs need to infer and use common conventions, and
+(iv) using not-yet-defined functions are also allowed, which can be
+created with hierarchical code-gen. Example benchmark questions
+can be found in Appendix E. We evaluate on four LLMs accessible
+from the OpenAI API 1 . As with standard benchmarks [1], our
+evaluation metric is the percentage of the generated code that
+passes human-written unit tests. See Table I. Domain-specific
+language models (Codex model) generally perform better. Within
+each model family, performance improves with larger models.
+Hierarchical performs better across the board, showing the benefit
+of allowing the LLM to break down complex functions into
+hierarchical parts and generate code for each part separately.
+We also analyze how code generation performance varies across
+the five types of generalization proposed in [23]. Hierarchical
+helps Productivity the most, which is when the new instruction
+requires longer code, or code with more logic layers than those
+in Examples. These improvements however, only occur with the
+two davinci models, and not cushman, suggesting that a certain
+level of code-generation capability needs to be reached first before
+hierarchical code-gen can bring further improvements. More
+results are in Appendix E.2.
+
+Evaluations in HumanEval [1] demonstrate that hierarchical
+code-gen improves not only policy code, but also general-purpose
+code. See Table II. Numbers achieved are higher than in recent
+works [1], [11], [58]. More details in Appendix D.
+
+<details>
+
+<summary>总结</summary>
+
+
+本研究基于两个代码生成基准展开评估：
+
+1.自研机器人主题测试集RoboCodeGen
+
+包含37个函数生成问题
+
+差异化特性：
+
+
+- 领域专精：问题聚焦空间推理（如求点集中最近点）、几何关系判断（如包围盒包含检测）、控制策略（PD控制实现）
+- 第三方库激励：允许并推荐使用NumPy等库简化实现
+- 弱约束函数定义：函数头不含文档描述与显式类型提示，模型需按命名惯例推断参数类型
+- 支持分层生成：允许调用未定义函数（通过递归生成填充）
+
+:::tip
+RoboCodeGen区别于已有的HumanEval，对机器人领域的代码生成填补了空白。它包含37个函数生成问题，有空间推理、几何推理、控制问题（包括PD控制），应对专门的机器人应用场景，揭示模型在不同类型泛化任务上的优劣势。
+:::
+
+2. 标准化基准HumanEval\[1\]
+
+覆盖通用编程问题
+模型选择与评估指标
+测试模型：通过OpenAI API开放的4种LLMs（包含Codex系列模型）
+评估标准：生成代码通过人工编写单元测试的百分比（详见表I）
+核心发现
+1. 领域专精模型的性能优势
+
+Codex（代码特化模型）整体表现最优，同系列内模型规模越大性能越强。
+
+:::tip
+通俗一点说就是堆算力，再通俗一点说就是追逐当时最优，参数最大的模型。（2023年的模型确实是往参数量来卷的，还没有像DeepSeek R1这样的模型出现）
+:::
+
+
+2. 分层生成技术的普适增益
+
+在各模型中，允许模型将复杂函数拆分为分层子任务并独立生成代码，平均性能提升显著（详见表I）。
+
+3.
+泛化维度深析（基于[23]分类）
+
+**生产力泛化（Productivity）**提升最大：针对代码长度或逻辑层数超出示范案例的任务（例如复杂控制律代码生成），分层生成使大模型（如Davinci）有效拆解问题。
+模型规模阈值效应：仅在Davinci级别模型中观测到分层增益，Cushman模型未见明显提升，表明分层技术需基础代码生成能力达标方能生效（更多结果见附录E.2）。
+HumanEval基准验证
+分层生成方法不仅提升机器人策略代码质量，也显著改进通用代码生成性能（对比近期研究[1][11][58]，本文成果指标全面超越，详见表II），具体分析参见附录D。
 
 </details>
 

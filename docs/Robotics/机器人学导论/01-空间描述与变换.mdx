@@ -444,6 +444,7 @@ $$
 上式右边的每个旋转描述都是按照Z-Y-X欧拉角的定义给出的，即B相对于A的最终姿态为：
 
 <img width="475" alt="Image" src="https://github.com/user-attachments/assets/4ddcb40d-b6b6-48c5-8da0-b322fb5250ac" />
+
 结果不太直观，但是与X-Y-Z固定角所得的结果相同。
 
 
@@ -481,6 +482,7 @@ $$
 
 
 虽然存在第二个解（在式中取$\beta$的正平方根），但我们总是求满足$0.0≤\beta≤180.0°$的单解。如果$\beta=0.0$或$180.0°$，上式的结果就会退化。在这种情况下，仅能求出$\alpha$和$\gamma$的和或差。这种情况下一般取$\alpha=0.0$，结果如下：
+
 <img width="592" alt="Image" src="https://github.com/user-attachments/assets/04b02a37-3003-4ee4-95d6-79373ce90fa3" />
 
 
@@ -498,9 +500,8 @@ $$
 矢量$\hat{K}$有时被称为有限旋转的等效轴。B相对于A的一般姿态可用$^A_BR(\hat{K},\theta)$或$R_K(\theta)$来表示，称作等效轴角坐标系表示法。确定矢量$^A\hat{K}$只需要两个参数，因为它的长度恒等于1。角度确定了第三个参数。经常用旋转量$\theta$乘以单位方向矢量$\hat{K}$形成一个简单的$3\times1$的矢量来描述姿态，用$K$表示（没有“帽号”），如上图所示。
 
 当选择A的主轴中的一个轴作为旋转轴时，则等效旋转矩阵成为我们熟悉的平面旋转矩阵：
- 
-:::danger
-:::
+
+<img width="277" alt="Image" src="https://github.com/user-attachments/assets/4b4bd96c-cb6f-480d-98d8-20052772c843" />
 
 
 若旋转轴为一般轴，则等效旋转阵为：

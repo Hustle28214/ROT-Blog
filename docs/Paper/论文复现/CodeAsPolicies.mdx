@@ -1,2 +1,57 @@
+import WordCount from '../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+
 ## 1. 摘要 
 
+Abstract—Large language models (LLMs) trained on code-completion have been shown to be capable of synthesizing simple Python programs from docstrings[1].We find that the secode-writing LLMs can be re-purposed to write robot policy code, given natural language commands. Specifically, policy code can express functions
+or feedback loops that process perception outputs (e.g., from object
+detectors [2], [3]) and parameterize control primitive APIs. When
+provided as input several example language commands (formatted
+as comments) followed by corresponding policy code (via few-shot
+prompting), LLMs can take in new commands and autonomously
+re-compose API calls to generate new policy code respectively. By
+chaining classic logic structures and referencing third-party libraries
+(e.g., NumPy, Shapely) to perform arithmetic, LLMs used in this way
+can write robot policies that (i) exhibit spatial-geometric reasoning,
+(ii) generalize to new instructions, and (iii) prescribe precise values
+(e.g., velocities) to ambiguous descriptions (“faster”) depending
+on context (i.e., behavioral commonsense). This paper presents
+Code as Policies: a robot-centric formulation of language model
+generated programs (LMPs) that can represent reactive policies (e.g.,
+impedance controllers), as well as waypoint-based policies (vision-
+based pick and place, trajectory-based control), demonstrated across
+multiple real robot platforms. Central to our approach is prompting
+hierarchical code-gen (recursively defining undefined functions),
+which can write more complex code and also improves state-of-the-
+art to solve 39.8% of problems on the HumanEval [1] benchmark.
+Code and videos are available at https://code-as-policies.github.io
+<details>
+
+<summary>翻译</summary>
+
+经过代码补全任务训练的大型语言模型（LLMs）已被证明能够根据文本注释生成简单的Python程序[1]。我们发现，这些擅长编写代码的LLM可通过重新定位用途，依据自然语言指令生成机器人策略代码。具体而言，策略代码可表述为处理感知输出（如来自目标检测器[2][3]）的函数或反馈回路，并参数化控制原语的应用程序编程接口（API）。当输入多个自然语言指令样例（以注释形式格式化）及其对应策略代码（通过少量示例提示）时，LLM能够接收新指令并自主重组API调用以生成相应的新策略代码。通过链式调用经典逻辑结构及引用第三方库（如NumPy、Shapely）执行算术运算，这种LLM可生成的机器人策略能够：(i) 展现空间几何推理能力；(ii) 泛化至新指令；(iii) 根据上下文（即行为常识）对模糊描述（如"更快"）赋予精确参数值（如速度值）。本文提出"代码即策略"（Code as Policies）框架——一种以机器人为核心的语言模型生成程序（LMPs）表述方式，能够表示反应式策略（如阻抗控制）和基于路径点的策略（视觉抓取放置、轨迹控制），并在多个真实机器人平台上完成验证。本方法的核心在于分层代码生成提示策略（通过递归定义未实现函数），该策略不仅能编写更复杂代码，还将HumanEval基准测试[1]的最优解决率提升至39.8%。
+
+</details>
+
+:::info
+
+机器人策略（Robot Policy）指的是一套系统化的决策逻辑或行为规则，用于控制机器人如何根据感知到的情况（如传感器数据、视觉信息）生成具体的动作指令。
+
+通俗来说，就是机器人从“所感”导致“所想”，再到“所做”的这一层。
+
+:::
+
+
+## 2. 引言
+
+
+
+## References
+
+此处指的是调研过程中的参考文献。
+
+
+
+</WordCount>

@@ -997,7 +997,7 @@ works [1], [11], [58]. More details in Appendix D.
 
 本研究基于两个代码生成基准展开评估：
 
-1.自研机器人主题测试集RoboCodeGen
+1. 自研机器人主题测试集RoboCodeGen
 
 包含37个函数生成问题
 
@@ -1013,19 +1013,21 @@ works [1], [11], [58]. More details in Appendix D.
 RoboCodeGen区别于已有的HumanEval，对机器人领域的代码生成填补了空白。它包含37个函数生成问题，有空间推理、几何推理、控制问题（包括PD控制），应对专门的机器人应用场景，揭示模型在不同类型泛化任务上的优劣势。
 :::
 
-2. 标准化基准HumanEval\[1\]
+2. 标准化基准HumanEval\[1\]: 覆盖通用编程问题
 
-覆盖通用编程问题
-模型选择与评估指标
+
 测试模型：通过OpenAI API开放的4种LLMs（包含Codex系列模型）
+
 评估标准：生成代码通过人工编写单元测试的百分比（详见表I）
-核心发现
+
+核心发现:
+
 1. 领域专精模型的性能优势
 
 Codex（代码特化模型）整体表现最优，同系列内模型规模越大性能越强。
 
 :::tip
-通俗一点说就是堆算力，再通俗一点说就是追逐当时最优，参数最大的模型。（2023年的模型确实是往参数量来卷的，还没有像DeepSeek R1这样的模型出现）
+通俗一点说就是堆算力，再通俗一点说就是追逐当时最优，参数最大的模型。（该研究发布于2023年）
 :::
 
 
@@ -1033,24 +1035,275 @@ Codex（代码特化模型）整体表现最优，同系列内模型规模越大
 
 在各模型中，允许模型将复杂函数拆分为分层子任务并独立生成代码，平均性能提升显著（详见表I）。
 
-3.
-泛化维度深析（基于[23]分类）
+3. 泛化维度深析（基于\[23\]分类）
 
-**生产力泛化（Productivity）**提升最大：针对代码长度或逻辑层数超出示范案例的任务（例如复杂控制律代码生成），分层生成使大模型（如Davinci）有效拆解问题。
+**生产力泛化(Productivity)** 提升最大：针对代码长度或逻辑层数超出示范案例的任务（例如复杂控制律代码生成），分层生成使大模型（如Davinci）有效拆解问题。
+
 模型规模阈值效应：仅在Davinci级别模型中观测到分层增益，Cushman模型未见明显提升，表明分层技术需基础代码生成能力达标方能生效（更多结果见附录E.2）。
-HumanEval基准验证
+
+:::tip
+可以考虑换用目前代码最优的模型，比如Grok 3、DeepSeek、GPT-o3等。
+:::
+
 分层生成方法不仅提升机器人策略代码质量，也显著改进通用代码生成性能（对比近期研究[1][11][58]，本文成果指标全面超越，详见表II），具体分析参见附录D。
 
 </details>
 
 ### B. CaP: Drawing Shapes via Generated Waypoints
 
+In this domain, we task a real UR5e robot arm to draw various
+shapes by generating and following a series of 2D waypoints. For perception, the LMPs are given APIs that detect object positions,
+implemented with off-the-shelf open vocabulary object detector
+MDETR [2]. For actions, an end-effector trajectory following
+API is provided. There are four LMPs: (i) parse user commands,
+maintain a session, and call action APIs, (ii) parse object names
+from language descriptions, (iii) parse waypoints from language
+descriptions, and (iv) generate new functions. Examples of
+successful on-robot executions of unseen language commands are
+in Fig. 2c. The system can elicit spatial reasoning to draw entirely
+new shapes from language commands. Additional examples
+which demonstrate the ability to parse precise dimensions,
+manipulate previous shapes, and multi-step commands, as well
+as full prompts, are in Appendix H.
+
+<details>
+
+<summary>总结</summary>
+
+实验配置：
+
+- 机器人本体：UR5e工业机械臂
+
+
+核心任务：根据语言指令生成并追踪2D路径点，完成多样化图形绘制
+
+
+系统模块分解：
+
+1. 感知层API
+
+采用现成的MDETR开放词汇目标检测器[2]，实时获取物体位置坐标。
+
+
+:::warning
+MDETR 目前只能处理静态的图像，不能处理视频；只能处理单个文本查询和单张图像的情况；只能输出边界框，而不能输出更精细的掩码或关键点。这一部分如果要移植，需要再写一层边界-物体掩码的代码。
+:::
+2. 执行层API
+
+提供末端执行器轨迹跟踪接口，将路径点序列转化为关节运动指令。
+
+3. 分层LMPs架构（4个核心模块）
+
+主控LMP:
+
+- 解析用户指令语义
+- 维护会话上下文
+- 协调子LMP生成并调用动作API
+
+物体解析LMP:
+
+- 从语言描述（如“红色方框”）映射至目标物体名称
+
+路径点生成LMP:
+
+- 根据指令（如“绘制边长30cm的正五边形”）转化为几何坐标序列
+
+函数动态生成LMP:
+
+- 按需创建新功能函数（如轨迹平滑算法）
+- 能力验证结果
+- 零样本新形状绘制
+
+图2c展示了首次出现的指令（如“螺旋线”、“六芒星”）的成功执行轨迹。
+
+- 精确尺寸解析
+
+根据语言描述的定量参数（如“半径15cm的圆”）生成对应路径。
+
+- 多步指令组合
+
+支持组合操作（如“擦除前一图形，并在其右侧绘制箭头”）。
+
+- 动态策略扩展
+
+通过函数生成模块实现实时算法增强（如轨迹插值优化）。
+
+完整提示模板与示例代码参见附录H。
+
+</details>
 
 
 ### C. CaP: Pick & Place Policies for Table-Top Manipulation
 
+
+The table-top manipulation domain tasks a UR5e robot arm
+to pick and place various plastic toy objects on a table. The
+arm is equipped with a suction gripper and an in-hand Intel
+Realsense D435 camera. We provide perception APIs that detect
+the presences of objects, their positions, and bounding boxes, via
+MDETR [2]. We also provide a scripted primitive that picks an
+object and places it on a target position. Prompts are similar to
+those from the last domain, except trajectory parsing is replaced
+with position parsing. Examples of on-robot executions of unseen
+language commands are in Fig. 2 panels a and b, showing
+the capacity to reason about object descriptions and spatial
+relationships. Other commands that use historical context (e.g.,
+"undo that"), reason about objects via geometric (e.g., "smallest")
+and spatial (e.g., "right-most") descriptions are in Appendix I.
+
+
+<details>
+
+<summary>注解</summary>
+
+系统配置与硬件参数
+1. 机器人本体：
+
+- 机械臂型号：UR5e协作型机械臂
+- 末端执行器：真空吸盘夹具（支持非结构化物体抓取）
+- 视觉模块：Intel Realsense D435手眼相机（实时RGB-D感知）
+2. 感知层API：MDETR开放词汇检测器[2]
+提供物体存在性检测、2D/3D坐标及边界框信息。
+3. 动作原语：
+
+``pick_and_place(obj, target_pos)``：
+
+参数``obj``：物体名称（如'红色积木'）
+
+参数``target_pos``：目标坐标（通过视觉系统解析或数值生成）
+
+语言指令解析能力
+
+1. 零样本场景验证（图2a&b）
+
+- 物体描述推理："将三角形块放在绿色圆形块左侧" → 需识别形状与颜色
+- 空间关系解析："将最大的积木移动到离机器人最近的碗中" → 需计算尺寸与距离
+2. 上下文敏感指令处理（更多案例见附录I）
+
+- 动作回溯："撤销上一步操作" → 需维护执行历史栈
+- 几何属性推理："移动最小的蓝色物体" → 需联合颜色筛选与尺寸排序
+- 动态空间定位："最右侧的碗" → 需实时计算X轴最大坐标
+
+对比先前的轨迹规划实验，此处核心改进为：
+
+
+从生成连续路径点（如绘制图形）转为直接获取离散目标点（简单抓放）
+
+删除多余的运动规划关键词，强化物体属性与位置关系描述.
+
+:::danger
+受限于MDETR的检测精度与语言描述粒度，系统暂无法处理亚毫米级定位或抽象符号指令（如"摆成笑脸图案"）。需混合高层策略与低层反馈控制实现复杂任务（如动态避障）。
+
+如果想要移植，特别是处理比较精细的如柔性插拔这样的工业场景，需要进一步调研合适的通用感知检测模型。
+:::
+
+</details>
+
 ### D. CaP: Table-Top Manipulation Simulation Evaluations
 
+We evaluate CaP on a simulated table-top manipulation
+environment from [16], [18]. The setup tasks a UR5e arm and
+Robotiq 2F85 gripper to manipulate 10 colored blocks and 10
+colored bowls. We inherit all 8 tasks, referred as "long-horizon"
+tasks due to their multi-step nature (e.g., "put the blocks in
+matching bowls"). We define 6 new tasks that require more
+challenging and precise spatial-geometric reasoning capabilities
+(e.g., "place the blocks in a diagonal line"). Each task is
+parameterized by some attributes (e.g., "pick up \<obj\> and place
+it in \<corner\>"), which are sampled during each trial. We split the
+task instructions (I) and the attributes (A) into "seen" (SI, SA) and
+"unseen" categories (UI, UA), where "seen" means it’s allowed to
+appear in the prompts or be trained on (in the case of supervised
+baseline). More details in Appendix K. We consider two baselines:
+(i) language-conditioned multi-task CLIPort [36] policies trained
+via imitation learning on 30k demonstrations, and (ii) few-shot
+prompted LLM planner using natural language instead of code.
+
+Results are in Table III. CaP compares competitively to the
+supervised CLIPort baseline on tasks with seen attributes and
+instructions, despite only few-shot prompted with one example
+rollout for each task. With unseen task attributes, CLIPort’s
+performance degrades significantly, while LLM-based methods
+retain similar performance. On unseen tasks and attributes, end-
+to-end systems like CLIPort struggle to generalize, and CaP
+outperforms LLM reasoning directly with language(also observed
+in [20]). Moreover, the natural-language planners [14], [16]–[18]
+are not applicable for tasks that require precise numerical spatial-
+geometric reasoning. We additionally show the benefits reasoning
+with code over natural language (both direct question and an-
+swering and Chain of Thought [47]), specifically the ability of the
+former to perform precise numerical computations,in Appendix C.
+
+<details>
+
+<summary>注解</summary>
+
+基于文献[16][18]构建的模拟桌面操作平台，系统配置如下：
+
+> 机器人装置：UR5e机械臂 + Robotiq 2F85夹具
+
+> 操作对象：10个彩色积木 + 10个彩色碗
+
+> 基础任务（8类）：多步骤长时程任务（如“积木颜色配对入碗”）
+
+> 新增任务（6类）：需精确空间几何推理的任务（如“将积木沿对角线排列”）
+
+参数化设计：
+
+任务属性（如“将\<物体\>放置至\<角落\>”）分为两类：
+
+- 已见属性（SA）：可包含在提示示例或监督学习基线训练集中
+- 未见属性（UA）：完全未在训练或提示中出现的属性组合
+
+指令分类（附录K详述）：
+
+- 已见指令（SI）：指令模板已在提示中示范
+- 未见指令（UI）：新颖任务描述语句
+
+:::tip
+是否“可见”主要指的是是否是已有知识、固定技能组合、能够在预训练数据中匹配的参数。
+:::
+
+基线方法与实验结果（表III）
+
+1. 监督学习基线CLIPort[36]
+
+数据依赖：30,000次专家演示的模仿学习
+
+性能表现：
+
+- SA/SI任务：表现良好
+- UA/UI任务：成功率显著下降
+
+:::tip
+不可见的任务的低成功率说明，LLM还是在泛化能力上有所缺陷。
+:::
+
+2. 自然语言LLM规划器
+
+方法特点：纯语言规划，不含代码生成
+
+功能限制：缺乏数值计算能力，无法完成需坐标运算的任务
+
+3. 代码即策略（CaP）
+
+配置要求：每个任务仅需单次示例提示
+
+关键结果：
+- SA/SI任务：性能与CLIPort相当
+- UA/UI任务：成功率保持稳定（代码生成实现零样本泛化）
+
+对比结论：
+
+- 监督学习局限：CLIPort受限于训练数据分布，难以应对属性/指令的开放组合
+- 自然语言规划缺陷：无法处理需精确空间计算的几何任务
+- 代码生成优势：直接生成数学运算代码（如坐标转换、距离计算），性能完胜自然语言链式推理（CoT）
+- 深层技术验证（附录C）: 针对几何推理场景（如“构建垂直排列”），对比分析显示：
+
+代码即策略框架的核心优势——**通过代数运算生成精确控制指令**，规避自然语言的模糊性局限。
+
+
+</details>
 
 ### E. CaP: Mobile Robot Navigation and Manipulation
 
@@ -1095,7 +1348,7 @@ CaP可适配不同API的机器人平台（移动导航与机械臂联动）。
 :::tip
 移动机器人平台选择:
 
-Everyday Robot作为移动机器人平台，演示机械臂为Ur5e，夹爪为Robotiq 2F85 gripper。
+Everyday Robot作为移动机器人平台，演示机械臂为Ur5e，夹爪为Robotiq 2F85 gripper，相机为Realsense D435 camera。
 :::
 
 
@@ -1171,6 +1424,7 @@ the prompt engineer should first verify that the prompt, especially
 the Examples most closely related to the Instruction, is bug-free.
 To reduce bugs related to syntax errors, one simple method is
 writing prompts in a code editor with syntax highlighting.
+
 There are many cases where the prompt contains variables
 or functions whose names are ambiguous. To produce reliable
 responses under these conditions, Examples in the prompt should
@@ -1183,6 +1437,7 @@ providing informal type hints, such as appending \_np to variable
 names to indicate its type, or appending it to function names to
 indicate the type of the returned variable. In general, more specific
 variable and function names give more consistent results.
+
 For using third party libraries, including import statements
 in the prompt may not be necessary, as we found that LMPs
 can generate code that calls NumPy and SciPy without them.
@@ -1197,6 +1452,7 @@ in Python this means using from utils import function_name
 instead of import function_name . If the latter is used, the LMP
 may treat the imported name as a package, and the generated code
 might write function_name.function_name() .
+
 One type of LMP failures are related to code generation
 correctness. For example, minor coding mistakes when calling
 internal or external APIs, such as missing arguments, can be
@@ -1210,6 +1466,15 @@ edit code and fix bugs (e.g., by using OpenAI's code edit API), in
 our experience this yielded inconsistent results (not always able to
 correct mistakes, and sometimes changed what the function was
 doing), so we did not employ this method in our experiments.
+
+
+<details>
+
+<summary>翻译</summary>
+
+
+
+</details>
 
 ### B. 方法选择的提示词
 
@@ -1387,6 +1652,9 @@ proach has a prompt. The prompts only contain only 2 Examples:
 
 此处指的是调研过程中的参考文献。
 
+[1]. MDETR -- Modulated Detection for End-to-End Multi-Modal Understanding.(2021).Aishwarya Kamath, Mannat Singh, Yann LeCun, Gabriel Synnaeve, Ishan Misra, Nicolas Carion.arXiv preprint arXiv:2104.12763.
+
+[2]. 
 
 
 </WordCount>

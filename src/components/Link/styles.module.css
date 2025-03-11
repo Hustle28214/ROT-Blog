@@ -1,0 +1,56 @@
+.socialLinks {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  padding: 0.01rem 0;
+  position: relative;
+  z-index: 50;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+@media (min-width: 768px) {
+  .socialLinks {
+    flex-wrap: wrap;
+    gap: 0.75rem;
+  }
+}
+
+.socialLinks a {
+  display: inline-flex;
+  box-sizing: content-box;
+  width: 1.3rem;
+  height: 1.3rem;
+  align-items: center;
+  justify-content: center;
+  transition-property: color, background-color;
+  transition-duration: 300ms;
+  border-radius: 9999px;
+  padding: 0.25rem;
+}
+
+.socialLinks a:hover {
+  color: #fff;
+  background-color: var(--color);
+}
+
+.socialLinks .dropdown {
+  display: flex;
+  align-items: center;
+}
+
+.socialLinks .dropdown span {
+  margin-left: 0.375rem;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+}
+
+.socialLinks .dropdown__menu {
+  right: 0;
+}
+
+.socialLinks svg,
+.socialLinks svg path {
+  width: 1.5rem;
+  height: 1.5rem;
+}

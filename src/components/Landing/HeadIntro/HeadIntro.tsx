@@ -5,7 +5,7 @@ import Translate from '@docusaurus/Translate';
 import { MovingButton } from '../../UIButton/MovingButton';
 import MeSvg from './img/intro2.svg';
 import React from 'react';
-
+import Links from '../../Link/Link';
 const variants: Variants = {
     visible: i => ({
         opacity: 1,
@@ -63,22 +63,28 @@ export default function HeadIntro() {
                 <HeadGreet />
                 <motion.p custom={2} initial="hidden" animate="visible" variants={variants} className="max-lg:px-4">
                     <Translate id="homepage.hero.text">
-                        一名机器人开发者，分享我在技术路上的经验和感悟。
+                        一名机器人开发者，热爱一切新技术，分享我在技术路上的经验和感悟。
                     </Translate>
-                    <motion.div className="mt-4 flex gap-2" custom={4} initial="hidden" animate="visible" variants={variants}>
-                        <MovingButton
-                            borderRadius="1.25rem"
-                            className="relative z-10 flex items-center rounded-2xl border-solid border-neutral-200 px-5 py-3 text-center text-base"
-                            style={{ backgroundColor: 'transparent' }} 
-                        >
-                            <div className={styles.buttons}>
-                                <Link to="/intro">
-                                    <Translate>HELLO THATS ME 👉</Translate>
-                                </Link>
-                            </div>
-                        </MovingButton>
-                    </motion.div>
                 </motion.p>
+                <motion.div custom={3} initial="hidden" animate="visible" variants={variants} className='items-center'>
+                    <Links />
+                </motion.div>
+                <motion.div className="mt-4 flex gap-2" custom={4} initial="hidden" animate="visible" variants={variants}>
+
+
+                    <MovingButton
+                        borderRadius="1.25rem"
+                        className="relative z-10 flex items-center rounded-2xl border-solid border-neutral-200 px-5 py-3 text-center text-base"
+                        style={{ backgroundColor: 'transparent' }}
+                    >
+                        <div className={styles.buttons}>
+                            <Link to="/intro">
+                                <Translate>HELLO THATS ME 👉</Translate>
+                            </Link>
+                        </div>
+                    </MovingButton>
+                </motion.div>
+
             </div>
             <motion.div className={styles.background}>
                 <MeSvg />

@@ -203,6 +203,10 @@
     "message": "生物信息学",
     "description": "The label for category Synbio in sidebar tutorialSidebar"
   },
+  "sidebar.tutorialSidebar.category.Paper": {
+    "message": "论文调研",
+    "description": "The label for category Synbio in sidebar tutorialSidebar"
+  },
   "sidebar.tutorialSidebar.category.机电传动控制": {
     "message": "机电传动控制",
     "description": "The label for category 机电传动控制 in sidebar tutorialSidebar"

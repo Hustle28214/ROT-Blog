@@ -8,11 +8,13 @@ import Mermaid from '@theme/Mermaid';
 
 W25Qxx系列是一种低成本、小型化、使用简单的非易失性存储器，常应用于数据存储、字库存储、固件程序存储等场景
 
-这就是说如果你想要断电不丢失数据，就可以用到这个存储器。
+这就是说如果你想要**断电不丢失数据**，就可以用到这个存储器。
 
 存储介质：Nor Flash（闪存）
 
-时钟频率：80MHz / 160MHz (Dual SPI) / 320MHz (Quad SPI)
+时钟频率：80MHz / 160MHz (Dual SPI，双重SPI) / 320MHz (Quad SPI，四重SPI)
+
+实际上最高的频率是80Mhz，只是说双重和四重等效了双倍和四倍的频率。
 
 存储容量（24位地址）：
     | 型号 | 容量 |
@@ -25,11 +27,22 @@ W25Qxx系列是一种低成本、小型化、使用简单的非易失性存储�
 	|W25Q128 |128Mbit / 16MByte|
 	|W25Q256 |256Mbit / 32MByte|
     
+每个型号的后两位除以8就是存储容量（Byte）。（40和80看成04和08）
+
+W25Q256分为3字节地址模式和4字节地址模式，在3字节地址模式下，只能读写前16MB的数据，后16Mbit，3个字节的地址够不着。如果需要读写到所以的存储单元，可以进入4字节地址的模式。
+
 ## 2. W25Q64
 
 ![Image](https://github.com/user-attachments/assets/aaa73bbf-1450-477d-929c-2f0d8ce617f2)
 
+WP写保护和HOLD如果不需要的话，可以用来做数据传输引脚。加上MISO就可以实现4个数据位同时收发。
+
+也可以说是4位并行模式。
+
 ![Image](https://github.com/user-attachments/assets/64774afa-ba9c-4847-8beb-b091e23ba717)
+
+
+
 
 ## 3. 操作说明
 

@@ -145,11 +145,11 @@ RTC\_Overflow是溢出中断，其来源是CNT的右边，即CNT的32位计数�
 - 设置RCC_APB1ENR的PWREN和BKPEN，使能PWR和BKP时钟
 - 设置PWR_CR的DBP，使能对BKP和RTC的访问
 
-若在读取RTC寄存器时，RTC的APB1接口曾经处于禁止状态，则软件首先必须等待RTC_CRL寄存器中的RSF位（寄存器同步标志）被硬件置1。
+若在读取RTC寄存器时，RTC的APB1接口曾经处于禁止状态，则软件首先必须等待RTC_CRL寄存器中的RSF位（寄存器同步标志）被硬件置1。(初始化的时候，调用一个等待函数)
 
-必须设置RTC_CRL寄存器中的CNF位，使RTC进入配置模式后，才能写入RTC_PRL、RTC_CNT、RTC_ALR寄存器。
+必须设置RTC\_CRL寄存器中的CNF位，使RTC进入配置模式后，才能写入RTC_PRL、RTC_CNT、RTC_ALR寄存器。
 
-对RTC任何寄存器的写操作，都必须在前一次写操作结束后进行。可以通过查询RTC_CR寄存器中的RTOFF状态位，判断RTC寄存器是否处于更新中。仅当RTOFF状态位是1时，才可以写入RTC寄存器。
+**对RTC任何寄存器的写操作，都必须在前一次写操作结束后进行。**可以通过查询RTC_CR寄存器中的RTOFF状态位，判断RTC寄存器是否处于更新中。仅当RTOFF状态位是1时，才可以写入RTC寄存器。（因为PCLK1的频率写入之后，这个值还不能立刻更新到RTC的寄存器里，因为RTC寄存器是由RTCCLK驱动的，PCLK1写完之后，得等RTCCLK的时钟，RTCCLK来一个上升沿，值更新到RTC寄存器里，写入过程才算结束。代码中，可以调用一个等待函数。）
 
 
 

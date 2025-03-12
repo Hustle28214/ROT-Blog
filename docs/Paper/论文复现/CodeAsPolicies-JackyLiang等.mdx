@@ -2,6 +2,19 @@ import WordCount from '../../../src/components/WordCount/WordCount';
 
 <WordCount>
 
+## 项目地址
+
+项目站：https://code-as-policies.github.io/
+
+想要复现该论文的代码，请访问：https://github.com/google-research/google-research/tree/master/code_as_policies
+
+主代码下载Experiment_ Robot Code-Gen Benchmark.ipynb即可。如需要工作中其他效果对比的验证代码，可以选择其他ipynb文件下载。
+
+Colab: https://colab.research.google.com/drive/124TE4TsGYyrvduzeDclufyvwcc2qbbrE
+
+Paper原文：https://arxiv.org/abs/2209.07753
+
+
 
 ## 1. 摘要 
 
@@ -1869,7 +1882,48 @@ use the most likely output.
 • Using first-party libraries:
 ```ret_val = obj_shape_does_not_contain_others(obj_name, other_obj_names)```
 
-## 移植重点：LMP部分的整体构建
+
+
+## 复现工作流
+
+> 由于Google Research在该方面做了比较多的工作，仓库中的ipynb较多，且并不都是CaP需要的，需要指明以下文件是文章的复现目标：
+
+> -> Experiment_ Reasoning with Code vs Natural Language.ipynb
+
+> 模型需要指定code-davinci-002，而不是text-davinci-002，非代码补全LLMs会带来性能影响。
+
+> $ Pip  install google-colab概率会失败，建议使用conda安装，实测成功:
+
+> $ conda install -c conda-forge google-colab
+
+> Ipython届时大概率报错，需要重新创建已被弃用的coloransi模块，以及其类TermColors（补充颜色Green的定义）
+
+> 补装traitlets模块
+
+> Api_key需要准备官方的api_key，国内中转的gpt-4的key会报405 Not Allowed
+
+> 概率需要更新ipykernel
+
+> 官方给出的colab在中国大陆环境下挂代理不可用，可能会卡在ffmpeg的安装上，待试验
+
+> Python: 3.11.11(colab环境下)
+
+> 环境：GTX 4090, ubuntu 20.04
+
+### 1. 填入api_key
+
+![Image](https://github.com/user-attachments/assets/b0731637-8947-4471-b05f-9edadbbe94ab)
+
+
+直接填入以sk为开头的api_key即可。
+
+![Image](https://github.com/user-attachments/assets/dfd7e3f9-a36e-4448-a655-faf1bdc7dc84)
+
+在这里可以考虑降版本到0.28.0（由于某些依赖关系），如果降版本就需要重新写一下比如api_key的读取。
+
+预设的``! pip ``命令可以检查安装的版本是否正确。
+
+### 2. LMP的构建（重点）
 
 ![Image](https://github.com/user-attachments/assets/a9ddd190-5b65-4cbb-a6ac-fd22cd437826)
 
@@ -1879,13 +1933,407 @@ use the most likely output.
 
 ![Image](https://github.com/user-attachments/assets/416e2aa6-ba88-4228-9883-a107b018aa84)
 
+如果未来换用deepseek，需要弃用openai，重新按照ds的要求换用ds的api。
 
-## 移植重点：关于问题(Problems)的提示词构建
 
+```python
+
+def solve_problems(problems, prompt, context_vars, log=False, recurse=False, bug_fix=False, query_kwargs=None):
+  f_names = [problem['f_name'] for problem in problems]
+  f_sigs = [problem['f_sig'] for problem in problems]
+  f_gens = lmp_fgen_batch(
+      prompt, f_names, f_sigs, 
+      context_vars=context_vars, bug_fix=bug_fix, recurse=recurse, 
+      log=log, query_kwargs=query_kwargs
+    )
+  return f_gens
+```
+
+以上代码负责传递问题到lmp中生成代码，``recurse``属性负责控制是否递归生成，如果需要用到递归（本文核心）的话可以传递为True。
+
+``bug_fix``属性负责控制是否使用代码纠错，在文中提及了纠错的可用性**但是效果不佳**，暂时不知是否指的就是这一点。模型为code-davinci-edit-001。
+
+``recurse``和``bug_fix``是默认为False的。
+
+附``lmp_fgen_batch``的实现：
+
+```python
+def lmp_fgen_batch(prompt, f_names, f_sigs, stop_tokens=['# define function:', '# example:'], 
+                   recurse=False, context_vars=None, bug_fix=False, log=True, query_kwargs=None,
+                   rate_limit_time=6):
+    queries = [f'# define function: {f_sig}.' for f_sig in f_sigs]
+    f_srcs_list = lmp_batch(prompt, queries, stop_tokens=stop_tokens, query_kwargs=query_kwargs)
+    
+    if bug_fix:
+        for idx in trange(len(f_srcs_list)):
+          sleep(rate_limit_time)
+          f_srcs_list[idx] = openai.Edit.create(
+            model='code-davinci-edit-001',
+            input='# ' + f_srcs_list[idx],
+            temperature=0,
+            instruction="Fix syntax errors. Keep same inputs and outputs. Only small changes. No comments.",
+          )['choices'][0]['text'].strip()
+
+    f_srcs = {f_name: f_src for f_name, f_src in zip(f_names, f_srcs_list)}
+
+    fs = {}
+    all_child_fs, all_child_f_srcs = {}, {}
+    for f_name, f_sig, f_src in zip(f_names, f_sigs, f_srcs_list):
+      if context_vars is None:
+        context_vars = {}
+      gvars = merge_dicts([context_vars, fs, all_child_fs])
+      lvars = {}
+    
+      try:
+        exec_safe(f_src, gvars, lvars)
+        fs[f_name] = lvars[f_name]
+      except Exception as e:
+        print(f_name)
+        print(f_src)
+        print(e)
+        fs[f_name] = lambda *args, **kwargs: None
+        continue      
+
+      # recursively define child_fs in the function body if needed
+      if recurse:
+        f_def_body = astunparse.unparse(ast.parse(f_src).body[0].body)
+        potential_child_fs, potential_child_f_sigs = {}, {}
+        f_parser = FunctionParser(potential_child_fs, potential_child_f_sigs)
+        f_parser.visit(ast.parse(f_def_body))
+        for potential_child_f_name, potential_child_f_sig in potential_child_f_sigs.items():
+          if potential_child_f_name in potential_child_fs:
+            potential_child_fs[potential_child_f_name] = potential_child_f_sig
+
+        child_fs, child_f_srcs = {}, {}
+        for child_f_name, child_f_sig in potential_child_fs.items():
+          all_vars = merge_dicts([context_vars, fs, all_child_fs, child_fs])
+          if not var_exists(child_f_name, all_vars):
+            sleep(rate_limit_time)
+            child_f, child_f_src = lmp_fgen(
+                prompt, child_f_name, child_f_sig, 
+                stop_tokens=stop_tokens, 
+                context_vars=all_vars, 
+                bug_fix=bug_fix, 
+                log=False,
+                recurse=True,
+                return_src=True,
+                query_kwargs=query_kwargs
+              )
+
+            child_fs[child_f_name] = child_f
+            child_f_srcs[child_f_name] = child_f_src
+
+        if len(child_fs) > 0:
+          # redefine parent f so newly created child_fs are in scope
+          gvars = merge_dicts([context_vars, fs, all_child_fs, child_fs])
+          lvars = {}
+        
+          exec_safe(f_src, gvars, lvars)
+          
+          fs[f_name] = lvars[f_name]
+          all_child_fs.update(child_fs)
+          all_child_f_srcs.update(child_f_srcs)
+
+    if log:
+      for query, f_src in zip(queries, f_srcs):
+        to_print = highlight(f'{query}\n{f_src}', PythonLexer(), TerminalFormatter())
+        print(f'LMP FGEN created:\n\n{to_print}\n')
+
+    all_fs = merge_dicts([fs, all_child_fs])
+    all_f_srcs = merge_dicts([f_srcs, all_child_f_srcs])
+    f_gens = {
+        f_name: {
+            'f': f,
+            'f_src': all_f_srcs[f_name]
+        }
+        for f_name, f in all_fs.items()
+    }
+
+    return f_gens
+```
+
+### 3. 提示词构建（重点）
+
+
+
+
+预设的文本注释提示词样式：
+```python
+# 这是两个对照组的实验设置
+prompt_f_gen = '''
+import numpy as np
+from shapely.geometry import *
+from shapely.affinity import *
+from utils import get_obj_outer_pts_np
+# define function line = make_line_by_length(length=x).
+def make_line_by_length(length):
+  start = np.array([0, 0])
+  end = np.array([length, 0])
+  line = make_line(start=start, end=end)
+  return line
+# example: scale a line by 2 around the centroid.
+line = make_line_by_length(1)
+new_shape = scale(line, xfact=2, yfact=2, origin='centroid')
+'''
+prompt_f_gen_flat = '''
+import numpy as np
+from shapely.geometry import *
+from shapely.affinity import *
+from utils import get_obj_outer_pts_np
+def make_line_by_length(length):
+  line = LineString([[0, 0], [length, 0]])
+  return line
+# example: scale a line by 2.
+line = make_line_by_length(1)
+new_shape = scale(line, xfact=2, yfact=2)
+'''
+prompt_f_gen_exec = '''
+import numpy as np
+from shapely.geometry import *
+from shapely.affinity import *
+# define function line = make_line_by_length(length=x).
+def make_line_by_length(length):
+  line = LineString([[0, 0], [length, 0]])
+  return line
+'''
+# exec不需要example
+
+context_vars = {}
+exec(prompt_f_gen_exec, context_vars)
+```
+
+对于模糊描述（更...多一点...少一些...这样的描述）的提示词处理，类似于Voxposer所使用的[-1,1]平滑，本文给出了一个处理方法，但是还是比较简单的。
 
 ![Image](https://github.com/user-attachments/assets/0c848fe9-3e5c-49ff-b5b4-0870a9f0891d)
 
+```python
+import numpy as np
+import shapely
+from shapely.geometry import *
+from shapely.affinity import *
+from operator import eq
 
+# 这两个函数用来处理"around"的概念
+
+def rotate_pts_around_pts_center_np(pts_np, angle_deg):
+  angle_rad = np.deg2rad(angle_deg)
+  centroid = np.mean(pts_np, axis=0)
+  R = np.array([
+      [np.cos(angle_rad), -np.sin(angle_rad)], 
+      [np.sin(angle_rad), np.cos(angle_rad)]
+  ])
+  new_pts = (pts_np - centroid) @ R.T + centroid
+  return new_pts
+
+def scale_pts_around_centroid_np(pts_np, scale_x=1.5, scale_y=1.5):
+    centroid = np.mean(pts_np, axis=0)
+    new_pts = pts_np - centroid
+    new_pts[:, 0] = new_pts[:, 0] * scale_x
+    new_pts[:, 1] = new_pts[:, 1] * scale_y
+    new_pts = new_pts + centroid
+    return new_pts
+
+problems_np = [
+    {
+    'f_name': 'get_right_most_idx',
+    'f_sig': 'idx = get_right_most_idx(points_np)',
+    'f_sol': lambda points_np: np.argmax(points_np[:, 0]),
+    'test_input_args': [(np.random.random((10, 2)),) for _ in range(5)],
+    'test_equiv': np.allclose
+  },
+  # 相对于比较级来说，最高级的获取比较容易，因为可以划定边界后直接用argmax获取想要的最高值。
+    {
+    'f_name': 'bbox_xyxy_contains_pt',
+    'f_sig': 'contains = bbox_xyxy_contains_pt(bbox_xyxy)',
+    'f_sol': lambda bbox_xyxy, pt: pt[0] >= bbox_xyxy[0] and pt[0] <= bbox_xyxy[2] and pt[1] >= bbox_xyxy[1] and pt[1] <= bbox_xyxy[3],
+    'test_input_args': [(np.random.random(4) * [-1, -1, 1, 1], np.random.random(2) *2 - 1) for _ in range(5)],
+    'test_equiv': np.allclose
+  },
+  # 对于包含这样的空间关系，也是划定边界后划定范围
+   {
+    'f_name': 'interpolate_pts_np',
+    'f_sig': 'pts = interpolate_pts_np(start, end, n)',
+    'f_sol': lambda start, end, n: np.linspace(start, end, n),
+    'test_input_args': [(np.random.random(2), np.random.random(2), 3) for _ in range(5)],
+    'test_equiv': np.allclose
+  },
+  # 插值方法，还提供了坐标系变换和翻转等
+  {
+    'f_name': 'rotate_pts_around_pts_center_np',
+    'f_sig': 'new_pts_np = rotate_pts_around_pts_center_np(pts_np, angle_deg)',
+    'f_sol': rotate_pts_around_pts_center_np,
+    'test_input_args': [(np.random.random((10, 2)), np.random.random()) for _ in range(5)],
+    'test_equiv': np.allclose
+  },
+  {
+    'f_name': 'scale_pts_around_centroid_np',
+    'f_sig': 'new_pts_np = scale_pts_around_centroid_np(pts_np, scale_x=1.5, scale_y=1.5)',
+    'f_sol': scale_pts_around_centroid_np,
+    'test_input_args': [(np.random.random((10, 2)), np.random.random(), np.random.random()) for _ in range(5)],
+    'test_equiv': np.allclose
+  },
+  # 用随机来做一个around的处理
+]
+```
+
+此外控制问题的处理：
+
+```python
+problems_ctrl = [
+  {
+    'f_name': 'pd_control',
+    'f_sig': 'u = pd_control(x_curr, x_goal, x_dot, Kp, Kv)',
+    'f_sol': lambda x_curr, x_goal, x_dot, Kp, Kv: Kp * (x_goal - x_curr) - Kv * x_dot,
+    'test_input_args': [(
+      np.random.random(2), np.random.random(2), np.random.random(2), np.random.random(), np.random.random()
+      ) for _ in range(5)],
+    'test_equiv': np.allclose
+  },
+  # PD控制问题的构建模板
+  {
+    'f_name': 'end_effector_impedance_control',
+    'f_sig': 'tau = end_effector_impedance_control(x_curr, x_goal, x_dot, K_x_mat, D_x_mat, J)',
+    'f_sol': lambda x_curr, x_goal, x_dot, K_x_mat, D_x_mat, J: J.T @ (K_x_mat @ (x_goal - x_curr) - D_x_mat @ x_dot),
+    'test_input_args': [(
+      np.random.random(3), np.random.random(3), np.random.random(3), 
+      np.diag(np.random.random(3)), np.diag(np.random.random(3)), 
+      np.random.random((3, 6))
+      ) for _ in range(5)],
+    'test_equiv': np.allclose
+  },]
+  # 阻抗控制
+  def get_direction_orthogonal_to_line_to_point(line, point):
+        # get the line's direction.
+        direction = np.array(line.coords[1]) - np.array(line.coords[0])
+        direction = direction / np.linalg.norm(direction)
+        # get the orthogonal direction.
+        orthogonal_direction = np.array([-direction[1], direction[0]])
+        # get the point's direction.
+        point_direction = np.array(point) - np.array(line.coords[0])
+        # get the sign of the point's direction.
+        sign = np.sign(np.dot(point_direction, orthogonal_direction))
+        # get the orthogonal direction from the line to the point.
+        orthogonal_direction_from_line_to_point = sign * orthogonal_direction
+        return orthogonal_direction_from_line_to_point
+
+def get_direction_orthogonal_to_line(line):
+    direction = np.array(line.coords[1]) - np.array(line.coords[0])
+    direction = direction / np.linalg.norm(direction)
+    direction = np.array([direction[1], -direction[0]])
+    return direction
+
+shape_eq = lambda f_sol_out, f_gen_out: np.allclose(f_sol_out.union(f_gen_out).area, f_sol_out.area, f_gen_out.area)
+
+make_rectangle = lambda width, height, center: box(center[0] - width / 2, center[1] - height / 2, center[0] + width / 2, center[1] + height / 2)
+
+problems_shapely = [{
+    'f_name': 'interpolate_pts_on_line',
+    'f_sig': 'pts_coords = interpolate_pts_on_line(line, n)',
+    'f_sol': lambda exterior, n: [exterior.interpolate(i / (n - 1), normalized=True).coords[0] for i in range(n)],
+    'test_input_args': [(LineString(np.random.random((2, 2))), np.random.randint(2, 100)) for _ in range(5)],
+    'test_equiv': np.allclose
+  },
+  {
+    'f_name': 'make_line',
+    'f_sig': 'line = make_line(start_pt_np, end_pt_np)',
+    'f_sol': lambda start_pt_np, end_pt_np: LineString([start_pt_np, end_pt_np]),
+    'test_input_args': [(np.random.random(2), np.random.random(2)) for _ in range(5)],
+    'test_equiv': eq
+  },]
+  # 需要使用shapely来进行几何解算的问题
+```
+
+模糊生成的参数：
+
+```python
+obj_names = ['block0', 'block1', 'block2', 'block3', 'block4', 'block5']
+obj_positions = np.array([
+    [0, 0],
+    [0.1, 0],
+    [0.5, 0.5],
+    [0, 0],
+    [0.6, 0.6],
+    [0, 0.9],
+    [0.4, 0.4]
+])
+sizes = [0.15, 0.15, 0.1, 0.2, 0.1, 0.05, 0.1]
+obj_boxes = [make_rectangle(size, size, pos) for pos, size in zip(obj_positions, sizes)]
+obj_outer_pts_np_map = {
+    obj_name: np.array(obj_box.exterior.coords)
+    for obj_name, obj_box in zip(obj_names, obj_boxes)
+}
+get_obj_outer_pts_np = lambda obj_name: obj_outer_pts_np_map[obj_name]
+obj_names0 = obj_names[:3]
+obj_names1 = obj_names[3:]
+```
+
+递归层处理：
+
+```py
+def obj_shape_does_not_contain_others(obj_name, other_obj_names):
+    obj_shape = get_obj_shape(obj_name)
+    for other_obj_name in other_obj_names:
+        other_obj_shape = get_obj_shape(other_obj_name)
+        if obj_shape.contains(other_obj_shape):
+            return False
+    return True
+
+def is_obj0_bigger_than_obj1(obj0_name, obj1_name):
+    obj0_pts = get_obj_outer_pts_np(obj0_name)
+    obj1_pts = get_obj_outer_pts_np(obj1_name)
+    obj0_area = get_area(obj0_pts)
+    obj1_area = get_area(obj1_pts)
+    return obj0_area > obj1_area
+```
+
+问题api:
+
+
+```py
+problems_api = [
+  {
+    'f_name': 'obj_shape_does_not_contain_others',
+    'f_sig': 'ret_val = obj_shape_does_not_contain_others(obj_name, other_obj_names)',
+    'f_sol': obj_shape_does_not_contain_others,
+    'test_input_args': [(obj_name0, obj_names1) for obj_name0 in obj_names0],
+    'test_equiv': eq
+  },
+  {
+    'f_name': 'is_obj0_bigger_than_obj1',
+    'f_sig': 'ret_val = is_obj0_bigger_than_obj1(obj0_name, obj1_name)',
+    'f_sol': is_obj0_bigger_than_obj1,
+    'test_input_args': [(np.random.choice(obj_names0), np.random.choice(obj_names1)) for _ in range(5)],
+    'test_equiv': eq
+  },]
+```
+
+最终集成处理：
+```py
+all_problems = problems_np + problems_ctrl + problems_shapely + problems_api
+print('n problems:', len(all_problems))
+
+context_vars['get_obj_outer_pts_np'] = get_obj_outer_pts_np
+```
+
+### 4. 验证
+
+```py
+print('Codex | Hierarchical Code-Gen | Hierarchical Prompt')
+
+f_gens_codex_hc_hp = solve_problems(all_problems, prompt_f_gen, context_vars, recurse=True, query_kwargs={'engine': 'code-davinci-002'})
+
+results_codex_hc_hp = eval_problems(all_problems, f_gens_codex_hc_hp)
+for r in results_codex_hc_hp:
+  print(int(r['success']))
+
+# failures_codex_hc_hp = [r for r in results_codex_hc_hp if not r['success']]
+# for failure in failures_codex_hc_hp:
+#   print(failure['f_name'], failure['info'], failure['f_gen']['f_src'])
+```
+
+![Image](https://github.com/user-attachments/assets/fa2c1308-aa25-420b-a5a1-1c3832bcf9ac)
+
+可以看到code-davinci-002模型的成功率为97%左右，基本能够解决文中提出的经典的问题。
 
 ## References
 

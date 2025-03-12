@@ -38,9 +38,29 @@ IWDG即独立看门狗。
 
 ## 6. WWDG工作特性
 
+递减计数器T\[6:0\]的值小于0x40时，WWDG产生复位
+
+递减计数器T\[6:0\]在窗口W\[6:0\]外被重新装载时，WWDG产生复位
+
+递减计数器T\[6:0\]等于0x40时可以产生早期唤醒中断（EWI），用于重装载计数器以避免WWDG复位
+
+定期写入WWDG_CR寄存器（喂狗）以避免WWDG复位
+
+
 ![Image](https://github.com/user-attachments/assets/8900a00c-3c20-4c97-90ff-1152b46fad5e)
 
 ## 7. WWDG超时时间
+
+超时时间：
+$$
+TWWDG = TPCLK1 × 4096 × WDGTB预分频系数 × (T[5:0] + 1)
+$$
+窗口时间：
+$$
+	TWIN = TPCLK1 × 4096 × WDGTB预分频系数 × (T[5:0] - W[5:0])
+$$
+其中：$TPCLK1 = 1 / FPCLK1$
+
 
 ![Image](https://github.com/user-attachments/assets/3a017871-7cfa-4b83-80b0-0859a79aaf32)
 

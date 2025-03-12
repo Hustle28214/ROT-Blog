@@ -78,6 +78,7 @@ RTC和时钟配置系统处于后备区域，系统复位时数据不清零，VD
 ## 7. RTC操作注意事项
 
 执行以下操作将使能对BKP和RTC的访问：
+
 - 设置RCC_APB1ENR的PWREN和BKPEN，使能PWR和BKP时钟
 - 设置PWR_CR的DBP，使能对BKP和RTC的访问
 

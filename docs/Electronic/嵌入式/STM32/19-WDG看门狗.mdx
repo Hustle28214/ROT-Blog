@@ -4,4 +4,48 @@ import Mermaid from '@theme/Mermaid';
 
 <WordCount>
 
+## 1. WDG（Watchdog）看门狗
+
+WDG看门狗可以监控程序的运行状态，当程序因为设计漏洞、硬件故障、电磁干扰等原因，出现卡死或跑飞现象时，看门狗能及时复位程序，避免程序陷入长时间的罢工状态，保证系统的可靠性和安全性
+
+看门狗本质上是一个定时器，当指定时间范围内，程序没有执行喂狗（重置计数器）操作时，看门狗硬件电路就自动产生复位信号
+
+STM32内置两个看门狗:
+
+- 独立看门狗（IWDG）：独立工作，对时间精度要求较低
+- 窗口看门狗（WWDG）：要求看门狗在精确计时窗口起作用
+
+
+## 2. IWDG结构
+
+IWDG即独立看门狗。
+
+![Image](https://github.com/user-attachments/assets/da5a610e-be7f-4b43-9c9a-3c3dac14f93f)
+
+
+## 3. IWDG键寄存器
+
+
+![Image](https://github.com/user-attachments/assets/6e36e12f-e8b6-44f1-a492-59bc9a0b0e09)
+
+## 4. IWDG超时时间
+
+![Image](https://github.com/user-attachments/assets/cbdb2c7a-90b7-418a-9518-b9bc3057d00c)
+
+## 5. WWDG结构
+
+![Image](https://github.com/user-attachments/assets/03451e63-3fb6-4949-9669-c66525120836)
+
+## 6. WWDG工作特性
+
+![Image](https://github.com/user-attachments/assets/8900a00c-3c20-4c97-90ff-1152b46fad5e)
+
+## 7. WWDG超时时间
+
+![Image](https://github.com/user-attachments/assets/3a017871-7cfa-4b83-80b0-0859a79aaf32)
+
+## 8. WWDG vs. IWDG
+
+![Image](https://github.com/user-attachments/assets/a80c3b0a-e02a-4325-83ed-f44b7ece242d)
+ 
 </WordCount>

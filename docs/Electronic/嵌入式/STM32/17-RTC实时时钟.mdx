@@ -4,4 +4,89 @@ import Mermaid from '@theme/Mermaid';
 
 <WordCount>
 
+## 1. Unix时间戳
+
+Unix 时间戳（Unix Timestamp）定义为从UTC/GMT的1970年1月1日0时0分0秒开始所经过的秒数，不考虑闰秒
+
+时间戳存储在一个秒计数器中，秒计数器为32位/64位的整型变量
+
+世界上所有时区的秒计数器相同，不同时区通过添加偏移来得到当地时间
+
+![Image](https://github.com/user-attachments/assets/22b1afd2-2921-4e71-811e-dfaa027828e3)
+
+## 2. GMT/UTC
+
+GMT（Greenwich Mean Time）格林尼治标准时间是一种以地球自转为基础的时间计量系统。它将地球自转一周的时间间隔等分为24小时，以此确定计时标准
+
+UTC（Universal Time Coordinated）协调世界时是一种以原子钟为基础的时间计量系统。它规定铯133原子基态的两个超精细能级间在零磁场下跃迁辐射9,192,631,770周所持续的时间为1秒。当原子钟计时一天的时间与地球自转一周的时间相差超过0.9秒时，UTC会执行闰秒来保证其计时与地球自转的协调一致
+
+## 3. 时间戳转换
+
+
+C语言的time.h模块提供了时间获取和时间戳转换的相关函数，可以方便地进行秒计数器、日期时间和字符串之间的转换
+
+> time.h参考: https://www.runoob.com/cprogramming/c-standard-library-time-h.html
+
+![Image](https://github.com/user-attachments/assets/3db57762-35fb-4b21-881f-b0138138bde0)
+
+``time_t``是一个typedef重命名的类型，``time_t``默认是``__time64_t``，实际上是int64类型。
+
+
+
+
+## 4. BKP备份寄存器
+
+
+BKP（Backup Registers）备份寄存器。BKP可用于存储用户应用程序数据。当VDD（2.0~3.6V）电源被切断，他们仍然由VBAT（1.8~3.6V）维持供电。当系统在待机模式下被唤醒，或系统复位或电源复位时，他们也不会被复位
+
+TAMPER引脚产生的侵入事件将所有备份寄存器内容清除
+
+RTC引脚输出RTC校准时钟、RTC闹钟脉冲或者秒脉冲
+
+存储RTC时钟校准寄存器
+
+用户数据存储容量： 20字节（中容量和小容量）/ 84字节（大容量和互联型）
+
+![Image](https://github.com/user-attachments/assets/2ec4af01-4686-4677-92e5-d64393d76529)
+
+
+
+## 5. RTC时钟
+
+RTC（Real Time Clock）实时时钟，RTC是一个独立的定时器，可为系统提供时钟和日历的功能
+
+RTC和时钟配置系统处于后备区域，系统复位时数据不清零，VDD（2.0~3.6V）断电后可借助VBAT（1.8~3.6V）供电继续走时
+
+32位的可编程计数器，可对应Unix时间戳的秒计数器
+
+20位的可编程预分频器，可适配不同频率的输入时钟
+
+可选择三种RTC时钟源：
+1. HSE时钟除以128（通常为8MHz/128）
+2. LSE振荡器时钟（通常为32.768KHz）
+3. LSI振荡器时钟（40KHz）
+
+![Image](https://github.com/user-attachments/assets/c99f6ef5-5642-4eb8-bb61-5dc2758f9cd7)
+
+![Image](https://github.com/user-attachments/assets/3604d31c-8b63-4a1d-a907-b6205e504f14)
+
+
+## 6. 硬件电路
+
+![Image](https://github.com/user-attachments/assets/01cf078b-4734-444d-866e-9a09d94b566e)
+
+## 7. RTC操作注意事项
+
+执行以下操作将使能对BKP和RTC的访问：
+- 设置RCC_APB1ENR的PWREN和BKPEN，使能PWR和BKP时钟
+- 设置PWR_CR的DBP，使能对BKP和RTC的访问
+
+若在读取RTC寄存器时，RTC的APB1接口曾经处于禁止状态，则软件首先必须等待RTC_CRL寄存器中的RSF位（寄存器同步标志）被硬件置1
+
+必须设置RTC_CRL寄存器中的CNF位，使RTC进入配置模式后，才能写入RTC_PRL、RTC_CNT、RTC_ALR寄存器
+
+对RTC任何寄存器的写操作，都必须在前一次写操作结束后进行。可以通过查询RTC_CR寄存器中的RTOFF状态位，判断RTC寄存器是否处于更新中。仅当RTOFF状态位是1时，才可以写入RTC寄存器
+
+
+
 </WordCount>

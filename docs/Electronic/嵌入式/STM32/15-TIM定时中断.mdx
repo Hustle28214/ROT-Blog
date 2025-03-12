@@ -4,6 +4,78 @@ import Mermaid from '@theme/Mermaid';
 
 <WordCount>
 
-## 1. 
+## 1. TIM定时器
+
+TIM（Timer）定时器，定时器可以对输入的时钟进行计数，并在计数值达到设定值时触发中断。
+
+16位计数器、预分频器、自动重装寄存器的时基单元，在72MHz计数时钟下可以实现最大59.65s的定时。
+
+不仅具备基本的定时中断功能，而且还包含内外时钟源选择、输入捕获、输出比较、编码器接口、主从触发模式等多种功能。
+
+根据复杂度和应用场景分为了高级定时器、通用定时器、基本定时器三种类型。
+
+
+## 2. 定时器类型
+
+![Image](https://github.com/user-attachments/assets/fbf95ab6-61ec-4af5-81fa-73c952e1f6ff)
+
+
+
+STM32F103C8T6定时器资源：TIM1、TIM2、TIM3、TIM4
+
+## 3. 高级定时器
+![Image](https://github.com/user-attachments/assets/aee57c88-6b48-4b43-bd32-a3962a8680fe)
+
+
+## 4. 通用定时器
+![Image](https://github.com/user-attachments/assets/868ec2ae-2641-4d51-bf7a-30b308196113)
+
+
+
+## 5. 基本定时器
+
+![Image](https://github.com/user-attachments/assets/e3bb240d-cbda-4006-bc91-7c4d70636a5d)
+
+
+
+## 6. 定时中断基本结构
+
+![Image](https://github.com/user-attachments/assets/3f2b96a8-b415-4ae6-8eb8-166701bc76c3)
+
+
+## 7. 预分频器时序
+
+![Image](https://github.com/user-attachments/assets/a648f61b-3ee6-4f37-8dc5-b8896d3b9700)
+
+计数器计数频率：
+$$
+CK_CNT = CK_PSC / (PSC + 1)
+$$
+
+
+## 8. 计数器时序
+
+![Image](https://github.com/user-attachments/assets/acd53b71-843c-4cf0-addc-1ca0732f2968)
+
+计数器溢出频率：
+$$
+CK_CNT_OV = CK_CNT / (ARR + 1)
+$$
+$$
+= CK_PSC / (PSC + 1) / (ARR + 1)
+$$
+
+### 8.1 计数器无预装时序
+
+![Image](https://github.com/user-attachments/assets/11a04841-08fb-4e3f-a0ce-3b8fb1da5dab)
+
+### 8.2 计数器有预装时序
+
+![Image](https://github.com/user-attachments/assets/c50589fb-b3a9-46fd-bf7f-1dc84f5e7ed8)
+
+## 9. RCC时钟树
+
+
+![Image](https://github.com/user-attachments/assets/9761c65f-b50b-457d-b37a-a94f666346f7)
 
 </WordCount>

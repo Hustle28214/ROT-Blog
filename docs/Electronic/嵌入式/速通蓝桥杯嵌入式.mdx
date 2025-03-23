@@ -1,0 +1,63 @@
+import WordCount from '../../../src/components/WordCount/WordCount.jsx';
+
+<WordCount>
+
+
+## 1. 通用配置模板
+
+
+扩展功能包要按提示下好。注册一个意法半导体的账号。要科学上网。
+
+主控先搜STM32G431RB，然后选择RBT3（无焊盘，直接引出引脚）。
+
+根据产品手册，输入频率改为24Mhz，选择输入外部高速时钟（HSE），选择PLLCLK，HCLK(Mhz)改为80Mhz。
+
+System Core处将RCC使能，高速时钟选择Crystal/Ceramic Resonater，其他不用管
+
+SYS处Debug选Serial Wire.
+
+Project Manager处的Toolchain选MDK-ARM。
+
+在工程文件夹中的MDK-ARM处可以用Keil打开项目文件。
+
+在Keil5的魔术棒里找debug，把debugger改为CMSIS，然后在Debug Settings里把Reset and run也选上，点OK保存。
+
+在工程文件夹与MDK-ARM同级的目录下创建一个目录User。在Keil项目树中创建一个新的组，与刚刚创建的目录同名。
+
+
+## 2. 知识点
+
+
+### 2.1 LED点灯
+
+#### CubeMX
+
+注意LED用的是PC8-PC10。PD2是锁存器的控制端口。
+
+PC8-PC15、PD2设置为GPIO_Output。
+
+:::warning
+旁边的SYS爆红不用管，这可能是因为端口功能复用，但是我们用不到他说的功能。
+
+做完上面就算是使能好了各个引脚。
+:::
+
+在GPIO中Configuration选中PC8-15，然后GPIO output level选High。
+
+点Generate Code，即可。
+
+#### Keil
+
+Reload文件。
+
+新建两个文件，一个led.c，一个led.h，保存在刚刚的User文件夹里。
+
+项目树新建一个User，把led.c放进去。
+
+在魔术棒里面，找“C/C++”，“Include Paths”新增这个User文件夹。这样就可以检测到.h的头文件。
+
+main.h里面定义一下uchar和uint，方便用。如果Core文件夹里面没有main.h，可以手动加进去。
+
+
+
+</WordCount>

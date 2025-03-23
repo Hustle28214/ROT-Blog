@@ -1,0 +1,92 @@
+
+import WordCount from '../../../../src/components/WordCount/WordCount.jsx';
+
+<WordCount>
+
+## 1. RTOS简介
+
+RTOS全称为：Real Time Operation System，即实时操作系统。
+
+在实时操作系统中，我们可以把要实现的功能划分为多个任务，每个任务负责实现一部分，这里的每个任务都是一个很简单的程序，通常是无限循环。
+
+实时的要求是：对时间精确可控。
+
+常见的操作系统：Windows和Linux都不是实时的。
+
+> 需要RTOS的场景：遥控接收、底盘运动、云台控制、自瞄...，FreeRTOS具有免费、开源、易移植、易开发的特点。
+
+> 机器人各个任务的功能独立，但是任务之间又互相关联时，就需要RTOS。这种场景出现在比如遥控，它就会同时对底盘和云台产生影响。此外，当机器人的实时性要求高，各类控制算法需要计算控制量对时间的积分/微分，要求按严格确定的周期执行，FreeRTOS就能派上用场。
+
+裸机编程的时候一般都是用``while(1)``做一个无限循环结合中断来完成所有的处理。相对于多任务系统而言，这个就是单任务系统，也称为前后台系统。
+
+:::danger
+前后台系统的实时性差，各个任务都是排队等着轮流执行，不管程序现在多紧急，都要等。
+:::
+
+RTOS则是有**优先级**之分，内核会管理不同优先级的任务的执行。
+
+
+
+## 2. 前后台编程与RTOS编程
+
+前后台：
+
+```c
+int add(int *a,int *b){
+    return *a + *b;
+}
+void main(){
+    int factor1 = 5;
+    int factor2 = 10;
+    int result;
+    while(1){
+        result = add(&factor1,&factor2);
+        factor2 = factor2 + 1;
+    }
+    return 0;
+}
+```
+
+RTOS：
+
+
+```c
+void TaskA(void const* argument){
+    int a;
+    while(1){
+        a = 1;
+    }
+
+}
+```
+
+
+## 3. CMSIS-RTOS
+
+CMSIS-RTOS提供了API，使得一个设计在不同的RTOS之间移植。
+
+通过宏进行对象定义，再进行函数调用转换。
+
+在使用CubeMX配置FreeRTOS的时候，接口API使用CMSIS_V2可以兼容更多型号的MCU。可以选择开启FPU，大大增强CPU的浮点数（小数）运算能力。
+
+CubeMX配置FreeRTOS会强制占用SysTick作为系统时钟。HAL库的时钟需要选用其他定时器。
+
+TICK_RATE_HZ：调度器执行频率，保持默认；
+
+MINIMAL_STACK_SIZE：最小栈大小（单位为字），默认即可。
+
+内存管理保持默认。动态分配的内存大小：15360字节。
+
+中断管理保持默认。规定中断优先级大于5（即0-4）的中断直接通过原本的硬件途径(NVIC)触发，触发后无法使用任何FreeRTOS提供的函数。中断优先级小于5的中断，由FreeRTOS接管，其内可使用“FromISR”结尾的API函数。中断按优先级嵌套的规律在一定程度上依旧成立。
+
+:::warning
+如果想要使用
+:::
+
+
+
+## 4. 
+
+
+
+</WordCount>

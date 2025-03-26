@@ -11,6 +11,7 @@
   
   .text {
     font-size: 1rem;
+    color: aliceblue;
     text-align: center;
     opacity: 0.9;
   }

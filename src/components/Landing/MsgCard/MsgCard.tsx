@@ -27,7 +27,7 @@ export const MsgCard = () => {
     updateText();
     
     // 定时器设置
-    const timer = setInterval(updateText, 10000);
+    const timer = setInterval(updateText, 8000);
     
     return () => clearInterval(timer);
   }, []);

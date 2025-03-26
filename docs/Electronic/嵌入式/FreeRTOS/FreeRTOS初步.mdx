@@ -96,6 +96,7 @@ taskENTER_CRITICAL();//进入临界区
 taskEXIT_CRITICAL();//退出临界区
 ```
 
+## 5. CMSIS-RTOS函数
 
 
 延时函数：osDelay()函数是相对延时函数，如果受到中断的干扰，计时时间会产生偏差，适合简单的单次长时间延时。
@@ -104,6 +105,87 @@ taskEXIT_CRITICAL();//退出临界区
 
 osDelayUntil函数是绝对延时函数，延时时比较的是当前时间-开始时间与目标延时时间。延时执行完后会自动给传入的开始时间变量加上延时的时间。
 
-任务删除：除了使用已有的ID变量，
+任务删除：除了使用已有的ID变量，如果一个任务要删除自身，可以使用osThreadCetId()函数现场获取自身ID。
 
+:::warning
+在FreeRTOS中，传入NULL也可以删除自身。
+:::
+
+CMSIS_V2 API中使用osThreadExit()函数退出自身。**上述方法将不起作用。**
+
+## 6. 使用“启动任务”创建其他任务
+
+使用一个启动任务来实现任务的优先级管理和启动顺序管理，加入一段临界区，防止启动过程被其自身创建的高优先级任务或中断打断。启动任务只执行一次，因此在末尾会删除其自身。
+
+```c
+void Start_Task(void const *argument)
+{
+    taskENTER_CRITICAL();
+
+    osThreadDef(TaskA,TaskA,osPriorityNormal,0,120); // 创建任务A，栈大小为120字节
+    StartTaskHandle = osThreadCreate(osThread(TaskA),NULL);
+
+    osThreadDef(TaskB,TaskB,osPriorityNormal,0,120); // 创建任务B
+    StartTaskHandle = osThreadCreate(osThread(TaskB),NULL);
+
+    osThreadTerminate(StartTaskHandle); // 删除启动任务
+
+    taskEXIT_CRITICAL();
+}
+```
+
+CubeMX中，通常是在main函数中的MX_FREERTOS_Init()函数中创建启动任务。
+
+并且启动任务通常通过CubeMX中FreeRTOS的“Tasks and Queues”选项卡中添加。（Add-Priority）
+
+## 7. CMSIS-RTOS创建任务全过程
+
+在main函数里面创建启动任务，然后在启动任务的临界区中创建其他任务。
+
+```c
+osThreadId StartTaskHandle;
+int main(void)
+{
+
+    osThreadDef(StartTask,Start_Task,osPriorityNormal,0,120); // 创建启动任务
+    StartTaskHandle = osThreadCreate(osThread(StartTask),NULL); // 启动启动任务
+    // 必须先启动调度器，才能启动任务
+    osKernelStart(); // 启动RTOS内核
+    //之后，while(1)将不会执行，而是执行调度器，往里面写代码没有用!
+    while(1){
+
+    }
+}
+
+void Start_Task(void const *argument)
+{
+    taskENTER_CRITICAL();
+
+    osThreadDef(TaskA,TaskA,osPriorityNormal,0,120); // 创建任务A，栈大小为120字节
+    StartTaskHandle = osThreadCreate(osThread(TaskA),NULL);
+
+    osThreadDef(TaskB,TaskB,osPriorityNormal,0,120); // 创建任务B
+    StartTaskHandle = osThreadCreate(osThread(TaskB),NULL);
+
+    osThreadTerminate(StartTaskHandle); // 删除启动任务
+
+    taskEXIT_CRITICAL();
+}
+
+void TaskA(void const *argument)
+{
+    for (;;)
+    {
+        osDelay(100); // 延时100ms
+    }
+}
+void TaskB(void const *argument)
+{
+    for (;;)
+    {
+        osDelay(100); // 延时100ms
+    }
+}
+
+```
 </WordCount>

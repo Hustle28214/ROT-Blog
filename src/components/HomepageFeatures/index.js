@@ -3,6 +3,7 @@ import Heading from '@theme/Heading';
 import styles from './styles.module.css';
 import Translate, {translate} from '@docusaurus/Translate';
 import HeadIntro from '../Landing/HeadIntro';
+import { MsgCard } from '../Landing/MsgCard/MsgCard';
 // const FeatureList = [
 //   {
 //     title: <Translate>关于我</Translate>,
@@ -55,7 +56,9 @@ export default function HomepageFeatures() {
             <Feature key={idx} {...props} />
           ))}
         </div> */}
+
         <HeadIntro/>
+        
       </div>
 
     

@@ -21,6 +21,7 @@
     "@easyops-cn/docusaurus-search-local": "^0.44.5",
     "@giscus/react": "^3.0.0",
     "@iconify-json/ri": "^1.2.5",
+    "@jdion/tilt-react": "^1.0.0",
     "@mdx-js/react": "^3.0.0",
     "@node-rs/jieba": "^1.10.3",
     "clsx": "^2.0.0",

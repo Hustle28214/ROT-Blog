@@ -6,6 +6,11 @@ import { MovingButton } from '../../UIButton/MovingButton';
 import MeSvg from './img/intro2.svg';
 import React from 'react';
 import Links from '../../Link/Link';
+import { Tilt } from '@jdion/tilt-react'
+import { MsgCard } from '../MsgCard/MsgCard';
+import Particles from '../StarrySky/StarrySky'
+
+
 const variants: Variants = {
     visible: i => ({
         opacity: 1,
@@ -23,6 +28,13 @@ const variants: Variants = {
 
 function Circle() {
     return <div className={styles.circle} />;
+}
+
+function MsgCardShow(){
+    return (
+        <MsgCard />
+    );
+
 }
 
 function HeadGreet() {
@@ -58,6 +70,8 @@ function HeadGreet() {
 
 export default function HeadIntro() {
     return (
+
+        
         <motion.div className={styles.hero} style={{ backgroundColor: 'transparent' }}>
             <div className={styles.intro}>
                 <HeadGreet />
@@ -86,10 +100,16 @@ export default function HeadIntro() {
                 </motion.div>
 
             </div>
+
+            
             <motion.div className={styles.background}>
                 <MeSvg />
                 <Circle />
+                
+                <MsgCard />
             </motion.div>
         </motion.div>
+
+        
     );
 }

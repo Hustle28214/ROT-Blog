@@ -56,11 +56,11 @@ USART中断输出控制，中断申请位就是状态寄存器的各种标志位
 
 在标准库的帮助下，需要多少波特率直接写就可以了。
 
-## 12. 基本的串口初始化、收发数据的代码
+## 4. 基本的串口初始化、收发数据的代码
 
 我这里提供标准库和HAL库的代码。
 
-### 12.1 串口初始化
+### 4.1 串口初始化(查询方式)
 
 #### 标准库
 
@@ -81,7 +81,7 @@ typedef struct
 标准库的串口初始化代码：
 
 ```c
-void usart_init(uint32_t baudrate){
+void usart1_init(uint32_t baudrate){
     GPIO_InitTypeDef GPIO_InitStruct;
     USART_InitTypeDef USART_InitStruct;
     RCC_APB2PeriphClockCmd(RCC_APB2Periph_USART1|RCC_APB2Periph_GPIOA, ENABLE);// 使能USART1, GPIOA的时钟
@@ -121,6 +121,64 @@ void usart_init(uint32_t baudrate){
 
 </details>
 
+### 4.2 串口初始化(中断方式)
+
+多了一个中断的配置。
+
+```c
+void usart1_init(uint32_t baudrate){
+    GPIO_InitTypeDef GPIO_InitStruct;
+    USART_InitTypeDef USART_InitStruct;
+    RCC_APB2PeriphClockCmd(RCC_APB2Periph_USART1|RCC_APB2Periph_GPIOA, ENABLE);// 使能USART1, GPIOA的时钟
+    USART_DeInit(USART1); // 复位串口1
+
+
+    // 记住GPIO配置需要的三大参数是引脚、模式、速度
+    GPIO_InitSturcture.GPIO_Pin = GPIO_Pin_9; // 串口1的发送TX，PA9，这个是原厂规定的哦！
+    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF_PP;// 推挽复用模式
+    GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz; // 50MHz
+    GPIO_Init(GPIOA, &GPIO_InitStructure); // GPIO_Init()这个也是标准库提供的函数
+
+    // 接收引脚
+    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_10; // 串口1的RX，PA10
+    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN_FLOATING; // 浮空输入模式
+    GPIO_Init(GPIOA, &GPIO_InitStructure); 
+
+    // 中断NVIC配置
+
+    NVIC_InitStructure.NVIC_IRQChannel = USART1_IRQn; // USART1中断
+    NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 3; // 抢占优先级3 数值越小，优先级越高
+    NVIC_InitStructure.NVIC_IRQChannelSubPriority = 3; // 子优先级3
+    NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE; // 使能
+    NVIC_Init(&NVIC_InitStructure);
+
+
+    USART_InitStructure.USART_BaudRate = baudrate;
+    USART_InitSructure.USART_WordLength = USART_WordLength_8b; // 字长为8位数据格式
+    USART_InitStructure.StopBits = USART_StopBits_1; // 1个停止位
+    USART_InitStructure.Parity = USART_Parity_No; // 无校验位，就简单的收发环境，没有别的通信干扰不需要校验
+    USART_InitStructure.Mode = USART_Mode_Rx | USART_Mode_Tx; // 允许接收和发送
+
+    USART_Init(USART1, &USART_InitStructure);
+    USART_Cmd(USART1,ENABLE);
+}
+```
+
+同时，还有一个对应的中断服务函数：
+
+```C
+void usart1_irq_handler(){
+    if(USART_GetITStatus(USART1, USART_IT_RXNE) != RESET){ 
+    {
+        Receive_Byte = USART_ReceiveData(USART1);
+        USART_SendData(USART1, Receive_Byte);
+        while(USART_GetFlagStatus(USART1, USART_FLAG_TC) != SET)
+        // 当USART的移位寄存器（负责把数据一位一位发出去）发送完最后一个bit，并且数据寄存器（TDR）里也没有新数据要发送时，TC标志会被硬件自动置 1。
+    }
+    
+    }
+}
+```
 
 
 </WordCount>

@@ -173,7 +173,7 @@ $T_{conv} = $ 采样时间 + 12.5 个ADC周期
 
 ## 10. 校准
 
-![Image](https://github.com/user-attachments/assets/d0d6133a-2a00-4755-894f-a4804ad41ee4)
+![Image](https://github.com/user-attachments/assets/d0d6133a-2a-4755-894f-a4804ad41ee4)
 
 ## 11. 硬件电路
 
@@ -188,6 +188,146 @@ $T_{conv} = $ 采样时间 + 12.5 个ADC周期
 第三个是一个简单的电压转换电路，把0-5V的转换为0-3.3V，进入ADC转换。
 
 
+## 12. ADC常用库函数
 
+### 12.1 初始化函数
+
+看一下ADC_TypeDef结构体：
+
+```c
+typedef struct
+{
+    /*---------------- ADC 状态寄存器 ----------------*/
+    __IO uint32_t SR;        /**< ADC状态寄存器（Status Register）
+                             *   - 位0 EOC:  转换结束标志（End of Conversion）
+                             *   - 位1 AWD:  模拟看门狗标志（Analog Watchdog）
+                             *   - 位2 JEOC: 注入通道转换结束（Injected Conversion End）
+                             *   - 位3 JSTRT: 注入通道转换开始（Injected Conversion Start）
+                             *   - 位4 STRT: 规则通道转换开始（Regular Conversion Start）
+                             *   - 位5 OVR:  数据溢出标志（Overrun） */
+
+    /*---------------- ADC 控制寄存器1 ----------------*/
+    __IO uint32_t CR1;       /**< ADC控制寄存器1（Control Register 1）
+                             *   - 位5:4 RES: 分辨率选择（00=12位，01=10位，10=8位，11=6位）
+                             *   - 位8 SCAN: 扫描模式使能（多通道自动转换）
+                             *   - 位9 JEOCIE: 注入通道转换结束中断使能
+                             *   - 位12 AWDIE: 模拟看门狗中断使能 */
+
+    /*---------------- ADC 控制寄存器2 ----------------*/
+    __IO uint32_t CR2;       /**< ADC控制寄存器2（Control Register 2）
+                             *   - 位0 ADON: ADC使能/禁用
+                             *   - 位1 CONT: 连续转换模式
+                             *   - 位8 DMA:  DMA使能
+                             *   - 位20 EXTSEL: 触发源选择（外部触发规则通道）
+                             *   - 位22 EXTTRIG: 外部触发使能 */
+
+    /*---------------- ADC 采样时间寄存器 ----------------*/
+    __IO uint32_t SMPR1;     /**< 采样时间寄存器1（Sampling Time Register 1）
+                             *   配置通道10-17的采样周期（每个通道3位） */
+    __IO uint32_t SMPR2;     /**< 采样时间寄存器2（Sampling Time Register 2）
+                             *   配置通道0-9的采样周期（每个通道3位） */
+
+    /*---------------- ADC 注入通道偏移寄存器 ----------------*/
+    __IO uint32_t JOFR1;     /**< 注入通道1数据偏移寄存器（Injected Offset Register 1） */
+    __IO uint32_t JOFR2;     /**< 注入通道2数据偏移寄存器 */
+    __IO uint32_t JOFR3;     /**< 注入通道3数据偏移寄存器 */
+    __IO uint32_t JOFR4;     /**< 注入通道4数据偏移寄存器 */
+
+    /*---------------- ADC 看门狗阈值寄存器 ----------------*/
+    __IO uint32_t HTR;       /**< 看门狗高阈值寄存器（High Threshold Register） */
+    __IO uint32_t LTR;       /**< 看门狗低阈值寄存器（Low Threshold Register） */
+
+    /*---------------- ADC 规则序列寄存器 ----------------*/
+    __IO uint32_t SQR1;      /**< 规则序列寄存器1（Regular Sequence Register 1）
+                             *   - 位23:20 L[3:0]: 规则通道序列长度（实际通道数=值+1）
+                             *   - 位19:15 SQ16: 序列中第16个转换的通道编号 */
+    __IO uint32_t SQR2;      /**< 规则序列寄存器2（配置序列中第7-12个转换的通道） */
+    __IO uint32_t SQR3;      /**< 规则序列寄存器3（配置序列中第1-6个转换的通道） */
+
+    /*---------------- ADC 注入序列寄存器 ----------------*/
+    __IO uint32_t JSQR;      /**< 注入序列寄存器（Injected Sequence Register）
+                             *   - 位21:20 JL[1:0]: 注入通道序列长度（实际通道数=值+1）
+                             *   - 位19:15 JSQ4: 注入序列中第4个转换的通道 */
+
+    /*---------------- ADC 注入数据寄存器 ----------------*/
+    __IO uint32_t JDR1;      /**< 注入通道1数据寄存器（Injected Data Register 1） */
+    __IO uint32_t JDR2;      /**< 注入通道2数据寄存器 */
+    __IO uint32_t JDR3;      /**< 注入通道3数据寄存器 */
+    __IO uint32_t JDR4;      /**< 注入通道4数据寄存器 */
+
+    /*---------------- ADC 规则数据寄存器 ----------------*/
+    __IO uint32_t DR;        /**< 规则数据寄存器（Regular Data Register）
+                             *   - 所有规则通道共享此寄存器，需及时读取避免溢出 */
+} ADC_TypeDef;
+
+```
+
+初始化结构体：
+
+```C
+typedef struct
+{
+    /**
+     * @brief ADC工作模式选择
+     * @note 可选值：
+     *   - @ref ADC_MODE_INDEPENDENT           独立模式（默认）
+     *   - @ref ADC_MODE_REG_INJEC_TRIG        规则和注入组的同步触发
+     *   - @ref ADC_MODE_REG_TRIG              仅规则组触发
+     *   - @ref ADC_MODE_INJEC_TRIG            仅注入组触发
+     *   - @ref ADC_MODE_FAST_INTERLEAVED      快速交替模式（双ADC）
+     *   - @ref ADC_MODE_SLOW_INTERLEAVED      慢速交替模式（双ADC）
+     */
+    uint32_t ADC_Mode;
+
+    /**
+     * @brief 扫描模式使能
+     * @note 多通道采集时必须启用（ENABLE）
+     *   - DISABLE: 单通道模式
+     *   - ENABLE:  扫描所有设置的通道（需配合SQR或JSQR寄存器）
+     */
+    FunctionalState ADC_ScanConvMode;
+
+    /**
+     * @brief 连续转换模式
+     * @note 
+     *   - DISABLE: 单次转换（每次需手动启动）
+     *   - ENABLE:  自动连续转换（首次触发后持续运行）
+     */
+    FunctionalState ADC_ContinuousConvMode;
+
+    /**
+     * @brief 外部触发源选择
+     * @note 可选值（依赖具体型号）：
+     *   - @ref ADC_EXTERNALTRIGCONV_T1_CC1   定时器1捕获比较1
+     *   - @ref ADC_EXTERNALTRIGCONV_T1_CC2   定时器1捕获比较2
+     *   - @ref ADC_EXTERNALTRIGCONV_T2_CC2   定时器2捕获比较2
+     *   - @ref ADC_EXTERNALTRIGCONV_T3_TRGO  定时器3触发输出
+     *   - @ref ADC_EXTERNALTRIGCONV_EXT_IT11 外部中断线11
+     *   - @ref ADC_EXTERNALTRIGCONV_SWSTART  软件触发（最常用）
+     */
+    uint32_t ADC_ExternalTrigConv;
+
+    /**
+     * @brief 数据对齐方式
+     * @note 
+     *   - @ref ADC_DATAALIGN_RIGHT  右对齐（推荐，直接读取有效数据）
+     *   - @ref ADC_DATAALIGN_LEFT   左对齐（需移位处理）
+     */
+    uint32_t ADC_DataAlign;
+
+    /**
+     * @brief 规则通道转换数量
+     * @note 范围：1-16（需与SQR寄存器的设置匹配）
+     * 例如：若转换3个通道，则设为3，并配置SQR1/2/3
+     */
+    uint8_t ADC_NbrOfChannel;
+
+} ADC_InitTypeDef;
+```
+
+初始化函数：
+```c
+
+```
 
 </WordCount>

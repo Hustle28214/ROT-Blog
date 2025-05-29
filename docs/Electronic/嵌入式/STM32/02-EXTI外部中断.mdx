@@ -30,4 +30,53 @@ NVIC，嵌套中断向量控制器。用于统一分配中断优先级和管理�
 
 抢占优先级高的可以中断嵌套。响应优先级高的可以优先排队，抢占优先级和响应优先级均相同的按中断号排队。
 
-##
+## NVIC 配置函数
+
+### 初始化
+
+首先我们来看下基本的几个结构体：
+
+NVIC_Type:  中断控制器的寄存器结构体，包含了中断使能寄存器、中断优先级寄存器等。
+
+```C
+typedef struct
+{
+  __IO uint32_t ISER[8];                      
+       uint32_t RESERVED0[24];                                   
+  __IO uint32_t ICER[8];                      
+       uint32_t RSERVED1[24];                                    
+  __IO uint32_t ISPR[8];                      
+       uint32_t RESERVED2[24];                                   
+  __IO uint32_t ICPR[8];                      
+       uint32_t RESERVED3[24];                                   
+  __IO uint32_t IABR[8];                      
+       uint32_t RESERVED4[56];                                   
+  __IO uint8_t  IP[240];                      
+       uint32_t RESERVED5[644];                                  
+  __O  uint32_t STIR;                         
+}NVIC_Type; 
+```
+
+NVIC_InitTypeDef:  中断初始化结构体，包含了中断通道、中断优先级、中断使能等信息。
+
+```C
+typedef struct
+{
+  uint8_t NVIC_IRQChannel;                    
+  uint8_t NVIC_IRQChannelPreemptionPriority;  
+  uint8_t NVIC_IRQChannelSubPriority;         
+  FunctionalState NVIC_IRQChannelCmd;         
+} NVIC_InitTypeDef;
+```
+NVIC_PriorityGroupConfig:  中断优先级分组函数，用于设置中断优先级分组。
+
+```C
+void NVIC_PriorityGroupConfig(uint32_t NVIC_PriorityGroup)
+{
+  /* Check the parameters */
+  assert_param(IS_NVIC_PRIORITY_GROUP(NVIC_PriorityGroup));
+  
+  /* Set the PRIGROUP[10:8] bits according to NVIC_PriorityGroup value */
+  SCB->AIRCR = AIRCR_VECTKEY_MASK | NVIC_PriorityGroup;
+}
+```

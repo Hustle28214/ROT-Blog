@@ -129,6 +129,14 @@ typedef struct
     uint16_t GPIO_Pin;
     GPIOSpeed_TypeDef GPIO_Speed;
     GPIOMode_TypeDefGPIO_Mode;
+    //GPIO_Mode_AIN 模拟输入	
+    // GPIO_Mode_IN_FLOATING  浮空输入	
+    // GPIO_Mode_IPD  下拉输入
+    // GPIO_Mode_IPU  上拉输入
+    // GPIO_Mode_Out_OD 开漏输出	
+    // GPIO_Mode_Out_PP 推挽输出
+    // GPIO_Mode_AF_OD  开漏复用输出
+    // GPIO_Mode_AF_PP  复用推挽输出
 }GPIO_InitTypeDef
 ```
 
@@ -192,7 +200,7 @@ void LedInit(void){
     GPIO_InitTypeDef GPIO_InitStructure;
     RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOC, ENABLE);
     GPIO_InitStructure.GPIO_Pin = GPIO_Pin_13;
-    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;
+    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;// 推挽输出
 }
 void KeyInit(void){
     GPIO_InitTypeDef GPIO_InitStructure;

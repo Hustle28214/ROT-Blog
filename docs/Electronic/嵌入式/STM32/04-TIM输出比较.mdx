@@ -180,7 +180,7 @@ Systick是什么？它是一个24位的倒计数器，一次最多可以计数$2
 
 所有的Cortex M3处理器都带有这个定时器。
 
-### 12.1 SysTick配置方法
+### 12.1 SysTick配置方法（标准库）
 
 首先看一下SysTick_Type结构体:
 
@@ -230,7 +230,7 @@ void SysTick_Init(void)
 }
 
 void SysTick_Handler(void)
-{
+{   // stm32f10x的库里面有一个同名函数，换个名字或者注释掉
     static uint8_t i = 0;
     i++;
     if(i == 100){
@@ -244,7 +244,21 @@ void SysTick_Handler(void)
 }// 假设LED1()已经写好了
 ```
 
+### 12.3 实时时钟RTC初始化
 
+17章有讲RTC的基本原理，这里给出初始化代码：
 
+```C
+void RTC_Clock_Config(void){
+    RCC_APB1PeriphClockCmd(RCC_APB1Periph_PWR|RCC_APB1Periph_BKP, ENABLE);// 使能电源时钟和备份区域时钟。
+    PWR_BackupAccessCmd(ENABLE);//  使能RTC, 允许对备份区域进行访问。
+    BKP_DeInit(); //  初始化备份区域
+    RCC_LSEConfig(RCC_LSE_ON);// 你要用LSE外部低速振荡器，就用LSE，不然就用LSIConfig配置。
+    RCC_RTCCLKConfig(RCC_RTCCLKSource_LSE);// 配置RTC时钟源
+    RCC_RTCCLKCmd(ENABLE);// 使能RTC时钟
+    RTC_EnterConfigMode(); // 进入配置模式
+    
+}
+```
 
 </WordCount>

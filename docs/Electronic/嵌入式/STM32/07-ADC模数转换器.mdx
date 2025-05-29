@@ -111,6 +111,10 @@ DMA请求可以用于触发DMA进行数据转运。
 
 开关控制就是ADC_Cmd函数，用于给ADC上电。
 
+:::danger
+不要让 ADC 时钟超过 14MHz，否则可能导致转换结果不准确。
+:::
+
 ## 5. 输入通道
 
 16个通道对应的GPIO口：
@@ -325,9 +329,29 @@ typedef struct
 } ADC_InitTypeDef;
 ```
 
-初始化函数：
+初始化GPIO函数：
 ```c
+GPIO_InitTypeDef GPIO_InitStructure;
 
+RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA|RCC_APB2Periph_ADC1, ENABLE); //A口，APB2
+GPIO_InitStructure.GPIO_Pin = GPIO_Pin_0;
+GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AIN; //模拟输入
+GPIO_Init(GPIOA, &GPIO_InitStructure);
 ```
+
+ADC初始化：
+```C
+void ADC1_Config(void){
+    ADC_InitTypeDef ADC_InitStructure;
+    // 初始化好一个结构体，然后根据上面的结构体成员变量，进行配置
+    ADC_InitStructure.ADC_Mode = ADC_Mode_Independent;//ADC1和ADC2工作在独立模式
+    ADC_InitStructure.ADC_ScanConvMode = DISABLE;//单通道模式
+}
+```
+
+
+
+
+
 
 </WordCount>

@@ -313,6 +313,7 @@ void RTC_GetDate(uint16_t *year, uint8_t *month, uint8_t *day) {
 用定时器TIM2控制LED灯的亮灭（PC13），每隔500ms闪烁一次：
 
 ```C
+#include "stm32f10x.h"
 void LED_PC13_Init(void){
     GPIO_InitTypeDef GPIO_InitStructure;
     RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOC,ENABLE);
@@ -328,8 +329,8 @@ void TIM2_Example_Init(void){
     TIM_TimeBaseInitTypeDef TIM_TimeBaseStructure;
     RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM2, ENABLE);
 
-    TIM_TimeBaseStructure.Prescaler = 72 - 1; // 72Mhz / (71 + 1) = 10 Hz, 周期就是100ms
-    TIM_TimeBaseStructure.Period = 5 - 1 ; // 5 - 1 = 4, 4个计数后，TIM2中断一次
+    TIM_TimeBaseStructure.Prescaler = 7200 - 1; // 72Mhz / (7199 + 1) = 0.01 MHz = 10kHz, 周期就是 1/ 10000 = 0.0001s = 0.1ms
+    TIM_TimeBaseStructure.Period = 5000 - 1 ; // 5000 - 1 = 4999, 4999个计数后，TIM2中断一次
     TIM_TimeBaseStructure.ClockDivision = TIM_CKD_DIV1;// 填0x0也行
     TIM_TimeBaseStructure.CounterMode = TIM_CounterMode_Up; // 往上计数
     TIM_TimeBaseInit(TIM2, &TIM_TimeBaseStructure); // 初始化TIM2
@@ -347,21 +348,24 @@ void NVIC_Example_Init(void){
     NVIC_Init(&NVIC_InitStructure); // 初始化中断
 }
 
-void TIM2_IRQHandler(void){
-    if(TIM_GetITStatus(TIM2, TIM_IT_Update) != RESET){ 
-        TIM_ClearITPendingBit(TIM2, TIM_IT_Update); // 清除TIM2中断标志位
-        GPIO_ToggleBits(GPIOC, GPIO_Pin_13); // 翻转GPIOC13的电平
-    }
-}
-
 int main(void){
     LED_PC13_Init();
 
-    TIM2_Init();
+    TIM2_Example_Init();
+    NVIC_Example_Init();
 
     while(1){
-        
-    }
+        if (TIM_GetFlagStatus(TIM2, TIM_FLAG_Update) == SET) {
+            TIM_ClearFlag(TIM2, TIM_FLAG_Update); // 清除标志
+            
+            // 翻转LED状态
+            if (GPIO_ReadOutputDataBit(GPIOC, GPIO_Pin_13)) {
+                GPIO_ResetBits(GPIOC, GPIO_Pin_13); // 点亮LED
+            } else {
+                GPIO_SetBits(GPIOC, GPIO_Pin_13);   // 熄灭LED
+            }
+        }
+    }   
 }
 
 ```

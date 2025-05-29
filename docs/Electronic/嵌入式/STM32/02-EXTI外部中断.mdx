@@ -30,9 +30,22 @@ NVIC，嵌套中断向量控制器。用于统一分配中断优先级和管理�
 
 抢占优先级高的可以中断嵌套。响应优先级高的可以优先排队，抢占优先级和响应优先级均相同的按中断号排队。
 
+### EXTI
+
+EXTI是（External interrupt/event controller）的缩写，外部中断/事件控制器的简称。管理控制器的 20个中断/事件线，每个中断/事件线都对应一个边沿检测器，可以实现输入信号的上升沿检测和下降沿的检测，可以实现对每个中断/事件线进行单独配置，可单独配置为中断或事件及其相对应的触发事件的属性。
+
+EXTI由19个产生事件/中断要求的边沿检测器组成。每个输入线可以独立地配置输入类型（脉冲或挂起）和对应的触发事件（上升沿、下降沿、双边沿触发）。每个输入线都可以被独立的屏蔽。
+
+STM32每个GPIO都可以触发一个外部中断，GPIO中断以组为单位，同组同一时间只能用一个。
+
+比如PA0、PB0、PC0、PD0、PE0和PG0为一组，如果PA0作为外部中断源，那么同组的其它GPIO（PB0、PC0、PD0、PE0和PG0）就不能再，只能使用类似于PB1、PC2这种数字序号不同的外部中断源。
+:::warning
+但是这个分组是不可以改的哦！它在STM32里面是固定的。它是按引脚序号（数字）进行分组的。
+:::
+
 ## NVIC 配置函数
 
-### 初始化
+### NVIC初始化
 
 首先我们来看下基本的几个结构体：
 
@@ -68,6 +81,7 @@ typedef struct
   FunctionalState NVIC_IRQChannelCmd;         
 } NVIC_InitTypeDef;
 ```
+
 NVIC_PriorityGroupConfig:  中断优先级分组函数，用于设置中断优先级分组。
 
 ```C
@@ -78,5 +92,73 @@ void NVIC_PriorityGroupConfig(uint32_t NVIC_PriorityGroup)
   
   /* Set the PRIGROUP[10:8] bits according to NVIC_PriorityGroup value */
   SCB->AIRCR = AIRCR_VECTKEY_MASK | NVIC_PriorityGroup;
+}
+```
+使能一个串口1的中断，同时设置抢占式优先级为1，响应式优先级为 2：
+```C
+void NVIC_Example_Config(void){
+    NVIC_InitTypeDef NVIC_InitStructure;
+    NVIC_InitStructure.NVIC_IRQChannel = EXTI1_IRQn; // 给个串口1的中断
+    NVIC_InitStructure.NVIC_IRQChannelPreemptionPriorty = 1; // 抢占优先级1
+    NVIC_InitStructure.NVIC_IRQChannelSubPriorty = 2; // 响应优先级2
+    NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
+    NVIC_Init(&NVIC_InitStructure);
+}
+```
+
+### EXTI配置函数
+
+首先我们看下EXTI相关的结构体：
+
+EXTI_TypeDef:  EXTI外设寄存器结构体，包含了中断屏蔽寄存器、事件屏蔽寄存器、上升沿触发选择寄存器、下降沿触发选择寄存器、软件中断事件寄存器和挂起寄存器等。
+
+```C
+typedef struct
+{
+  __IO uint32_t IMR;   // Interrupt Mask Register（中断屏蔽寄存器）
+  __IO uint32_t EMR;   // Event Mask Register（事件屏蔽寄存器）
+  __IO uint32_t RTSR;  // Rising Trigger Selection Register（上升沿触发选择寄存器）
+  __IO uint32_t FTSR;  // Falling Trigger Selection Register（下降沿触发选择寄存器）
+  __IO uint32_t SWIER; // Software Interrupt Event Register（软件中断事件寄存器）
+  __IO uint32_t PR;    // Pending Register（挂起寄存器）
+} EXTI_TypeDef;
+```
+
+:::tip
+“IMR管中断，EMR管事件；RTSR上升，FTSR下降；SWIER软件触发，PR记得清！”
+:::
+
+EXTI_InitTypeDef: EXTI初始化结构体，包含了中断线、工作模式、触发方式和使能状态等信息。
+
+```C
+typedef struct
+{
+  uint32_t EXTI_Line;               // 选择要配置的EXTI线（如EXTI_Line0~EXTI_Line15）
+  EXTIMode_TypeDef EXTI_Mode;       // 工作模式：中断（Interrupt）或事件（Event）
+  EXTITrigger_TypeDef EXTI_Trigger; // 触发方式：上升沿、下降沿或双边沿
+  FunctionalState EXTI_LineCmd;     // 使能（ENABLE）或禁用（DISABLE）该EXTI线
+} EXTI_InitTypeDef;
+```
+
+电路有两个按键分别为KEY1、KEY2，两个LED分别为D1、D2。使用中断方式实现以下两个功能：
+
+1. KEY1按键按下，D1点亮；
+
+2. KEY2按键按下，D2点亮。
+
+这里的中断初始化函数：
+
+```C
+void NVIC_Example_Init(void){
+    EXTI_InitTypeDef EXTI_InitStructure;
+
+    KeyInit();
+
+    RCC_APB2PeriphClockCmd(RCC_APB2Periph_AFIO, ENABLE); // 使能GPIO的复用时钟功能，因为配置外部中断的寄存器（AFIO_EXTICRx）之前要先打开AFIO时钟。
+
+    GPIO_EXTILineConfig(GPIO_PortSourceGPIOB, GPIO_PinSource0);
+    GPIO_EXTILineConfig(GPIO_PortSourceGPIOB, GPIO_PinSource1);// 将PB组对应的IO口映射到外部中断的EXTI0和EXTI1上。
+
+    EXTI_InitStructure.EXTI_Line
 }
 ```

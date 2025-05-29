@@ -249,15 +249,62 @@ void SysTick_Handler(void)
 17章有讲RTC的基本原理，这里给出初始化代码：
 
 ```C
-void RTC_Clock_Config(void){
+void RTC_Clock_Config(uint8_t hours, uint8_t minutes, uint8_t seconds){
     RCC_APB1PeriphClockCmd(RCC_APB1Periph_PWR|RCC_APB1Periph_BKP, ENABLE);// 使能电源时钟和备份区域时钟。
     PWR_BackupAccessCmd(ENABLE);//  使能RTC, 允许对备份区域进行访问。
     BKP_DeInit(); //  初始化备份区域
     RCC_LSEConfig(RCC_LSE_ON);// 你要用LSE外部低速振荡器，就用LSE，不然就用LSIConfig配置。
     RCC_RTCCLKConfig(RCC_RTCCLKSource_LSE);// 配置RTC时钟源
     RCC_RTCCLKCmd(ENABLE);// 使能RTC时钟
+    RTC_WaitForLastTask(); // 等待上次写操作完成
+    RTC_WaitForSynchro(); // 等待RTC时钟同步
     RTC_EnterConfigMode(); // 进入配置模式
+    RTC_ExitConfigMode(); // 退出配置模式, 更新配置
+    RTCSetPrescaler(32767); //  设置预分频器, 32.768KHz / (32767+1) = 1Hz, 那现在周期就是1s.
+    RTC_ITConfig(RTC_IT_SEC, ENABLE); //  使能秒中断, RTC_IT_SEC (uint16_t)0x0001
     
+    uint32_t time_value = (hours * 3600) + (minutes * 60) + seconds;
+    RTC_WaitForLastTask();
+    
+    RTC_SetCounter(time_value);
+    RTC_WaitForLastTask();
+    RTC_WaitForSynchro();
+    RTC_ExitConfigMode()；
+}
+// 或者通过单独的函数设置时间
+void RTC_SetTime(uint8_t hours, uint8_t minutes, uint8_t seconds) { 
+    uint32_t time_value = (hours * 3600) + (minutes * 60) + seconds;
+    RTC_WaitForLastTask();
+    
+    RTC_SetCounter(time_value);
+    RTC_WaitForLastTask();
+}
+// 没有直接可以用的寄存器来寄存日期，需要自己用RTC备用寄存器设置
+void RTC_SetDate(uint8_t day, uint8_t month, uint16_t year) { 
+    BKP_WriteBackupRegister(BKP_DR1, year);
+    BKP_WriteBackupRegister(BKP_DR2, month);
+    BKP_WriteBackupRegister(BKP_DR3, day);
+}
+```
+
+### 读取时间
+
+主要是调用RTC_GetCounter()来读取时间（计数值）。
+
+```c
+void RTC_GetTime(uint8_t *hour, uint8_t *minute, uint8_t *second) {
+    uint32_t timeValue = RTC_GetCounter();
+    *hour = timeValue / 3600;
+    *minute = (timeValue % 3600) / 60;
+    *second = (timeValue % 60);
+}
+```
+
+```C
+void RTC_GetDate(uint16_t *year, uint8_t *month, uint8_t *day) {
+    *year = BKP_ReadBackupRegister(BKP_DR1);
+    *month = BKP_ReadBackupRegister(BKP_DR2);
+    *day = BKP_ReadBackupRegister(BKP_DR3);
 }
 ```
 

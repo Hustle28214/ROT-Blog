@@ -170,4 +170,81 @@ BO1和BO2是B路的两个输出，其控制端是上面的PWMB、BIN2、BIN1。
 STBY如果不需要待机模式的话，可以直接接VCC(3.3V)。
 
 
+## 12. 系统节拍定时器SysTick
+
+Systick是什么？它是一个24位的倒计数器，一次最多可以计数$2^{24}$个时钟脉冲。
+
+当从某个数倒数到0时，将从RELOAD寄存器中取值作为定时器的初始值，同时可以选择在这个时候产生中断。
+
+只要不把它在SysTick控制器及状态寄存器中的使能位清除，就永不停息，即使在睡眠模式下也能继续工作。
+
+所有的Cortex M3处理器都带有这个定时器。
+
+### 12.1 SysTick配置方法
+
+首先看一下SysTick_Type结构体:
+
+```C
+typedef struct
+{
+    __IO uint32_t CTRL;  /**< SysTick 控制和状态寄存器 */
+    __IO uint32_t LOAD;  /**< SysTick 自动重装载数值寄存器 */
+    __IO uint32_t VAL;   /**< SysTick 当前数值寄存器 */
+    __I  uint32_t CALIB; /**< SysTick 校准值寄存器 */
+}SysTick_Type;
+```
+
+再来看一下SysTick_Config函数:
+
+```C
+static __INLINE uint32_t SysTick_Config(uint32_t ticks)
+{
+    if (ticks > SysTick_LOAD_RELOAD_Msk)  return (1);            /* Reload value impossible */
+
+    SysTick->LOAD  = (ticks & SysTick_LOAD_RELOAD_Msk) - 1;      /* set reload register */
+
+    NVIC_SetPriorty(ticks & SysTick_LOAD_RELOAD_Msk) - 1 ;
+
+    SysTick->VAL   = 0;
+    SysTick->CTRL  = SysTick_CTRL_CLKSOURCE_Msk |
+                     SysTick_CTRL_TICKINT_Msk   |
+                     SysTick_CTRL_ENABLE_Msk;
+    return(0);
+}
+```
+
+我们配置SysTick就是用SysTick_Config函数，传入ticks给重装寄存器LOAD就行了。
+
+
+ticks表示SysTick定时器从LOAD值倒数到0所需要的时钟周期数。
+
+### 12.2 SysTick初始化
+:::tip
+例子：通过一定的方法实现 LED 的闪烁，每隔特定的时间亮、灭一次。
+:::
+
+```C
+void SysTick_Init(void)
+{
+    SysTick_Config(80000);
+}
+
+void SysTick_Handler(void)
+{
+    static uint8_t i = 0;
+    i++;
+    if(i == 100){
+        LED1(1);
+    }
+
+    if(i == 200){
+        LED1(0);
+        i = 0;
+    }
+}// 假设LED1()已经写好了
+```
+
+
+
+
 </WordCount>

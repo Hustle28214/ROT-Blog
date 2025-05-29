@@ -2,7 +2,7 @@ import WordCount from '../../../../src/components/WordCount/WordCount';
 
 <WordCount>
 
-## GPIO简介
+## 1. GPIO简介
 
 GPIO(General Purpose Input/Output)通用输入输出口
 
@@ -12,7 +12,7 @@ GPIO(General Purpose Input/Output)通用输入输出口
 
 如果需要接入功率比较大的设备，需要接入驱动电路。
 
-## GPIO基本结构
+## 2. GPIO基本结构
 
 ![微信截图_20241025155054](https://github.com/user-attachments/assets/17b0431e-ffa9-400e-97b8-892aba4d2188)
 
@@ -26,13 +26,13 @@ STM32是32位的单片机，所以STM32内部的寄存器都是32位的。驱动
 
 如果需要点灯，还是需要驱动器增大信号的驱动能力。
 
-## GPIO位结构
+## 3. GPIO位结构
 
 ![微信截图_20241025160331](https://github.com/user-attachments/assets/c3b1e4e8-7afb-4e7b-af7f-2c0923bd5195)
 
 由图可见，左边三个寄存器，右边则是驱动器，最右边则是引脚。上半部分是输入部分，下半部分是输出部分。
 
-### 输入
+### 4. 输入
 
 输入部分由IO引脚和两个保护二极管组成，上面的二极管接VDD(3.3V)，下面的二极管接VSS(0V)，输入电压如果比3.3V高，那么上方二极管将导通，输入电压产生的电流将不会流入主电路；如果输入电压低于VSS（负电压），那么下方二极管将导通。
 
@@ -47,7 +47,7 @@ STM32是32位的单片机，所以STM32内部的寄存器都是32位的。驱动
 
 最左边的模拟输入线，连接到ADC（需要接收模拟量）。另一个是复用功能输入（接收数字量），连接到其他需要读取端口的外设上，比如串口的输入引脚等。
 
-### 输出
+### 5. 输出
 
 数字部分可以由输出数据寄存器或片上外设控制，通过数据选择器接到了输出控制部分。
 
@@ -67,7 +67,7 @@ STM32是32位的单片机，所以STM32内部的寄存器都是32位的。驱动
 
 
 
-## GPIO输入模式
+## 6. GPIO输入模式
 
 |模式|性质|特征|
 |:---|:---|:---|
@@ -88,12 +88,153 @@ STM32是32位的单片机，所以STM32内部的寄存器都是32位的。驱动
 开漏和推挽：结构也基本一样。区别刚刚讲过。
 
 
-## 封装技术
+## 7. 封装技术
+
+以STM32H723为例：
 
 LQFP封装:
 
+https://github.com/user-attachments/assets/91f3e340-acb7-412b-8d41-7c3a19d3b2e0
+
+QFN封装:
+
+https://github.com/user-attachments/assets/3a98584b-f735-45e9-b772-06449305c888
 
 
+BGA：球栅阵列封装技术
+
+## 8. 相关函数（标准库）
+
+### 8.1 GPIO初始化函数
+
+看一下GPIO_TypeDef结构体：
+```c
+typedef struct
+{
+__IO uint32_t CRL;
+__IO uint32_t CRH;
+__IO uint32_t IDR;
+__IO uint32_t ODR;
+__IO uint32_t BSRR;
+__IO uint32_t BRR;
+__IO uint32_t LCKR;
+} GPIO_TypeDef;
+```
+看一下GPIO_InitTypeDef结构体：
+
+```C
+typedef struct
+{
+    // 引脚、传输速度、模式
+    uint16_t GPIO_Pin;
+    GPIOSpeed_TypeDef GPIO_Speed;
+    GPIOMode_TypeDefGPIO_Mode;
+}GPIO_InitTypeDef
+```
+
+初始化示例：
+
+```C
+GPIO_InitTypeDef GPIO_InitStructure;
+GPIO_InitStructure.GPIO_Pin = GPIO_Pin_0
+GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;
+GPIO_Init(GPIOA, &GPIO_InitStructure);
+```
+
+### 8.2 GPIO读取输入函数
+
+主要是ReadInputDataBit来完成。
+
+```C
+uint8_t ReadInValue;
+ReadInValue = GPIO_ReadInputDataBit(GPIOA, GPIO_Pin_0);
+```
+
+如果要读取所有A口的引脚的输入，那就不指定引脚：
+
+```C
+uint16_t ReadInValue;
+ReadInValue = GPIO_ReadInputData(GPIOA);
+```
+
+### 8.3 GPIO读取输出函数
+
+```C
+uint8_t ReadOutValue;
+ReadOutValue = GPIO_ReadOutputDataBit(GPIOA, GPIO_Pin_0);
+```
+
+### 8.4 GPIO写入函数
+
+```C
+GPIO_SetBits(GPIOA, GPIO_Pin_0); // 设置指定的数据端口位为1，但需要注意端口模式！
+GPIO_ResetBits(GPIOA, GPIO_Pin_0); // 清除指定的数据端口位，置0
+GPIO_WriteBit(GPIOA, GPIO_Pin_0, Bit_SET); // 写数据到指定的数据端口位，Bit_SET表示写1，Bit_RESET表示写0
+GPIO_Write(GPIOA, 0x00FF); // 写数据到指定的数据端口，0x00FF表示写11111111
+```
+
+### 8.5 添加一个按键来控制LED的亮灭（例程）
+
+• 按键按下，LED点亮；
+• 按键释放，LED熄灭。
+
+这里的LED是PC13.
+
+```C
+#include "vartypes.h"
+#include "includes.h"
+
+#define KEY_ON 1
+#define KEY_OFF 0
+
+void LedInit(void){
+    GPIO_InitTypeDef GPIO_InitStructure;
+    RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOC, ENABLE);
+    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_13;
+    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;
+}
+void KeyInit(void){
+    GPIO_InitTypeDef GPIO_InitStructure;
+    RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA, ENABLE);
+    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_1; //PA1
+    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPD; // 下拉Pull-Down
+    GPIO_Init(GPIOA, &GPIO_InitStructure);
+}
+
+int KeyScan(void){
+   uint32_t ReadValue;
+   ReadValue = GPIO_ReadInputDataBit(GPIOA, GPIO_Pin_1);
+   return ReadValue; 
+}
+
+void LED1(uint32_t Switch){
+    if(Switch == KEY_ON){
+        GPIO_SetBits(GPIOC, GPIO_Pin_13); 
+    }else if(Switch == KEY_OFF){
+        GPIO_ResetBits(GPIOC, GPIO_Pin_13); 
+    }
+}
+```
+
+```c
+#include "includes.h"
+
+int main(){
+    LedInit();
+    KeyInit();
+
+    LED1(0);
+    
+    while(1){
+        if(KeyScan() == KEY_ON){
+            LED1(1);
+        }else{
+            LED1(0);
+        }
+    }
+}
+```
 
 ## Reference
 

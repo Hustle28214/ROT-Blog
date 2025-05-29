@@ -105,8 +105,8 @@ void usart1_init(uint32_t baudrate){
     USART_InitStructure.Parity = USART_Parity_No; // 无校验位，就简单的收发环境，没有别的通信干扰不需要校验
     USART_InitStructure.Mode = USART_Mode_Rx | USART_Mode_Tx; // 允许接收和发送
 
-    USART_Init(USART1, &USART_InitStructure);
-    USART_Cmd(USART1,ENABLE);
+    USART_Init(USART1, &USART_InitStructure); //  初始化USART1
+    USART_Cmd(USART1,ENABLE); // 使能USART1
 }
 ```
 

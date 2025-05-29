@@ -320,6 +320,8 @@ void LED_PC13_Init(void){
     GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_OD; // 开漏输出，因为PC13是接VCC
     GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz; // 高速
     GPIO_Init(GPIOC,&GPIO_InitStructure);
+
+    GPIO_SetBits(LED_GPIO, LED_PIN); // 默认关闭LED, 注意：PC13默认高电平熄灭！
 }
 
 void TIM2_Example_Init(void){
@@ -336,10 +338,32 @@ void TIM2_Example_Init(void){
     TIM_Cmd(TIM2, ENABLE); // 使能TIM2
 }
 
-void TIM2_IRQHandler(void){
-    
-    static uint8_t i = 0;
+void NVIC_Example_Init(void){
+    NVIC_InitTypeDef NVIC_InitStructure;
+    NVIC_InitStructure.NVIC_IRQChannel = TIM2_IRQn; // 选择中断源
+    NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 0; // 抢占优先级
+    NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0; // 子优先级
+    NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE; // 使能中断
+    NVIC_Init(&NVIC_InitStructure); // 初始化中断
 }
+
+void TIM2_IRQHandler(void){
+    if(TIM_GetITStatus(TIM2, TIM_IT_Update) != RESET){ 
+        TIM_ClearITPendingBit(TIM2, TIM_IT_Update); // 清除TIM2中断标志位
+        GPIO_ToggleBits(GPIOC, GPIO_Pin_13); // 翻转GPIOC13的电平
+    }
+}
+
+int main(void){
+    LED_PC13_Init();
+
+    TIM2_Init();
+
+    while(1){
+        
+    }
+}
+
 ```
 
 </WordCount>

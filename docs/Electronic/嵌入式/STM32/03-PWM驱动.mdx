@@ -9,7 +9,43 @@ PWM
 
 ## 1. PWM驱动LED呼吸灯
 
+来看一下必需掌握的结构体：
 
+```C
+
+```
+
+```C
+void PWM_Example_Init(void)
+{
+    RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM2, ENABLE); // TIM2时钟使能
+    RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA, ENABLE); // GPIOA时钟使能
+    RCC_APB2PeriphClockCmd(RCC_APB2Periph_AFIO, ENABLE); // AFIO时钟使能
+
+    GPIO_PinRemapConfig(GPIO_PartialRemap_TIM2, ENABLE); // GPIOA0映射到TIM2_CH1
+    GPIO_PinRemapConfig(GPIO_Remap_SWJ_NoJTRST, ENABLE); // 禁止JTAG
+    GPIO_InitTypeDef GPIO_InitStructure;
+    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF_PP; //  复用推挽输出
+    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_15;
+    GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+    GPIO_Init(GPIOA, &GPIO_InitStructure);
+
+    TIM_InternalClockConfig(TIM2); // 内部时钟配置(选择是内部还是外部的时钟源)
+
+    TIM_TimeBaseInitTypeDef TIM_TimeBaseStructure;
+    TIM_TimeBaseStructure.TIM_ClockDivision = TIM_CKD_DIV1; // 时钟分频因子
+    TIM_TimeBaseStructure.TIM_CounterMode = TIM_CounterMode_Up; // 向上计数模式
+    TIM_TimeBaseStructure.TIM_Period = 100-1; // ARR
+    TIM_TimeBaseStructure.TIM_Prescaler = 720-1;// PSC
+    TIM_TimeBaseInitStructure.TIM_RepetitionCounter = 0; // 重复计数器的值
+    TIM_TimeBaseInit(TIM1, &TIM_TimeBaseStructure);
+
+    TIM_OCINitTypeDef TIM_OCInitStructure;	//初始化比较单元
+    TIM_OCStructInit(&TIM_OCInitStructure);//
+
+
+}
+```
 
 ## 2. PWM驱动舵机
 

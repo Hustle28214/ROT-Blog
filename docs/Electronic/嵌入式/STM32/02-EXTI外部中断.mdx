@@ -160,6 +160,7 @@ void NVIC_Example_Init(void){
     GPIO_EXTILineConfig(GPIO_PortSourceGPIOB, GPIO_PinSource1);// 将PB组对应的IO口映射到外部中断的EXTI0和EXTI1上。
 
     EXTI_InitStructure.EXTI_Line = EXTI_Line_0 | EXTI_Line_1;
-    
+    EXTI_InitStructure.EXTI_Mode = EXTI_Mode_Interrupt;
+    EXTI_InitStructure.EXTI_Trigger = EXTI_Trigger_Falling;
 }
 ```

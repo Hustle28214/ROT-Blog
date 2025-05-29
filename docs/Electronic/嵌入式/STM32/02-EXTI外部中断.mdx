@@ -54,20 +54,40 @@ NVIC_Type:  中断控制器的寄存器结构体，包含了中断使能寄存�
 ```C
 typedef struct
 {
+  // 中断使能寄存器组 (Interrupt Set-Enable Registers)
+  // 每个bit对应一个中断的使能状态，共8个32位寄存器（支持最多256个中断）
   __IO uint32_t ISER[8];                      
-       uint32_t RESERVED0[24];                                   
+       uint32_t RESERVED0[24];  // 保留区域，用于对齐内存地址
+                                   
+  // 中断清除使能寄存器组 (Interrupt Clear-Enable Registers)
+  // 用于禁用中断，与ISER对应
   __IO uint32_t ICER[8];                      
-       uint32_t RSERVED1[24];                                    
+       uint32_t RSERVED1[24];  // 保留区域（注意这里有拼写错误：应为RESERVED1）                                    
+  
+  // 中断挂起设置寄存器组 (Interrupt Set-Pending Registers)
+  // 用于手动触发中断
   __IO uint32_t ISPR[8];                      
-       uint32_t RESERVED2[24];                                   
+       uint32_t RESERVED2[24];  // 保留区域                                   
+  
+  // 中断挂起清除寄存器组 (Interrupt Clear-Pending Registers)
+  // 用于清除挂起状态
   __IO uint32_t ICPR[8];                      
-       uint32_t RESERVED3[24];                                   
+       uint32_t RESERVED3[24];  // 保留区域                                   
+  
+  // 中断活跃状态寄存器组 (Interrupt Active Bit Registers)
+  // 只读，显示当前正在处理的中断
   __IO uint32_t IABR[8];                      
-       uint32_t RESERVED4[56];                                   
+       uint32_t RESERVED4[56];  // 保留区域                                   
+  
+  // 中断优先级寄存器组 (Interrupt Priority Registers)
+  // 每个8位字段配置一个中断的优先级（实际使用的位数取决于芯片实现）
   __IO uint8_t  IP[240];                      
-       uint32_t RESERVED5[644];                                  
+       uint32_t RESERVED5[644];  // 保留区域                                  
+  
+  // 软件触发中断寄存器 (Software Trigger Interrupt Register)
+  // 通过写入中断号来软件触发中断
   __O  uint32_t STIR;                         
-}NVIC_Type; 
+} NVIC_Type;
 ```
 
 NVIC_InitTypeDef:  中断初始化结构体，包含了中断通道、中断优先级、中断使能等信息。

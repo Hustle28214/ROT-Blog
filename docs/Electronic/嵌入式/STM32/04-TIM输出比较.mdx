@@ -308,4 +308,38 @@ void RTC_GetDate(uint16_t *year, uint8_t *month, uint8_t *day) {
 }
 ```
 
+### TIM配置
+
+用定时器TIM2控制LED灯的亮灭（PC13），每隔500ms闪烁一次：
+
+```C
+void LED_PC13_Init(void){
+    GPIO_InitTypeDef GPIO_InitStructure;
+    RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOC,ENABLE);
+    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_13;
+    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_OD; // 开漏输出，因为PC13是接VCC
+    GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz; // 高速
+    GPIO_Init(GPIOC,&GPIO_InitStructure);
+}
+
+void TIM2_Example_Init(void){
+    TIM_TimeBaseInitTypeDef TIM_TimeBaseStructure;
+    RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM2, ENABLE);
+
+    TIM_TimeBaseStructure.Prescaler = 72 - 1; // 72Mhz / (71 + 1) = 10 Hz, 周期就是100ms
+    TIM_TimeBaseStructure.Period = 5 - 1 ; // 5 - 1 = 4, 4个计数后，TIM2中断一次
+    TIM_TimeBaseStructure.ClockDivision = TIM_CKD_DIV1;// 填0x0也行
+    TIM_TimeBaseStructure.CounterMode = TIM_CounterMode_Up; // 往上计数
+    TIM_TimeBaseInit(TIM2, &TIM_TimeBaseStructure); // 初始化TIM2
+
+    TIM_ITConfig(TIM2, TIM_IT_Update, ENABLE); // 使能TIM2秒中断
+    TIM_Cmd(TIM2, ENABLE); // 使能TIM2
+}
+
+void TIM2_IRQHandler(void){
+    
+    static uint8_t i = 0;
+}
+```
+
 </WordCount>

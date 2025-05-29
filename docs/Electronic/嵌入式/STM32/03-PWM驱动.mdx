@@ -11,9 +11,25 @@ PWM
 
 来看一下必需掌握的结构体：
 
-```C
+TIM_OCInitTypeDef结构体: 定义了定时器的输出比较模式、输出比较状态、输出比较极性、输出比较值、输出比较极性、输出比较空闲状态。
 
+这个结构体经常用来配置PWM，具体的参数如下：
+
+```C
+typedef struct
+{
+  uint16_t TIM_OCMode;        // 输出比较模式（PWM/翻转/强制等）
+  uint16_t TIM_OutputState;   // 主输出通道使能（ENABLE/DISABLE）
+  uint16_t TIM_OutputNState;  // 互补输出通道使能（高级定时器用）
+  uint16_t TIM_Pulse;         // 比较值（决定PWM占空比或触发时机）
+  uint16_t TIM_OCPolarity;    // 主输出通道极性（高电平有效/低电平有效）
+  uint16_t TIM_OCNPolarity;   // 互补输出通道极性（高级定时器用）
+  uint16_t TIM_OCIdleState;   // 空闲状态下主输出电平（刹车/停机时）
+  uint16_t TIM_OCNIdleState;  // 空闲状态下互补输出电平（刹车/停机时）
+} TIM_OCInitTypeDef;
 ```
+
+示例初始化代码：
 
 ```C
 void PWM_Example_Init(void)
@@ -38,18 +54,33 @@ void PWM_Example_Init(void)
     TIM_TimeBaseStructure.TIM_Period = 100-1; // ARR
     TIM_TimeBaseStructure.TIM_Prescaler = 720-1;// PSC
     TIM_TimeBaseInitStructure.TIM_RepetitionCounter = 0; // 重复计数器的值
-    TIM_TimeBaseInit(TIM1, &TIM_TimeBaseStructure);
+    TIM_TimeBaseInit(TIM2, &TIM_TimeBaseStructure); // 初始化定时器
 
     TIM_OCINitTypeDef TIM_OCInitStructure;	//初始化比较单元
-    TIM_OCStructInit(&TIM_OCInitStructure);//
+    TIM_OCStructInit(&TIM_OCInitStructure);// 传入结构体
+    TIM_OCInitStructure.TIM_OCMode = TIM_OCMode_PWM1; // 设置比较单元的模式为PWM1
+    TIM_OCInitStructure.TIM_OCPolarity = TIM_OCPolarity_High; // 比较单元输出极性为高电平有效
+    TIM_OCInitStructure.TIM_OutputState = TIM_OutputState_Enable; // 比较单元输出使能，我们这里是驱动呼吸灯不需要高级定时器，否则需要用TIM_OCNPolarity
+    TIM_OCInitStructure.TIM_Pulse = 0; // 比较单元的初始占空比为0，CCR
 
+    TIM_OC1Init(TIM2, &TIM_OCInitStructure); // 初始化比较单元1
+    TIM_Cmd(TIM2, ENABLE); // 使能定时器
+}
 
+void PWM_SetCompare1(uint16_t Compare){
+    TIM_SetCompare1(TIM2, Compare); // 设置比较单元1的比较值
 }
 ```
 
 ## 2. PWM驱动舵机
 
+舵机的频率一般为频率为50HZ，也就是一个20ms左右的时基脉冲。所以上面的分频和周期改改就好了。
+
 ## 3. PWM驱动直流电机
+
+首先我们需要捕获一下编码器的数据。也就是读取电机的速度。
+
+
 
 
 

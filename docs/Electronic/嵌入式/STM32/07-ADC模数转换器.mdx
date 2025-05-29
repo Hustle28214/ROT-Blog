@@ -346,9 +346,47 @@ void ADC1_Config(void){
     // 初始化好一个结构体，然后根据上面的结构体成员变量，进行配置
     ADC_InitStructure.ADC_Mode = ADC_Mode_Independent;//ADC1和ADC2工作在独立模式
     ADC_InitStructure.ADC_ScanConvMode = DISABLE;//单通道模式
+    ADC_InitStructure.ADC_ContinuousConvMode = ENABLE; //连续转换模式
+    ADC_InitStructure.ADC_ExternalTrigConv = ADC_ExternalTrigConv_None; //不使用外部触发
+    ADC_InitStructure.ADC_DataAlign = ADC_DataAlign_Right; // 右对齐
+    ADC_InitStructure.ADC_NbrOfChannel = 1; // 转换通道数为1
+    ADC_Init(ADC1, &ADC_InitStructure);
+
+    RCC_ADCCLKConfig(RCC_PCLK2_Div8); // 配置ADC时钟为CLK2的8分频,72/8=9MHz
+    ADC_RegularChannelConfig(ADC1, ADC_Channel_0, 1, ADC_SampleTime_239Cycles5); // 配置ADC通道0，采样时间为239.5周期
+    ADC_ITConfig(ADC1, ADC_IT_EOC, ENABLE); //使能EOC中断(如果需要 ADC 中断处理才执行这个步骤)
+    ADC_Cmd(ADC1, ENABLE); // 使能ADC1
+    ADC_ResetCalibration(ADC1); // 重置ADC1的校准
+    while(ADC_GetResetCalibrationStatus(ADC1)); // 等待校准完成
+    ADC_StartCalibration(ADC1); // 启动校准
+    while(ADC_GetCalibrationStatus(ADC1)); //  等待校准完成
+
+    ADC_SoftwareStartConvCmd(ADC1, ENABLE); //  启动ADC1转换
+    while(!ADC_GetFlagStatus(ADC1, ADC_FLAG_EOC)); // 等待转换完成
+    return ADC_GetConversionValue(ADC1); // 获取转换值(最近一次)
 }
 ```
 
+### 12.2 获取ADC转换值
+```c
+// 获取ADC转换值
+uint16_t GetADCValue(void)
+{ 
+    ADC_SoftwareStartConvCmd(ADC1, ENABLE); //  启动ADC1转换
+    while(!ADC_GetFlagStatus(ADC1, ADC_FLAG_EOC)); // 等待转换完成
+    return ADC_GetConversionValue(ADC1);
+}
+// 获取ADC转换值的平均值
+uint16_t GetADCValue_Average(uint8_t num)
+{ 
+    uint32_t temp_val = 0;
+    uint8_t i = 0;
+    for(i = 0; i <num; i++){
+        temp_val += GetADCValue();
+    }
+    return temp_val/num;
+}
+```
 
 
 

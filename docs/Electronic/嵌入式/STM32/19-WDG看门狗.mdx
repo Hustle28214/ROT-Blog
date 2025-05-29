@@ -93,6 +93,22 @@ void IWDG_Example_Init(uint8_t psc, uint16_t Reload_Value){
 IWDG一旦打开以后，想要关闭，只能重启，并且重启之后不能打开IWDG，否则问题依旧，所以如果不用IWDG不要打开。
 :::
 
+### 9.2 WWDG的启动
 
+```C
+void WWDG_Example_Init(void)
+{
+	RCC_APB1PeriphClockCmd(RCC_APB1Periph_WWDG,ENABLE); //  WWDG时钟使能
+	WWDG_SetWindowValue(0x5F); //  WWDG窗口值设置
+	WWDG_SetPrescaler(WWDG_Prescaler_8);//  WWDG分频系数设置
+	NVIC_InitStructure.NVIC_IRQChannel = WWDG_IRQn;  
+    NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 1;  
+    NVIC_InitStructure.NVIC_IRQChannelSubPriority = 1;  
+    NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;  
+    NVIC_Init(&NVIC_InitStructure); // 配置NVIC嵌入式中断向量优先级
+	WWDG_Enable(0x5F);//  WWDG计数器值设置
+	WWDG_EnableIT();
+}
+```
 
 </WordCount>

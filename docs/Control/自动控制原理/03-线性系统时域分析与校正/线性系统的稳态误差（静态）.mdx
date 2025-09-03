@@ -5,11 +5,56 @@ sidebar_position: 5
 
 
 import VideoPlayer from '../../../../src/components/Videoplayer/Videoplayer.jsx';
+import WordCount from '../../../../src/components/WordCount/WordCount';
+
+<WordCount>
 
 > 上
 
+
+
+
 <VideoPlayer src="//player.bilibili.com/player.html?isOutside=true&aid=811394492&bvid=BV1F34y1h7so&cid=718427803&p=22" />
 <br />
+
+## 3.4.1 稳定性的概念
+
+对于线性系统，稳定性的概念由一个公式定义：
+
+$$
+\lim_{t \to \infty}k(t) = 0
+$$
+
+其中，$k(t)$ 是系统的脉冲响应，$t$ 是时间。
+
+:::tip
+或者我们可以这样理解：一个系统一般是会受到很多干扰的，如果说我们把这些干扰都去掉了，系统有回到平衡位置的能力，那就说这个是个稳定系统。
+:::
+
+## 3.4.2 稳定的充要条件
+
+严格的说，**系统的闭环特征方程的所有根都具有负的实部，或者所有闭环特征根均严格位于左半s平面**，这就是稳定性的充要条件。
+
+:::info
+对于线性定常系统来说，只需要看单位脉冲响应是否回零。回零就是稳定的，不回零一定不稳定。
+:::
+
+- 大范围稳定：不论偏移多大的范围，最终能回到平衡点
+- 小范围稳定：一定范围内偏移，能回到平衡点
+
+## 3.4.3 稳定判据
+
+### 3.4.3.1 劳斯（劳斯-赫尔维茨）判据
+
+
+稳态误差是系统的稳态性能指标，是对系统控制精度的度量。
+
+:::warning
+一定要对稳定的系统研究稳态误差，撇开稳态不谈，毫无意义！
+:::
+
+
 > 下
 
 <VideoPlayer src="//player.bilibili.com/player.html?isOutside=true&aid=811394492&bvid=BV1F34y1h7so&cid=718427489&p=23" />
+</WordCount>

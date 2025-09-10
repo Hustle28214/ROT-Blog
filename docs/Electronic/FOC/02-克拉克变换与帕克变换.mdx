@@ -177,7 +177,56 @@ $$
 
 <img width="126" height="120" alt="Image" src="https://github.com/user-attachments/assets/7f2eb302-69af-4518-9142-9071c7a8da1b" />
 
+由于$I_q - I_d$坐标系随转子转动，所以$I_q - I_d$坐标系因转动而造成的与$Iα−Iβ$​坐标系的差角$θ$称为电角度。
 
+得矩阵：
+
+$$
+\begin{bmatrix}
+i_{d} \\
+i_q
+\end{bmatrix} =
+\begin{bmatrix}
+cos\theta & sin\theta \\
+-sin\theta & cos\theta
+\end{bmatrix}
+\begin{bmatrix}
+i_\alpha \\
+i_\beta
+\end{bmatrix}
+$$
+
+求逆后，Iα​和Iβ:
+
+$$
+\begin{bmatrix}
+i_\alpha \\
+i_\beta
+\end{bmatrix}
+ =
+\begin{bmatrix}
+cos\theta & sin\theta \\
+-sin\theta & cos\theta
+\end{bmatrix}^{-1}
+\begin{bmatrix}
+i_{d} \\
+i_q
+\end{bmatrix}
+$$
+
+写成等式：
+
+$$
+i_\alpha = cos\theta i_{d} - sin\theta i_q
+i_\beta = sin\theta i_{d} + cos\theta i_q
+$$
+
+电角度$\theta$可以由编码器读出。如果你想要把$i_q$和$i_d$合成为一个矢量，也是可以的，这样就是一个旋转的矢量。进而分解之后得到$i_q$和$i_d$。有了这两个分量又可以得到$I_\alpha$和$I_\beta$。然后升维之后也可以得到$i_a$和$i_b$和$i_c$。这样就是一个完整的正逆变换过程。
+
+
+## References
+
+[1]. DengFOC.灯哥教你写FOC算法系列：无刷电机的FOC软件控制原理\[EB/OL\]\(2023-06-22\)\[2025-09-10\].https://dengfoc.com/#/dengfoc/%E7%81%AF%E5%93%A5%E6%89%8B%E6%8A%8A%E6%89%8B%E6%95%99%E4%BD%A0%E5%86%99FOC%E7%AE%97%E6%B3%95/3.3%E5%B8%95%E5%85%8B%E5%8F%98%E6%8D%A2
 
 
 </WordCount>

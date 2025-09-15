@@ -119,22 +119,17 @@ const config = {
     /** @type {import('@docusaurus/preset-classic').ThemeConfig} */
     ({
       
-      imageZoom: {
-        // CSS selector to apply the plugin to, defaults to '.markdown img'
-        selector: '.markdown :not(em) > img',
-        // Optional medium-zoom options
-        // see: https://www.npmjs.com/package/medium-zoom#options
-        options: {
-          margin: 24,
-          background: {
-            light:'#FFFFFF',
-            dark: '#222222'
-          },
-          scrollOffset: 0,
-          //container: '#zoom-container',
-          //template: '#zoom-template',
+      zooming: {
+        selector: '.markdown img',
+        delay: 500,
+        background: {
+          light: 'rgba(101,108,133,0.8)',
+          dark: 'rgba(9,10,17,0.8)'
         },
-      },// Set z-index:999 in custom.css to avoid conflict with TOC
+        options: {
+          // See the docs of zooming for all available options: https://github.com/francoischalifour/medium-zoom#usage
+        }
+      },
 
     metadata: [
       {name: 'keywords', content: 'robot, computer, github, blog'},

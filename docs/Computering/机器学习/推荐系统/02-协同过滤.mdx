@@ -63,8 +63,229 @@ $$
 
 基于物品倒排表的优化：
 
+1. 构建倒排表：为每个物品维护一个用户列表，记录哪些用户对这个物品有过行为。这样就可以通过物品快速找到相关用户。
+2. 稀疏矩阵计算：创建一个矩阵$C[u][v]$来记录用户和的共同物品数量。遍历每个物品的用户列表，将列表中的用户两两配对，对应的$C[u][v]$值加1。
+3. 计算最终相似度：矩阵$C$给出了余弦相似度公式的分子，再除以分母$sqrt(|C[u][u]| \cdot |C[v][v]|)$就得到了用户相似度。
+4. 生成推荐：使用以下公式计算用户对物品的兴趣分数：
+$$
+\hat{p}_{u,i} = \sum_{v \in S_u \cap N(i)} w_{uv}r_{vi}
+$$
+其中，$S_u$是与用户$u$最相似的用户集合，$N(i)$是对物品$i$的物品有过行为的用户集合实际推荐时，针对目标用户未交互过的物品计算上述兴趣度量值，并按分值降序排列，选择Top-N物品作为推荐结果。
+
+新算法的时间复杂度约为$O(R \cdot \bar{n})$。其中，$R$是总的用户-物品交互记录数，$\bar{n}$是每个物品的平均用户数，在稀疏数据场景下显示出了更好的性能。
+
+### 2.2.4 code实践
+
+```python
+import numpy as np
+user_data = {
+    'user1': {'item1': 5, 'item2': 3, 'item3': 4, 'item4': 4},
+    'user2': {'item1': 3, 'item2': 1, 'item3': 2, 'item4': 3, 'item5': 3},
+    'user3': {'item1': 4, 'item2': 3, 'item3': 4, 'item4': 3, 'item5': 5},
+    'user4': {'item1': 3, 'item2': 3, 'item3': 1, 'item4': 5, 'item5': 4},
+    'user5': {'item1': 1, 'item2': 5, 'item3': 5, 'item4': 2, 'item5': 1},
+}
+# 我们计划预测用户1对物品5的评分
+similarity_matrix = pd.DataFrame(
+    np.identity(len(user_data)),
+    index=user_data.keys(),
+    columns=user_data.keys(),
+)
+# 首先计算他们的相似度：
+# 遍历每条用户-物品评分数据
+for u1, items1 in user_data.items():
+    for u2, items2 in user_data.items():
+        if u1 == u2:
+            continue
+        vec1, vec2 = [], []
+        for item, rating1 in items1.items():
+            rating2 = items2.get(item, -1)
+            if rating2 == -1:
+                continue
+            vec1.append(rating1)
+            vec2.append(rating2)
+        # 计算不同用户之间的皮尔逊相关系数
+        similarity_matrix[u1][u2] = np.corrcoef(vec1, vec2)[0][1]
+
+print(similarity_matrix)
+
+target_user = 'user1'
+num = 2
+# 由于最相似的用户为自己，去除本身
+sim_users = similarity_matrix[target_user].sort_values(ascending=False)[1:num+1].index.tolist()
+print(f'与用户{target_user}最相似的{num}个用户为：{sim_users}')
+weighted_scores = 0.
+corr_values_sum = 0.
+
+target_item = 'item5'
+# 基于皮尔逊相关系数预测用户评分
+for user in sim_users:
+    corr_value = similarity_matrix[target_user][user]
+    user_mean_rating = np.mean(list(user_data[user].values()))
+
+    weighted_scores += corr_value * (user_data[user][target_item] - user_mean_rating)
+    corr_values_sum += corr_value
+
+target_user_mean_rating = np.mean(list(user_data[target_user].values()))
+target_item_pred = target_user_mean_rating + weighted_scores / corr_values_sum
+print(f'用户{target_user}对物品{target_item}的预测评分为：{target_item_pred:.4f}')
+```
+```python
+import os
+import sys
+import funrec
+from funrec.utils import build_metrics_table
+
+# 加载配置
+config = funrec.load_config('user_cf')
+
+# 加载数据
+train_data, test_data = funrec.load_data(config.data)
+
+# 准备特征
+feature_columns, processed_data = funrec.prepare_features(config.features, train_data, test_data)
+
+# 训练模型
+models = funrec.train_model(config.training, feature_columns, processed_data)
+
+# 评估模型
+metrics = funrec.evaluate_model(models, processed_data, config.evaluation, feature_columns)
+
+print(build_metrics_table(metrics))
+
+```
 
 
+## 2.4 基于物品的协同过滤
 
+
+ItemCF关注的是“和你喜欢的物品相似的还有什么”。
+
+实际上ItemCF的计算过程与UserCF类似，只是计算的对象从用户到物品，相似度的计算也从用户之间到物品之间。
+
+1. 物品相似度计算（余弦相似度计算一个共现矩阵出来）
+2. 候选物品推荐(皮尔逊相关系数评分，基于该评分预测)
+ 
+### 2.4.1 code实践
+
+```python
+import numpy as np
+item_data = {
+    'item1': {'user1': 5, 'user2': 3, 'user3': 4, 'user4': 3, 'user5': 1},
+    'item2': {'user1': 3, 'user2': 1, 'user3': 3, 'user4': 3, 'user5': 5},
+    'item3': {'user1': 4, 'user2': 2, 'user3': 4, 'user4': 1, 'user5': 5},
+    'item4': {'user1': 4, 'user2': 3, 'user3': 3, 'user4': 5, 'user5': 2},
+    'item5': {'user2': 3, 'user3': 5, 'user4': 4, 'user5': 1},
+}
+similarity_matrix = pd.DataFrame(
+    np.identity(len(item_data)),
+    index=item_data.keys(),
+    columns=item_data.keys(),
+)
+
+# 遍历每条物品-用户评分数据
+for i1, users1 in item_data.items():
+    for i2, users2 in item_data.items():
+        if i1 == i2:
+            continue
+        vec1, vec2 = [], []
+        for user, rating1 in users1.items():
+            rating2 = users2.get(user, -1)
+            if rating2 == -1:
+                continue
+            vec1.append(rating1)
+            vec2.append(rating2)
+        similarity_matrix[i1][i2] = np.corrcoef(vec1, vec2)[0][1]
+
+print(similarity_matrix)
+target_user = 'user1'
+target_item = 'item5'
+num = 2
+
+sim_items = []
+sim_items_list = similarity_matrix[target_item].sort_values(ascending=False).index.tolist()
+for item in sim_items_list:
+    # 如果target_user对物品item评分过
+    if target_user in item_data[item]:
+        sim_items.append(item)
+    if len(sim_items) == num:
+        break
+print(f'与物品{target_item}最相似的{num}个物品为：{sim_items}')
+target_user_mean_rating = np.mean(list(item_data[target_item].values()))
+weighted_scores = 0.
+corr_values_sum = 0.
+
+
+for item in sim_items:
+    corr_value = similarity_matrix[target_item][item]
+    user_mean_rating = np.mean(list(item_data[item].values()))
+
+    weighted_scores += corr_value * (item_data[item][target_user] - user_mean_rating)
+    corr_values_sum += corr_value
+
+target_item_pred = target_user_mean_rating + weighted_scores / corr_values_sum
+print(f'用户{target_user}对物品{target_item}的预测评分为：{target_item_pred}')
+```
+
+```python
+import os
+import sys
+import funrec
+from funrec.utils import build_metrics_table
+
+# 加载配置
+config = funrec.load_config('item_cf')
+
+# 加载数据
+train_data, test_data = funrec.load_data(config.data)
+
+# 准备特征
+feature_columns, processed_data = funrec.prepare_features(config.features, train_data, test_data)
+
+# 训练模型
+models = funrec.train_model(config.training, feature_columns, processed_data)
+
+# 评估模型
+metrics = funrec.evaluate_model(models, processed_data, config.evaluation, feature_columns)
+
+print(build_metrics_table(metrics))
+```
+
+## 2.5 Swing算法
+
+如果用户在不小心点到或者出于好奇心驱使，但并不想自己的首页充斥着无关内容，Swing算法就能派上用场。它关注的是鲁棒性较强的共同购买关系，以此度量物品相似性。
+
+如果多个用户在其他共同购买行为较少的情况下，同时购买了同一对物品，那么这对物品之间的关联性就更可信。
+
+Swing算法的基本步骤是：
+
+1. 构建用户-物品二部图
+2. 分析图中用户对的共同交互模式（即swing结构）来计算物品相似度。
+
+### 2.5.1 用户-物品二部图构建
+
+这个二部图描述的是用户与物品的交互关系。
+
+<img width="1015" height="588" alt="Image" src="https://github.com/user-attachments/assets/fbc31623-4cd6-46c8-bebd-4fa53a16e1db" />
+
+在这个图中，一边是所有用户节点，另一边是所有物品节点。如果用户对某个物品发生了点击、购买等行为，就在对应的用户节点与物品节点之间添加一条边。这个二部图为后续的相似度计算提供了结构化的数据基础。
+
+### 2.5.2 物品相似度计算
+
+我们基于该图计算任意一对物品i与j的相似度。设$U_i$和$U_j$分别表示与物品i和物品j相关联的用户集合。$I_u$表示用户u交互过的所有物品集合。
+
+1. 用户交集提取: 计算$U_i$和$U_j$的交集$U_{i,j}$，表示同时购买了物品i和物品j的用户集合。
+2. 内部子结构分析: 对集合中的每一对用户(u,v),统计他们的其他共同购买行为。如果用户u与v的其他交互行为重合较少（即$|I_u \cap I_v|$较小），则认为他们在共同选择物品i和j上的行为更具特异性，应该为这对物品贡献更高的相似度得分。
+
+Swing score的计算：
+
+$$
+s(i,j) = \sum_{u \in U_{i,j}}  \sum_{v \in U_{i,j}}\frac{1}{\alpha+|I_u \cap I_v|}
+$$
+
+其中，$\alpha$是一个小的正常数，用于避免除零错误。
+
+
+![Image](https://github.com/user-attachments/assets/b021409c-c264-43dc-8c66-7949ca96144e)
 
 </WordCount>

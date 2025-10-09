@@ -256,7 +256,7 @@ function ReadmeEditor({ isOpen, onClose, isDarkMode, content, onContentChange })
           }}
           placeholder={`# 欢迎来到我的项目空间！
 
-这里是我的个人项目展示平台，你可以：
+星标实在是不够用了！所以做了一个项目页，把我喜欢的和我正在做的项目放进去。你可以：
 
 ## 🚀 项目分类
 - **机器人项目** - 各种机器人相关开发

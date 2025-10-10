@@ -329,6 +329,7 @@ function ReadmeEditor({ isOpen, onClose, isDarkMode, content, onContentChange })
 
 // 项目数据
 const projectData = {
+  
   "喜欢的项目": {
     categories: [
       {
@@ -569,7 +570,107 @@ const projectData = {
         ]
       }
     ]
-  }
+  },
+  "Archives": {
+    categories: [
+      {
+        name: "计算机体系",
+        projects: [
+          {
+            name: "计算机体系结构基础",
+            description: "一本开源的计组指南",
+            icon: "⚛️",
+            link: "https://foxsen.github.io/archbase/",
+            color: "#61dafb"
+          },
+          {
+            name: "408考研archive",
+            description: "偏应试的一个仓库",
+            icon: "🟢",
+            link: "https://github.com/CodePanda66/CSPostgraduate-408.git",
+            color: "#42b883"
+          },
+          
+        ]
+      },
+      {
+        name: "硬件",
+        projects: [
+          {
+            name: "FPGA Tutorial",
+            description: "FPGA的入门指南",
+            icon: "🧠",
+            link: "https://github.com/LeiWang1999/FPGA.git",
+            color: "#ff6f00"
+          },
+          
+        ]
+      }
+    ]
+  },
+  "Books": {
+    categories: [
+      {
+        name: "计算机体系",
+        projects: [
+          {
+            name: "计算机体系结构基础",
+            description: "一本开源的计组指南",
+            icon: "⚛️",
+            link: "https://foxsen.github.io/archbase/",
+            color: "#61dafb"
+          },
+        ]
+      },
+      {
+        name: "硬件",
+        projects: [
+          {
+            name: "电子技术基础-模拟部分",
+            description: "模电经典教材",
+            icon: "🧠",
+            link: "https://z-library.ec/book/21096687/e3ecc9/%E7%94%B5%E5%AD%90%E6%8A%80%E6%9C%AF%E5%9F%BA%E7%A1%80-%E6%A8%A1%E6%8B%9F%E9%83%A8%E5%88%86-%E7%AC%AC%E5%85%AD%E7%89%88.html",
+            color: "#ff6f00"
+          },
+          {
+            name: "电子技术基础-数字部分",
+            description: "数电经典教材",
+            icon: "🧠",
+            link: "https://zh.z-library.ec/book/18839371/55c938/%E7%94%B5%E5%AD%90%E6%8A%80%E6%9C%AF%E5%9F%BA%E7%A1%80-%E6%95%B0%E5%AD%97%E9%83%A8%E5%88%86-%E7%AC%AC%E5%85%AD%E7%89%88.html",
+            color: "#ff6f00"
+          },
+          {
+            name: "电子技术基础-数字部分-学习辅导",
+            description: "知识点总结",
+            icon: "🧠",
+            link: "https://icourse.club/uploads/files/552f5aed4a34696b9fa54dba6ddb6cb503f11e03.pdf",
+            color: "#ff6f00"
+          },
+          {
+            name: "RISC-V ISA Manual",
+            description: "RISC-V指令集手册",
+            icon: "🧠",
+            link: "https://github.com/riscv/riscv-isa-manual/releases/download/20240411/unpriv-isa-asciidoc.pdf",
+            color: "#ff6f00"
+          },
+          {
+            name: "半导体物理学",
+            description: "RISC-V指令集手册",
+            icon: "🧠",
+            link: "https://z-library.ec/book/12066614/64423b/%E5%8D%8A%E5%AF%BC%E4%BD%93%E7%89%A9%E7%90%86%E5%AD%A6-%E5%88%98%E6%81%A9%E7%A7%91-%E7%AC%AC%E4%B8%83%E7%89%88.html",
+            color: "#ff6f00"
+          },
+          {
+            name: "模拟CMOS集成电路",
+            description: "必看经典",
+            icon: "🧠",
+            link: "https://z-library.ec/book/11858644/dacdeb/%E6%A8%A1%E6%8B%9Fcmos%E9%9B%86%E6%88%90%E7%94%B5%E8%B7%AF-%E7%AC%AC%E4%BA%8C%E7%89%88-%E6%8B%89%E6%89%8E%E7%BB%B4.html",
+            color: "#ff6f00"
+          },
+        ]
+      }
+    ]
+  },
 };
 
 export default function Projects() {

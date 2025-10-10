@@ -667,6 +667,27 @@ const projectData = {
             link: "https://z-library.ec/book/11858644/dacdeb/%E6%A8%A1%E6%8B%9Fcmos%E9%9B%86%E6%88%90%E7%94%B5%E8%B7%AF-%E7%AC%AC%E4%BA%8C%E7%89%88-%E6%8B%89%E6%89%8E%E7%BB%B4.html",
             color: "#ff6f00"
           },
+          {
+            name: "开关电源设计",
+            description: "必看经典",
+            icon: "🧠",
+            link: "https://z-library.ec/book/22344808/20882c/%E7%B2%BE%E9%80%9A%E5%BC%80%E5%85%B3%E7%94%B5%E6%BA%90%E8%AE%BE%E8%AE%A1%E7%AC%AC2%E7%89%88.html",
+            color: "#ff6f00"
+          },
+          {
+            name: "开关电源设计",
+            description: "必看经典",
+            icon: "🪫",
+            link: "https://z-library.ec/book/22344808/20882c/%E7%B2%BE%E9%80%9A%E5%BC%80%E5%85%B3%E7%94%B5%E6%BA%90%E8%AE%BE%E8%AE%A1%E7%AC%AC2%E7%89%88.html",
+            color: "#ff6f00"
+          },
+          {
+            name: "Bluetooth",
+            description: "蓝牙学习指南",
+            icon: "🟦🦷",
+            link: "https://www.bluetooth.com/bluetooth-resources/?types=study-guide",
+            color: "#3490de"
+          },
         ]
       }
     ]
@@ -809,8 +830,8 @@ export default function Projects() {
             title="喜欢的项目"
             onClick={() => setOpenFolder('喜欢的项目')}
             isDarkMode={isDarkMode}
-            icon="📁"
-            color="rgba(0, 122, 204, 0.8)"
+            icon="💖"
+            color="rgba(0, 0, 0, 0)"
           />
 
           {/* 个人项目 */}
@@ -819,8 +840,25 @@ export default function Projects() {
             onClick={() => setOpenFolder('个人项目')}
             isDarkMode={isDarkMode}
             icon="📁"
-            color="rgba(0, 122, 204, 0.8)"
+            color="rgba(0, 0, 0, 0)"
           />
+
+          <DesktopIcon
+            title="Archives"
+            onClick={() => setOpenFolder('Archives')}
+            isDarkMode={isDarkMode}
+            icon="🧭"
+            color="rgba(0, 0, 0, 0)"
+          />
+
+          <DesktopIcon
+            title="Books"
+            onClick={() => setOpenFolder('Books')}
+            isDarkMode={isDarkMode}
+            icon="📖"
+            color="rgba(0, 0, 0, 0)"
+          />
+          
 
           {/* README.md 文件 */}
           <DesktopIcon
@@ -828,7 +866,7 @@ export default function Projects() {
             onClick={() => setReadmeOpen(true)}
             isDarkMode={isDarkMode}
             icon="📄"
-            color="rgba(76, 175, 80, 0.8)"
+            color="rgba(0, 0, 0, 0)"
           />
         </div>
 

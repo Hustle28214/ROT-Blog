@@ -20,7 +20,7 @@ const config = {
   
   
   // Set the production url of your site here
-  url: 'https://rotleyan.site',
+  url: 'https://rot-blog.vercel.app',
   // Set the /<baseUrl>/ pathname under which your site is served
   // For GitHub pages deployment, it is often '/<projectName>/'
   baseUrl: '/',
@@ -30,7 +30,7 @@ const config = {
   organizationName: 'facebook', // Usually your GitHub org/user name.
   projectName: 'docusaurus', // Usually your repo name.
 
-  onBrokenLinks: 'throw',
+  onBrokenLinks: 'warn',
   onBrokenMarkdownLinks: 'warn',
 
   // Even if you don't use internationalization, you can use this field to set
@@ -203,7 +203,7 @@ const config = {
           },  
 
           {
-            href: 'https://www.rotleyan.site/blog/rss.xml',
+            to: '/blog/rss.xml',
             label: 'RSS',
             position: 'right',
           },

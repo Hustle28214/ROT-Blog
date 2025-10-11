@@ -495,55 +495,140 @@ function ReadmeEditor({ isOpen, onClose, isDarkMode, content, onContentChange })
 
 // 项目数据
 const projectData = {
+  
   "Liked": {
-    categories: [
+    "categories": [
       {
-        name: "Web开发",
-        projects: [
+        "name": "Web开发",
+        "projects": [
           {
-            name: "React",
-            description: "用于构建用户界面的JavaScript库",
-            icon: "⚛️",
-            link: "https://reactjs.org",
-            color: "#61dafb"
+            "name": "React",
+            "description": "用于构建用户界面的JavaScript库",
+            "icon": "⚛️",
+            "link": "https://reactjs.org",
+            "color": "#61DAFB"
           },
           {
-            name: "Vue.js",
-            description: "渐进式JavaScript框架",
-            icon: "🟢",
-            link: "https://vuejs.org",
-            color: "#42b883"
+            "name": "Vue.js",
+            "description": "渐进式JavaScript框架",
+            "icon": "🌿",
+            "link": "https://vuejs.org",
+            "color": "#42B883"
           },
           {
-            name: "Next.js",
-            description: "React全栈框架",
-            icon: "▲",
-            link: "https://nextjs.org",
-            color: "#000000"
+            "name": "Next.js",
+            "description": "React全栈框架",
+            "icon": "▲",
+            "link": "https://nextjs.org",
+            "color": "#000000"
           }
         ]
       },
       {
-        name: "机器学习",
-        projects: [
+        "name": "机器学习",
+        "projects": [
           {
-            name: "TensorFlow",
-            description: "端到端机器学习平台",
-            icon: "🧠",
-            link: "https://tensorflow.org",
-            color: "#ff6f00"
+            "name": "TensorFlow",
+            "description": "端到端机器学习平台",
+            "icon": "🧠",
+            "link": "https://tensorflow.org",
+            "color": "#FF6F00"
           },
           {
-            name: "PyTorch",
-            description: "开源机器学习框架",
-            icon: "🔥",
-            link: "https://pytorch.org",
-            color: "#ee4c2c"
+            "name": "PyTorch",
+            "description": "开源机器学习框架",
+            "icon": "🔥",
+            "link": "https://pytorch.org",
+            "color": "#EE4C2C"
+          }
+        ]
+      },
+      {
+        "name": "操作系统",
+        "projects": [
+          {
+            "name": "Linux",
+            "description": "我需要说什么吗",
+            "icon": "🐧",
+            "link": "https://github.com/torvalds/linux.git",
+            "color": "#FCC624"
+          }
+        ]
+      },
+      {
+        "name": "编译器",
+        "projects": [
+          {
+            "name": "GCC",
+            "description": "无需多言",
+            "icon": "🔧",
+            "link": "https://github.com/gcc-mirror/gcc.git",
+            "color": "#0277BD"
+          },
+          {
+            "name": "Rust",
+            "description": "它是未来",
+            "icon": "🦀",
+            "link": "https://github.com/rust-lang/rust.git",
+            "color": "#DEA584"
+          }
+        ]
+      },
+      {
+        "name": "仿真求解",
+        "projects": [
+          {
+            "name": "Octave",
+            "description": "类似Matlab的平替",
+            "icon": "📊",
+            "link": "https://github.com/gnu-octave/octave.git",
+            "color": "#0790C9"
+          }
+        ]
+      },
+      {
+        "name": "物理引擎",
+        "projects": [
+          {
+            "name": "Box2D",
+            "description": "2D游戏物理引擎",
+            "icon": "📦",
+            "link": "https://github.com/erincatto/box2d.git",
+            "color": "#8E44AD"
+          },
+          {
+            "name": "Physac",
+            "description": "2D游戏物理引擎",
+            "icon": "⚡",
+            "link": "https://github.com/victorfisac/Physac.git",
+            "color": "#3498DB"
+          },
+          {
+            "name": "Bullet3",
+            "description": "开源机器人仿真引擎",
+            "icon": "🔫",
+            "link": "https://github.com/bulletphysics/bullet3.git",
+            "color": "#E74C3C"
+          },
+          {
+            "name": "Mujoco",
+            "description": "开源机器人仿真平台",
+            "icon": "🤖",
+            "link": "https://github.com/google-deepmind/mujoco.git",
+            "color": "#2ECC71"
+          },
+          {
+            "name": "Jolt",
+            "description": "刚体碰撞检测引擎",
+            "icon": "💥",
+            "link": "https://github.com/jrouwe/JoltPhysics.git",
+            "color": "#F39C12"
           }
         ]
       }
     ]
   },
+  
   "Self": {
     categories: [
       {
@@ -736,278 +821,333 @@ const projectData = {
       }
     ]
   },
+  
   "Archives": {
-    categories: [
+    "categories": [
       {
-        name: "计算机体系",
-        projects: [
+        "name": "计算机体系",
+        "projects": [
           {
-            name: "计算机体系结构基础",
-            description: "一本开源的计组指南",
-            icon: "🏗️",
-            link: "https://foxsen.github.io/archbase/",
-            color: "#3498db"
+            "name": "计算机体系结构基础",
+            "description": "一本开源的计组指南",
+            "icon": "🏛️",
+            "link": "https://foxsen.github.io/archbase/",
+            "color": "#2E86AB"
           },
           {
-            name: "408考研archive",
-            description: "偏应试的一个仓库",
+            "name": "408考研archive",
+            "description": "偏应试的一个仓库",
+            "icon": "🎯",
+            "link": "https://github.com/CodePanda66/CSPostgraduate-408.git",
+            "color": "#A23B72"
+          },
+          {
+            "name": "CSDiy",
+            "description": "北大学长CS自学课程地图",
+            "icon": "🗺️",
+            "link": "https://csdiy.wiki/%E6%B7%B1%E5%BA%A6%E7%94%9F%E6%88%90%E6%A8%A1%E5%9E%8B/roadmap/",
+            "color": "#F18F01"
+          },
+          {
+            "name": "CS/EE Courses Map",
+            "description": "UC Berkeley 课程地图",
+            "icon": "🎓",
+            "link": "https://hkn.eecs.berkeley.edu/courseguides",
+            "color": "#003262"
+          },
+          {
+            "name": "EE-CS Courses at Stanford",
+            "description": "Stanford EE/CS 课程地图",
+            "icon": "🌲",
+            "link": "https://ee.stanford.edu/eecs",
+            "color": "#8C1515"
+          },
+          {
+            name: "ECE Courses at CMU",
+            description: "CMU EE/CS 课程地图",
             icon: "📚",
-            link: "https://github.com/CodePanda66/CSPostgraduate-408.git",
+            link: "https://courses.ece.cmu.edu/",
             color: "#e74c3c"
+          },
+        ]
+      },
+      {
+        "name": "强化学习",
+        "projects": [
+          {
+            "name": "动手学强化学习",
+            "description": "一本开源的RL实践指南",
+            "icon": "🎮",
+            "link": "https://hrl.boyuai.com/",
+            "color": "#00A896"
           }
         ]
       },
       {
-        name: "硬件",
-        projects: [
+        "name": "硬件",
+        "projects": [
           {
-            name: "ESP-IDF编程指南",
-            description: "ESP-IDF的官方编程指南",
-            icon: "🔧",
-            link: "https://docs.espressif.com/projects/esp-idf/zh_CN/stable/esp32/get-started/index.html",
-            color: "#f39c12"
+            "name": "ESP-IDF编程指南",
+            "description": "ESP-IDF的官方编程指南",
+            "icon": "🔌",
+            "link": "https://docs.espressif.com/projects/esp-idf/zh_CN/stable/esp32/get-started/index.html",
+            "color": "#D1495B"
           },
           {
-            name: "FPGA Tutorial",
-            description: "FPGA的入门指南",
-            icon: "⚡",
-            link: "https://github.com/LeiWang1999/FPGA.git",
-            color: "#9b59b6"
+            "name": "FPGA Tutorial",
+            "description": "FPGA的入门指南",
+            "icon": "⚡",
+            "link": "https://github.com/LeiWang1999/FPGA.git",
+            "color": "#6A4C93"
           },
           {
-            name: "Digital Lab",
-            description: "中科大计算机学院实验手册",
-            icon: "🔬",
-            link: "https://soc.ustc.edu.cn/Digital/2025/lab3/FPGAOL/",
-            color: "#1abc9c"
+            "name": "Digital Lab",
+            "description": "中科大计算机学院实验手册",
+            "icon": "🔬",
+            "link": "https://soc.ustc.edu.cn/Digital/2025/lab3/FPGAOL/",
+            "color": "#1982C4"
           },
           {
-            name: "PA",
-            description: "南大计算机系统基础实验",
-            icon: "🎯",
-            link: "https://ysyx.oscc.cc/docs/ics-pa/",
-            color: "#d35400"
+            "name": "PA",
+            "description": "南大计算机系统基础实验",
+            "icon": "🛠️",
+            "link": "https://ysyx.oscc.cc/docs/ics-pa/",
+            "color": "#FF595E"
           }
         ]
       }
     ]
   },
   "Books": {
-    categories: [
+    "categories": [
       {
-        name: "计算机体系",
-        projects: [
+        "name": "计算机体系",
+        "projects": [
           {
-            name: "计算机体系结构基础",
-            description: "一本开源的计组指南",
-            icon: "📖",
-            link: "https://foxsen.github.io/archbase/",
-            color: "#2980b9"
+            "name": "计算机体系结构基础",
+            "description": "一本开源的计组指南",
+            "icon": "📚",
+            "link": "https://foxsen.github.io/archbase/",
+            "color": "#4361EE"
           }
         ]
       },
       {
-        name: "硬件",
-        projects: [
+        "name": "硬件",
+        "projects": [
           {
-            name: "电子技术基础-模拟部分",
-            description: "模电经典教材",
-            icon: "📊",
-            link: "https://z-library.ec/book/21096687/e3ecc9/%E7%94%B5%E5%AD%90%E6%8A%80%E6%9C%AF%E5%9F%BA%E7%A1%80-%E6%A8%A1%E6%8B%9F%E9%83%A8%E5%88%86-%E7%AC%AC%E5%85%AD%E7%89%88.html",
-            color: "#e67e22",
-            details: ""
+            "name": "电子技术基础-模拟部分",
+            "description": "模电经典教材",
+            "icon": "📈",
+            "link": "https://z-library.ec/book/21096687/e3ecc9/%E7%94%B5%E5%AD%90%E6%8A%80%E6%9C%AF%E5%9F%BA%E7%A1%80-%E6%A8%A1%E6%8B%9F%E9%83%A8%E5%88%86-%E7%AC%AC%E5%85%AD%E7%89%88.html",
+            "color": "#F3722C"
           },
           {
-            name: "电子技术基础-数字部分",
-            description: "数电经典教材",
-            icon: "🔢",
-            link: "https://zh.z-library.ec/book/18839371/55c938/%E7%94%B5%E5%AD%90%E6%8A%80%E6%9C%AF%E5%9F%BA%E7%A1%80-%E6%95%B0%E5%AD%97%E9%83%A8%E5%88%86-%E7%AC%AC%E5%85%AD%E7%89%88.html",
-            color: "#27ae60"
+            "name": "电子技术基础-数字部分",
+            "description": "数电经典教材",
+            "icon": "🔢",
+            "link": "https://zh.z-library.ec/book/18839371/55c938/%E7%94%B5%E5%AD%90%E6%8A%80%E6%9C%AF%E5%9F%BA%E7%A1%80-%E6%95%B0%E5%AD%97%E9%83%A8%E5%88%86-%E7%AC%AC%E5%85%AD%E7%89%88.html",
+            "color": "#43AA8B"
           },
           {
-            name: "电子技术基础-数字部分-学习辅导",
-            description: "知识点总结",
-            icon: "💡",
-            link: "https://icourse.club/uploads/files/552f5aed4a34696b9fa54dba6ddb6cb503f11e03.pdf",
-            color: "#f1c40f"
+            "name": "电子技术基础-数字部分-学习辅导",
+            "description": "知识点总结",
+            "icon": "💡",
+            "link": "https://icourse.club/uploads/files/552f5aed4a34696b9fa54dba6ddb6cb503f11e03.pdf",
+            "color": "#F9C74F"
           },
           {
-            name: "RISC-V ISA Manual",
-            description: "RISC-V指令集手册",
-            icon: "🔄",
-            link: "https://github.com/riscv/riscv-isa-manual/releases/download/20240411/unpriv-isa-asciidoc.pdf",
-            color: "#8e44ad"
+            "name": "RISC-V ISA Manual",
+            "description": "RISC-V指令集手册",
+            "icon": "🔄",
+            "link": "https://github.com/riscv/riscv-isa-manual/releases/download/20240411/unpriv-isa-asciidoc.pdf",
+            "color": "#577590"
           },
           {
-            name: "半导体物理学",
-            description: "半导体物理教材",
-            icon: "🔌",
-            link: "https://z-library.ec/book/12066614/64423b/%E5%8D%8A%E5%AF%BC%E4%BD%93%E7%89%A9%E7%90%86%E5%AD%A6-%E5%88%98%E6%81%A9%E7%A7%91-%E7%AC%AC%E4%B8%83%E7%89%88.html",
-            color: "#34495e"
+            "name": "Arm v8",
+            "description": "Arm v8架构手册",
+            "icon": "🛡️",
+            "link": "https://developer.arm.com/documentation/ddi0553/latest/",
+            "color": "#277DA1"
           },
           {
-            name: "模拟CMOS集成电路",
-            description: "必看经典",
-            icon: "💎",
-            link: "https://z-library.ec/book/11858644/dacdeb/%E6%A8%A1%E6%8B%9Fcmos%E9%9B%86%E6%88%90%E7%94%B5%E8%B7%AF-%E7%AC%AC%E4%BA%8C%E7%89%88-%E6%8B%89%E6%89%8E%E7%BB%B4.html",
-            color: "#16a085"
+            "name": "半导体物理学",
+            "description": "半导体物理教材",
+            "icon": "🔋",
+            "link": "https://z-library.ec/book/12066614/64423b/%E5%8D%8A%E5%AF%BC%E4%BD%93%E7%89%A9%E7%90%86%E5%AD%A6-%E5%88%98%E6%81%A9%E7%A7%91-%E7%AC%AC%E4%B8%83%E7%89%88.html",
+            "color": "#4D908E"
           },
           {
-            name: "开关电源设计",
-            description: "必看经典",
-            icon: "⚡",
-            link: "https://z-library.ec/book/22344808/20882c/%E7%B2%BE%E9%80%9A%E5%BC%80%E5%85%B3%E7%94%B5%E6%BA%90%E8%AE%BE%E8%AE%A1%E7%AC%AC2%E7%89%88.html",
-            color: "#c0392b"
+            "name": "模拟CMOS集成电路",
+            "description": "必看经典",
+            "icon": "💎",
+            "link": "https://z-library.ec/book/11858644/dacdeb/%E6%A8%A1%E6%8B%9Fcmos%E9%9B%86%E6%88%90%E7%94%B5%E8%B7%AF-%E7%AC%AC%E4%BA%8C%E7%89%88-%E6%8B%89%E6%89%8E%E7%BB%B4.html",
+            "color": "#F9844A"
           },
           {
-            name: "电磁兼容导论",
-            description: "必看经典",
-            icon: "🌀",
-            link: "https://api.eestar.com/article/share/2021/10/0640e202110231006056608.pdf",
-            color: "#3498db"
+            "name": "开关电源设计",
+            "description": "必看经典",
+            "icon": "🔋",
+            "link": "https://z-library.ec/book/22344808/20882c/%E7%B2%BE%E9%80%9A%E5%BC%80%E5%85%B3%E7%94%B5%E6%BA%90%E8%AE%BE%E8%AE%A1%E7%AC%AC2%E7%89%88.html",
+            "color": "#90BE6D"
           },
           {
-            name: "Bluetooth",
-            description: "蓝牙学习指南",
-            icon: "📱",
-            link: "https://www.bluetooth.com/bluetooth-resources/?types=study-guide",
-            color: "#2c3e50"
+            "name": "电磁兼容导论",
+            "description": "必看经典",
+            "icon": "🌀",
+            "link": "https://api.eestar.com/article/share/2021/10/0640e202110231006056608.pdf",
+            "color": "#577590"
+          },
+          {
+            "name": "Bluetooth",
+            "description": "蓝牙学习指南",
+            "icon": "📱",
+            "link": "https://www.bluetooth.com/bluetooth-resources/?types=study-guide",
+            "color": "#2D7DD2"
           }
         ]
       }
     ]
   },
   "Video": {
-    categories: [
+    "categories": [
       {
-        name: "机器人",
-        projects: [
+        "name": "机器人",
+        "projects": [
           {
-            name: "基于强化学习的机器人控制",
-            creator: "CLEAR_LAB",
-            description: "SDM5008高等机器人控制",
-            icon: "💻",
-            link: "https://www.bilibili.com/video/BV1wPyfYHEmE/?share_source=copy_web&vd_source=8b2bc57e71349607b55c9fde6b078ebd",
-            color: "#FF6B6B",
-            type: "系列课程",
-            episodes: "12",
+            "name": "基于强化学习的机器人控制",
+            "creator": "CLEAR_LAB",
+            "description": "SDM5008高等机器人控制",
+            "icon": "🤖",
+            "link": "https://www.bilibili.com/video/BV1wPyfYHEmE/?share_source=copy_web&vd_source=8b2bc57e71349607b55c9fde6b078ebd",
+            "color": "#FF6B6B",
+            "type": "系列课程",
+            "episodes": "12"
           },
           {
-            name: "基于旋量理论的机器人控制",
-            creator: "CLEAR_LAB",
-            description: "MEE5114 Advanced Control for Robotics 高等机器人控制",
-            icon: "📊",
-            link: "https://www.bilibili.com/video/BV1CY411V74R/?share_source=copy_web&vd_source=8b2bc57e71349607b55c9fde6b078ebd",
-            color: "#4ECDC4",
-            type: "系列课程",
-            episodes: "25",
-          },
-          
-          {
-            name: "深度强化学习",
-            creator: "UC Berkeley",
-            description: "CS285 Deep Reinforcement Learning",
-            icon: "📊",
-            link: "https://youtube.com/playlist?list=PL_iWQOsE6TfVYGEGiAOMaOzzv41Jfm_Ps&si=xDIp69E3nOd4MQOo",
-            color: "#4ECDC4",
-            type: "系列课程",
-            episodes: "99",
-          },
-        ]
-      },
-      {
-        name: "物理引擎",
-        projects: [
-          {
-            name: "高级物理引擎实战指南",
-            creator: "胡渊鸣",
-            description: "GAMES201：高级物理引擎实战指南2020",
-            icon: "🎮",
-            link: "https://www.bilibili.com/video/BV1ZK411H7Hc/?share_source=copy_web&vd_source=8b2bc57e71349607b55c9fde6b078ebd",
-            color: "#45B7D1",
-            type: "引擎开发",
-            episodes: "10",
-            details: "胡渊鸣，无需多言"
+            "name": "基于旋量理论的机器人控制",
+            "creator": "CLEAR_LAB",
+            "description": "MEE5114 Advanced Control for Robotics 高等机器人控制",
+            "icon": "⚙️",
+            "link": "https://www.bilibili.com/video/BV1CY411V74R/?share_source=copy_web&vd_source=8b2bc57e71349607b55c9fde6b078ebd",
+            "color": "#4ECDC4",
+            "type": "系列课程",
+            "episodes": "25"
           },
           {
-            name: "现代计算机图形学入门",
-            creator: "闫令琪",
-            description: "GAMES101 现代计算机图形学入门",
-            icon: "🌐",
-            link: "https://www.bilibili.com/video/BV1X7411F744/?share_source=copy_web&vd_source=8b2bc57e71349607b55c9fde6b078ebd",
-            color: "#96CEB4",
-            type: "图形学",
-            episodes: "23",
-          },
-          {
-            name: "现代游戏引擎",
-            creator: "王希",
-            description: "GAMES104-现代游戏引擎：从入门到实践",
-            icon: "🌐",
-            link: "https://www.bilibili.com/video/BV1oU4y1R7Km/?share_source=copy_web&vd_source=8b2bc57e71349607b55c9fde6b078ebd",
-            color: "#96CEB4",
-            type: "引擎开发",
-            episodes: "23",
-          },
-          
-        ]
-      },
-      {
-        name: "硬件与嵌入式",
-        projects: [
-          {
-            name: "Ben Eater计算机构建",
-            creator: "Ben Eater",
-            description: "从晶体管开始构建8位计算机，深入理解计算机工作原理",
-            icon: "🔧",
-            link: "https://www.youtube.com/c/BenEater",
-            color: "#FECA57",
-            type: "硬件制作",
-            episodes: "50+",
-            details: "Ben Eater的计算机构建系列，从最基础的逻辑门开始，一步步构建完整的8位计算机，深入理解计算机底层原理。"
-          },
-          {
-            name: "Andreas Spiess传感器教程",
-            creator: "Andreas Spiess",
-            description: "ESP32、Arduino等嵌入式开发实战教程，涵盖各种传感器应用",
-            icon: "📡",
-            link: "https://www.youtube.com/c/AndreasSpiess",
-            color: "#FF9FF3",
-            type: "物联网",
-            episodes: "300+",
-            details: "Andreas Spiess的嵌入式系统教程，专注于ESP32、Arduino等平台的实战应用，涵盖各种传感器和通信协议。"
+            "name": "深度强化学习",
+            "creator": "UC Berkeley",
+            "description": "CS285 Deep Reinforcement Learning",
+            "icon": "🧠",
+            "link": "https://youtube.com/playlist?list=PL_iWQOsE6TfVYGEGiAOMaOzzv41Jfm_Ps&si=xDIp69E3nOd4MQOo",
+            "color": "#9B5DE5",
+            "type": "系列课程",
+            "episodes": "99"
           }
         ]
       },
       {
-        name: "AI与机器学习",
-        projects: [
+        "name": "物理引擎",
+        "projects": [
           {
-            name: "Two Minute Papers学术速递",
-            creator: "Two Minute Papers",
-            description: "用通俗语言介绍最新的AI研究论文，保持技术前沿性",
-            icon: "📑",
-            link: "https://www.youtube.com/c/KárolyZsolnai",
-            color: "#54A0FF",
-            type: "学术前沿",
-            episodes: "400+",
-            details: "Károly Zsolnai博士创建的频道，用简洁易懂的方式介绍计算机图形学、AI等领域的最新研究论文。"
+            "name": "高级物理引擎实战指南",
+            "creator": "胡渊鸣",
+            "description": "GAMES201：高级物理引擎实战指南2020",
+            "icon": "🎮",
+            "link": "https://www.bilibili.com/video/BV1ZK411H7Hc/?share_source=copy_web&vd_source=8b2bc57e71349607b55c9fde6b078ebd",
+            "color": "#00BBF9",
+            "type": "引擎开发",
+            "episodes": "10",
+            "details": "胡渊鸣，无需多言"
           },
           {
-            name: "Sentdex Python机器学习",
-            creator: "Sentdex",
-            description: "Python机器学习实战教程，从基础到深度学习应用",
-            icon: "🤖",
-            link: "https://www.youtube.com/c/sentdex",
-            color: "#5F27CD",
-            type: "机器学习",
-            episodes: "1000+",
-            details: "Harrison Kinsley的Python编程和机器学习教程，涵盖从基础数据分析到深度学习的各种实战项目。"
+            "name": "现代计算机图形学入门",
+            "creator": "闫令琪",
+            "description": "GAMES101 现代计算机图形学入门",
+            "icon": "🖥️",
+            "link": "https://www.bilibili.com/video/BV1X7411F744/?share_source=copy_web&vd_source=8b2bc57e71349607b55c9fde6b078ebd",
+            "color": "#00F5D4",
+            "type": "图形学",
+            "episodes": "23"
+          },
+          {
+            "name": "现代游戏引擎",
+            "creator": "王希",
+            "description": "GAMES104-现代游戏引擎：从入门到实践",
+            "icon": "🎯",
+            "link": "https://www.bilibili.com/video/BV1oU4y1R7Km/?share_source=copy_web&vd_source=8b2bc57e71349607b55c9fde6b078ebd",
+            "color": "#FB5607",
+            "type": "引擎开发",
+            "episodes": "23"
+          }
+        ]
+      },
+      {
+        "name": "硬件与嵌入式",
+        "projects": [
+          {
+            "name": "相控阵雷达制作",
+            "creator": "Jon Kraft",
+            "description": "制作一台属于自己的无人机跟踪雷达",
+            "icon": "📡",
+            "link": "https://youtu.be/igrN_wd_g74?si=aEBprLR-hvWHdR3i",
+            "color": "#FFBE0B",
+            "type": "硬件制作",
+            "episodes": "50+"
+          },
+          {
+            "name": "Andreas Spiess传感器教程",
+            "creator": "Andreas Spiess",
+            "description": "ESP32、Arduino等嵌入式开发实战教程，涵盖各种传感器应用",
+            "icon": "🔧",
+            "link": "https://www.youtube.com/c/AndreasSpiess",
+            "color": "#8338EC",
+            "type": "物联网",
+            "episodes": "300+",
+            "details": "Andreas Spiess的嵌入式系统教程，专注于ESP32、Arduino等平台的实战应用，涵盖各种传感器和通信协议。"
+          }
+        ]
+      },
+      {
+        "name": "AI与机器学习",
+        "projects": [
+          {
+            "name": "Two Minute Papers学术速递",
+            "creator": "Two Minute Papers",
+            "description": "用通俗语言介绍最新的AI研究论文，保持技术前沿性",
+            "icon": "📰",
+            "link": "https://www.youtube.com/c/KárolyZsolnai",
+            "color": "#06D6A0",
+            "type": "学术前沿",
+            "episodes": "400+",
+            "details": "Károly Zsolnai博士创建的频道，用简洁易懂的方式介绍计算机图形学、AI等领域的最新研究论文。"
+          },
+          {
+            "name": "Agentic AI",
+            "creator": "Andrew Ng",
+            "description": "吴恩达智能体教程",
+            "icon": "🤖",
+            "link": "https://www.bilibili.com/video/BV1aaxyz8ELY/?share_source=copy_web&vd_source=8b2bc57e71349607b55c9fde6b078ebd",
+            "color": "#118AB2",
+            "type": "学术前沿",
+            "episodes": "31"
+          },
+          {
+            "name": "Sentdex Python机器学习",
+            "creator": "Sentdex",
+            "description": "Python机器学习实战教程，从基础到深度学习应用",
+            "icon": "🐍",
+            "link": "https://www.youtube.com/c/sentdex",
+            "color": "#EF476F",
+            "type": "机器学习",
+            "episodes": "1000+",
+            "details": "Harrison Kinsley的Python编程和机器学习教程，涵盖从基础数据分析到深度学习的各种实战项目。"
           }
         ]
       }
     ]
-  },
+  }
+  
 };
 
 export default function Projects() {

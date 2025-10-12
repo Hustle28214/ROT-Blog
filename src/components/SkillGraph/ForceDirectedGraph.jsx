@@ -4,6 +4,127 @@ import { useForceLayout } from '../../hooks/useForceLayout';
 import { zoom, zoomIdentity } from 'd3-zoom';
 import { select } from 'd3-selection';
 
+// ✅ 单独提取 NodeComponent 并用 React.memo 优化
+const NodeComponent = React.memo(({
+    node,
+    isSelected,
+    isHovered,
+    onNodeClick,
+    onNavigateDoc,
+    onHover
+}) => {
+    const baseSize = getNodeSize(node);
+    const hoverSize = isHovered ? baseSize * 1.3 : baseSize;
+
+    return (
+        <g
+            className="node-group"
+            onClick={(e) => onNodeClick(node, e)}
+            onDoubleClick={() => onNavigateDoc(node.docPath)}
+            onMouseEnter={() => onHover(node, true)}
+            onMouseLeave={() => onHover(node, false)}
+            style={{ cursor: 'pointer' }}
+        >
+            {/* 选中光环 */}
+            {isSelected && (
+                <circle
+                    r={hoverSize + 6}
+                    fill="none"
+                    stroke={getNodeColor(node)}
+                    strokeWidth="2"
+                    strokeOpacity="0.4"
+                />
+            )}
+
+            {/* 节点阴影 */}
+            <circle
+                r={hoverSize}
+                fill={getNodeColor(node)}
+                filter="url(#node-shadow)"
+                opacity={0.8}
+            />
+
+            {/* 节点主体 */}
+            <circle
+                r={hoverSize - 1}
+                fill={getNodeColor(node)}
+                stroke="#ffffff"
+                strokeWidth={isSelected ? 3 : 2}
+            />
+
+            {/* 高光 */}
+            <circle
+                r={hoverSize - 4}
+                fill="url(#node-gradient)"
+                opacity="0.3"
+            />
+
+            {/* 进度环 */}
+            {node.progress > 0 && node.progress < 100 && (
+                <circle
+                    r={hoverSize + 2}
+                    fill="none"
+                    stroke="#10B981"
+                    strokeWidth="2"
+                    strokeDasharray={`${(node.progress / 100) * 2 * Math.PI * (hoverSize + 2)} ${2 * Math.PI * (hoverSize + 2)}`}
+                    transform="rotate(-90)"
+                />
+            )}
+
+            {/* 掌握状态 */}
+            {node.status === 'mastered' && (
+                <circle
+                    r={hoverSize / 2.5}
+                    fill="#10B981"
+                    stroke="#ffffff"
+                    strokeWidth="1.5"
+                />
+            )}
+
+            {/* 节点标签 */}
+            <text
+                textAnchor="middle"
+                dy={hoverSize + 16}
+                fontSize={getTextSize(node)}
+                fontWeight={node.type === 'category' ? 'bold' : 'normal'}
+                className="node-label"
+                style={{
+                    pointerEvents: 'none',
+                    userSelect: 'none',
+                    textShadow: '0 1px 2px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.3)'
+                }}
+            >
+                {node.title}
+            </text>
+
+            {/* 级别标签 */}
+            {(isSelected || isHovered) && node.level && node.type === 'skill' && (
+                <text
+                    textAnchor="middle"
+                    dy={hoverSize + 30}
+                    fontSize="9"
+                    className="node-level-label"
+                    fontWeight="500"
+                    style={{
+                        pointerEvents: 'none',
+                        userSelect: 'none',
+                        textShadow: '0 1px 1px rgba(0,0,0,0.3)'
+                    }}
+                >
+                    {node.level}
+                </text>
+            )}
+        </g>
+    );
+}, (prevProps, nextProps) => {
+    // 只有关键属性变化才重渲染
+    return (
+        prevProps.node.id === nextProps.node.id &&
+        prevProps.isSelected === nextProps.isSelected &&
+        prevProps.isHovered === nextProps.isHovered
+    );
+});
+
 const ForceDirectedGraph = ({
     nodes,
     links,
@@ -26,17 +147,16 @@ const ForceDirectedGraph = ({
     const zoomContainerRef = useRef(null);
     const zoomBehaviorRef = useRef(null);
     const isDragging = useRef(false);
-    const nodeRefs = useRef(new Map()); // 存储节点DOM引用
-    const linkRefs = useRef(new Map()); // 存储链接DOM引用
+    const nodeRefs = useRef(new Map());
+    const linkRefs = useRef(new Map());
 
-    // 过滤节点和链接（用于决定显示哪些）
+    // 过滤节点和链接
     const { displayNodes, displayLinks, categoryCenter } = useMemo(() => {
         if (!filteredCategory) {
-            // 无过滤：使用所有节点
             const validNodes = nodes.map(node => ({
                 ...node,
-                x: node.x || width / 2 + (Math.random() - 0.5) * 400,
-                y: node.y || height / 2 + (Math.random() - 0.5) * 400
+                x: node.x ?? width / 2 + (Math.random() - 0.5) * 400,
+                y: node.y ?? height / 2 + (Math.random() - 0.5) * 400
             }));
 
             const validLinks = links.filter(link => {
@@ -52,7 +172,6 @@ const ForceDirectedGraph = ({
             };
         }
 
-        // 过滤指定分类
         const categoryNodes = nodes.filter(node =>
             node.category === filteredCategory ||
             (node.type === 'category' && node.id === filteredCategory)
@@ -87,8 +206,8 @@ const ForceDirectedGraph = ({
         const filteredNodes = getRelatedNodes(categoryNodes, nodes, links);
         const validNodes = filteredNodes.map(node => ({
             ...node,
-            x: node.x || width / 2 + (Math.random() - 0.5) * 400,
-            y: node.y || height / 2 + (Math.random() - 0.5) * 400
+            x: node.x ?? width / 2 + (Math.random() - 0.5) * 400,
+            y: node.y ?? height / 2 + (Math.random() - 0.5) * 400
         }));
 
         const validLinks = links.filter(link => {
@@ -97,7 +216,6 @@ const ForceDirectedGraph = ({
             return validNodes.some(n => n.id === sourceId) && validNodes.some(n => n.id === targetId);
         });
 
-        // 计算中心点
         let center = null;
         const mainCategoryNode = validNodes.find(node =>
             (node.type === 'category' && node.category === filteredCategory) ||
@@ -184,7 +302,6 @@ const ForceDirectedGraph = ({
             .on('dblclick.zoom', null)
             .style('cursor', 'grab');
 
-        // 初始视图
         if (!filteredCategory) {
             setTimeout(() => {
                 try {
@@ -205,11 +322,10 @@ const ForceDirectedGraph = ({
         }
     }, [displayNodes, width, height, filteredCategory]);
 
-    // ✅ 核心：D3 直接操作 DOM 更新位置
+    // ✅ 核心修复：ticked 中检查 DOM 是否仍连接
     useEffect(() => {
         if (!simulation) return;
 
-        // ✅ 修改后的 ticked 函数
         const ticked = () => {
             // 更新链接
             displayLinks.forEach(link => {
@@ -218,7 +334,6 @@ const ForceDirectedGraph = ({
                 const sourceNode = simulation.nodes().find(n => n.id === sourceId);
                 const targetNode = simulation.nodes().find(n => n.id === targetId);
                 if (sourceNode && targetNode) {
-                    // ✅ 优先使用固定坐标（fx/fy），否则用 x/y
                     const sx = isValidNumber(sourceNode.fx) ? sourceNode.fx : sourceNode.x;
                     const sy = isValidNumber(sourceNode.fy) ? sourceNode.fy : sourceNode.y;
                     const tx = isValidNumber(targetNode.fx) ? targetNode.fx : targetNode.x;
@@ -239,13 +354,13 @@ const ForceDirectedGraph = ({
 
             // 更新节点
             simulation.nodes().forEach(node => {
-                // ✅ 关键：如果节点被固定，使用 fx/fy；否则用 x/y
                 const posX = isValidNumber(node.fx) ? node.fx : node.x;
                 const posY = isValidNumber(node.fy) ? node.fy : node.y;
 
                 if (isValidNumber(posX) && isValidNumber(posY)) {
                     const nodeEl = nodeRefs.current.get(node.id);
-                    if (nodeEl) {
+                    // ✅ 关键：检查元素是否仍在 DOM 中
+                    if (nodeEl && nodeEl.isConnected) {
                         nodeEl.setAttribute('transform', `translate(${posX},${posY})`);
                     }
                 }
@@ -336,18 +451,16 @@ const ForceDirectedGraph = ({
         onSelectNode(null);
     }, [onSelectNode]);
 
-    // ✅ 悬停处理：使用 fixNode/unfixNode
+    // 悬停处理
     const handleNodeHover = useCallback((node, isHovering) => {
         if (isHovering) {
-            
             fixNode(node.id);
             onHoverNode(node);
         } else {
             unfixNode(node.id);
             onHoverNode(null);
-            
         }
-    }, [stopSimulation, restartSimulation, onHoverNode, fixNode, unfixNode]);
+    }, [onHoverNode, fixNode, unfixNode]);
 
     return (
         <div className="force-graph-container">
@@ -410,8 +523,8 @@ const ForceDirectedGraph = ({
                 <rect width="100%" height="100%" fill="transparent" style={{ cursor: 'grab' }} />
 
                 <g ref={zoomContainerRef}>
-                    {/* 链接 - 静态创建，动态更新 */}
-                    {displayLinks.map((link, index) => {
+                    {/* 链接 */}
+                    {displayLinks.map((link) => {
                         const id = link.id || `${typeof link.source === 'object' ? link.source.id : link.source}-${typeof link.target === 'object' ? link.target.id : link.target}`;
                         return (
                             <line
@@ -426,13 +539,10 @@ const ForceDirectedGraph = ({
                         );
                     })}
 
-                    {/* 节点 - 静态创建，动态更新位置 */}
+                    {/* 节点 - 使用优化后的组件 */}
                     {displayNodes.map(node => {
                         const isSelected = selectedNode?.id === node.id;
                         const isHovered = hoveredNode?.id === node.id;
-                        const baseSize = getNodeSize(node);
-                        const hoverSize = isHovered ? baseSize * 1.3 : baseSize;
-
                         return (
                             <g
                                 key={node.id}
@@ -443,108 +553,20 @@ const ForceDirectedGraph = ({
                                         nodeRefs.current.delete(node.id);
                                     }
                                 }}
-                                className="node-group"
-                                onClick={(e) => handleNodeClick(node, e)}
-                                onDoubleClick={() => onNavigateDoc(node.docPath)}
-                                onMouseEnter={() => handleNodeHover(node, true)}
-                                onMouseLeave={() => handleNodeHover(node, false)}
-                                style={{ cursor: 'pointer' }}
                             >
-                                {/* 选中光环 */}
-                                {isSelected && (
-                                    <circle
-                                        r={hoverSize + 6}
-                                        fill="none"
-                                        stroke={getNodeColor(node)}
-                                        strokeWidth="2"
-                                        strokeOpacity="0.4"
-                                    />
-                                )}
-
-                                {/* 节点阴影 */}
-                                <circle
-                                    r={hoverSize}
-                                    fill={getNodeColor(node)}
-                                    filter="url(#node-shadow)"
-                                    opacity={0.8}
+                                <NodeComponent
+                                    node={node}
+                                    isSelected={isSelected}
+                                    isHovered={isHovered}
+                                    onNodeClick={handleNodeClick}
+                                    onNavigateDoc={onNavigateDoc}
+                                    onHover={handleNodeHover}
                                 />
-
-                                {/* 节点主体 */}
-                                <circle
-                                    r={hoverSize - 1}
-                                    fill={getNodeColor(node)}
-                                    stroke="#ffffff"
-                                    strokeWidth={isSelected ? 3 : 2}
-                                />
-
-                                {/* 高光 */}
-                                <circle
-                                    r={hoverSize - 4}
-                                    fill="url(#node-gradient)"
-                                    opacity="0.3"
-                                />
-
-                                {/* 进度环 */}
-                                {node.progress > 0 && node.progress < 100 && (
-                                    <circle
-                                        r={hoverSize + 2}
-                                        fill="none"
-                                        stroke="#10B981"
-                                        strokeWidth="2"
-                                        strokeDasharray={`${(node.progress / 100) * 2 * Math.PI * (hoverSize + 2)} ${2 * Math.PI * (hoverSize + 2)}`}
-                                        transform="rotate(-90)"
-                                    />
-                                )}
-
-                                {/* 掌握状态 */}
-                                {node.status === 'mastered' && (
-                                    <circle
-                                        r={hoverSize / 2.5}
-                                        fill="#10B981"
-                                        stroke="#ffffff"
-                                        strokeWidth="1.5"
-                                    />
-                                )}
-
-                                {/* 节点标签 */}
-                                <text
-                                    textAnchor="middle"
-                                    dy={hoverSize + 16}
-                                    fontSize={getTextSize(node)}
-                                    fontWeight={node.type === 'category' ? 'bold' : 'normal'}
-                                    className="node-label"
-                                    style={{
-                                        pointerEvents: 'none',
-                                        userSelect: 'none',
-                                        textShadow: '0 1px 2px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.3)'
-                                    }}
-                                >
-                                    {node.title}
-                                </text>
-
-                                {/* 级别标签 */}
-                                {(isSelected || isHovered) && node.level && node.type === 'skill' && (
-                                    <text
-                                        textAnchor="middle"
-                                        dy={hoverSize + 30}
-                                        fontSize="9"
-                                        className="node-level-label"
-                                        fontWeight="500"
-                                        style={{
-                                            pointerEvents: 'none',
-                                            userSelect: 'none',
-                                            textShadow: '0 1px 1px rgba(0,0,0,0.3)'
-                                        }}
-                                    >
-                                        {node.level}
-                                    </text>
-                                )}
                             </g>
                         );
                     })}
                 </g>
 
-                {/* 使用说明 */}
                 <text
                     x={10}
                     y={height - 10}
@@ -557,7 +579,6 @@ const ForceDirectedGraph = ({
                     }
                 </text>
 
-                {/* 错误信息 */}
                 {displayNodes.length === 0 && nodes.length > 0 && (
                     <text
                         x={width / 2}

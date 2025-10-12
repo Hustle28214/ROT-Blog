@@ -1,0 +1,65 @@
+{
+    "categories": {
+        "Computering": {
+            "color": "#3B82F6",
+            "priority": 1,
+            "subcategories": {
+                "Linux": {
+                    "color": "#F59E0B"
+                },
+                "WEB开发": {
+                    "color": "#10B981"
+                },
+                "信息安全": {
+                    "color": "#EF4444"
+                },
+                "机器学习": {
+                    "color": "#8B5CF6"
+                },
+                "编程语言": {
+                    "color": "#EC4899"
+                }
+            }
+        },
+        "Robotics": {
+            "color": "#10B981",
+            "priority": 2
+        },
+        "Mathematics": {
+            "color": "#8B5CF6",
+            "priority": 3
+        },
+        "Mechanics": {
+            "color": "#F59E0B",
+            "priority": 4
+        },
+        "Electronic": {
+            "color": "#EF4444",
+            "priority": 5
+        }
+    },
+    "skillLevels": {
+        "beginner": {
+            "color": "#6B7280",
+            "size": 6
+        },
+        "intermediate": {
+            "color": "#10B981",
+            "size": 8
+        },
+        "advanced": {
+            "color": "#3B82F6",
+            "size": 10
+        },
+        "expert": {
+            "color": "#8B5CF6",
+            "size": 12
+        }
+    },
+    "layout": {
+        "width": 1200,
+        "height": 800,
+        "enablePhysics": true,
+        "showCategories": true
+    }
+}

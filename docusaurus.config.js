@@ -182,7 +182,7 @@ const config = {
               
                 {to: '/todolist', label: '📂待办',},
                 {to: '/tomato', label: '🍅番茄',},
-            
+              { to: '/Skill', label: '🔎技能',},
             ],
           },
           

@@ -1,4 +1,3 @@
-// src/hooks/useForceLayout.js
 import { useCallback, useEffect, useRef } from 'react';
 import { forceSimulation, forceManyBody, forceCenter, forceLink, forceCollide } from 'd3-force';
 const isValidNumber = (value) => {
@@ -10,21 +9,18 @@ export const useForceLayout = (nodes, links, width, height) => {
     useEffect(() => {
         if (!nodes.length) return;
 
-        // 初始化节点位置
         const validNodes = nodes.map(node => ({
             ...node,
             x: node.x || width / 2 + (Math.random() - 0.5) * 400,
             y: node.y || height / 2 + (Math.random() - 0.5) * 400
         }));
 
-        // 标准化链接
         const validLinks = links.map(link => ({
             ...link,
             source: typeof link.source === 'object' ? link.source.id : link.source,
             target: typeof link.target === 'object' ? link.target.id : link.target
         }));
 
-        // 创建力导向模拟
         const simulation = forceSimulation(validNodes)
             .force('charge', forceManyBody().strength(-800))
             .force('center', forceCenter(width / 2, height / 2))
@@ -45,7 +41,6 @@ export const useForceLayout = (nodes, links, width, height) => {
         };
     }, [nodes, links, width, height]);
 
-    // 固定节点
     const fixNode = useCallback((nodeId) => {
         if (simulationRef.current) {
             const node = simulationRef.current.nodes().find(n => n.id === nodeId);
@@ -63,7 +58,6 @@ export const useForceLayout = (nodes, links, width, height) => {
             if (node) {
                 node.fx = null;
                 node.fy = null;
-                // 不要 restart，避免扰动
             }
         }
     }, []);

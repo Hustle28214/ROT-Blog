@@ -1,10 +1,9 @@
-// src/components/SkillGraph/ForceDirectedGraph.jsx
 import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import { useForceLayout } from '../../hooks/useForceLayout';
 import { zoom, zoomIdentity } from 'd3-zoom';
 import { select } from 'd3-selection';
 
-// ✅ 单独提取 NodeComponent 并用 React.memo 优化
+
 const NodeComponent = React.memo(({
     node,
     isSelected,
@@ -25,7 +24,7 @@ const NodeComponent = React.memo(({
             onMouseLeave={() => onHover(node, false)}
             style={{ cursor: 'pointer' }}
         >
-            {/* 选中光环 */}
+
             {isSelected && (
                 <circle
                     r={hoverSize + 6}
@@ -36,7 +35,6 @@ const NodeComponent = React.memo(({
                 />
             )}
 
-            {/* 节点阴影 */}
             <circle
                 r={hoverSize}
                 fill={getNodeColor(node)}
@@ -44,7 +42,6 @@ const NodeComponent = React.memo(({
                 opacity={0.8}
             />
 
-            {/* 节点主体 */}
             <circle
                 r={hoverSize - 1}
                 fill={getNodeColor(node)}
@@ -52,14 +49,12 @@ const NodeComponent = React.memo(({
                 strokeWidth={isSelected ? 3 : 2}
             />
 
-            {/* 高光 */}
             <circle
                 r={hoverSize - 4}
                 fill="url(#node-gradient)"
                 opacity="0.3"
             />
 
-            {/* 进度环 */}
             {node.progress > 0 && node.progress < 100 && (
                 <circle
                     r={hoverSize + 2}
@@ -71,7 +66,6 @@ const NodeComponent = React.memo(({
                 />
             )}
 
-            {/* 掌握状态 */}
             {node.status === 'mastered' && (
                 <circle
                     r={hoverSize / 2.5}
@@ -81,7 +75,6 @@ const NodeComponent = React.memo(({
                 />
             )}
 
-            {/* 节点标签 */}
             <text
                 textAnchor="middle"
                 dy={hoverSize + 16}
@@ -97,7 +90,6 @@ const NodeComponent = React.memo(({
                 {node.title}
             </text>
 
-            {/* 级别标签 */}
             {(isSelected || isHovered) && node.level && node.type === 'skill' && (
                 <text
                     textAnchor="middle"
@@ -117,7 +109,7 @@ const NodeComponent = React.memo(({
         </g>
     );
 }, (prevProps, nextProps) => {
-    // 只有关键属性变化才重渲染
+    
     return (
         prevProps.node.id === nextProps.node.id &&
         prevProps.isSelected === nextProps.isSelected &&
@@ -150,7 +142,7 @@ const ForceDirectedGraph = ({
     const nodeRefs = useRef(new Map());
     const linkRefs = useRef(new Map());
 
-    // 过滤节点和链接
+   
     const { displayNodes, displayLinks, categoryCenter } = useMemo(() => {
         if (!filteredCategory) {
             const validNodes = nodes.map(node => ({
@@ -240,7 +232,6 @@ const ForceDirectedGraph = ({
         };
     }, [nodes, links, width, height, filteredCategory]);
 
-    // 处理 centerOnCategory
     useEffect(() => {
         if (centerOnCategory && centerOnCategory !== filteredCategory) {
             setFilteredCategory(centerOnCategory);
@@ -248,7 +239,6 @@ const ForceDirectedGraph = ({
         }
     }, [centerOnCategory, filteredCategory, stopSimulation]);
 
-    // 自动居中分类
     useEffect(() => {
         if (categoryCenter && zoomBehaviorRef.current && svgRef.current) {
             const svg = select(svgRef.current);
@@ -322,12 +312,11 @@ const ForceDirectedGraph = ({
         }
     }, [displayNodes, width, height, filteredCategory]);
 
-    // ✅ 核心修复：ticked 中检查 DOM 是否仍连接
+
     useEffect(() => {
         if (!simulation) return;
 
         const ticked = () => {
-            // 更新链接
             displayLinks.forEach(link => {
                 const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
                 const targetId = typeof link.target === 'object' ? link.target.id : link.target;
@@ -352,7 +341,6 @@ const ForceDirectedGraph = ({
                 }
             });
 
-            // 更新节点
             simulation.nodes().forEach(node => {
                 const posX = isValidNumber(node.fx) ? node.fx : node.x;
                 const posY = isValidNumber(node.fy) ? node.fy : node.y;
@@ -371,7 +359,6 @@ const ForceDirectedGraph = ({
         return () => simulation.on('tick', null);
     }, [simulation, displayLinks]);
 
-    // 检查模拟状态
     useEffect(() => {
         if (simulation && displayNodes.length > 0) {
             const hasValidPositions = simulation.nodes().some(node =>
@@ -384,7 +371,6 @@ const ForceDirectedGraph = ({
         }
     }, [simulation, displayNodes, width, height]);
 
-    // 重置视图
     const resetView = useCallback(() => {
         if (svgRef.current && displayNodes.length > 0 && zoomBehaviorRef.current) {
             const svg = select(svgRef.current);
@@ -423,7 +409,6 @@ const ForceDirectedGraph = ({
         }
     }, [displayNodes, nodes, width, height, filteredCategory]);
 
-    // 节点点击
     const handleNodeClick = useCallback((node, event) => {
         if (!isDragging.current) {
             event.stopPropagation();
@@ -436,7 +421,6 @@ const ForceDirectedGraph = ({
         isDragging.current = false;
     }, [stopSimulation, onSelectNode]);
 
-    // 背景点击
     const handleBackgroundClick = useCallback((event) => {
         if (!isDragging.current && event.target === event.currentTarget) {
             stopSimulation();
@@ -445,13 +429,11 @@ const ForceDirectedGraph = ({
         isDragging.current = false;
     }, [stopSimulation, onSelectNode]);
 
-    // 清除分类过滤
     const clearCategoryFilter = useCallback(() => {
         setFilteredCategory(null);
         onSelectNode(null);
     }, [onSelectNode]);
 
-    // 悬停处理
     const handleNodeHover = useCallback((node, isHovering) => {
         if (isHovering) {
             fixNode(node.id);
@@ -491,7 +473,7 @@ const ForceDirectedGraph = ({
                 )}
 
                 <div className="usage-tip">
-                    提示: 拖拽移动，滚轮缩放，R重置，ESC返回
+                    提示: 拖拽移动，滚轮缩放，点击节点查看详情
                 </div>
             </div>
 
@@ -523,7 +505,7 @@ const ForceDirectedGraph = ({
                 <rect width="100%" height="100%" fill="transparent" style={{ cursor: 'grab' }} />
 
                 <g ref={zoomContainerRef}>
-                    {/* 链接 */}
+                    
                     {displayLinks.map((link) => {
                         const id = link.id || `${typeof link.source === 'object' ? link.source.id : link.source}-${typeof link.target === 'object' ? link.target.id : link.target}`;
                         return (
@@ -539,7 +521,7 @@ const ForceDirectedGraph = ({
                         );
                     })}
 
-                    {/* 节点 - 使用优化后的组件 */}
+                    
                     {displayNodes.map(node => {
                         const isSelected = selectedNode?.id === node.id;
                         const isHovered = hoveredNode?.id === node.id;
@@ -595,7 +577,7 @@ const ForceDirectedGraph = ({
     );
 };
 
-// 工具函数（保持不变）
+
 const getNodeColor = (node) => {
     const colorMap = {
         Computering: '#3B82F6',

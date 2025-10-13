@@ -1,9 +1,7 @@
-// src/components/SkillGraph/SkillLink.jsx
 import React from 'react';
 import { motion } from 'framer-motion';
 
 const SkillLink = ({ link, selectedNode, hoveredNode }) => {
-    // 获取源节点和目标节点的位置
     const source = typeof link.source === 'object' ? link.source : { x: 0, y: 0 };
     const target = typeof link.target === 'object' ? link.target : { x: 0, y: 0 };
 

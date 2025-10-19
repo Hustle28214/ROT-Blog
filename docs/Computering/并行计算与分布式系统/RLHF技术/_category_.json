@@ -1,6 +1,6 @@
 {
-    "label": "GPU编程",
-    "position": 6,
+    "label": "RLHF技术",
+    "position": 5,
     "link": {
       "type": "generated-index"
     }

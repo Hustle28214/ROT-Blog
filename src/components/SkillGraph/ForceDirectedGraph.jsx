@@ -90,7 +90,7 @@ const NodeComponent = React.memo(({
                 {node.title}
             </text>
 
-            {(isSelected || isHovered) && node.level && node.type === 'skill' && (
+            {(isSelected || isHovered) && node.level && node.type === 'skills' && (
                 <text
                     textAnchor="middle"
                     dy={hoverSize + 30}
@@ -166,7 +166,8 @@ const ForceDirectedGraph = ({
 
         const categoryNodes = nodes.filter(node =>
             node.category === filteredCategory ||
-            (node.type === 'category' && node.id === filteredCategory)
+            node.id === filteredCategory || 
+            (node.subcategories && `${node.category}-${node.subcategories}` === filteredCategory)
         );
 
         const getRelatedNodes = (startNodes, allNodes, allLinks) => {
@@ -410,16 +411,17 @@ const ForceDirectedGraph = ({
     }, [displayNodes, nodes, width, height, filteredCategory]);
 
     const handleNodeClick = useCallback((node, event) => {
-        if (!isDragging.current) {
-            event.stopPropagation();
-            stopSimulation(true);
-            if (node.type === 'category') {
-                setFilteredCategory(node.category || node.id);
-            }
-            onSelectNode(node);
+    if (!isDragging.current) {
+        event.stopPropagation();
+        stopSimulation(true);
+        
+        if (['category', 'subcategories', 'topics'].includes(node.type)) {
+            setFilteredCategory(node.id);
         }
-        isDragging.current = false;
-    }, [stopSimulation, onSelectNode]);
+        onSelectNode(node);
+    }
+    isDragging.current = false;
+}, [stopSimulation, onSelectNode]);
 
     const handleBackgroundClick = useCallback((event) => {
         if (!isDragging.current && event.target === event.currentTarget) {
@@ -597,8 +599,9 @@ const getNodeColor = (node) => {
 const getNodeSize = (node) => {
     const baseSizes = {
         category: 28,
-        subcategory: 20,
-        skill: 14
+        subcategories: 20,
+        topics: 17,
+        skills: 14
     };
     const levelMultipliers = {
         beginner: 0.9,
@@ -613,9 +616,10 @@ const getNodeSize = (node) => {
 
 const getTextSize = (node) => {
     switch (node.type) {
-        case 'category': return 14;
-        case 'subcategory': return 12;
-        case 'skill': return 10;
+        case 'category': return 16;
+        case 'subcategories': return 14;
+        case 'topics': return 12;
+        case 'skills': return 10;
         default: return 11;
     }
 };

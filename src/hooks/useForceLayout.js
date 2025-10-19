@@ -29,7 +29,7 @@ export const useForceLayout = (nodes, links, width, height) => {
                 .distance(100)
                 .strength(0.5))
             .force('collide', forceCollide().radius(d => {
-                const base = d.type === 'category' ? 28 : d.type === 'subcategory' ? 20 : 14;
+                const base = d.type === 'category' ? 28 : d.type === 'subcategories' ? 20 : 14;
                 return base * 1.2;
             }).strength(0.8))
             .alphaDecay(0.02);

@@ -1,14 +1,10 @@
-// src/hooks/useSkillData.js
 import { useMemo } from 'react';
 
 export const useSkillData = () => {
     return useMemo(() => {
         try {
             const data = generateCompleteDocsData();
-
-            // 验证数据完整性
             validateData(data);
-
             return data;
         } catch (error) {
             console.error('获取技能数据失败:', error);
@@ -17,1352 +13,906 @@ export const useSkillData = () => {
     }, []);
 };
 
-// 数据验证函数
 const validateData = (data) => {
     const { nodes, links } = data;
-
-    // 验证节点
     nodes.forEach(node => {
         if (!node.id) {
             console.warn('Node missing id:', node);
             node.id = `node-${Math.random().toString(36).substr(2, 9)}`;
         }
-
         if (!node.title) {
             console.warn('Node missing title:', node);
             node.title = '未命名节点';
         }
-
         if (!node.category) {
             console.warn('Node missing category:', node);
             node.category = 'other';
         }
-
         if (!node.type) {
             console.warn('Node missing type:', node);
             node.type = 'skill';
         }
-
-        // 验证文档路径
         if (node.docPath) {
             node.docPath = cleanDocPath(node.docPath);
         }
     });
 
-    // 验证链接
     const validLinks = links.filter(link => {
         const sourceExists = nodes.some(n => n.id === link.source);
         const targetExists = nodes.some(n => n.id === link.target);
-
         if (!sourceExists || !targetExists) {
             console.warn('Invalid link - missing nodes:', link);
             return false;
         }
-
         return true;
     });
-
     data.links = validLinks;
     console.log('Data validation complete:', {
         nodes: nodes.length,
         links: validLinks.length
     });
-
     return data;
 };
 
-// 清理文档路径函数 - 移除数字前缀和文件扩展名
 const cleanDocPath = (path) => {
     if (!path) return '';
-
-    // 移除文件扩展名
     let cleanPath = path.replace(/\.mdx?$/, '');
-
-    // 移除数字前缀（如 "01-"）
     cleanPath = cleanPath.replace(/\d+-/g, '');
-
-    // 确保路径不以斜杠开头
     cleanPath = cleanPath.replace(/^\//, '');
-
     return cleanPath;
 };
 
-// 基于你的完整docs结构生成数据
 const generateCompleteDocsData = () => {
     const nodes = [];
     const links = [];
 
-    // 完整的分类结构，与你的docs目录完全对应
+
     const categories = {
-        'Computering': {
-            color: '#3B82F6',
-            docPath: 'Computering/计算机科学与技术',
-            subcategories: {
-                'Linux': {
-                    docPath: 'Computering/Linux',
-                    skills: {
-                        'Shell基础': {
-                            docPath: 'Computering/Linux/Shell',
-                            level: 'beginner',
-                            tags: ['shell', 'linux']
-                        },
-                        'Shell工具与脚本': {
-                            docPath: 'Computering/Linux/Shell工具与脚本',
-                            level: 'intermediate',
-                            tags: ['scripting', 'tools']
-                        },
-                        'Linux系统简介': {
-                            docPath: 'Computering/Linux/Linux系统简介',
-                            level: 'beginner',
-                            tags: ['system']
-                        },
-                        'Linux文件系统': {
-                            docPath: 'Computering/Linux/Linux文件系统',
-                            level: 'intermediate',
-                            tags: ['filesystem']
-                        },
-                        'Shell压缩命令': {
-                            docPath: 'Computering/Linux/Shell压缩命令',
-                            level: 'beginner',
-                            tags: ['compression']
-                        },
-                        '字符设备驱动框架': {
-                            docPath: 'Computering/Linux/Linux驱动开发/字符设备驱动框架',
-                            level: 'advanced',
-                            tags: ['driver', 'kernel']
+    'Computering': {
+        color: '#3B82F6',
+        docPath: 'Computering/计算机科学与技术',
+        subcategories: {
+            '操作系统': {
+                docPath: 'Computering/操作系统',
+                topics: {
+                    'Linux': {
+                        docPath: 'Computering/操作系统/Linux',
+                        skills: {
+                            'Shell基础': { docPath: 'Computering/操作系统/Linux/Shell', level: 'beginner', tags: ['linux', 'shell'] },
+                            'Shell工具与脚本': { docPath: 'Computering/操作系统/Linux/Shell工具与脚本', level: 'intermediate', tags: ['linux', 'scripting'] },
+                            'Linux系统简介': { docPath: 'Computering/操作系统/Linux/Linux系统简介', level: 'beginner', tags: ['linux'] },
+                            'Linux文件系统': { docPath: 'Computering/操作系统/Linux/Linux文件系统', level: 'intermediate', tags: ['linux', 'filesystem'] },
+                            'Shell压缩命令': { docPath: 'Computering/操作系统/Linux/Shell压缩命令', level: 'beginner', tags: ['linux', 'compression'] }
                         }
-                    }
-                },
-                'WEB开发': {
-                    docPath: 'Computering/WEB开发',
-                    skills: {
-                        'WEB技能树': {
-                            docPath: 'Computering/WEB开发/WEB技能树',
-                            level: 'intermediate',
-                            tags: ['web', 'overview']
-                        },
-                        'Docusaurus插件': {
-                            docPath: 'Computering/WEB开发/Docusaurus/Plugins',
-                            level: 'intermediate',
-                            tags: ['docusaurus', 'plugins']
-                        },
-                        'Docusaurus Swizzle': {
-                            docPath: 'Computering/WEB开发/Docusaurus/Swizzle',
-                            level: 'advanced',
-                            tags: ['docusaurus', 'customization']
-                        },
-                        'Vercel部署': {
-                            docPath: 'Computering/WEB开发/Docusaurus/Vercel联合部署',
-                            level: 'intermediate',
-                            tags: ['deployment', 'vercel']
+                    },
+                    'Linux驱动开发': {
+                        docPath: 'Computering/操作系统/Linux/Linux驱动开发',
+                        skills: {
+                            '字符设备驱动框架': { docPath: 'Computering/操作系统/Linux/Linux驱动开发/字符设备驱动框架', level: 'advanced', tags: ['linux', 'driver'] }
                         }
-                    }
-                },
-                '信息安全': {
-                    docPath: 'Computering/信息安全',
-                    skills: {
-                        '密码基础': {
-                            docPath: 'Computering/信息安全/密码学/密码基础',
-                            level: 'intermediate',
-                            tags: ['crypto', 'security']
-                        }
-                    }
-                },
-                '实用工作流': {
-                    docPath: 'Computering/实用工作流',
-                    skills: {
-                        'Markdown入门': {
-                            docPath: 'Computering/实用工作流/8分钟入门Markdown',
-                            level: 'beginner',
-                            tags: ['markdown', 'writing']
-                        },
-                        'Git版本控制': {
-                            docPath: 'Computering/实用工作流/Git',
-                            level: 'intermediate',
-                            tags: ['git', 'version-control']
-                        }
-                    }
-                },
-                '并行计算与分布式系统': {
-                    docPath: 'Computering/并行计算与分布式系统',
-                    skills: {
-                        'P-tuning和Adapter': {
-                            docPath: 'Computering/并行计算与分布式系统/Fine-tunning/P-tuning和Adapter',
-                            level: 'advanced',
-                            tags: ['fine-tuning', 'efficiency']
-                        },
-                        '全量微调': {
-                            docPath: 'Computering/并行计算与分布式系统/Fine-tunning/全量微调',
-                            level: 'advanced',
-                            tags: ['fine-tuning']
-                        },
-                        '显存计算': {
-                            docPath: 'Computering/并行计算与分布式系统/Fine-tunning/显存计算',
-                            level: 'advanced',
-                            tags: ['gpu', 'memory']
-                        },
-                        '模型评估': {
-                            docPath: 'Computering/并行计算与分布式系统/Fine-tunning/模型评估',
-                            level: 'intermediate',
-                            tags: ['evaluation', 'metrics']
-                        },
-                        'CUDA基础': {
-                            docPath: 'Computering/并行计算与分布式系统/GPU编程/CUDA基础',
-                            level: 'intermediate',
-                            tags: ['gpu', 'cuda']
-                        },
-                        'DPO和PPO算法': {
-                            docPath: 'Computering/并行计算与分布式系统/RLHF技术/DPO和PPO算法',
-                            level: 'advanced',
-                            tags: ['rlhf', 'alignment']
-                        },
-                        'Reward Model': {
-                            docPath: 'Computering/并行计算与分布式系统/RLHF技术/Reward Model',
-                            level: 'advanced',
-                            tags: ['rlhf', 'reward']
-                        },
-                        'RLHF': {
-                            docPath: 'Computering/并行计算与分布式系统/RLHF技术/RLHF',
-                            level: 'advanced',
-                            tags: ['rlhf', 'alignment']
-                        },
-                        '绪论': {
-                            docPath: 'Computering/并行计算与分布式系统/协同进化计算与多智能体系统/绪论',
-                            level: 'intermediate',
-                            tags: ['multi-agent', 'evolution']
-                        },
-                        'MOE并行与Deepspeed': {
-                            docPath: 'Computering/并行计算与分布式系统/模型分布式训练和并行计算/MOE并行与Deepspeed',
-                            level: 'advanced',
-                            tags: ['distributed', 'moe']
-                        },
-                        '多维混合并行与自动并行': {
-                            docPath: 'Computering/并行计算与分布式系统/模型分布式训练和并行计算/多维混合并行与自动并行',
-                            level: 'advanced',
-                            tags: ['parallel', 'automation']
-                        },
-                        '数据并行和模型并行': {
-                            docPath: 'Computering/并行计算与分布式系统/模型分布式训练和并行计算/数据并行和模型并行',
-                            level: 'intermediate',
-                            tags: ['parallel', 'distributed']
-                        },
-                        '流水线并行与张量并行': {
-                            docPath: 'Computering/并行计算与分布式系统/模型分布式训练和并行计算/流水线并行与张量并行',
-                            level: 'advanced',
-                            tags: ['pipeline', 'tensor']
-                        },
-                        'HIP异构编程模型': {
-                            docPath: 'Computering/并行计算与分布式系统/高性能计算HPC/HIP异构编程模型',
-                            level: 'advanced',
-                            tags: ['hpc', 'hip']
-                        },
-                        '优化程序性能方法概览': {
-                            docPath: 'Computering/并行计算与分布式系统/高性能计算HPC/优化程序性能方法概览',
-                            level: 'intermediate',
-                            tags: ['optimization', 'performance']
-                        }
-                    }
-                },
-                '数字图像处理': {
-                    docPath: 'Computering/数字图像处理',
-                    skills: {
-                        '数字图像基础': {
-                            docPath: 'Computering/数字图像处理/数字图像基础',
-                            level: 'intermediate',
-                            tags: ['image-processing', 'basics']
-                        },
-                        '数字图像特征': {
-                            docPath: 'Computering/数字图像处理/数字图像特征',
-                            level: 'intermediate',
-                            tags: ['features', 'analysis']
-                        },
-                        '离散二维处理': {
-                            docPath: 'Computering/数字图像处理/离散二维处理',
-                            level: 'advanced',
-                            tags: ['2d', 'processing']
-                        },
-                        '图像改进': {
-                            docPath: 'Computering/数字图像处理/图像改进',
-                            level: 'intermediate',
-                            tags: ['enhancement', 'improvement']
-                        },
-                        '图像分析': {
-                            docPath: 'Computering/数字图像处理/图像分析',
-                            level: 'advanced',
-                            tags: ['analysis', 'processing']
-                        },
-                        '图像处理软件': {
-                            docPath: 'Computering/数字图像处理/图像处理软件',
-                            level: 'beginner',
-                            tags: ['software', 'tools']
-                        },
-                        'YOLOv10速通': {
-                            docPath: 'Computering/数字图像处理/速通yoloV10',
-                            level: 'advanced',
-                            tags: ['yolo', 'object-detection']
-                        }
-                    }
-                },
-                '数据结构与算法': {
-                    docPath: 'Computering/数据结构与算法',
-                    skills: {
-                        '数据结构概述': {
-                            docPath: 'Computering/数据结构与算法/数据结构',
-                            level: 'intermediate',
-                            tags: ['data-structures', 'overview']
-                        },
-                        '算法概述': {
-                            docPath: 'Computering/数据结构与算法/算法',
-                            level: 'intermediate',
-                            tags: ['algorithms', 'overview']
-                        },
-                        'KMP算法': {
-                            docPath: 'Computering/数据结构与算法/数据结构/KMP',
-                            level: 'advanced',
-                            tags: ['string-matching', 'algorithm']
-                        },
-                        'Trie树': {
-                            docPath: 'Computering/数据结构与算法/数据结构/Trie',
-                            level: 'intermediate',
-                            tags: ['trie', 'data-structure']
-                        },
-                        '栈': {
-                            docPath: 'Computering/数据结构与算法/数据结构/栈',
-                            level: 'beginner',
-                            tags: ['stack', 'data-structure']
-                        },
-                        '链表与邻接表': {
-                            docPath: 'Computering/数据结构与算法/数据结构/链表与邻接表',
-                            level: 'intermediate',
-                            tags: ['linked-list', 'graph']
-                        },
-                        '队列': {
-                            docPath: 'Computering/数据结构与算法/数据结构/队列',
-                            level: 'beginner',
-                            tags: ['queue', 'data-structure']
-                        },
-                        '排序算法': {
-                            docPath: 'Computering/数据结构与算法/算法/排序',
-                            level: 'intermediate',
-                            tags: ['sorting', 'algorithms']
-                        },
-                        '动态规划基础': {
-                            docPath: 'Computering/数据结构与算法/算法/简单DP',
-                            level: 'intermediate',
-                            tags: ['dynamic-programming', 'algorithms']
-                        }
-                    }
-                },
-                '机器学习': {
-                    docPath: 'Computering/机器学习',
-                    skills: {
-                        '监督学习': {
-                            docPath: 'Computering/机器学习/AAAMLP/SupervisedLearning监督学习',
-                            level: 'intermediate',
-                            tags: ['supervised-learning', 'ml']
-                        },
-                        '交叉验证': {
-                            docPath: 'Computering/机器学习/AAAMLP/CrossValidation交叉验证',
-                            level: 'intermediate',
-                            tags: ['cross-validation', 'evaluation']
-                        },
-                        '评估指标': {
-                            docPath: 'Computering/机器学习/AAAMLP/EvaluationMetrics评估指标',
-                            level: 'intermediate',
-                            tags: ['metrics', 'evaluation']
-                        },
-                        '组织机器学习项目': {
-                            docPath: 'Computering/机器学习/AAAMLP/ArrangingMLProjects组织机器学习',
-                            level: 'intermediate',
-                            tags: ['project-management', 'mlops']
-                        },
-                        '处理分类变量': {
-                            docPath: 'Computering/机器学习/AAAMLP/ApproachingCategoricalVar处理分类变量',
-                            level: 'intermediate',
-                            tags: ['categorical-data', 'preprocessing']
-                        },
-                        '特征工程': {
-                            docPath: 'Computering/机器学习/AAAMLP/FeatureEngineering特征工程',
-                            level: 'intermediate',
-                            tags: ['feature-engineering', 'preprocessing']
-                        },
-                        '特征选择': {
-                            docPath: 'Computering/机器学习/AAAMLP/FeatureSelection特征选择',
-                            level: 'intermediate',
-                            tags: ['feature-selection', 'optimization']
-                        },
-                        '超参数优化': {
-                            docPath: 'Computering/机器学习/AAAMLP/HyperparameterOptimization超参数优化',
-                            level: 'advanced',
-                            tags: ['hyperparameter-tuning', 'optimization']
-                        },
-                        '图像分类和分割': {
-                            docPath: 'Computering/机器学习/AAAMLP/ApproachingImageClassification&Segmentation图像分类和分割',
-                            level: 'advanced',
-                            tags: ['image-classification', 'segmentation']
-                        },
-                        '文本分类或回归': {
-                            docPath: 'Computering/机器学习/AAAMLP/ApproachingTextClassification&Regression文本分类或回归',
-                            level: 'advanced',
-                            tags: ['nlp', 'text-classification']
-                        },
-                        '组合和堆叠': {
-                            docPath: 'Computering/机器学习/AAAMLP/ApproachingEnsembling&Stacking组合和堆叠',
-                            level: 'advanced',
-                            tags: ['ensemble', 'stacking']
-                        },
-                        '可重复代码和模型': {
-                            docPath: 'Computering/机器学习/AAAMLP/ApproachingReproducibleCode&ModelServing可重复代码和模型',
-                            level: 'intermediate',
-                            tags: ['reproducibility', 'mlops']
-                        },
-                        '阅读提示': {
-                            docPath: 'Computering/机器学习/AAAMLP/阅读本系列的提示',
-                            level: 'beginner',
-                            tags: ['guidance', 'learning']
-                        },
-                        'Bellman公式': {
-                            docPath: 'Computering/机器学习/强化学习/bellman公式',
-                            level: 'advanced',
-                            tags: ['reinforcement-learning', 'bellman']
-                        },
-                        '推荐系统概述': {
-                            docPath: 'Computering/机器学习/推荐系统/概述',
-                            level: 'intermediate',
-                            tags: ['recommendation', 'overview']
-                        },
-                        '协同过滤': {
-                            docPath: 'Computering/机器学习/推荐系统/协同过滤',
-                            level: 'intermediate',
-                            tags: ['collaborative-filtering', 'recommendation']
-                        },
-                        '深度学习概览': {
-                            docPath: 'Computering/机器学习/深度学习/深度学习概览',
-                            level: 'intermediate',
-                            tags: ['deep-learning', 'overview']
-                        },
-                        'BP神经网络': {
-                            docPath: 'Computering/机器学习/深度学习/BP神经网络',
-                            level: 'advanced',
-                            tags: ['neural-networks', 'backpropagation']
-                        },
-                        'LSTM': {
-                            docPath: 'Computering/机器学习/深度学习/LSTM',
-                            level: 'advanced',
-                            tags: ['lstm', 'rnn']
-                        }
-                    }
-                },
-                '编程语言': {
-                    docPath: 'Computering/编程语言',
-                    skills: {
-                        '编程语言概述': {
-                            docPath: 'Computering/编程语言/编程语言',
-                            level: 'beginner',
-                            tags: ['programming', 'overview']
-                        },
-                        'C++概述': {
-                            docPath: 'Computering/编程语言/C++/C++概述',
-                            level: 'beginner',
-                            tags: ['c++', 'overview']
-                        },
-                        'C++程序组成': {
-                            docPath: 'Computering/编程语言/C++/C++程序的基本组成',
-                            level: 'beginner',
-                            tags: ['c++', 'basics']
-                        },
-                        '标识符和数据类型': {
-                            docPath: 'Computering/编程语言/C++/标识符和数据类型',
-                            level: 'beginner',
-                            tags: ['c++', 'syntax']
-                        },
-                        'STL Vector': {
-                            docPath: 'Computering/编程语言/C++/STL/vector',
-                            level: 'intermediate',
-                            tags: ['c++', 'stl', 'containers']
-                        },
-                        'Rust基础语法': {
-                            docPath: 'Computering/编程语言/Rust/Rust基础语法',
-                            level: 'intermediate',
-                            tags: ['rust', 'syntax']
-                        },
-                        'OJ项目调研': {
-                            docPath: 'Computering/编程语言/项目：实现一个OJ/调研、技术选型',
-                            level: 'intermediate',
-                            tags: ['project', 'oj']
-                        },
-                        'ArkTS': {
-                            docPath: 'Computering/编程语言/鸿蒙/ArkTS',
-                            level: 'intermediate',
-                            tags: ['harmonyos', 'typescript']
-                        }
-                    }
-                },
-                '编译原理': {
-                    docPath: 'Computering/编译原理',
-                    skills: {
-                        'TinyC': {
-                            docPath: 'Computering/编译原理/TinyC',
-                            level: 'advanced',
-                            tags: ['compilers', 'tinyc']
-                        }
-                    }
-                },
-                '虚拟化容器': {
-                    docPath: 'Computering/虚拟化容器',
-                    skills: {
-                        'Kubernetes扫盲': {
-                            docPath: 'Computering/虚拟化容器/kubernetes扫盲',
-                            level: 'intermediate',
-                            tags: ['kubernetes', 'containers']
-                        }
-                    }
-                },
-                '计算机网络': {
-                    docPath: 'Computering/计算机网络',
-                    skills: {
-                        '数据通信': {
-                            docPath: 'Computering/计算机网络/数据通信',
-                            level: 'intermediate',
-                            tags: ['networking', 'data-communication']
-                        },
-                        '广域通信网': {
-                            docPath: 'Computering/计算机网络/广域通信网',
-                            level: 'intermediate',
-                            tags: ['wan', 'networking']
-                        },
-                        '局域网和城域网': {
-                            docPath: 'Computering/计算机网络/局域网和城域网',
-                            level: 'intermediate',
-                            tags: ['lan', 'man']
-                        },
-                        '无线通信网': {
-                            docPath: 'Computering/计算机网络/无线通信网',
-                            level: 'intermediate',
-                            tags: ['wireless', 'networking']
-                        },
-                        '下一代互联网': {
-                            docPath: 'Computering/计算机网络/下一代互联网',
-                            level: 'advanced',
-                            tags: ['ipv6', 'future-internet']
-                        },
-                        '网络安全': {
-                            docPath: 'Computering/计算机网络/网络安全',
-                            level: 'intermediate',
-                            tags: ['security', 'networking']
-                        },
-                        '网络操作系统': {
-                            docPath: 'Computering/计算机网络/网络操作系统与服务器',
-                            level: 'intermediate',
-                            tags: ['nos', 'servers']
-                        },
-                        '组网技术': {
-                            docPath: 'Computering/计算机网络/组网技术',
-                            level: 'intermediate',
-                            tags: ['networking', 'configuration']
-                        },
-                        '网络管理': {
-                            docPath: 'Computering/计算机网络/网络管理',
-                            level: 'intermediate',
-                            tags: ['network-management', 'administration']
-                        },
-                        '软件工程': {
-                            docPath: 'Computering/计算机网络/软件工程',
-                            level: 'intermediate',
-                            tags: ['software-engineering', 'development']
-                        },
-                        '知识产权和标准化': {
-                            docPath: 'Computering/计算机网络/知识产权和标准化',
-                            level: 'beginner',
-                            tags: ['ip', 'standards']
-                        },
-                        'DNS使用问题': {
-                            docPath: 'Computering/计算机网络/漫谈DNS使用问题',
-                            level: 'intermediate',
-                            tags: ['dns', 'networking']
-                        },
-                        '代理Proxy': {
-                            docPath: 'Computering/计算机网络/浅说代理Proxy',
-                            level: 'intermediate',
-                            tags: ['proxy', 'networking']
-                        },
-                        '传统发邮件方式': {
-                            docPath: 'Computering/计算机网络/如何用传统的方式发邮件',
-                            level: 'intermediate',
-                            tags: ['email', 'protocols']
+                    },
+                    'QEMU': {
+                        docPath: 'Computering/操作系统/QEMU',
+                        skills: {
+                            'Hypervisor（虚拟机监控器）': { docPath: 'Computering/操作系统/QEMU/Hypervisor（虚拟机监控器）', level: 'intermediate', tags: ['qemu', 'virtualization'] },
+                            '面向对象建模': { docPath: 'Computering/操作系统/QEMU/面向对象建模', level: 'intermediate', tags: ['qemu', 'modeling'] }
                         }
                     }
                 }
-            }
-        },
-        'Control': {
-            color: '#10B981',
-            docPath: 'Control/控制理论',
-            subcategories: {
-                'Simulink': {
-                    docPath: 'Control/Simulink',
-                    skills: {
-                        'Simulink入门': {
-                            docPath: 'Control/Simulink/Simulink入门',
-                            level: 'beginner',
-                            tags: ['simulink', 'simulation']
+            },
+            'WEB开发': {
+                docPath: 'Computering/WEB开发',
+                topics: {
+                    'Docusaurus': {
+                        docPath: 'Computering/WEB开发/Docusaurus',
+                        skills: {
+                            'Plugins': { docPath: 'Computering/WEB开发/Docusaurus/Plugins', level: 'intermediate', tags: ['docusaurus'] },
+                            'Swizzle': { docPath: 'Computering/WEB开发/Docusaurus/Swizzle', level: 'advanced', tags: ['docusaurus'] },
+                            'Vercel联合部署': { docPath: 'Computering/WEB开发/Docusaurus/Vercel联合部署', level: 'intermediate', tags: ['deployment'] }
                         }
                     }
                 },
-                '微机原理': {
-                    docPath: 'Control/微机原理',
-                    skills: {
-                        '计算机组成概览': {
-                            docPath: 'Control/微机原理/计算机组成概览',
-                            level: 'intermediate',
-                            tags: ['computer-architecture', 'microcontrollers']
-                        }
-                    }
-                },
-                '机电传动控制': {
-                    docPath: 'Control/机电传动控制',
-                    skills: {
-                        '概述': {
-                            docPath: 'Control/机电传动控制/概述',
-                            level: 'beginner',
-                            tags: ['electromechanical', 'overview']
-                        },
-                        '动力学基础': {
-                            docPath: 'Control/机电传动控制/机电传动系统的动力学基础',
-                            level: 'intermediate',
-                            tags: ['dynamics', 'modeling']
-                        },
-                        '直流电机': {
-                            docPath: 'Control/机电传动控制/直流电机的工作原理及特性',
-                            level: 'intermediate',
-                            tags: ['dc-motor', 'electrical']
-                        },
-                        '交流电机': {
-                            docPath: 'Control/机电传动控制/交流电机的工作原理及其特性',
-                            level: 'intermediate',
-                            tags: ['ac-motor', 'electrical']
-                        },
-                        '控制电机': {
-                            docPath: 'Control/机电传动控制/控制电机',
-                            level: 'advanced',
-                            tags: ['control-motors', 'automation']
-                        }
-                    }
-                },
-                '现代控制理论': {
-                    docPath: 'Control/现代控制理论',
-                    skills: {
-                        '绪论': {
-                            docPath: 'Control/现代控制理论/绪论',
-                            level: 'beginner',
-                            tags: ['modern-control', 'overview']
-                        },
-                        '状态空间表达式': {
-                            docPath: 'Control/现代控制理论/控制系统的状态空间表达式',
-                            level: 'intermediate',
-                            tags: ['state-space', 'modeling']
-                        },
-                        '状态空间解': {
-                            docPath: 'Control/现代控制理论/控制系统状态空间表达式的解',
-                            level: 'advanced',
-                            tags: ['state-space', 'solutions']
-                        },
-                        '能控性和能观性': {
-                            docPath: 'Control/现代控制理论/线性控制系统的能控性和能观性',
-                            level: 'advanced',
-                            tags: ['controllability', 'observability']
-                        },
-                        '李雅普诺夫方法': {
-                            docPath: 'Control/现代控制理论/稳定性与李雅普诺夫方法',
-                            level: 'advanced',
-                            tags: ['lyapunov', 'stability']
-                        },
-                        '线性系统综合': {
-                            docPath: 'Control/现代控制理论/线性定常系统的综合',
-                            level: 'advanced',
-                            tags: ['system-synthesis', 'control']
-                        },
-                        '最优控制': {
-                            docPath: 'Control/现代控制理论/最优控制',
-                            level: 'advanced',
-                            tags: ['optimal-control', 'optimization']
-                        }
-                    }
-                },
-                '自动控制原理': {
-                    docPath: 'Control/自动控制原理',
-                    skills: {
-                        'PID控制': {
-                            docPath: 'Control/自动控制原理/PID',
-                            level: 'intermediate',
-                            tags: ['pid', 'control']
-                        },
-                        '自动控制概念': {
-                            docPath: 'Control/自动控制原理/自动控制概念/自动控制的一般概念',
-                            level: 'beginner',
-                            tags: ['control-concepts', 'basics']
-                        },
-                        '控制系统数学模型': {
-                            docPath: 'Control/自动控制原理/自动控制概念/控制系统的数学模型',
-                            level: 'intermediate',
-                            tags: ['mathematical-models', 'control']
-                        }
-                    }
-                },
-                '高阶控制理论': {
-                    docPath: 'Control/高阶控制理论',
-                    skills: {
-                        '连续系统离散化': {
-                            docPath: 'Control/高阶控制理论/连续系统离散化',
-                            level: 'advanced',
-                            tags: ['discretization', 'control-systems']
-                        },
-                        '动态系统分析': {
-                            docPath: 'Control/高阶控制理论/动态系统分析',
-                            level: 'advanced',
-                            tags: ['dynamic-systems', 'analysis']
-                        },
-                        '系统可控性': {
-                            docPath: 'Control/高阶控制理论/系统的可控性',
-                            level: 'advanced',
-                            tags: ['controllability', 'systems']
+                skills: {
+                    'WEB技能树': { docPath: 'Computering/WEB开发/WEB技能树', level: 'intermediate', tags: ['web'] }
+                }
+            },
+            '信息安全': {
+                docPath: 'Computering/信息安全',
+                topics: {
+                    '密码学': {
+                        docPath: 'Computering/信息安全/密码学',
+                        skills: {
+                            '密码基础': { docPath: 'Computering/信息安全/密码学/密码基础', level: 'intermediate', tags: ['crypto'] }
                         }
                     }
                 }
-            }
-        },
-        'Electronic': {
-            color: '#F59E0B',
-            docPath: 'Electronic/电子科学与技术',
-            subcategories: {
-                'FOC': {
-                    docPath: 'Electronic/FOC',
-                    skills: {
-                        '标幺值': {
-                            docPath: 'Electronic/FOC/标幺值',
-                            level: 'intermediate',
-                            tags: ['foc', 'electrical']
-                        },
-                        '克拉克与帕克变换': {
-                            docPath: 'Electronic/FOC/克拉克变换与帕克变换',
-                            level: 'advanced',
-                            tags: ['clarke-park', 'transformations']
-                        },
-                        '开环调速': {
-                            docPath: 'Electronic/FOC/开环调速',
-                            level: 'intermediate',
-                            tags: ['speed-control', 'foc']
+            },
+            '实用工作流': {
+                docPath: 'Computering/实用工作流',
+                skills: {
+                    'Markdown入门': { docPath: 'Computering/实用工作流/8分钟入门Markdown', level: 'beginner', tags: ['markdown'] },
+                    'Git版本控制': { docPath: 'Computering/实用工作流/Git', level: 'intermediate', tags: ['git'] }
+                }
+            },
+            '并行计算与分布式系统': {
+                docPath: 'Computering/并行计算与分布式系统',
+                topics: {
+                    'Fine-tunning': {
+                        docPath: 'Computering/并行计算与分布式系统/Fine-tunning',
+                        skills: {
+                            'P-tuning和Adapter': { docPath: 'Computering/并行计算与分布式系统/Fine-tunning/P-tuning和Adapter', level: 'advanced', tags: ['fine-tuning'] },
+                            '全量微调': { docPath: 'Computering/并行计算与分布式系统/Fine-tunning/全量微调', level: 'advanced', tags: ['fine-tuning'] },
+                            '显存计算': { docPath: 'Computering/并行计算与分布式系统/Fine-tunning/显存计算', level: 'advanced', tags: ['gpu'] },
+                            '模型评估': { docPath: 'Computering/并行计算与分布式系统/Fine-tunning/模型评估', level: 'intermediate', tags: ['evaluation'] }
                         }
-                    }
-                },
-                'FPGA': {
-                    docPath: 'Electronic/FPGA',
-                    skills: {
-                        'Verilog简介': {
-                            docPath: 'Electronic/FPGA/Verilog/Verilog简介',
-                            level: 'beginner',
-                            tags: ['verilog', 'fpga']
-                        },
-                        'Verilog语法基础': {
-                            docPath: 'Electronic/FPGA/Verilog/Verilog语法基础',
-                            level: 'intermediate',
-                            tags: ['verilog', 'syntax']
+                    },
+                    'GPU编程': {
+                        docPath: 'Computering/并行计算与分布式系统/GPU编程',
+                        skills: {
+                            'CUDA基础': { docPath: 'Computering/并行计算与分布式系统/GPU编程/CUDA基础', level: 'intermediate', tags: ['gpu', 'cuda'] }
                         }
-                    }
-                },
-                '信号与系统': {
-                    docPath: 'Electronic/信号与系统',
-                    skills: {
-                        '信号与系统概述': {
-                            docPath: 'Electronic/信号与系统/信号与系统',
-                            level: 'beginner',
-                            tags: ['signals', 'systems']
-                        },
-                        '线性时不变系统': {
-                            docPath: 'Electronic/信号与系统/线性时不变系统',
-                            level: 'intermediate',
-                            tags: ['lti', 'systems']
-                        },
-                        '傅里叶级数': {
-                            docPath: 'Electronic/信号与系统/周期信号的傅里叶级数表示',
-                            level: 'intermediate',
-                            tags: ['fourier-series', 'signals']
-                        },
-                        '连续时间傅里叶变换': {
-                            docPath: 'Electronic/信号与系统/连续时间傅里叶变换',
-                            level: 'advanced',
-                            tags: ['fourier-transform', 'continuous']
-                        },
-                        '离散时间傅里叶变换': {
-                            docPath: 'Electronic/信号与系统/离散时间傅里叶变换',
-                            level: 'advanced',
-                            tags: ['dtft', 'discrete']
-                        },
-                        '时域和频域特性': {
-                            docPath: 'Electronic/信号与系统/信号与系统的时域和频域特性',
-                            level: 'intermediate',
-                            tags: ['time-domain', 'frequency-domain']
-                        },
-                        '采样': {
-                            docPath: 'Electronic/信号与系统/采样',
-                            level: 'intermediate',
-                            tags: ['sampling', 'signals']
-                        },
-                        '通信系统': {
-                            docPath: 'Electronic/信号与系统/通信系统',
-                            level: 'intermediate',
-                            tags: ['communication-systems']
-                        },
-                        '拉普拉斯变换': {
-                            docPath: 'Electronic/信号与系统/拉普拉斯变换',
-                            level: 'advanced',
-                            tags: ['laplace-transform', 'signals']
-                        },
-                        '卡尔曼滤波器': {
-                            docPath: 'Electronic/信号与系统/卡尔曼滤波器MATLAB实现',
-                            level: 'advanced',
-                            tags: ['kalman-filter', 'matlab']
+                    },
+                    'RLHF技术': {
+                        docPath: 'Computering/并行计算与分布式系统/RLHF技术',
+                        skills: {
+                            'DPO和PPO算法': { docPath: 'Computering/并行计算与分布式系统/RLHF技术/DPO和PPO算法', level: 'advanced', tags: ['rlhf'] },
+                            'Reward Model': { docPath: 'Computering/并行计算与分布式系统/RLHF技术/Reward Model', level: 'advanced', tags: ['reward'] },
+                            'RLHF': { docPath: 'Computering/并行计算与分布式系统/RLHF技术/RLHF', level: 'advanced', tags: ['rlhf'] }
                         }
-                    }
-                },
-                '嵌入式': {
-                    docPath: 'Electronic/嵌入式',
-                    skills: {
-                        '蓝桥杯嵌入式速通': {
-                            docPath: 'Electronic/嵌入式/速通蓝桥杯嵌入式',
-                            level: 'intermediate',
-                            tags: ['embedded', 'competition']
-                        },
-                        'FreeRTOS初步': {
-                            docPath: 'Electronic/嵌入式/FreeRTOS/FreeRTOS初步',
-                            level: 'intermediate',
-                            tags: ['freertos', 'rtos']
-                        },
-                        'GPIO': {
-                            docPath: 'Electronic/嵌入式/STM32/GPIO',
-                            level: 'beginner',
-                            tags: ['stm32', 'gpio']
-                        },
-                        '外部中断': {
-                            docPath: 'Electronic/嵌入式/STM32/EXTI外部中断',
-                            level: 'intermediate',
-                            tags: ['stm32', 'interrupts']
+                    },
+                    '协同进化计算与多智能体系统': {
+                        docPath: 'Computering/并行计算与分布式系统/协同进化计算与多智能体系统',
+                        skills: {
+                            '绪论': { docPath: 'Computering/并行计算与分布式系统/协同进化计算与多智能体系统/绪论', level: 'intermediate', tags: ['multi-agent'] }
                         }
-                        // 可以继续添加更多STM32技能...
-                    }
-                },
-                '滤波器设计': {
-                    docPath: 'Electronic/滤波器设计',
-                    skills: {
-                        '滤波器设计概述': {
-                            docPath: 'Electronic/滤波器设计/滤波器设计概述',
-                            level: 'beginner',
-                            tags: ['filters', 'design']
-                        },
-                        '频率响应与时间响应': {
-                            docPath: 'Electronic/滤波器设计/滤波器的频率响应与时间响应特性',
-                            level: 'intermediate',
-                            tags: ['frequency-response', 'time-response']
+                    },
+                    '模型分布式训练和并行计算': {
+                        docPath: 'Computering/并行计算与分布式系统/模型分布式训练和并行计算',
+                        skills: {
+                            'MOE并行与Deepspeed': { docPath: 'Computering/并行计算与分布式系统/模型分布式训练和并行计算/MOE并行与Deepspeed', level: 'advanced', tags: ['distributed'] },
+                            '多维混合并行与自动并行': { docPath: 'Computering/并行计算与分布式系统/模型分布式训练和并行计算/多维混合并行与自动并行', level: 'advanced', tags: ['parallel'] },
+                            '数据并行和模型并行': { docPath: 'Computering/并行计算与分布式系统/模型分布式训练和并行计算/数据并行和模型并行', level: 'intermediate', tags: ['parallel'] },
+                            '流水线并行与张量并行': { docPath: 'Computering/并行计算与分布式系统/模型分布式训练和并行计算/流水线并行与张量并行', level: 'advanced', tags: ['pipeline'] }
                         }
-                    }
-                },
-                '电源设计': {
-                    docPath: 'Electronic/电源设计',
-                    skills: {
-                        '电源系统介绍': {
-                            docPath: 'Electronic/电源设计/电源系统介绍',
-                            level: 'beginner',
-                            tags: ['power-supply', 'electronics']
+                    },
+                    '调度算法': {
+                        docPath: 'Computering/并行计算与分布式系统/调度算法',
+                        skills: {
+                            '调度算法简介': { docPath: 'Computering/并行计算与分布式系统/调度算法/调度算法简介', level: 'intermediate', tags: ['scheduling'] }
+                        }
+                    },
+                    '高性能计算HPC': {
+                        docPath: 'Computering/并行计算与分布式系统/高性能计算HPC',
+                        skills: {
+                            'HIP异构编程模型': { docPath: 'Computering/并行计算与分布式系统/高性能计算HPC/HIP异构编程模型', level: 'advanced', tags: ['hpc'] },
+                            '优化程序性能方法概览': { docPath: 'Computering/并行计算与分布式系统/高性能计算HPC/优化程序性能方法概览', level: 'intermediate', tags: ['optimization'] }
                         }
                     }
                 }
-            }
-        },
-        'Mathematics': {
-            color: '#8B5CF6',
-            docPath: 'Mathematics/数学基础',
-            subcategories: {
-                '微积分': {
-                    docPath: 'Mathematics/微积分',
-                    skills: {
-                        '微积分概述': {
-                            docPath: 'Mathematics/微积分/微积分',
-                            level: 'beginner',
-                            tags: ['calculus', 'overview']
-                        },
-                        '不定积分': {
-                            docPath: 'Mathematics/微积分/不定积分',
-                            level: 'intermediate',
-                            tags: ['integral-calculus', 'integration']
-                        },
-                        '多元函数微积分': {
-                            docPath: 'Mathematics/微积分/多元函数微积分学综合',
-                            level: 'advanced',
-                            tags: ['multivariable', 'calculus']
-                        },
-                        '多元函数极限与微分': {
-                            docPath: 'Mathematics/微积分/多元函数的极限、连续与微分',
-                            level: 'advanced',
-                            tags: ['multivariable', 'limits']
-                        },
-                        '定积分': {
-                            docPath: 'Mathematics/微积分/定积分',
-                            level: 'intermediate',
-                            tags: ['definite-integral', 'integration']
-                        },
-                        '微分中值定理': {
-                            docPath: 'Mathematics/微积分/微分中值定理',
-                            level: 'advanced',
-                            tags: ['mean-value-theorem', 'calculus']
-                        },
-                        '微分方程': {
-                            docPath: 'Mathematics/微积分/微分方程',
-                            level: 'advanced',
-                            tags: ['differential-equations', 'mathematics']
-                        },
-                        '级数': {
-                            docPath: 'Mathematics/微积分/级数',
-                            level: 'advanced',
-                            tags: ['series', 'mathematics']
-                        },
-                        '线面积分': {
-                            docPath: 'Mathematics/微积分/线面积分',
-                            level: 'advanced',
-                            tags: ['line-integral', 'surface-integral']
+            },
+            '数字图像处理': {
+                docPath: 'Computering/数字图像处理',
+                skills: {
+                    '数字图像基础': { docPath: 'Computering/数字图像处理/数字图像基础', level: 'intermediate', tags: ['image'] },
+                    '数字图像特征': { docPath: 'Computering/数字图像处理/数字图像特征', level: 'intermediate', tags: ['features'] },
+                    '离散二维处理': { docPath: 'Computering/数字图像处理/离散二维处理', level: 'advanced', tags: ['2d'] },
+                    '图像改进': { docPath: 'Computering/数字图像处理/图像改进', level: 'intermediate', tags: ['enhancement'] },
+                    '图像分析': { docPath: 'Computering/数字图像处理/图像分析', level: 'advanced', tags: ['analysis'] },
+                    '图像处理软件': { docPath: 'Computering/数字图像处理/图像处理软件', level: 'beginner', tags: ['software'] },
+                    'YOLOv10速通': { docPath: 'Computering/数字图像处理/速通yoloV10', level: 'advanced', tags: ['yolo'] }
+                }
+            },
+            '数据结构与算法': {
+                docPath: 'Computering/数据结构与算法',
+                topics: {
+                    '数据结构': {
+                        docPath: 'Computering/数据结构与算法/数据结构',
+                        skills: {
+                            'KMP': { docPath: 'Computering/数据结构与算法/数据结构/KMP', level: 'advanced', tags: ['string'] },
+                            'Trie': { docPath: 'Computering/数据结构与算法/数据结构/Trie', level: 'intermediate', tags: ['trie'] },
+                            '栈': { docPath: 'Computering/数据结构与算法/数据结构/栈', level: 'beginner', tags: ['stack'] },
+                            '链表与邻接表': { docPath: 'Computering/数据结构与算法/数据结构/链表与邻接表', level: 'intermediate', tags: ['linked-list'] },
+                            '队列': { docPath: 'Computering/数据结构与算法/数据结构/队列', level: 'beginner', tags: ['queue'] }
+                        }
+                    },
+                    '算法': {
+                        docPath: 'Computering/数据结构与算法/算法',
+                        skills: {
+                            '排序': { docPath: 'Computering/数据结构与算法/算法/排序', level: 'intermediate', tags: ['sorting'] },
+                            '简单DP': { docPath: 'Computering/数据结构与算法/算法/简单DP', level: 'intermediate', tags: ['dp'] }
                         }
                     }
                 },
-                '线性代数': {
-                    docPath: 'Mathematics/线性代数',
-                    skills: {
-                        '行列式': {
-                            docPath: 'Mathematics/线性代数/行列式',
-                            level: 'intermediate',
-                            tags: ['determinants', 'linear-algebra']
-                        },
-                        '矩阵运算': {
-                            docPath: 'Mathematics/线性代数/矩阵及其运算',
-                            level: 'intermediate',
-                            tags: ['matrices', 'linear-algebra']
-                        },
-                        '线性方程组': {
-                            docPath: 'Mathematics/线性代数/矩阵的初等变换与线性方程组',
-                            level: 'intermediate',
-                            tags: ['linear-equations', 'matrices']
-                        },
-                        '向量组线性相关性': {
-                            docPath: 'Mathematics/线性代数/向量组的线性相关性',
-                            level: 'advanced',
-                            tags: ['linear-dependence', 'vectors']
-                        },
-                        '相似矩阵与二次型': {
-                            docPath: 'Mathematics/线性代数/相似矩阵及二次型',
-                            level: 'advanced',
-                            tags: ['similar-matrices', 'quadratic-forms']
-                        },
-                        '线性空间': {
-                            docPath: 'Mathematics/线性代数/线性空间与线性变换',
-                            level: 'advanced',
-                            tags: ['vector-spaces', 'linear-transformations']
+                skills: {
+                    '数据结构概述': { docPath: 'Computering/数据结构与算法/数据结构', level: 'intermediate', tags: ['overview'] },
+                    '算法概述': { docPath: 'Computering/数据结构与算法/算法', level: 'intermediate', tags: ['overview'] }
+                }
+            },
+            '机器学习': {
+                docPath: 'Computering/机器学习',
+                topics: {
+                    'AAAMLP': {
+                        docPath: 'Computering/机器学习/AAAMLP',
+                        skills: {
+                            '监督学习': { docPath: 'Computering/机器学习/AAAMLP/SupervisedLearning监督学习', level: 'intermediate', tags: ['ml'] },
+                            '交叉验证': { docPath: 'Computering/机器学习/AAAMLP/CrossValidation交叉验证', level: 'intermediate', tags: ['evaluation'] },
+                            '评估指标': { docPath: 'Computering/机器学习/AAAMLP/EvaluationMetrics评估指标', level: 'intermediate', tags: ['metrics'] },
+                            '组织机器学习项目': { docPath: 'Computering/机器学习/AAAMLP/ArrangingMLProjects组织机器学习', level: 'intermediate', tags: ['mlops'] },
+                            '处理分类变量': { docPath: 'Computering/机器学习/AAAMLP/ApproachingCategoricalVar处理分类变量', level: 'intermediate', tags: ['preprocessing'] },
+                            '特征工程': { docPath: 'Computering/机器学习/AAAMLP/FeatureEngineering特征工程', level: 'intermediate', tags: ['feature'] },
+                            '特征选择': { docPath: 'Computering/机器学习/AAAMLP/FeatureSelection特征选择', level: 'intermediate', tags: ['selection'] },
+                            '超参数优化': { docPath: 'Computering/机器学习/AAAMLP/HyperparameterOptimization超参数优化', level: 'advanced', tags: ['tuning'] },
+                            '图像分类和分割': { docPath: 'Computering/机器学习/AAAMLP/ApproachingImageClassification&Segmentation图像分类和分割', level: 'advanced', tags: ['cv'] },
+                            '文本分类或回归': { docPath: 'Computering/机器学习/AAAMLP/ApproachingTextClassification&Regression文本分类或回归', level: 'advanced', tags: ['nlp'] },
+                            '组合和堆叠': { docPath: 'Computering/机器学习/AAAMLP/ApproachingEnsembling&Stacking组合和堆叠', level: 'advanced', tags: ['ensemble'] },
+                            '可重复代码和模型': { docPath: 'Computering/机器学习/AAAMLP/ApproachingReproducibleCode&ModelServing可重复代码和模型', level: 'intermediate', tags: ['reproducibility'] },
+                            '阅读提示': { docPath: 'Computering/机器学习/AAAMLP/阅读本系列的提示', level: 'beginner', tags: ['guide'] }
+                        }
+                    },
+                    '强化学习': {
+                        docPath: 'Computering/机器学习/强化学习',
+                        skills: {
+                            'Bellman公式': { docPath: 'Computering/机器学习/强化学习/bellman公式', level: 'advanced', tags: ['rl'] }
+                        }
+                    },
+                    '推荐系统': {
+                        docPath: 'Computering/机器学习/推荐系统',
+                        skills: {
+                            '概述': { docPath: 'Computering/机器学习/推荐系统/概述', level: 'intermediate', tags: ['recsys'] },
+                            '协同过滤': { docPath: 'Computering/机器学习/推荐系统/协同过滤', level: 'intermediate', tags: ['cf'] }
+                        }
+                    },
+                    '深度学习': {
+                        docPath: 'Computering/机器学习/深度学习',
+                        skills: {
+                            '深度学习概览': { docPath: 'Computering/机器学习/深度学习/深度学习概览', level: 'intermediate', tags: ['dl'] },
+                            'BP神经网络': { docPath: 'Computering/机器学习/深度学习/BP神经网络', level: 'advanced', tags: ['nn'] },
+                            'LSTM': { docPath: 'Computering/机器学习/深度学习/LSTM', level: 'advanced', tags: ['rnn'] }
+                        }
+                    }
+                }
+            },
+            '编程语言': {
+                docPath: 'Computering/编程语言',
+                topics: {
+                    'C++': {
+                        docPath: 'Computering/编程语言/C++',
+                        skills: {
+                            'C++概述': { docPath: 'Computering/编程语言/C++/C++概述', level: 'beginner', tags: ['cpp'] },
+                            'C++程序组成': { docPath: 'Computering/编程语言/C++/C++程序的基本组成', level: 'beginner', tags: ['cpp'] },
+                            '标识符和数据类型': { docPath: 'Computering/编程语言/C++/标识符和数据类型', level: 'beginner', tags: ['cpp'] }
+                        }
+                    },
+                    'STL': {
+                        docPath: 'Computering/编程语言/C++/STL',
+                        skills: {
+                            'vector': { docPath: 'Computering/编程语言/C++/STL/vector', level: 'intermediate', tags: ['stl'] }
+                        }
+                    },
+                    'Rust': {
+                        docPath: 'Computering/编程语言/Rust',
+                        skills: {
+                            'Rust基础语法': { docPath: 'Computering/编程语言/Rust/Rust基础语法', level: 'intermediate', tags: ['rust'] }
+                        }
+                    },
+                    '项目：实现一个OJ': {
+                        docPath: 'Computering/编程语言/项目：实现一个OJ',
+                        skills: {
+                            '调研、技术选型': { docPath: 'Computering/编程语言/项目：实现一个OJ/调研、技术选型', level: 'intermediate', tags: ['project'] }
+                        }
+                    },
+                    '鸿蒙': {
+                        docPath: 'Computering/编程语言/鸿蒙',
+                        skills: {
+                            'ArkTS': { docPath: 'Computering/编程语言/鸿蒙/ArkTS', level: 'intermediate', tags: ['harmonyos'] }
                         }
                     }
                 },
-                '概率论与数理统计': {
-                    docPath: 'Mathematics/概率论与数理统计',
-                    skills: {
-                        '基本概念': {
-                            docPath: 'Mathematics/概率论与数理统计/基本概念',
-                            level: 'beginner',
-                            tags: ['probability', 'basics']
-                        },
-                        '随机变量及其分布': {
-                            docPath: 'Mathematics/概率论与数理统计/随机变量及其分布',
-                            level: 'intermediate',
-                            tags: ['random-variables', 'distributions']
-                        },
-                        '多维随机变量': {
-                            docPath: 'Mathematics/概率论与数理统计/多维随机变量及其分布',
-                            level: 'advanced',
-                            tags: ['multivariate', 'distributions']
-                        },
-                        '数字特征': {
-                            docPath: 'Mathematics/概率论与数理统计/随机变量的数字特征',
-                            level: 'intermediate',
-                            tags: ['expectation', 'variance']
-                        },
-                        '大数定律': {
-                            docPath: 'Mathematics/概率论与数理统计/大数定律及中心极限定理',
-                            level: 'advanced',
-                            tags: ['law-of-large-numbers', 'central-limit-theorem']
-                        },
-                        '参数估计': {
-                            docPath: 'Mathematics/概率论与数理统计/参数估计',
-                            level: 'intermediate',
-                            tags: ['parameter-estimation', 'statistics']
-                        },
-                        '假设检验': {
-                            docPath: 'Mathematics/概率论与数理统计/假设检验',
-                            level: 'intermediate',
-                            tags: ['hypothesis-testing', 'statistics']
-                        }
-                    }
+                skills: {
+                    '编程语言概述': { docPath: 'Computering/编程语言/编程语言', level: 'beginner', tags: ['programming'] }
                 }
-            }
-        },
-        'Robotics': {
-            color: '#EF4444',
-            docPath: 'Robotics/机器人学',
-            subcategories: {
-                'ROS': {
-                    docPath: 'Robotics/ROS',
-                    skills: {
-                        'ROS基本操作': {
-                            docPath: 'Robotics/ROS/ROS基本操作',
-                            level: 'beginner',
-                            tags: ['ros', 'basics']
-                        },
-                        '话题通信': {
-                            docPath: 'Robotics/ROS/话题通信机制',
-                            level: 'intermediate',
-                            tags: ['ros', 'communication']
-                        },
-                        'ROS安装': {
-                            docPath: 'Robotics/ROS/ROS安装流程',
-                            level: 'beginner',
-                            tags: ['ros', 'installation']
-                        },
-                        'Coppeliasim': {
-                            docPath: 'Robotics/ROS/Coppeliasim',
-                            level: 'intermediate',
-                            tags: ['coppeliasim', 'simulation']
-                        }
-                    }
-                },
-                '机器人学导论': {
-                    docPath: 'Robotics/机器人学导论',
-                    skills: {
-                        '空间描述与变换': {
-                            docPath: 'Robotics/机器人学导论/空间描述与变换',
-                            level: 'intermediate',
-                            tags: ['kinematics', 'transformations']
-                        },
-                        '正运动学': {
-                            docPath: 'Robotics/机器人学导论/机器人正运动学',
-                            level: 'intermediate',
-                            tags: ['forward-kinematics', 'robotics']
-                        },
-                        '逆运动学': {
-                            docPath: 'Robotics/机器人学导论/机器人逆运动学',
-                            level: 'advanced',
-                            tags: ['inverse-kinematics', 'robotics']
-                        }
-                    }
-                },
-                '机器人运动控制': {
-                    docPath: 'Robotics/机器人运动控制',
-                    skills: {
-                        '概述': {
-                            docPath: 'Robotics/机器人运动控制/概述',
-                            level: 'beginner',
-                            tags: ['motion-control', 'overview']
-                        },
-                        '系统构成': {
-                            docPath: 'Robotics/机器人运动控制/机器人系统构成',
-                            level: 'intermediate',
-                            tags: ['system-architecture', 'robotics']
-                        }
-                    }
+            },
+            '编译原理': {
+                docPath: 'Computering/编译原理',
+                skills: {
+                    'TinyC': { docPath: 'Computering/编译原理/TinyC', level: 'advanced', tags: ['compiler'] }
                 }
-            }
-        }, 'Machinery': {
-            color: '#DC2626',
-            docPath: 'Machinery/机械设计',
-            subcategories: {
-                'Pyslvs': {
-                    docPath: 'Machinery/Pyslvs',
-                    skills: {
-                        'Pyslvs使用教程': {
-                            docPath: 'Machinery/Pyslvs/Pyslvs使用教程',
-                            level: 'intermediate',
-                            tags: ['pyslvs', 'mechanism']
-                        }
-                    }
-                },
-                '机械设计': {
-                    docPath: 'Machinery/机械设计',
-                    skills: {
-                        '平面机构自由度': {
-                            docPath: 'Machinery/机械设计/平面机构的自由度和速度分析',
-                            level: 'intermediate',
-                            tags: ['mechanism', 'degrees-of-freedom']
-                        },
-                        '平面连杆机构': {
-                            docPath: 'Machinery/机械设计/平面连杆机构',
-                            level: 'intermediate',
-                            tags: ['linkage', 'mechanism']
-                        },
-                        '凸轮机构': {
-                            docPath: 'Machinery/机械设计/凸轮机构',
-                            level: 'intermediate',
-                            tags: ['cam', 'mechanism']
-                        },
-                        '齿轮机构': {
-                            docPath: 'Machinery/机械设计/齿轮机构',
-                            level: 'intermediate',
-                            tags: ['gear', 'mechanism']
-                        },
-                        '轮系': {
-                            docPath: 'Machinery/机械设计/轮系',
-                            level: 'intermediate',
-                            tags: ['gear-train', 'mechanism']
-                        },
-                        '连接': {
-                            docPath: 'Machinery/机械设计/连接',
-                            level: 'intermediate',
-                            tags: ['connections', 'fasteners']
-                        },
-                        '齿轮传动': {
-                            docPath: 'Machinery/机械设计/齿轮传动',
-                            level: 'intermediate',
-                            tags: ['gear-transmission', 'mechanical']
-                        },
-                        '蜗杆传动': {
-                            docPath: 'Machinery/机械设计/蜗杆传动',
-                            level: 'advanced',
-                            tags: ['worm-gear', 'transmission']
-                        },
-                        '带传动': {
-                            docPath: 'Machinery/机械设计/带传动',
-                            level: 'intermediate',
-                            tags: ['belt-drive', 'transmission']
-                        },
-                        '轴': {
-                            docPath: 'Machinery/机械设计/轴',
-                            level: 'intermediate',
-                            tags: ['shaft', 'mechanical']
-                        },
-                        '滚动轴承': {
-                            docPath: 'Machinery/机械设计/滚动轴承',
-                            level: 'intermediate',
-                            tags: ['bearings', 'mechanical']
-                        }
-                    }
+            },
+            '虚拟化容器': {
+                docPath: 'Computering/虚拟化容器',
+                skills: {
+                    'Kubernetes扫盲': { docPath: 'Computering/虚拟化容器/kubernetes扫盲', level: 'intermediate', tags: ['k8s'] }
                 }
-            }
-        },
-        'Mechanics': {
-            color: '#7C3AED',
-            docPath: 'Mechanics/力学',
-            subcategories: {
-                'Adams': {
-                    docPath: 'Mechanics/Adams',
-                    skills: {
-                        'Adams入门教程': {
-                            docPath: 'Mechanics/Adams/Adams入门教程',
-                            level: 'intermediate',
-                            tags: ['adams', 'simulation']
-                        }
-                    }
-                },
-                '刚体动力学': {
-                    docPath: 'Mechanics/刚体动力学',
-                    skills: {
-                        'RBDL Dynamics': {
-                            docPath: 'Mechanics/刚体动力学/RBDL/Dynamics',
-                            level: 'advanced',
-                            tags: ['rbdl', 'dynamics']
-                        },
-                        'RBDL Details': {
-                            docPath: 'Mechanics/刚体动力学/RBDL/Details',
-                            level: 'advanced',
-                            tags: ['rbdl', 'details']
-                        }
-                    }
-                }
-            }
-        },
-        'Paper': {
-            color: '#059669',
-            docPath: 'Paper',
-            subcategories: {
-                '论文复现': {
-                    docPath: 'Paper/论文复现',
-                    skills: {
-                        'CodeAsPolicies': {
-                            docPath: 'Paper/论文复现/CodeAsPolicies-JackyLiang等',
-                            level: 'advanced',
-                            tags: ['paper-reproduction', 'robotics']
-                        },
-                        'ViT': {
-                            docPath: 'Paper/论文复现/ViT-Alexey Dosovitskiy等',
-                            level: 'advanced',
-                            tags: ['vision-transformer', 'computer-vision']
-                        },
-                        'Voxposer': {
-                            docPath: 'Paper/论文复现/Voxposer-李飞飞等',
-                            level: 'advanced',
-                            tags: ['voxposer', 'robotics']
-                        }
-                    }
-                }
-            }
-        },
-        'PLC': {
-            color: '#D97706',
-            docPath: 'PLC',
-            subcategories: {
-                'Siemens PLC': {
-                    docPath: 'PLC',
-                    skills: {
-                        'Siemens PLC': {
-                            docPath: 'PLC/Siemens PLC',
-                            level: 'intermediate',
-                            tags: ['plc', 'industrial-automation']
-                        }
-                    }
-                }
-            }
-        },
-        'Sensor': {
-            color: '#0D9488',
-            docPath: 'Sensor/仪器科学与技术',
-            subcategories: {
-                '传感器与机器人感知技术': {
-                    docPath: 'Sensor/传感器与机器人感知技术',
-                    skills: {
-                        '概述': {
-                            docPath: 'Sensor/传感器与机器人感知技术/概述',
-                            level: 'beginner',
-                            tags: ['sensors', 'overview']
-                        },
-                        '信号采集与处理': {
-                            docPath: 'Sensor/传感器与机器人感知技术/传感器信号采集及数据处理技术',
-                            level: 'intermediate',
-                            tags: ['signal-processing', 'data-acquisition']
-                        },
-                        '内部传感器': {
-                            docPath: 'Sensor/传感器与机器人感知技术/机器人内部传感器',
-                            level: 'intermediate',
-                            tags: ['internal-sensors', 'robotics']
-                        },
-                        '外部传感器': {
-                            docPath: 'Sensor/传感器与机器人感知技术/机器人外部传感器',
-                            level: 'intermediate',
-                            tags: ['external-sensors', 'robotics']
-                        },
-                        '智能传感器': {
-                            docPath: 'Sensor/传感器与机器人感知技术/智能传感器及新型传感器',
-                            level: 'advanced',
-                            tags: ['smart-sensors', 'emerging-technology']
-                        },
-                        '应用示例': {
-                            docPath: 'Sensor/传感器与机器人感知技术/机器人及机械臂上传感器的应用示例',
-                            level: 'intermediate',
-                            tags: ['sensor-applications', 'robotics']
-                        }
-                    }
-                }
-            }
-        },
-        'Synbio': {
-            color: '#65A30D',
-            docPath: 'Synbio/生物信息学',
-            subcategories: {
-                '生物信息学': {
-                    docPath: 'Synbio',
-                    skills: {
-                        '生物信息学': {
-                            docPath: 'Synbio/生物信息学',
-                            level: 'intermediate',
-                            tags: ['bioinformatics', 'biology']
-                        },
-                        '化信问题解决': {
-                            docPath: 'Synbio/记替朋友解决的一个化信问题',
-                            level: 'intermediate',
-                            tags: ['problem-solving', 'chemistry']
-                        }
-                    }
+            },
+            '计算机网络': {
+                docPath: 'Computering/计算机网络',
+                skills: {
+                    '数据通信': { docPath: 'Computering/计算机网络/数据通信', level: 'intermediate', tags: ['network'] },
+                    '广域通信网': { docPath: 'Computering/计算机网络/广域通信网', level: 'intermediate', tags: ['wan'] },
+                    '局域网和城域网': { docPath: 'Computering/计算机网络/局域网和城域网', level: 'intermediate', tags: ['lan'] },
+                    '无线通信网': { docPath: 'Computering/计算机网络/无线通信网', level: 'intermediate', tags: ['wireless'] },
+                    '下一代互联网': { docPath: 'Computering/计算机网络/下一代互联网', level: 'advanced', tags: ['ipv6'] },
+                    '网络安全': { docPath: 'Computering/计算机网络/网络安全', level: 'intermediate', tags: ['security'] },
+                    '网络操作系统与服务器': { docPath: 'Computering/计算机网络/网络操作系统与服务器', level: 'intermediate', tags: ['nos'] },
+                    '组网技术': { docPath: 'Computering/计算机网络/组网技术', level: 'intermediate', tags: ['networking'] },
+                    '网络管理': { docPath: 'Computering/计算机网络/网络管理', level: 'intermediate', tags: ['management'] },
+                    '软件工程': { docPath: 'Computering/计算机网络/软件工程', level: 'intermediate', tags: ['se'] },
+                    '知识产权和标准化': { docPath: 'Computering/计算机网络/知识产权和标准化', level: 'beginner', tags: ['ip'] },
+                    'DNS使用问题': { docPath: 'Computering/计算机网络/漫谈DNS使用问题', level: 'intermediate', tags: ['dns'] },
+                    '代理Proxy': { docPath: 'Computering/计算机网络/浅说代理Proxy', level: 'intermediate', tags: ['proxy'] },
+                    '传统发邮件方式': { docPath: 'Computering/计算机网络/如何用传统的方式发邮件', level: 'intermediate', tags: ['email'] }
                 }
             }
         }
-    };
+    },
+    'Control': {
+        color: '#10B981',
+        docPath: 'Control/控制理论',
+        subcategories: {
+            '强化学习': {
+                docPath: 'Control/强化学习',
+                skills: {
+                    '马尔可夫决策过程': { docPath: 'Control/强化学习/马尔可夫决策过程', level: 'intermediate', tags: ['mdp'] },
+                    '动态规划算法': { docPath: 'Control/强化学习/动态规划算法', level: 'advanced', tags: ['dp'] },
+                    '时序差分算法': { docPath: 'Control/强化学习/时序差分算法', level: 'advanced', tags: ['td'] },
+                    'Dyna-Q算法': { docPath: 'Control/强化学习/Dyna-Q算法', level: 'advanced', tags: ['dyna'] },
+                    'DQN算法': { docPath: 'Control/强化学习/DQN算法', level: 'advanced', tags: ['dqn'] },
+                    'DQN改进算法': { docPath: 'Control/强化学习/DQN改进算法', level: 'advanced', tags: ['deep-rl'] },
+                    '策略梯度算法': { docPath: 'Control/强化学习/策略梯度算法', level: 'advanced', tags: ['pg'] },
+                    'Actor-Critic算法': { docPath: 'Control/强化学习/Actor-Critic算法', level: 'advanced', tags: ['ac'] },
+                    'TRPO算法': { docPath: 'Control/强化学习/TRPO算法', level: 'advanced', tags: ['trpo'] },
+                    'PPO算法': { docPath: 'Control/强化学习/PPO算法', level: 'advanced', tags: ['ppo'] },
+                    'DDPG算法': { docPath: 'Control/强化学习/DDPG算法', level: 'advanced', tags: ['ddpg'] },
+                    'SAC算法': { docPath: 'Control/强化学习/SAC算法', level: 'advanced', tags: ['sac'] }
+                }
+            },
+            '模仿学习': {
+                docPath: 'Control/模仿学习',
+                skills: {
+                    '行为克隆': { docPath: 'Control/模仿学习/行为克隆', level: 'intermediate', tags: ['bc'] },
+                    '对抗式模仿学习': { docPath: 'Control/模仿学习/对抗式模仿学习', level: 'advanced', tags: ['gail'] },
+                    '环境模仿': { docPath: 'Control/模仿学习/环境模仿', level: 'advanced', tags: ['environment'] }
+                }
+            },
+            '自动控制原理': {
+                docPath: 'Control/自动控制原理',
+                topics: {
+                    '自动控制概念': {
+                        docPath: 'Control/自动控制原理/自动控制概念',
+                        skills: {
+                            '自动控制的一般概念': { docPath: 'Control/自动控制原理/自动控制概念/自动控制的一般概念', level: 'beginner', tags: ['basics'] },
+                            '控制系统的数学模型': { docPath: 'Control/自动控制原理/自动控制概念/控制系统的数学模型', level: 'intermediate', tags: ['modeling'] }
+                        }
+                    },
+                    '数学模型': {
+                        docPath: 'Control/自动控制原理/数学模型',
+                        skills: {
+                            '传递函数': { docPath: 'Control/自动控制原理/数学模型/传递函数', level: 'intermediate', tags: ['transfer'] },
+                            '信号流图、系统传递函数': { docPath: 'Control/自动控制原理/数学模型/信号流图、系统传递函数', level: 'intermediate', tags: ['signal-flow'] },
+                            '控制系统复域数学模型': { docPath: 'Control/自动控制原理/数学模型/控制系统复域数学模型', level: 'intermediate', tags: ['complex-model'] },
+                            '结构图及等效变换': { docPath: 'Control/自动控制原理/数学模型/结构图及等效变换', level: 'intermediate', tags: ['block-diagram'] }
+                        }
+                    },
+                    '线性系统时域分析与校正': {
+                        docPath: 'Control/自动控制原理/线性系统时域分析与校正',
+                        skills: {
+                            '一阶、过阻尼二阶系统动态性能': { docPath: 'Control/自动控制原理/线性系统时域分析与校正/一阶、过阻尼二阶系统动态性能', level: 'intermediate', tags: ['time-domain'] },
+                            '欠阻尼二阶系统动态性能指标': { docPath: 'Control/自动控制原理/线性系统时域分析与校正/欠阻尼二阶系统动态性能指标', level: 'intermediate', tags: ['time-domain'] },
+                            '线性系统的动态误差和时域校正': { docPath: 'Control/自动控制原理/线性系统时域分析与校正/线性系统的动态误差和时域校正', level: 'advanced', tags: ['error'] },
+                            '线性系统的稳态误差（静态）': { docPath: 'Control/自动控制原理/线性系统时域分析与校正/线性系统的稳态误差（静态）', level: 'intermediate', tags: ['steady-state'] },
+                            '高阶系统动态性能': { docPath: 'Control/自动控制原理/线性系统时域分析与校正/高阶系统动态性能', level: 'advanced', tags: ['high-order'] }
+                        }
+                    },
+                    '根轨迹法': {
+                        docPath: 'Control/自动控制原理/根轨迹法',
+                        skills: {
+                            '基本概念、绘制法则': { docPath: 'Control/自动控制原理/根轨迹法/基本概念、绘制法则', level: 'intermediate', tags: ['root-locus'] },
+                            '利用根轨迹分析系统性能': { docPath: 'Control/自动控制原理/根轨迹法/利用根轨迹分析系统性能', level: 'advanced', tags: ['analysis'] },
+                            '广义根轨迹': { docPath: 'Control/自动控制原理/根轨迹法/广义根轨迹', level: 'advanced', tags: ['generalized'] }
+                        }
+                    },
+                    '线性系统频域分析与校正': {
+                        docPath: 'Control/自动控制原理/线性系统频域分析与校正',
+                        skills: {
+                            'Bode图': { docPath: 'Control/自动控制原理/线性系统频域分析与校正/Bode图', level: 'advanced', tags: ['bode'] },
+                            'Nyquist图': { docPath: 'Control/自动控制原理/线性系统频域分析与校正/Nyquist图', level: 'advanced', tags: ['nyquist'] },
+                            '开环对数幅频特性分析系统性能': { docPath: 'Control/自动控制原理/线性系统频域分析与校正/开环对数幅频特性分析系统性能', level: 'advanced', tags: ['open-loop'] },
+                            '稳定裕度': { docPath: 'Control/自动控制原理/线性系统频域分析与校正/稳定裕度', level: 'advanced', tags: ['margin'] },
+                            '闭环频率特性分析系统性能': { docPath: 'Control/自动控制原理/线性系统频域分析与校正/闭环频率特性分析系统性能', level: 'advanced', tags: ['closed-loop'] },
+                            '频域稳定判据': { docPath: 'Control/自动控制原理/线性系统频域分析与校正/频域稳定判据', level: 'advanced', tags: ['stability'] },
+                            '相角超前校正': { docPath: 'Control/自动控制原理/线性系统频域分析与校正/相角超前校正', level: 'intermediate', tags: ['lead'] },
+                            '相角滞后校正': { docPath: 'Control/自动控制原理/线性系统频域分析与校正/相角滞后校正', level: 'intermediate', tags: ['lag'] },
+                            '滞后超前校正、PID校正': { docPath: 'Control/自动控制原理/线性系统频域分析与校正/滞后超前校正、PID校正', level: 'advanced', tags: ['lag-lead'] }
+                        }
+                    },
+                    '线性离散系统分析与校正': {
+                        docPath: 'Control/自动控制原理/线性离散系统分析与校正',
+                        skills: {
+                            '离散系统、信号采样与保持': { docPath: 'Control/自动控制原理/线性离散系统分析与校正/离散系统、信号采样与保持', level: 'intermediate', tags: ['discrete'] },
+                            'z变换': { docPath: 'Control/自动控制原理/线性离散系统分析与校正/z变换', level: 'advanced', tags: ['z-transform'] },
+                            '离散系统数学模型': { docPath: 'Control/自动控制原理/线性离散系统分析与校正/离散系统数学模型', level: 'advanced', tags: ['model'] },
+                            '稳定性分析': { docPath: 'Control/自动控制原理/线性离散系统分析与校正/稳定性分析', level: 'advanced', tags: ['stability'] },
+                            '稳态误差、动态性能分析': { docPath: 'Control/自动控制原理/线性离散系统分析与校正/稳态误差、动态性能分析', level: 'advanced', tags: ['performance'] },
+                            '模拟化校正、数字校正': { docPath: 'Control/自动控制原理/线性离散系统分析与校正/模拟化校正、数字校正', level: 'advanced', tags: ['correction'] }
+                        }
+                    },
+                    '非线性控制系统分析': {
+                        docPath: 'Control/自动控制原理/非线性控制系统分析',
+                        skills: {
+                            '相平面法': { docPath: 'Control/自动控制原理/非线性控制系统分析/相平面法', level: 'advanced', tags: ['phase-plane'] },
+                            '描述函数法': { docPath: 'Control/自动控制原理/非线性控制系统分析/描述函数法', level: 'advanced', tags: ['describing-function'] },
+                            '改善非线性系统性能措施': { docPath: 'Control/自动控制原理/非线性控制系统分析/改善非线性系统性能措施', level: 'advanced', tags: ['improvement'] }
+                        }
+                    }
+                },
+                skills: {
+                    'PID控制': { docPath: 'Control/自动控制原理/PID', level: 'intermediate', tags: ['pid'] }
+                }
+            },
+            'Simulink': {
+                docPath: 'Control/Simulink',
+                skills: {
+                    'Simulink入门': { docPath: 'Control/Simulink/Simulink入门', level: 'beginner', tags: ['simulink'] }
+                }
+            },
+            '微机原理': {
+                docPath: 'Control/微机原理',
+                skills: {
+                    '计算机组成概览': { docPath: 'Control/微机原理/计算机组成概览', level: 'intermediate', tags: ['computer-architecture'] }
+                }
+            },
+            '机电传动控制': {
+                docPath: 'Control/机电传动控制',
+                skills: {
+                    '概述': { docPath: 'Control/机电传动控制/概述', level: 'beginner', tags: ['overview'] },
+                    '动力学基础': { docPath: 'Control/机电传动控制/机电传动系统的动力学基础', level: 'intermediate', tags: ['dynamics'] },
+                    '直流电机': { docPath: 'Control/机电传动控制/直流电机的工作原理及特性', level: 'intermediate', tags: ['dc-motor'] },
+                    '交流电机': { docPath: 'Control/机电传动控制/交流电机的工作原理及其特性', level: 'intermediate', tags: ['ac-motor'] },
+                    '控制电机': { docPath: 'Control/机电传动控制/控制电机', level: 'advanced', tags: ['control-motor'] }
+                }
+            },
+            '现代控制理论': {
+                docPath: 'Control/现代控制理论',
+                skills: {
+                    '绪论': { docPath: 'Control/现代控制理论/绪论', level: 'beginner', tags: ['overview'] },
+                    '状态空间表达式': { docPath: 'Control/现代控制理论/控制系统的状态空间表达式', level: 'intermediate', tags: ['state-space'] },
+                    '状态空间解': { docPath: 'Control/现代控制理论/控制系统状态空间表达式的解', level: 'advanced', tags: ['solution'] },
+                    '能控性和能观性': { docPath: 'Control/现代控制理论/线性控制系统的能控性和能观性', level: 'advanced', tags: ['controllability'] },
+                    '李雅普诺夫方法': { docPath: 'Control/现代控制理论/稳定性与李雅普诺夫方法', level: 'advanced', tags: ['lyapunov'] },
+                    '线性系统综合': { docPath: 'Control/现代控制理论/线性定常系统的综合', level: 'advanced', tags: ['synthesis'] },
+                    '最优控制': { docPath: 'Control/现代控制理论/最优控制', level: 'advanced', tags: ['optimal'] }
+                }
+            },
+            '高阶控制理论': {
+                docPath: 'Control/高阶控制理论',
+                skills: {
+                    '连续系统离散化': { docPath: 'Control/高阶控制理论/连续系统离散化', level: 'advanced', tags: ['discretization'] },
+                    '动态系统分析': { docPath: 'Control/高阶控制理论/动态系统分析', level: 'advanced', tags: ['dynamic'] },
+                    '系统的可控性': { docPath: 'Control/高阶控制理论/系统的可控性', level: 'advanced', tags: ['controllability'] }
+                }
+            }
+        }
+    },
+    'Electronic': {
+        color: '#EF4444',
+        docPath: 'Electronic/电子科学与技术',
+        subcategories: {
+            '嵌入式': {
+                docPath: 'Electronic/嵌入式',
+                topics: {
+                    'STM32': {
+                        docPath: 'Electronic/嵌入式/STM32',
+                        skills: {
+                            'GPIO': { docPath: 'Electronic/嵌入式/STM32/GPIO', level: 'beginner', tags: ['stm32'] },
+                            'EXTI外部中断': { docPath: 'Electronic/嵌入式/STM32/EXTI外部中断', level: 'intermediate', tags: ['interrupt'] },
+                            'PWM驱动': { docPath: 'Electronic/嵌入式/STM32/PWM驱动', level: 'intermediate', tags: ['pwm'] },
+                            'TIM输出比较': { docPath: 'Electronic/嵌入式/STM32/TIM输出比较', level: 'intermediate', tags: ['timer'] },
+                            'TIM输入捕获': { docPath: 'Electronic/嵌入式/STM32/TIM输入捕获', level: 'intermediate', tags: ['capture'] },
+                            'TIM编码器接口': { docPath: 'Electronic/嵌入式/STM32/TIM编码器接口', level: 'intermediate', tags: ['encoder'] },
+                            'ADC模数转换器': { docPath: 'Electronic/嵌入式/STM32/ADC模数转换器', level: 'intermediate', tags: ['adc'] },
+                            'DMA直接存储器存取': { docPath: 'Electronic/嵌入式/STM32/DMA直接存储器存取', level: 'intermediate', tags: ['dma'] },
+                            'USART串口协议': { docPath: 'Electronic/嵌入式/STM32/USART串口协议', level: 'intermediate', tags: ['uart'] },
+                            'USART外设': { docPath: 'Electronic/嵌入式/STM32/USART外设', level: 'intermediate', tags: ['uart'] },
+                            'I2C通信协议': { docPath: 'Electronic/嵌入式/STM32/I2C通信协议', level: 'intermediate', tags: ['i2c'] },
+                            'SPI通信协议': { docPath: 'Electronic/嵌入式/STM32/SPI通信协议', level: 'intermediate', tags: ['spi'] },
+                            'MPU6050': { docPath: 'Electronic/嵌入式/STM32/MPU6050', level: 'advanced', tags: ['sensor'] },
+                            'OLED调试': { docPath: 'Electronic/嵌入式/STM32/OLED调试', level: 'intermediate', tags: ['display'] },
+                            'TIM定时中断': { docPath: 'Electronic/嵌入式/STM32/TIM定时中断', level: 'intermediate', tags: ['timer'] },
+                            'W25Q64': { docPath: 'Electronic/嵌入式/STM32/W25Q64', level: 'intermediate', tags: ['flash'] },
+                            'RTC实时时钟': { docPath: 'Electronic/嵌入式/STM32/RTC实时时钟', level: 'intermediate', tags: ['rtc'] },
+                            'PWR电源控制': { docPath: 'Electronic/嵌入式/STM32/PWR电源控制', level: 'intermediate', tags: ['power'] },
+                            'WDG看门狗': { docPath: 'Electronic/嵌入式/STM32/WDG看门狗', level: 'intermediate', tags: ['watchdog'] },
+                            'FLASH闪存': { docPath: 'Electronic/嵌入式/STM32/FLASH闪存', level: 'intermediate', tags: ['flash'] }
+                        }
+                    },
+                    'FreeRTOS': {
+                        docPath: 'Electronic/嵌入式/FreeRTOS',
+                        skills: {
+                            'FreeRTOS初步': { docPath: 'Electronic/嵌入式/FreeRTOS/FreeRTOS初步', level: 'intermediate', tags: ['rtos'] }
+                        }
+                    }
+                },
+                skills: {
+                    '蓝桥杯嵌入式速通': { docPath: 'Electronic/嵌入式/速通蓝桥杯嵌入式', level: 'intermediate', tags: ['embedded'] }
+                }
+            },
+            '信号与系统': {
+                docPath: 'Electronic/信号与系统',
+                skills: {
+                    '信号与系统': { docPath: 'Electronic/信号与系统/信号与系统', level: 'beginner', tags: ['signals'] },
+                    '线性时不变系统': { docPath: 'Electronic/信号与系统/线性时不变系统', level: 'intermediate', tags: ['lti'] },
+                    '傅里叶级数': { docPath: 'Electronic/信号与系统/周期信号的傅里叶级数表示', level: 'intermediate', tags: ['fourier'] },
+                    '连续时间傅里叶变换': { docPath: 'Electronic/信号与系统/连续时间傅里叶变换', level: 'advanced', tags: ['ft'] },
+                    '离散时间傅里叶变换': { docPath: 'Electronic/信号与系统/离散时间傅里叶变换', level: 'advanced', tags: ['dtft'] },
+                    '时域和频域特性': { docPath: 'Electronic/信号与系统/信号与系统的时域和频域特性', level: 'intermediate', tags: ['domain'] },
+                    '采样': { docPath: 'Electronic/信号与系统/采样', level: 'intermediate', tags: ['sampling'] },
+                    '通信系统': { docPath: 'Electronic/信号与系统/通信系统', level: 'intermediate', tags: ['communication'] },
+                    '拉普拉斯变换': { docPath: 'Electronic/信号与系统/拉普拉斯变换', level: 'advanced', tags: ['laplace'] },
+                    '卡尔曼滤波器': { docPath: 'Electronic/信号与系统/卡尔曼滤波器MATLAB实现', level: 'advanced', tags: ['kalman'] }
+                }
+            },
+            'FPGA': {
+                docPath: 'Electronic/FPGA',
+                topics: {
+                    'Verilog': {
+                        docPath: 'Electronic/FPGA/Verilog',
+                        skills: {
+                            'Verilog简介': { docPath: 'Electronic/FPGA/Verilog/Verilog简介', level: 'beginner', tags: ['verilog'] },
+                            'Verilog语法基础': { docPath: 'Electronic/FPGA/Verilog/Verilog语法基础', level: 'intermediate', tags: ['verilog'] }
+                        }
+                    }
+                }
+            },
+            'FOC': {
+                docPath: 'Electronic/FOC',
+                skills: {
+                    '标幺值': { docPath: 'Electronic/FOC/标幺值', level: 'intermediate', tags: ['foc'] },
+                    '克拉克变换与帕克变换': { docPath: 'Electronic/FOC/克拉克变换与帕克变换', level: 'advanced', tags: ['transform'] },
+                    '开环调速': { docPath: 'Electronic/FOC/开环调速', level: 'intermediate', tags: ['speed'] }
+                }
+            },
+            '滤波器设计': {
+                docPath: 'Electronic/滤波器设计',
+                skills: {
+                    '滤波器设计概述': { docPath: 'Electronic/滤波器设计/滤波器设计概述', level: 'beginner', tags: ['filter'] },
+                    '频率响应与时间响应特性': { docPath: 'Electronic/滤波器设计/滤波器的频率响应与时间响应特性', level: 'intermediate', tags: ['response'] }
+                }
+            },
+            '电源设计': {
+                docPath: 'Electronic/电源设计',
+                skills: {
+                    '电源系统介绍': { docPath: 'Electronic/电源设计/电源系统介绍', level: 'beginner', tags: ['power'] }
+                }
+            }
+        }
+    },
+    'Materials': {
+        color: '#EC4899',
+        docPath: 'Materials/半导体物理学',
+        subcategories: {
+            '半导体物理学': {
+                docPath: 'Materials/半导体物理学',
+                skills: {
+                    '半导体中的电子状态': { docPath: 'Materials/半导体物理学/半导体中的电子状态', level: 'advanced', tags: ['semiconductor'] },
+                    '半导体中杂质和缺陷能级': { docPath: 'Materials/半导体物理学/半导体中杂质和缺陷能级', level: 'advanced', tags: ['defects'] },
+                    '半导体中载流子的统计分布': { docPath: 'Materials/半导体物理学/半导体中载流子的统计分布', level: 'advanced', tags: ['carrier'] },
+                    '半导体的导电性': { docPath: 'Materials/半导体物理学/半导体的导电性', level: 'advanced', tags: ['conductivity'] },
+                    '非平衡载流子': { docPath: 'Materials/半导体物理学/非平衡载流子', level: 'advanced', tags: ['non-equilibrium'] },
+                    'pn结': { docPath: 'Materials/半导体物理学/pn结', level: 'advanced', tags: ['pn-junction'] },
+                    '金属和半导体的接触': { docPath: 'Materials/半导体物理学/金属和半导体的接触', level: 'advanced', tags: ['contact'] },
+                    '半导体表面与MIS结构': { docPath: 'Materials/半导体物理学/半导体表面与MIS结构', level: 'advanced', tags: ['surface'] },
+                    '半导体异质结构': { docPath: 'Materials/半导体物理学/半导体异质结构', level: 'advanced', tags: ['heterostructure'] },
+                    '半导体的光学性质和光电与发光现象': { docPath: 'Materials/半导体物理学/半导体的光学性质和光电与发光现象', level: 'advanced', tags: ['optical'] },
+                    '半导体的热电性质': { docPath: 'Materials/半导体物理学/半导体的热电性质', level: 'advanced', tags: ['thermoelectric'] },
+                    '半导体磁和压阻效应': { docPath: 'Materials/半导体物理学/半导体磁和压阻效应', level: 'advanced', tags: ['magnetic'] },
+                    '非晶态半导体': { docPath: 'Materials/半导体物理学/非晶态半导体', level: 'advanced', tags: ['amorphous'] }
+                }
+            }
+        }
+    },
+    'Mathematics': {
+        color: '#8B5CF6',
+        docPath: 'Mathematics/数学基础',
+        subcategories: {
+            '微积分': {
+                docPath: 'Mathematics/微积分',
+                skills: {
+                    '微积分': { docPath: 'Mathematics/微积分/微积分', level: 'beginner', tags: ['calculus'] },
+                    '不定积分': { docPath: 'Mathematics/微积分/不定积分', level: 'intermediate', tags: ['integral'] },
+                    '定积分': { docPath: 'Mathematics/微积分/定积分', level: 'intermediate', tags: ['definite'] },
+                    '多元函数极限、连续与微分': { docPath: 'Mathematics/微积分/多元函数的极限、连续与微分', level: 'advanced', tags: ['multivariable'] },
+                    '多元函数微积分学综合': { docPath: 'Mathematics/微积分/多元函数微积分学综合', level: 'advanced', tags: ['multivariable'] },
+                    '微分中值定理': { docPath: 'Mathematics/微积分/微分中值定理', level: 'advanced', tags: ['mvt'] },
+                    '微分方程': { docPath: 'Mathematics/微积分/微分方程', level: 'advanced', tags: ['ode'] },
+                    '级数': { docPath: 'Mathematics/微积分/级数', level: 'advanced', tags: ['series'] },
+                    '线面积分': { docPath: 'Mathematics/微积分/线面积分', level: 'advanced', tags: ['integral'] }
+                }
+            },
+            '线性代数': {
+                docPath: 'Mathematics/线性代数',
+                skills: {
+                    '行列式': { docPath: 'Mathematics/线性代数/行列式', level: 'intermediate', tags: ['determinant'] },
+                    '矩阵及其运算': { docPath: 'Mathematics/线性代数/矩阵及其运算', level: 'intermediate', tags: ['matrix'] },
+                    '矩阵的初等变换与线性方程组': { docPath: 'Mathematics/线性代数/矩阵的初等变换与线性方程组', level: 'intermediate', tags: ['equation'] },
+                    '向量组的线性相关性': { docPath: 'Mathematics/线性代数/向量组的线性相关性', level: 'advanced', tags: ['dependence'] },
+                    '相似矩阵及二次型': { docPath: 'Mathematics/线性代数/相似矩阵及二次型', level: 'advanced', tags: ['similarity'] },
+                    '线性空间与线性变换': { docPath: 'Mathematics/线性代数/线性空间与线性变换', level: 'advanced', tags: ['space'] }
+                }
+            },
+            '概率论与数理统计': {
+                docPath: 'Mathematics/概率论与数理统计',
+                skills: {
+                    '基本概念': { docPath: 'Mathematics/概率论与数理统计/基本概念', level: 'beginner', tags: ['probability'] },
+                    '随机变量及其分布': { docPath: 'Mathematics/概率论与数理统计/随机变量及其分布', level: 'intermediate', tags: ['distribution'] },
+                    '多维随机变量及其分布': { docPath: 'Mathematics/概率论与数理统计/多维随机变量及其分布', level: 'advanced', tags: ['multivariate'] },
+                    '随机变量的数字特征': { docPath: 'Mathematics/概率论与数理统计/随机变量的数字特征', level: 'intermediate', tags: ['expectation'] },
+                    '大数定律及中心极限定理': { docPath: 'Mathematics/概率论与数理统计/大数定律及中心极限定理', level: 'advanced', tags: ['limit'] },
+                    '参数估计': { docPath: 'Mathematics/概率论与数理统计/参数估计', level: 'intermediate', tags: ['estimation'] },
+                    '假设检验': { docPath: 'Mathematics/概率论与数理统计/假设检验', level: 'intermediate', tags: ['testing'] },
+                    '样本及抽样分布': { docPath: 'Mathematics/概率论与数理统计/样本及抽样分布', level: 'intermediate', tags: ['sampling'] },
+                    '方差分析及回归分析': { docPath: 'Mathematics/概率论与数理统计/方差分析及回归分析', level: 'advanced', tags: ['anova'] },
+                    '时间序列分析': { docPath: 'Mathematics/概率论与数理统计/时间序列分析', level: 'advanced', tags: ['time-series'] },
+                    '平稳随机过程': { docPath: 'Mathematics/概率论与数理统计/平稳随机过程', level: 'advanced', tags: ['process'] },
+                    '随机过程': { docPath: 'Mathematics/概率论与数理统计/随机过程', level: 'advanced', tags: ['process'] },
+                    '马尔科夫链': { docPath: 'Mathematics/概率论与数理统计/马尔科夫链', level: 'advanced', tags: ['markov'] },
+                    'bootstrap方法': { docPath: 'Mathematics/概率论与数理统计/bootstrap方法', level: 'advanced', tags: ['bootstrap'] },
+                    'R的应用': { docPath: 'Mathematics/概率论与数理统计/R的应用', level: 'intermediate', tags: ['r'] }
+                }
+            },
+            '旋量代数与李群李代数': {
+                docPath: 'Mathematics/旋量代数与李群李代数',
+                skills: {
+                    '绪论': { docPath: 'Mathematics/旋量代数与李群李代数/绪论', level: 'beginner', tags: ['lie'] },
+                    '直线几何': { docPath: 'Mathematics/旋量代数与李群李代数/直线几何', level: 'intermediate', tags: ['geometry'] },
+                    '位移算子、指数映射与李群': { docPath: 'Mathematics/旋量代数与李群李代数/位移算子、指数映射与李群', level: 'advanced', tags: ['exponential'] },
+                    '旋量代数与李代数及李运算': { docPath: 'Mathematics/旋量代数与李群李代数/旋量代数与李代数及李运算', level: 'advanced', tags: ['algebra'] },
+                    '互易性与旋量系': { docPath: 'Mathematics/旋量代数与李群李代数/互易性与旋量系', level: 'advanced', tags: ['reciprocity'] },
+                    '旋量系关联关系理论': { docPath: 'Mathematics/旋量代数与李群李代数/旋量系关联关系理论', level: 'advanced', tags: ['relation'] },
+                    '旋量系对偶原理与分解定理': { docPath: 'Mathematics/旋量代数与李群李代数/旋量系对偶原理与分解定理', level: 'advanced', tags: ['duality'] },
+                    '旋量系零空间构造理论': { docPath: 'Mathematics/旋量代数与李群李代数/旋量系零空间构造理论', level: 'advanced', tags: ['null-space'] }
+                }
+            }
+        }
+    },
+    'Robotics': {
+        color: '#06B6D4',
+        docPath: 'Robotics/机器人学',
+        subcategories: {
+            'ROS': {
+                docPath: 'Robotics/ROS',
+                skills: {
+                    'ROS基本操作': { docPath: 'Robotics/ROS/ROS基本操作', level: 'beginner', tags: ['ros'] },
+                    '话题通信机制': { docPath: 'Robotics/ROS/话题通信机制', level: 'intermediate', tags: ['communication'] },
+                    'ROS安装流程': { docPath: 'Robotics/ROS/ROS安装流程', level: 'beginner', tags: ['install'] },
+                    'ROS': { docPath: 'Robotics/ROS/ROS', level: 'beginner', tags: ['ros'] },
+                    'Coppeliasim': { docPath: 'Robotics/ROS/Coppeliasim', level: 'intermediate', tags: ['simulation'] },
+                    'Coppeliasim基本操作': { docPath: 'Robotics/ROS/Coppeliasim基本操作', level: 'intermediate', tags: ['simulation'] },
+                    '总复习': { docPath: 'Robotics/ROS/总复习', level: 'advanced', tags: ['review'] }
+                }
+            },
+            '机器人学导论': {
+                docPath: 'Robotics/机器人学导论',
+                skills: {
+                    '空间描述与变换': { docPath: 'Robotics/机器人学导论/空间描述与变换', level: 'intermediate', tags: ['kinematics'] },
+                    '机器人正运动学': { docPath: 'Robotics/机器人学导论/机器人正运动学', level: 'intermediate', tags: ['forward'] },
+                    '机器人逆运动学': { docPath: 'Robotics/机器人学导论/机器人逆运动学', level: 'advanced', tags: ['inverse'] }
+                }
+            },
+            '机器人运动控制': {
+                docPath: 'Robotics/机器人运动控制',
+                skills: {
+                    '概述': { docPath: 'Robotics/机器人运动控制/概述', level: 'beginner', tags: ['overview'] },
+                    '机器人系统构成': { docPath: 'Robotics/机器人运动控制/机器人系统构成', level: 'intermediate', tags: ['system'] },
+                    '数学模型': { docPath: 'Robotics/机器人运动控制/数学模型', level: 'intermediate', tags: ['model'] },
+                    '机器人运动学基础': { docPath: 'Robotics/机器人运动控制/机器人运动学基础', level: 'intermediate', tags: ['kinematics'] },
+                    '机器人系统电学设计': { docPath: 'Robotics/机器人运动控制/机器人系统电学设计', level: 'intermediate', tags: ['electrical'] },
+                    '机器人底层控制': { docPath: 'Robotics/机器人运动控制/机器人底层控制', level: 'advanced', tags: ['low-level'] },
+                    '机器人上层控制': { docPath: 'Robotics/机器人运动控制/机器人上层控制', level: 'advanced', tags: ['high-level'] },
+                    '移动机器人路径规划': { docPath: 'Robotics/机器人运动控制/移动机器人路径规划', level: 'advanced', tags: ['planning'] },
+                    '机器人视觉': { docPath: 'Robotics/机器人运动控制/机器人视觉', level: 'advanced', tags: ['vision'] }
+                }
+            },
+            '视觉SLAM十四讲': {
+                docPath: 'Robotics/视觉SLAM十四讲',
+                skills: {
+                    'Eigen实验': { docPath: 'Robotics/视觉SLAM十四讲/Eigen实验', level: 'intermediate', tags: ['slam'] }
+                }
+            }
+        }
+    },
+    'Machinery': {
+        color: '#F59E0B',
+        docPath: 'Machinery/机械设计',
+        subcategories: {
+            '机械设计': {
+                docPath: 'Machinery/机械设计',
+                skills: {
+                    '平面机构的自由度和速度分析': { docPath: 'Machinery/机械设计/平面机构的自由度和速度分析', level: 'intermediate', tags: ['mechanism'] },
+                    '平面连杆机构': { docPath: 'Machinery/机械设计/平面连杆机构', level: 'intermediate', tags: ['linkage'] },
+                    '凸轮机构': { docPath: 'Machinery/机械设计/凸轮机构', level: 'intermediate', tags: ['cam'] },
+                    '齿轮机构': { docPath: 'Machinery/机械设计/齿轮机构', level: 'intermediate', tags: ['gear'] },
+                    '轮系': { docPath: 'Machinery/机械设计/轮系', level: 'intermediate', tags: ['train'] },
+                    '连接': { docPath: 'Machinery/机械设计/连接', level: 'intermediate', tags: ['fastener'] },
+                    '齿轮传动': { docPath: 'Machinery/机械设计/齿轮传动', level: 'intermediate', tags: ['transmission'] },
+                    '蜗杆传动': { docPath: 'Machinery/机械设计/蜗杆传动', level: 'advanced', tags: ['worm'] },
+                    '带传动': { docPath: 'Machinery/机械设计/带传动', level: 'intermediate', tags: ['belt'] },
+                    '轴': { docPath: 'Machinery/机械设计/轴', level: 'intermediate', tags: ['shaft'] },
+                    '滚动轴承': { docPath: 'Machinery/机械设计/滚动轴承', level: 'intermediate', tags: ['bearing'] }
+                }
+            },
+            'Pyslvs': {
+                docPath: 'Machinery/Pyslvs',
+                skills: {
+                    'Pyslvs使用教程': { docPath: 'Machinery/Pyslvs/Pyslvs使用教程', level: 'intermediate', tags: ['pyslvs'] }
+                }
+            }
+        }
+    },
+    'Mechanics': {
+        color: '#6B7280',
+        docPath: 'Mechanics/力学',
+        subcategories: {
+            '刚体动力学': {
+                docPath: 'Mechanics/刚体动力学',
+                topics: {
+                    'RBDL': {
+                        docPath: 'Mechanics/刚体动力学/RBDL',
+                        skills: {
+                            'Dynamics': { docPath: 'Mechanics/刚体动力学/RBDL/Dynamics', level: 'advanced', tags: ['rbdl'] },
+                            'Details': { docPath: 'Mechanics/刚体动力学/RBDL/Details', level: 'advanced', tags: ['rbdl'] }
+                        }
+                    }
+                }
+            },
+            'Adams': {
+                docPath: 'Mechanics/Adams',
+                skills: {
+                    'Adams入门教程': { docPath: 'Mechanics/Adams/Adams入门教程', level: 'intermediate', tags: ['adams'] }
+                }
+            }
+        }
+    },
+    'Paper': {
+        color: '#F97316',
+        docPath: 'Paper',
+        subcategories: {
+            '论文复现': {
+                docPath: 'Paper/论文复现',
+                skills: {
+                    'CodeAsPolicies': { docPath: 'Paper/论文复现/CodeAsPolicies-JackyLiang等', level: 'advanced', tags: ['paper'] },
+                    'ViT': { docPath: 'Paper/论文复现/ViT-Alexey Dosovitskiy等', level: 'advanced', tags: ['vision'] },
+                    'Voxposer': { docPath: 'Paper/论文复现/Voxposer-李飞飞等', level: 'advanced', tags: ['robotics'] }
+                }
+            }
+        }
+    },
+    'PLC': {
+        color: '#6366F1',
+        docPath: 'PLC',
+        subcategories: {
+            'Siemens PLC': {
+                docPath: 'PLC',
+                skills: {
+                    'Siemens PLC': { docPath: 'PLC/Siemens PLC', level: 'intermediate', tags: ['plc'] }
+                }
+            }
+        }
+    },
+    'Sensor': {
+        color: '#84CC16',
+        docPath: 'Sensor/仪器科学与技术',
+        subcategories: {
+            '传感器与机器人感知技术': {
+                docPath: 'Sensor/传感器与机器人感知技术',
+                skills: {
+                    '概述': { docPath: 'Sensor/传感器与机器人感知技术/概述', level: 'beginner', tags: ['sensor'] },
+                    '传感器信号采集及数据处理技术': { docPath: 'Sensor/传感器与机器人感知技术/传感器信号采集及数据处理技术', level: 'intermediate', tags: ['signal'] },
+                    '机器人内部传感器': { docPath: 'Sensor/传感器与机器人感知技术/机器人内部传感器', level: 'intermediate', tags: ['internal'] },
+                    '机器人外部传感器': { docPath: 'Sensor/传感器与机器人感知技术/机器人外部传感器', level: 'intermediate', tags: ['external'] },
+                    '智能传感器及新型传感器': { docPath: 'Sensor/传感器与机器人感知技术/智能传感器及新型传感器', level: 'advanced', tags: ['smart'] },
+                    '机器人及机械臂上传感器的应用示例': { docPath: 'Sensor/传感器与机器人感知技术/机器人及机械臂上传感器的应用示例', level: 'intermediate', tags: ['application'] }
+                }
+            }
+        }
+    },
+    'Synbio': {
+        color: '#14B8A6',
+        docPath: 'Synbio/生物信息学',
+        subcategories: {
+            '生物信息学': {
+                docPath: 'Synbio',
+                skills: {
+                    '生物信息学': { docPath: 'Synbio/生物信息学', level: 'intermediate', tags: ['bio'] },
+                    '化信问题解决': { docPath: 'Synbio/记替朋友解决的一个化信问题', level: 'intermediate', tags: ['chemistry'] }
+                }
+            }
+        }
+    }
+};
 
-    // 创建节点的逻辑
     Object.keys(categories).forEach(category => {
-        const categoryInfo = categories[category];
+    const categoryInfo = categories[category];
+    // Category 节点
+    nodes.push({
+        id: category,
+        title: category,
+        category: category,
+        type: 'category',
+        level: 'expert',
+        color: categoryInfo.color,
+        docPath: categoryInfo.docPath,
+        progress: 100
+    });
 
-        // 分类节点
-        const categoryNode = {
-            id: category,
-            title: category,
+    const subcategories = categoryInfo.subcategories || {};
+    Object.keys(subcategories).forEach(subcategory => {
+        const subcategoryInfo = subcategories[subcategory];
+        const subId = `${category}-${subcategory}`;
+        // Subcategory 节点
+        nodes.push({
+            id: subId,
+            title: subcategory,
             category: category,
-            type: 'category',
-            level: 'expert',
+            type: 'subcategory',
             color: categoryInfo.color,
-            docPath: categoryInfo.docPath,
-            description: `${category}相关知识与技能`,
-            progress: 100
-        };
-        nodes.push(categoryNode);
+            docPath: subcategoryInfo.docPath,
+            progress: 80
+        });
+        links.push({ source: category, target: subId, type: 'contains' });
 
-        const subcategories = categoryInfo.subcategories;
-        Object.keys(subcategories).forEach(subcategory => {
-            const subcategoryInfo = subcategories[subcategory];
-
-            // 子分类节点
-            const subcategoryNode = {
-                id: `${category}-${subcategory}`,
-                title: subcategory,
+        // === 处理 topics（新增）===
+        const topics = subcategoryInfo.topics || {};
+        Object.keys(topics).forEach(topic => {
+            const topicInfo = topics[topic];
+            const topicId = `${subId}-${topic}`;
+            nodes.push({
+                id: topicId,
+                title: topic,
                 category: category,
-                subcategory: subcategory,
-                type: 'subcategory',
-                level: 'advanced',
+                type: 'topics',  // 注意类型是 'topics'
                 color: categoryInfo.color,
-                docPath: subcategoryInfo.docPath,
-                progress: Math.floor(Math.random() * 30) + 70
-            };
-            nodes.push(subcategoryNode);
-
-            // 链接分类和子分类
-            links.push({
-                source: category,
-                target: `${category}-${subcategory}`,
-                type: 'contains',
-                strength: 1.0
+                docPath: topicInfo.docPath,
+                progress: 60
             });
+            links.push({ source: subId, target: topicId, type: 'contains' });
 
-            // 具体技能节点
-            const skills = subcategoryInfo.skills;
+            const skills = topicInfo.skills || {};
             Object.keys(skills).forEach(skillName => {
                 const skillInfo = skills[skillName];
-                const skillId = `${category}-${subcategory}-${skillName}`;
-
-                const skillNode = {
+                const skillId = `${topicId}-${skillName}`;
+                nodes.push({
                     id: skillId,
                     title: skillName,
                     category: category,
-                    subcategory: subcategory,
                     type: 'skill',
-                    level: skillInfo.level || 'intermediate',
+                    level: skillInfo.level,
                     color: categoryInfo.color,
-                    tags: skillInfo.tags || [],
-                    progress: Math.floor(Math.random() * 100),
-                    status: ['learning', 'mastered', 'planned'][Math.floor(Math.random() * 3)],
                     docPath: skillInfo.docPath,
-                    description: `${skillName} - ${category}领域的重要知识点`
-                };
-                nodes.push(skillNode);
-
-                // 链接子分类和技能
-                links.push({
-                    source: `${category}-${subcategory}`,
-                    target: skillId,
-                    type: 'contains',
-                    strength: 0.8
+                    progress: Math.random() * 100
                 });
+                links.push({ source: topicId, target: skillId, type: 'contains' });
             });
         });
+
+        // === 兼容无 topic 的 direct skills ===
+        const directSkills = subcategoryInfo.skills || {};
+        Object.keys(directSkills).forEach(skillName => {
+            const skillInfo = directSkills[skillName];
+            const skillId = `${subId}-${skillName}`;
+            nodes.push({
+                id: skillId,
+                title: skillName,
+                category: category,
+                type: 'skill',
+                level: skillInfo.level,
+                color: categoryInfo.color,
+                docPath: skillInfo.docPath,
+                progress: Math.random() * 100
+            });
+            links.push({ source: subId, target: skillId, type: 'contains' });
+        });
     });
+});
 
     // 添加知识关联
     addKnowledgeRelations(nodes, links);

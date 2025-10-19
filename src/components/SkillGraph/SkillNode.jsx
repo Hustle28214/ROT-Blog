@@ -20,7 +20,8 @@ const SkillNode = ({
             Machinery: '#06B6D4',
             Sensor: '#84CC16',
             Paper: '#F97316',
-            PLC: '#6366F1'
+            PLC: '#6366F1',
+            Materials: '#D946EF',
         };
         return colorMap[node.category] || node.color || '#6B7280';
     };
@@ -30,7 +31,8 @@ const SkillNode = ({
         const baseSizes = {
             category: 25,
             subcategory: 18,
-            skill: 12
+            topics: 15,
+            skill: 12,
         };
 
         const levelMultipliers = {
@@ -218,8 +220,9 @@ const SkillNode = ({
 // 文字大小计算
 const getTextSize = (node) => {
     switch (node.type) {
-        case 'category': return 14;
-        case 'subcategory': return 12;
+        case 'category': return 16;
+        case 'subcategory': return 14;
+        case 'topics': return 12;
         case 'skill': return 10;
         default: return 11;
     }

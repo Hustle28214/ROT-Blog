@@ -15,7 +15,7 @@ y总还提到了一个双指针做法，十分优美：
 设有两个指针i,r最初分别指向数组的最左端和最右端.
 i指向的数若小于等于x，那么继续向右走(向右遍历检查数组元素大小和x的关系)，若大于X,那么指针i停下.j指向的数若大于x，继续向左走，直到j指向的数小于等于x,此时交换i,j指向的数，往中间移动一位；那么，该排在x右边的数和左边的数都归位了一组；此时i,j指针再继续向中间走，但此时i检验的就是之前j检验的小于x的数，
 
-```c++
+```cpp
 #include<iostream>
 #include<cstring>
 #include<cstdio>
@@ -74,7 +74,7 @@ int main()
 算法实现：
 算法的最后比较两个有序表的元素的大小，从第一个开始，谁小就先取谁，取了就在原数列里删，时间复杂度O(n)：
 
-```C++
+```cpp
 void merge(int a[],int n,int b[],int m,int c[])
 {
     //将a[]和b[]合并到新的c[]中.
@@ -94,7 +94,7 @@ void merge(int a[],int n,int b[],int m,int c[])
 }
 ```
 单数组也可以，尤其是求逆序对个数这样的经典归并题：
-```c++
+```cpp
 #include<iostream>
 #include<cstring>
 #include<cstdio>
@@ -161,7 +161,7 @@ int main()
 ### 整数二分
 二分的本质并不是单调性，他们之间存在的是“有单调性就可以二分”这种关系。整数二分的两个区间无交点。
 
-```c++
+```cpp
 bool check(int x) {/* ... */} // 检查x是否满足某种性质
 
 int bsearch(int l, int r)
@@ -179,7 +179,7 @@ int bsearch(int l, int r)
 ### 冒泡排序(Bubble Sort)
 时间复杂度较大，比较传统的一种排序。
 主打一个大小互换。
-```c++
+```cpp
 int arr[80];
 void bubble(int a[],int n)
 {
@@ -206,7 +206,7 @@ void bubble(int a[],int n)
 
 ### 希尔排序（Shell's Sort）
 也称缩小增量排序。初始增量为数组长度/2，整个数组被分成a[1]和a[6],a[2]和a[7]等5组。这5组里面比对，如果a[1]>a[6]那么交换值。然后增量缩到5/2=2。数组被分为a[1]/a[3]/a[5]/a[7]/a[9]和a[2]...两组。以此类推，增量缩到2/2=1。然后对这个单独的子序列进行排序。
-```c++
+```cpp
 void shellsort(int n,int arr[])
 {
     for(int gap=arr.length/2;gap>0;gap=gap/2)

@@ -202,31 +202,18 @@ const generateCompleteDocsData = () => {
                     'YOLOv10速通': { docPath: 'Computering/数字图像处理/速通yoloV10', level: 'advanced', tags: ['yolo'] }
                 }
             },
-            '数据结构与算法': {
-                docPath: 'Computering/数据结构与算法',
-                topics: {
-                    '数据结构': {
-                        docPath: 'Computering/数据结构与算法/数据结构',
-                        skills: {
-                            'KMP': { docPath: 'Computering/数据结构与算法/数据结构/KMP', level: 'advanced', tags: ['string'] },
-                            'Trie': { docPath: 'Computering/数据结构与算法/数据结构/Trie', level: 'intermediate', tags: ['trie'] },
-                            '栈': { docPath: 'Computering/数据结构与算法/数据结构/栈', level: 'beginner', tags: ['stack'] },
-                            '链表与邻接表': { docPath: 'Computering/数据结构与算法/数据结构/链表与邻接表', level: 'intermediate', tags: ['linked-list'] },
-                            '队列': { docPath: 'Computering/数据结构与算法/数据结构/队列', level: 'beginner', tags: ['queue'] }
-                        }
-                    },
-                    '算法': {
-                        docPath: 'Computering/数据结构与算法/算法',
-                        skills: {
-                            '排序': { docPath: 'Computering/数据结构与算法/算法/排序', level: 'intermediate', tags: ['sorting'] },
-                            '简单DP': { docPath: 'Computering/数据结构与算法/算法/简单DP', level: 'intermediate', tags: ['dp'] }
-                        }
-                    }
-                },
+            '数据结构': {
+                docPath: 'Computering/数据结构',
                 skills: {
-                    '数据结构概述': { docPath: 'Computering/数据结构与算法/数据结构', level: 'intermediate', tags: ['overview'] },
-                    '算法概述': { docPath: 'Computering/数据结构与算法/算法', level: 'intermediate', tags: ['overview'] }
-                }
+                            'KMP': { docPath: 'Computering/数据结构/KMP', level: 'advanced', tags: ['string'] },
+                            'Trie': { docPath: 'Computering/数据结构/Trie', level: 'intermediate', tags: ['trie'] },
+                            '栈': { docPath: 'Computering/数据结构/栈', level: 'beginner', tags: ['stack'] },
+                            '链表与邻接表': { docPath: 'Computering/数据结构/链表与邻接表', level: 'intermediate', tags: ['linked-list'] },
+                            '队列': { docPath: 'Computering/数据结构/队列', level: 'beginner', tags: ['queue'] },
+                            '数据结构概述': { docPath: 'Computering/数据结构/数据结构', level: 'intermediate', tags: ['overview'] },
+                        }
+                            
+                },
             },
             '机器学习': {
                 docPath: 'Computering/机器学习',
@@ -249,12 +236,7 @@ const generateCompleteDocsData = () => {
                             '阅读提示': { docPath: 'Computering/机器学习/AAAMLP/阅读本系列的提示', level: 'beginner', tags: ['guide'] }
                         }
                     },
-                    '强化学习': {
-                        docPath: 'Computering/机器学习/强化学习',
-                        skills: {
-                            'Bellman公式': { docPath: 'Computering/机器学习/强化学习/bellman公式', level: 'advanced', tags: ['rl'] }
-                        }
-                    },
+                    
                     '推荐系统': {
                         docPath: 'Computering/机器学习/推荐系统',
                         skills: {
@@ -343,8 +325,7 @@ const generateCompleteDocsData = () => {
                     '传统发邮件方式': { docPath: 'Computering/计算机网络/如何用传统的方式发邮件', level: 'intermediate', tags: ['email'] }
                 }
             }
-        }
-    },
+        },
     'Control': {
         color: '#10B981',
         docPath: 'Control/控制理论',

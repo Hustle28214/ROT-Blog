@@ -47,7 +47,7 @@ $$
 $$
 \pi(a|s) = 
 \begin{cases} 
-1 - \epsilon + \frac{\epsilon}{|A(s)|} & \text{if } a = \arg\max_{a'} Q(s, a') \\
+1 - \epsilon + \frac{ \epsilon}{|A(s)|} & \text{if } a = \arg\max_{a'} Q(s, a') \\
 \frac{\epsilon}{|A(s)|} & \text{otherwise}
 \end{cases}
 $$
@@ -149,6 +149,68 @@ $$
 
 ## 5. Q-Learning 收敛性证明
 
+假设一个随机过程 $\{\Delta_t\}$ 的形式为：
+$$
+\Delta_{t+1}(x) = (1 - \alpha_t(x))\Delta_t(x) + \alpha_t(x)F_t(x)
+$$
+如果满足以下条件，那么它将收敛到 0：
 
+(1) $\sum_t \alpha_t(x) = \infty$，$\sum_t \alpha_t^2(x) < \infty$；
+
+(2) $\|\mathbb{E}[F_t(x)|\mathcal{F}_t]\|_W \leq \gamma \|\Delta_t\|_W$，其中 $\gamma < 1$；
+
+(3) $\text{Var}[F_t(x)|\mathcal{F}_t] \leq C(1 + \|\Delta_t\|_W)^2$，其中 $C > 0$ 是一个常数。
+
+在时间步 $t$ 给定一个数据 $(s_t, a_t, r_t, s_{t+1})$，Q-learning 的更新公式可以写成：
+$$
+Q_{t+1}(s_t, a_t) = Q_t(s_t, a_t) + \alpha_t[s_t, a_t]\left(r_t + \gamma \max_{a'} Q_t(s_{t+1}, a') - Q_t(s_t, a_t)\right)
+$$
+
+其中，更新步长 $\alpha_t$ 与时间有关，并且满足 $\sum_t \alpha_t = \infty$，$\sum_t \alpha_t^2 < \infty$。我们将其重写成以下形式：
+$$
+Q_{t+1}(s_t, a_t) = (1 - \alpha_t)Q_t(s_t, a_t) + \alpha_t\left(r_t + \gamma \max_{a'} Q_t(s_{t+1}, a')\right)
+$$
+
+假设 $Q^*$ 是最优动作价值函数，令 $\Delta_t = Q_t - Q^*$。在上式等号左右两边减去 $Q^*$，然后令 $F_t = r_t + \gamma \max_{a'} Q_t(s_{t+1}, a') - Q^*(s_t, a_t)$，于是有：
+$$
+\Delta_{t+1}(s_t, a_t) = (1 - \alpha_t)\Delta_t(s_t, a_t) + \alpha_t F_t
+$$
+
+基于环境状态转移的概率分布，可以求得其期望值为：
+$$
+\mathbb{E}[F_t|\mathcal{F}_t] = r_t + \gamma \mathbb{E}[\max_{a'} Q_t(s_{t+1}, a')] - Q^*(s_t, a_t)
+$$
+
+定义 Bellman 最优算子 $\mathcal{T}$：
+$$
+(\mathcal{T}Q)(s,a) = \mathbb{E}[r_t + \gamma \max_{a'} Q(s_{t+1}, a') | s_t = s, a_t = a]
+$$
+
+于是有：
+$$
+\mathbb{E}[F_t|\mathcal{F}_t] = (\mathcal{T}Q_t)(s_t,a_t) - Q^*(s_t,a_t)
+$$
+
+对于最优动作函数 $Q^*$，根据定义，它满足 Bellman 最优方程：
+$$
+Q^* = \mathcal{T}Q^*
+$$
+
+所以：
+$$
+\mathbb{E}[F_t|\mathcal{F}_t] = (\mathcal{T}Q_t)(s_t,a_t) - (\mathcal{T}Q^*)(s_t,a_t)
+$$
+
+可以证明 $\mathcal{T}$ 是一个 $\gamma$-压缩算子，所以有：
+$$
+\|\mathbb{E}[F_t|\mathcal{F}_t]\|_\infty \leq \gamma \|Q_t - Q^*\|_\infty = \gamma \|\Delta_t\|_\infty
+$$
+
+接下来，根据随机近似理论，我们可以进一步推导方差条件。因为奖励函数 $r_t$ 是有界的，所以存在一个常数 $C$，使得：
+$$
+\text{Var}[F_t|\mathcal{F}_t] \leq C(1 + \|\Delta_t\|_\infty)^2
+$$
+
+因此，根据引理，$\Delta_t$ 能收敛到 0，这意味着 $Q_t$ 能够收敛到 $Q^*$。
 
 </WordCount>

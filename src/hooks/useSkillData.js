@@ -215,6 +215,37 @@ const generateCompleteDocsData = () => {
                             
                 },
             },
+            '算法': {
+                docPath: 'Computering/算法',
+                skills: {
+                    '算法': { docPath: 'Computering/算法/算法', level: 'intermediate', tags: ['algorithm'] }
+                },
+                topics: {
+                    '搜索': {
+                        docPath: 'Computering/算法/搜索',
+                        skills: {
+                            'A星': { docPath: 'Computering/算法/搜索/A星', level: 'intermediate', tags: ['search'] },
+                            'BFS': { docPath: 'Computering/算法/搜索/BFS', level: 'beginner', tags: ['search'] },
+                            'DFS': { docPath: 'Computering/算法/搜索/DFS', level: 'beginner', tags: ['search'] },
+                            'IDA星': { docPath: 'Computering/算法/搜索/IDA星', level: 'advanced', tags: ['search'] },
+                            '双向搜索': { docPath: 'Computering/算法/搜索/双向搜索', level: 'intermediate', tags: ['search'] },
+                            '启发式搜索': { docPath: 'Computering/算法/搜索/启发式搜索', level: 'intermediate', tags: ['search'] },
+                            '回溯法': { docPath: 'Computering/算法/搜索/回溯法', level: 'intermediate', tags: ['search'] },
+                            '迭代加深搜索': { docPath: 'Computering/算法/搜索/迭代加深搜索', level: 'advanced', tags: ['search'] }
+                        }
+                    },
+                    '算法基础': {
+                        docPath: 'Computering/算法/算法基础',
+                        skills: {
+                            '二分': { docPath: 'Computering/算法/算法基础/二分', level: 'beginner', tags: ['binary-search'] },
+                            '前缀和 & 差分': { docPath: 'Computering/算法/算法基础/前缀和 & 差分', level: 'intermediate', tags: ['prefix-sum'] },
+                            '排序': { docPath: 'Computering/算法/算法基础/排序', level: 'beginner', tags: ['sorting'] },
+                            '简单DP': { docPath: 'Computering/算法/算法基础/简单DP', level: 'intermediate', tags: ['dp'] },
+                            '贪心': { docPath: 'Computering/算法/算法基础/贪心', level: 'intermediate', tags: ['greedy'] }
+                        }
+                    }
+                }
+            },
             '机器学习': {
                 docPath: 'Computering/机器学习',
                 topics: {
@@ -569,8 +600,28 @@ const generateCompleteDocsData = () => {
     },
     'Materials': {
         color: '#EC4899',
-        docPath: 'Materials/半导体物理学',
+        docPath: 'Materials/材料科学与工程',
         subcategories: {
+            '半导体器件': {
+                docPath: 'Materials/半导体器件',
+                skills: {
+                    '固体晶格结构': { docPath: 'Materials/半导体器件/01-固体晶格结构', level: 'advanced', tags: ['semiconductor'] },
+                    '量子力学初步': { docPath: 'Materials/半导体器件/02-量子力学初步', level: 'advanced', tags: ['quantum'] },
+                    '固体量子理论初步': { docPath: 'Materials/半导体器件/03-固体量子理论初步', level: 'advanced', tags: ['solid-state'] },
+                    '平衡半导体': { docPath: 'Materials/半导体器件/04-平衡半导体', level: 'advanced', tags: ['equilibrium'] },
+                    '载流子输运现象': { docPath: 'Materials/半导体器件/05-载流子输运现象', level: 'advanced', tags: ['transport'] },
+                    '半导体中的非平衡过剩载流子': { docPath: 'Materials/半导体器件/06-半导体中的非平衡过剩载流子', level: 'advanced', tags: ['non-equilibrium'] },
+                    'pn结': { docPath: 'Materials/半导体器件/07-pn结', level: 'advanced', tags: ['pn-junction'] },
+                    'pn结二极管': { docPath: 'Materials/半导体器件/08-pn结二极管', level: 'advanced', tags: ['diode'] },
+                    '金属半导体和半导体异质结': { docPath: 'Materials/半导体器件/09-金属半导体和半导体异质结', level: 'advanced', tags: ['heterojunction'] },
+                    '双极晶体管': { docPath: 'Materials/半导体器件/10-双极晶体管', level: 'advanced', tags: ['bjt'] },
+                    'MOSFET基础': { docPath: 'Materials/半导体器件/11-MOSFET基础', level: 'advanced', tags: ['mosfet'] },
+                    'MOSFET概念深入': { docPath: 'Materials/半导体器件/12-MOSFET概念深入', level: 'advanced', tags: ['mosfet'] },
+                    '结型场效应晶体管': { docPath: 'Materials/半导体器件/13-结型场效应晶体管', level: 'advanced', tags: ['jfet'] },
+                    '光器件': { docPath: 'Materials/半导体器件/14-光器件', level: 'advanced', tags: ['optoelectronics'] },
+                    '半导体功率器件': { docPath: 'Materials/半导体器件/15-半导体功率器件', level: 'advanced', tags: ['power-device'] }
+                }
+            },
             '半导体物理学': {
                 docPath: 'Materials/半导体物理学',
                 skills: {
@@ -659,6 +710,19 @@ const generateCompleteDocsData = () => {
         color: '#06B6D4',
         docPath: 'Robotics/机器人学',
         subcategories: {
+            '机器人不同构型实践': {
+                docPath: 'Robotics/机器人不同构型实践',
+                skills: {
+                    'rikibotROS小车': { docPath: 'Robotics/机器人不同构型实践/rikibotROS小车', level: 'intermediate', tags: ['robot'] },
+                    '云津日记': { docPath: 'Robotics/机器人不同构型实践/云津日记', level: 'intermediate', tags: ['project'] }
+                }
+            },
+            '高等机器人控制': {
+                docPath: 'Robotics/高等机器人控制',
+                skills: {
+                    '非线性控制在机器人中的应用': { docPath: 'Robotics/高等机器人控制/非线性控制在机器人中的应用', level: 'advanced', tags: ['nonlinear-control'] }
+                }
+            },
             'ROS': {
                 docPath: 'Robotics/ROS',
                 skills: {

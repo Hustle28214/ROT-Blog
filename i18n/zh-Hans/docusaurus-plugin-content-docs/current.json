@@ -214,5 +214,9 @@
   "sidebar.tutorialSidebar.category.Finance": {
     "message": "经济与金融学",
     "description": "The label for category Finance in sidebar tutorialSidebar"
+  },
+  "sidebar.tutorialSidebar.category.Materials": {
+    "message": "材料科学与工程",
+    "description": "The label for category Materials in sidebar tutorialSidebar"
   }
 }

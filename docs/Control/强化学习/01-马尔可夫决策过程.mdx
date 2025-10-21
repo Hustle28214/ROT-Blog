@@ -597,6 +597,524 @@ print("使用蒙特卡洛方法计算MDP的状态价值为\n", V)
 
 ## 5. 占用度量(Word Count)
 
+在开始介绍占用度量之前，我们先引入状态分布的概念。
 
+我们定义 MDP 的初始状态分布为 $\nu_0(s)$，表示智能体初始时刻处于状态 $s$ 的概率：
+$$
+\sum_{s \in \mathcal{S}} \nu_0(s) = 1
+$$
+
+用 $P(s_t = s \mid \pi)$ 表示采取策略 $\pi$ 使得智能体在时刻 $t$ 处于状态 $s$ 的概率。初始时有：
+$$
+P(s_0 = s \mid \pi) = \nu_0(s)
+$$
+
+策略 $\pi$ 的状态访问分布（state visitation distribution）定义为：
+$$
+\nu^\pi(s) = (1 - \gamma) \sum_{t=0}^\infty \gamma^t P(s_t = s \mid \pi)
+$$
+
+其中，$(1-\gamma)$ 是归一化因子，确保 $\sum_{s \in \mathcal{S}} \nu^\pi(s) = 1$。
+
+状态访问分布满足以下重要性质：
+
+**归一性**：
+   $$
+   \sum_{s \in \mathcal{S}} \nu^\pi(s) = 1
+   $$
+**递归关系**：
+   $$
+   \nu^\pi(s) = (1 - \gamma)\nu_0(s) + \gamma \sum_{s' \in \mathcal{S}} \sum_{a \in \mathcal{A}} \nu^\pi(s') \pi(a \mid s') P(s \mid s', a)
+   $$
+
+   推导过程：
+   $$
+   \begin{align*}
+   \nu^\pi(s) &= (1 - \gamma) \sum_{t=0}^\infty \gamma^t P(s_t = s \mid \pi) \\
+   &= (1 - \gamma)\nu_0(s) + (1 - \gamma) \sum_{t=1}^\infty \gamma^t P(s_t = s \mid \pi) \\
+   &= (1 - \gamma)\nu_0(s) + \gamma (1 - \gamma) \sum_{t=0}^\infty \gamma^t P(s_{t+1} = s \mid \pi) \\
+   &= (1 - \gamma)\nu_0(s) + \gamma \sum_{s'} \sum_a (1 - \gamma) \sum_{t=0}^\infty \gamma^t P(s_t = s' \mid \pi) \pi(a \mid s') P(s \mid s', a) \\
+   &= (1 - \gamma)\nu_0(s) + \gamma \sum_{s'} \sum_a \nu^\pi(s') \pi(a \mid s') P(s \mid s', a)
+   \end{align*}
+  $$
+
+现在我们可以定义占用度量（occupancy measure）。
+
+策略 $\pi$ 的占用度量（occupancy measure）定义为：
+$$
+\rho^\pi(s, a) = \nu^\pi(s) \pi(a \mid s)
+$$
+
+它表示状态-动作对 $(s, a)$ 被访问到的概率。
+
+占用度量与状态访问分布满足以下关系：
+
+1. **状态访问分布恢复**：
+   $$
+   \nu^\pi(s) = \sum_{a \in \mathcal{A}} \rho^\pi(s, a)
+   $$
+
+2. **策略恢复**：
+   $$
+   \pi(a \mid s) = \frac{\rho^\pi(s, a)}{\sum_{a' \in \mathcal{A}} \rho^\pi(s, a')} = \frac{\rho^\pi(s, a)}{\nu^\pi(s)}
+   $$
+
+:::tip
+
+***重要定理***
+
+**定理 1：占用度量的递归关系**
+
+对于任意两个策略 $\pi$ 和 $\pi'$，它们与同一个 MDP 交互产生的占用度量满足：
+$$
+\rho^{\pi'}(s, a) = (1 - \gamma)\nu_0(s)\pi'(a \mid s) + \gamma \sum_{s' \in \mathcal{S}} \sum_{a' \in \mathcal{A}} \rho^{\pi'}(s', a') P(s \mid s', a') \pi'(a \mid s)
+$$
+
+**证明**：
+$$
+\begin{align*}
+\rho^{\pi'}(s, a) &= \nu^{\pi'}(s) \pi'(a \mid s) \\
+&= \left[(1 - \gamma)\nu_0(s) + \gamma \sum_{s'} \sum_{a'} \nu^{\pi'}(s') \pi'(a' \mid s') P(s \mid s', a')\right] \pi'(a \mid s) \\
+&= (1 - \gamma)\nu_0(s)\pi'(a \mid s) + \gamma \sum_{s'} \sum_{a'} \nu^{\pi'}(s') \pi'(a' \mid s') P(s \mid s', a') \pi'(a \mid s) \\
+&= (1 - \gamma)\nu_0(s)\pi'(a \mid s) + \gamma \sum_{s'} \sum_{a'} \rho^{\pi'}(s', a') P(s \mid s', a') \pi'(a \mid s)
+\end{align*}
+$$
+**定理 2：占用度量到策略的唯一映射**
+
+给定一个合法的占用度量 $\rho(s, a)$（即存在某个策略 $\pi$ 使得 $\rho(s, a) = \rho^\pi(s, a)$），可生成该占用度量的唯一策略是：
+$$
+\pi(a \mid s) = \frac{\rho(s, a)}{\sum_{a' \in \mathcal{A}} \rho(s, a')}
+$$
+
+**证明**：
+1. **存在性**：定义 $\nu(s) = \sum_{a'} \rho(s, a')$，则 $\pi(a \mid s) = \rho(s, a) / \nu(s)$ 是一个有效的策略，因为：
+   - $\pi(a \mid s) \geq 0$ 对所有 $s, a$ 成立
+   - $\sum_{a} \pi(a \mid s) = \sum_{a} \rho(s, a) / \nu(s) = \nu(s) / \nu(s) = 1$
+
+2. **唯一性**：假设存在另一个策略 $\pi'$ 也生成相同的占用度量 $\rho$，则：
+   $$\rho(s, a) = \nu(s) \pi(a \mid s) = \nu(s) \pi'(a \mid s)$$
+   由于 $\nu(s) > 0$（否则该状态不会被访问），可得 $\pi(a \mid s) = \pi'(a \mid s)$，因此策略是唯一的。
+
+**合法性条件:**
+
+一个占用度量 $\rho(s, a)$ 是合法的，当且仅当它满足以下条件：
+
+1. **非负性**：$\rho(s, a) \geq 0$ 对所有 $s, a$ 成立
+2. **归一性**：$\sum_{s, a} \rho(s, a) = 1$
+3. **流守恒**：$\sum_{a} \rho(s, a) = (1 - \gamma)\nu_0(s) + \gamma \sum_{s', a'} \rho(s', a') P(s \mid s', a')$ 对所有 $s$ 成立
+:::
+用Python近似估计占用度量:
+<details>
+
+
+```python
+import numpy as np
+from collections import defaultdict
+import matplotlib.pyplot as plt
+
+class OccupancyMeasureEstimator:
+    """
+    占用度量估计器
+    
+    通过采样轨迹来估计策略的状态访问分布和占用度量
+    """
+    
+    def __init__(self, env, discount_factor=0.99):
+        """
+        初始化
+        
+        参数:
+            env: 环境对象，需要实现 reset() 和 step() 方法
+            discount_factor: 折扣因子 γ
+        """
+        self.env = env
+        self.gamma = discount_factor
+    
+    def estimate_undiscounted_occupancy(self, policy, num_episodes=1000, max_steps=1000):
+        """
+        估计非折扣占用度量
+        
+        参数:
+            policy: 策略函数，输入状态返回动作概率分布
+            num_episodes: 采样回合数
+            max_steps: 每个回合最大步数
+            
+        返回:
+            occupancy: 占用度量字典，(state, action) -> 概率
+            state_visitation: 状态访问分布字典
+        """
+        state_action_count = defaultdict(int)
+        state_count = defaultdict(int)
+        total_visits = 0
+        
+        for episode in range(num_episodes):
+            state = self.env.reset()
+            done = False
+            step = 0
+            
+            while not done and step < max_steps:
+                # 根据策略选择动作
+                if hasattr(policy, 'predict'):
+                    # 如果策略有predict方法
+                    action = policy.predict(state)
+                else:
+                    # 如果策略是概率分布函数
+                    action_probs = policy(state)
+                    action = np.random.choice(len(action_probs), p=action_probs)
+                
+                # 更新计数器
+                state_action_count[(state, action)] += 1
+                state_count[state] += 1
+                total_visits += 1
+                
+                # 执行动作
+                next_state, reward, done, _ = self.env.step(action)
+                state = next_state
+                step += 1
+        
+        # 计算占用度量和状态访问分布
+        occupancy = {}
+        state_visitation = {}
+        
+        for (s, a), count in state_action_count.items():
+            occupancy[(s, a)] = count / total_visits
+            
+        for s, count in state_count.items():
+            state_visitation[s] = count / total_visits
+        
+        return occupancy, state_visitation
+    
+    def estimate_discounted_occupancy(self, policy, num_episodes=1000, max_steps=1000):
+        """
+        估计折扣占用度量
+        
+        参数:
+            policy: 策略函数
+            num_episodes: 采样回合数
+            max_steps: 每个回合最大步数
+            
+        返回:
+            discounted_occupancy: 折扣占用度量
+            discounted_state_visitation: 折扣状态访问分布
+        """
+        discounted_occupancy = defaultdict(float)
+        discounted_state_visitation = defaultdict(float)
+        total_discounted_weight = 0
+        
+        for episode in range(num_episodes):
+            state = self.env.reset()
+            done = False
+            step = 0
+            discount = 1.0  # γ^0 = 1
+            
+            while not done and step < max_steps:
+                # 根据策略选择动作
+                if hasattr(policy, 'predict'):
+                    action = policy.predict(state)
+                else:
+                    action_probs = policy(state)
+                    action = np.random.choice(len(action_probs), p=action_probs)
+                
+                # 更新折扣计数器
+                discounted_occupancy[(state, action)] += discount
+                discounted_state_visitation[state] += discount
+                total_discounted_weight += discount
+                
+                # 执行动作
+                next_state, reward, done, _ = self.env.step(action)
+                state = next_state
+                step += 1
+                discount *= self.gamma  # 更新折扣因子
+        
+        # 归一化
+        for key in discounted_occupancy:
+            discounted_occupancy[key] /= total_discounted_weight
+            
+        for key in discounted_state_visitation:
+            discounted_state_visitation[key] /= total_discounted_weight
+        
+        return discounted_occupancy, discounted_state_visitation
+    
+    def recover_policy_from_occupancy(self, occupancy, states=None, actions=None):
+        """
+        从占用度量恢复策略
+        
+        参数:
+            occupancy: 占用度量字典
+            states: 状态空间（可选）
+            actions: 动作空间（可选）
+            
+        返回:
+            policy: 恢复的策略函数
+        """
+        if states is None or actions is None:
+            # 从占用度量中提取所有状态和动作
+            states = set()
+            actions_set = set()
+            for (s, a) in occupancy.keys():
+                states.add(s)
+                actions_set.add(a)
+            states = sorted(list(states))
+            actions = sorted(list(actions_set))
+        
+        policy_dict = {}
+        
+        for s in states:
+            total = 0
+            action_probs = []
+            
+            for a in actions:
+                prob = occupancy.get((s, a), 0)
+                action_probs.append(prob)
+                total += prob
+            
+            # 归一化
+            if total > 1e-10:  # 避免除零
+                action_probs = [p / total for p in action_probs]
+            else:
+                # 如果该状态没有被访问过，使用均匀分布
+                action_probs = [1.0 / len(actions)] * len(actions)
+            
+            policy_dict[s] = action_probs
+        
+        # 创建策略函数
+        def policy(state):
+            if state in policy_dict:
+                return policy_dict[state]
+            else:
+                # 如果遇到未知状态，返回均匀分布
+                return [1.0 / len(actions)] * len(actions)
+        
+        return policy
+    
+    def compare_policies(self, policy1, policy2, num_episodes=1000, max_steps=1000):
+        """
+        比较两个策略的占用度量
+        
+        参数:
+            policy1, policy2: 要比较的两个策略
+            num_episodes: 采样回合数
+            max_steps: 每个回合最大步数
+            
+        返回:
+            comparison_results: 比较结果字典
+        """
+        # 估计两个策略的占用度量
+        occ1, vis1 = self.estimate_discounted_occupancy(policy1, num_episodes, max_steps)
+        occ2, vis2 = self.estimate_discounted_occupancy(policy2, num_episodes, max_steps)
+        
+        # 计算差异度量
+        all_keys = set(occ1.keys()) | set(occ2.keys())
+        
+        l1_distance = 0
+        l2_distance = 0
+        max_distance = 0
+        
+        for key in all_keys:
+            p1 = occ1.get(key, 0)
+            p2 = occ2.get(key, 0)
+            diff = abs(p1 - p2)
+            l1_distance += diff
+            l2_distance += diff ** 2
+            max_distance = max(max_distance, diff)
+        
+        l2_distance = np.sqrt(l2_distance)
+        
+        return {
+            'policy1_occupancy': occ1,
+            'policy2_occupancy': occ2,
+            'policy1_visitation': vis1,
+            'policy2_visitation': vis2,
+            'l1_distance': l1_distance,
+            'l2_distance': l2_distance,
+            'max_distance': max_distance
+        }
+
+# 示例使用代码
+if __name__ == "__main__":
+    # 创建一个简单的网格世界环境示例
+    class SimpleGridWorld:
+        def __init__(self, size=5):
+            self.size = size
+            self.state = 0
+            self.goal = size * size - 1
+            
+        def reset(self):
+            self.state = 0
+            return self.state
+            
+        def step(self, action):
+            # 动作: 0=上, 1=右, 2=下, 3=左
+            row = self.state // self.size
+            col = self.state % self.size
+            
+            if action == 0 and row > 0:  # 上
+                row -= 1
+            elif action == 1 and col < self.size - 1:  # 右
+                col += 1
+            elif action == 2 and row < self.size - 1:  # 下
+                row += 1
+            elif action == 3 and col > 0:  # 左
+                col -= 1
+                
+            self.state = row * self.size + col
+            
+            done = (self.state == self.goal)
+            reward = 1.0 if done else 0.0
+            
+            return self.state, reward, done, {}
+    
+    # 创建环境和估计器
+    env = SimpleGridWorld(size=3)
+    estimator = OccupancyMeasureEstimator(env, discount_factor=0.9)
+    
+    # 定义两个不同的策略
+    def random_policy(state):
+        # 随机策略
+        return [0.25, 0.25, 0.25, 0.25]
+    
+    def right_biased_policy(state):
+        # 偏向向右的策略
+        return [0.1, 0.7, 0.1, 0.1]
+    
+    # 估计占用度量
+    print("估计随机策略的占用度量...")
+    random_occ, random_vis = estimator.estimate_discounted_occupancy(random_policy, num_episodes=1000)
+    
+    print("估计右偏策略的占用度量...")
+    right_occ, right_vis = estimator.estimate_discounted_occupancy(right_biased_policy, num_episodes=1000)
+    
+    # 比较两个策略
+    print("\n比较两个策略...")
+    comparison = estimator.compare_policies(random_policy, right_biased_policy, num_episodes=1000)
+    print(f"L1距离: {comparison['l1_distance']:.4f}")
+    print(f"L2距离: {comparison['l2_distance']:.4f}")
+    print(f"最大距离: {comparison['max_distance']:.4f}")
+    
+    # 从占用度量恢复策略
+    print("\n从占用度量恢复策略...")
+    recovered_policy = estimator.recover_policy_from_occupancy(random_occ)
+    
+    # 测试恢复的策略
+    test_state = 0
+    original_probs = random_policy(test_state)
+    recovered_probs = recovered_policy(test_state)
+    
+    print(f"状态 {test_state}:")
+    print(f"  原始策略: {original_probs}")
+    print(f"  恢复策略: {[f'{p:.3f}' for p in recovered_probs]}")
+    
+    # 可视化状态访问分布（简单示例）
+    states = list(range(9))  # 3x3网格
+    random_visits = [random_vis.get(s, 0) for s in states]
+    right_visits = [right_vis.get(s, 0) for s in states]
+    
+    plt.figure(figsize=(10, 5))
+    plt.subplot(1, 2, 1)
+    plt.bar(states, random_visits)
+    plt.title('随机策略状态访问分布')
+    plt.xlabel('状态')
+    plt.ylabel('访问概率')
+    
+    plt.subplot(1, 2, 2)
+    plt.bar(states, right_visits)
+    plt.title('右偏策略状态访问分布')
+    plt.xlabel('状态')
+    plt.ylabel('访问概率')
+    
+    plt.tight_layout()
+    plt.show()
+```
+</details>
+
+## 6. 贝尔曼最优方程
+
+
+强化学习的目标是找到一个策略 $\pi^*$，使得智能体从初始状态出发能获得最大的期望回报。我们首先定义策略之间的偏序关系。
+
+对于任意两个策略 $\pi$ 和 $\pi'$，我们定义：
+- $\pi \geq \pi'$ 当且仅当对于所有状态 $s$，都有 $V^\pi(s) \geq V^{\pi'}(s)$
+- $\pi > \pi'$ 当且仅当 $\pi \geq \pi'$ 且至少存在一个状态 $s$ 使得 $V^\pi(s) > V^{\pi'}(s)$
+
+在有限状态和动作空间的 MDP 中，至少存在一个策略不差于其他所有策略，这样的策略称为**最优策略**（optimal policy）。最优策略可能不唯一，但所有最优策略都具有相同的价值函数。
+
+所有最优策略共享相同的最优状态价值函数，定义为：
+$$
+V^*(s) = \max_\pi V^\pi(s) = \max_\pi \mathbb{E}_\pi \left[ \sum_{k=0}^\infty \gamma^k R_{t+k+1} \mid S_t = s \right]
+$$
+
+最优动作价值函数定义为：
+$$
+Q^*(s, a) = \max_\pi Q^\pi(s, a) = \max_\pi \mathbb{E}_\pi \left[ \sum_{k=0}^\infty \gamma^k R_{t+k+1} \mid S_t = s, A_t = a \right]
+$$
+
+**定理 1**：最优状态价值与最优动作价值的关系
+$$V^*(s) = \max_a Q^*(s, a)$$
+
+**证明**：
+$$
+\begin{align*}
+V^*(s) &= \max_\pi V^\pi(s) \\
+&= \max_\pi \sum_a \pi(a \mid s) Q^\pi(s, a) \\
+&\leq \max_\pi \max_a Q^\pi(s, a) \quad \text{(由于加权平均不超过最大值)} \\
+&= \max_a \max_\pi Q^\pi(s, a) \\
+&= \max_a Q^*(s, a)
+\end{align*}
+$$
+另一方面，对于任意 $\varepsilon > 0$，存在策略 $\pi$ 使得 $V^\pi(s) \geq V^*(s) - \varepsilon$。设 $a^* = \arg\max_a Q^*(s, a)$，我们可以构造一个策略 $\pi'$ 在状态 $s$ 选择动作 $a^*$，然后遵循最优策略。那么：
+$$
+V^{\pi'}(s) = Q^{\pi'}(s, a^*) \geq Q^*(s, a^*) - \varepsilon = \max_a Q^*(s, a) - \varepsilon
+$$
+
+由于 $V^*(s) \geq V^{\pi'}(s)$，我们有：
+
+$$
+V^*(s) \geq \max_a Q^*(s, a) - \varepsilon
+$$
+
+由于 $\varepsilon$ 是任意的，我们得到 $V^*(s) \geq \max_a Q^*(s, a)$。
+
+结合两个不等式，我们得到 $V^*(s) = \max_a Q^*(s, a)$。
+
+结合两个不等式，我们得到 $V^*(s) = \max_a Q^*(s, a)$。
+
+**定理 2**：最优动作价值的贝尔曼方程
+$$Q^*(s, a) = R(s, a) + \gamma \sum_{s'} P(s' \mid s, a) V^*(s')$$
+
+**证明**：
+$$
+\begin{align*}
+Q^*(s, a) &= \max_\pi Q^\pi(s, a) \\
+&= \max_\pi \left[ R(s, a) + \gamma \sum_{s'} P(s' \mid s, a) V^\pi(s') \right] \\
+&= R(s, a) + \gamma \sum_{s'} P(s' \mid s, a) \max_\pi V^\pi(s') \quad \text{(由于最大值可交换)} \\
+&= R(s, a) + \gamma \sum_{s'} P(s' \mid s, a) V^*(s')
+\end{align*}
+$$
+
+
+结合定理 1 和定理 2，我们可以推导出贝尔曼最优方程。
+
+**贝尔曼最优方程（状态价值形式）**：
+$$
+\begin{align*}
+V^*(s) &= \max_a Q^*(s, a) \\
+&= \max_a \left[ R(s, a) + \gamma \sum_{s'} P(s' \mid s, a) V^*(s') \right]
+\end{align*}
+$$
+**贝尔曼最优方程（动作价值形式）**：
+$$
+\begin{align*}
+Q^*(s, a) &= R(s, a) + \gamma \sum_{s'} P(s' \mid s, a) V^*(s') \\
+&= R(s, a) + \gamma \sum_{s'} P(s' \mid s, a) \max_{a'} Q^*(s', a')
+\end{align*}
+$$
+
+## References
+
+[1].  张伟楠.动手学强化学习.\[EB/OL\](2022-07-02)\[2025-10-19\].https://hrl.boyuai.com/chapter/1/%E5%88%9D%E6%8E%A2%E5%BC%BA%E5%8C%96%E5%AD%A6%E4%B9%A0
+
+[2] SUTTON R S, BARTO A G. Reinforcement learning: an introduction [M]. Cambridge:MIT press, 2018.
+
+[3] OTTERLO M V, WIERING M. Reinforcement learning and markov decision processes [M]. Berlin, Heidelberg: Springer, 2012: 3-42.
 
 </WordCount>

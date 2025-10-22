@@ -880,7 +880,15 @@ const projectData = {
             "icon": "🎮",
             "link": "https://hrl.boyuai.com/",
             "color": "#00A896"
-          }
+          },
+          
+          {
+            "name": "Spinning Up",
+            "description": "OpenAI 开源深度强化学习教程",
+            "icon": "🎮",
+            "link": "https://spinningup.openai.com/en/latest/index.html",
+            "color": "#fcb70a"
+          },
         ]
       },
       {

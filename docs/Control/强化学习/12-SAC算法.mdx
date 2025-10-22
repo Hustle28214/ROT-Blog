@@ -2,4 +2,543 @@ import WordCount from '../../../src/components/WordCount/WordCount';
 
 <WordCount>
 
+
+
+想象一下，你正在训练一个机器人学习走路。早期的算法就像是一个严格的教练，要求机器人严格按照指令行动，但这往往导致学习过程缓慢且容易卡在局部最优。而SAC算法则像是一位开明的导师，鼓励机器人在学习过程中保持适度的好奇心，在追求高分的同时也不忘探索未知的可能性。
+
+传统的离线策略算法如DDPG虽然样本效率较高，但训练过程就像在钢丝上行走，稍有不慎就会失去平衡。SAC算法的出现改变了这一局面，它巧妙地将探索与利用相结合，在保持高效率的同时显著提升了训练的稳定性。
+
+## 1. SAC（Soft Actor-Critic）算法
+
+在信息论中，熵是衡量不确定性的指标。如果一个策略的熵值很高，说明它的行为更加多样化；反之，熵值低则表示策略更加确定和专注。
+
+具体来说，如果策略$\pi$在状态$s$下选择动作$a$的概率为$\pi(a|s)$，那么该策略在该状态下的熵定义为：
+
+$$
+H(\pi(\cdot|s)) = -\sum_a \pi(a|s) \log \pi(a|s)
+$$
+
+### 1.1 最大熵强化学习
+
+最大熵强化学习的核心思想可以用一个简单的类比来理解：假设你要在一片未知的森林中寻找宝藏，传统的强化学习算法会要求你直奔最有可能藏宝的地点，而最大熵方法则会鼓励你在寻找过程中也留意周边的环境，保持对未知区域的好奇心。**这也就是最大化累积奖励，还要使得策略更加随机**。
+
+数学上，这个思想被表述为：
+
+$$
+\pi^* = \arg\max_{\pi} \mathbb{E}_{\pi}\left[\sum_{t=0}^{\infty} \gamma^t(r_t + \alpha H(\pi(\cdot|s_t)))\right]
+$$
+
+其中$\alpha$是一个平衡参数，控制着探索与利用的相对重要性。
+
+### 1.2 软化策略迭代
+
+
+传统的强化学习算法基于贝尔曼方程进行价值迭代，而SAC引入了一个"软化"的版本。这个软化的贝尔曼方程不仅考虑期望回报，还融入了策略的随机性：
+
+$$
+Q(s_t,a_t) = r_t + \gamma \mathbb{E}_{s_{t+1}}[V(s_{t+1})]
+$$
+
+其中状态价值函数的定义也相应调整为：
+
+$$
+V(s_t) = \mathbb{E}_{a_t \sim \pi}[Q(s_t,a_t) - \alpha \log \pi(a_t|s_t)]
+$$
+
+这种调整使得算法在评估状态价值时，不仅考虑该状态下能获得的期望回报，还考虑了执行策略的多样性程度。
+
+### 1.3 SAC算法
+
+SAC采用了一种多重网络的设计理念：
+
+1. **双重Q网络**：使用两个独立的Q函数估计器，有效缓解价值高估问题
+2. **策略网络**：学习一个随机策略，输出动作的概率分布
+3. **目标网络**：提供稳定的学习目标，类似于教师角色的参考网络
+
+
+每个Q网络都通过最小化以下目标进行学习：
+
+$$
+L_Q(\phi_i) = \mathbb{E}_{(s,a,r,s') \sim \mathcal{D}}\left[\left(Q_{\phi_i}(s,a) - \left(r + \gamma V_{\text{target}}(s')\right)\right)^2\right]
+$$
+
+其中目标价值函数$V_{\text{target}}(s')$结合了下一状态的Q值估计和策略的熵：
+
+$$
+V_{\text{target}}(s') = \mathbb{E}_{a' \sim \pi_\theta(\cdot|s')}[Q_{\phi_{\text{target}}}(s',a') - \alpha \log \pi_\theta(a'|s')]
+$$
+
+策略网络的学习目标是在最大化期望回报的同时保持足够的随机性：
+
+$$
+L_\pi(\theta) = \mathbb{E}_{s \sim \mathcal{D}}\left[\mathbb{E}_{a \sim \pi_\theta(\cdot|s)}[\alpha \log \pi_\theta(a|s) - Q_{\phi}(s,a)]\right]
+$$
+
+它鼓励策略在那些Q值较高的动作上有较高的概率，同时通过熵项防止策略过早收敛到确定性行为。
+
+对于连续动作空间，SAC采用重参数化技巧使采样过程可导：
+
+$$
+a = \mu_\theta(s) + \sigma_\theta(s) \odot \epsilon, \quad \epsilon \sim \mathcal{N}(0,I)
+$$
+
+这种方法允许梯度通过随机性采样过程反向传播，使得整个网络可以端到端训练。
+
+### 1.4 自动调整熵正则项
+
+在SAC算法中，熵正则项的系数$\alpha$扮演着至关重要的角色。它控制着探索与利用之间的平衡：当环境不确定性高或智能体处于学习初期时，需要较大的$\alpha$值来鼓励探索。当智能体已经掌握环境规律时，需要较小的$\alpha$值来专注于利用已知知识。
+
+手动调节这个参数既困难又低效，因此SAC采用了一种自动调节机制，让算法能够根据当前的学习状态自主调整探索程度。
+
+SAC将原来的无约束优化问题转化为带约束的优化问题：
+
+$$
+\begin{aligned}
+\max_{\pi} \quad & \mathbb{E}_{\pi}\left[\sum_{t=0}^{\infty} \gamma^t r_t\right] \\
+\text{s.t.} \quad & \mathbb{E}_{(s,a) \sim \rho_\pi}[-\log \pi(a|s)] \geq \mathcal{H}_0
+\end{aligned}
+$$
+
+其中$\mathcal{H}_0$是预设的目标熵值。这个约束确保策略的平均熵不低于$\mathcal{H}_0$，从而保证最低限度的探索。
+
+
+为了解决这个带约束的优化问题，我们引入拉格朗日乘子$\alpha$（这里$\alpha \geq 0$），构建拉格朗日函数：
+
+$$
+\mathcal{L}(\pi, \alpha) = \mathbb{E}_{\pi}\left[\sum_{t=0}^{\infty} \gamma^t r_t\right] + \alpha\left( \mathbb{E}_{(s,a) \sim \rho_\pi}[-\log \pi(a|s)] - \mathcal{H}_0 \right)
+$$
+
+原始约束问题等价于如下的极小极大问题：
+
+$$
+\max_{\pi} \min_{\alpha \geq 0} \mathcal{L}(\pi, \alpha)
+$$
+
+我们通过交替更新策略$\pi$和熵系数$\alpha$来求解这个极小极大问题：
+
+**步骤1：固定$\alpha$，优化策略$\pi$**
+$$
+\pi^* = \arg\max_{\pi} \mathbb{E}_{\pi}\left[\sum_{t=0}^{\infty} \gamma^t (r_t + \alpha H(\pi(\cdot|s_t)))\right]
+$$
+
+这正好对应标准SAC中策略网络的学习目标。
+
+**步骤2：固定$\pi$，优化熵系数$\alpha$**
+$$
+\alpha^* = \arg\min_{\alpha \geq 0} \alpha\left( \mathbb{E}_{(s,a) \sim \rho_\pi}[-\log \pi(a|s)] - \mathcal{H}_0 \right)
+$$
+
+
+从步骤2的优化目标中，我们直接得到$\alpha$的损失函数：
+
+$$
+L(\alpha) = \alpha \left( \mathbb{E}_{(s,a) \sim \rho_\pi}[-\log \pi(a|s)] - \mathcal{H}_0 \right)
+$$
+
+在实际实现中，我们使用经验回放池中的样本进行估计：
+
+$$
+L(\alpha) = \mathbb{E}_{s \sim \mathcal{D}, a \sim \pi_\theta(\cdot|s)} \left[ -\alpha \log \pi_\theta(a|s) - \alpha \mathcal{H}_0 \right]
+$$
+
+计算损失函数对$\alpha$的梯度：
+
+$$
+\nabla_\alpha L(\alpha) = \mathbb{E}_{s \sim \mathcal{D}, a \sim \pi_\theta(\cdot|s)} \left[ -\log \pi_\theta(a|s) - \mathcal{H}_0 \right]
+$$
+
+基于这个梯度，我们分析$\alpha$的调节行为：
+
+- **当策略熵低于目标值**：$-\log \pi(a|s) < \mathcal{H}_0$，梯度为负，$\alpha$增大
+- **当策略熵高于目标值**：$-\log \pi(a|s) > \mathcal{H}_0$，梯度为正，$\alpha$减小
+
+这样，$\alpha$能够自动收敛到合适的值，使策略熵维持在目标水平附近。
+
+
+目标熵$\mathcal{H}_0$通常基于动作空间的维度来选择：
+
+- 对于维度为$d$的连续动作空间，常见的经验值是$\mathcal{H}_0 = -d$
+- 这个选择基于最大熵原理，使得每个动作维度平均贡献$-1$的熵值
+
+
+
+### 1.5 训练流程
+
+
+基于上述推导，SAC的完整算法流程如下：
+
+1. **初始化**：
+   - 随机初始化两个Critic网络参数$\phi_1$, $\phi_2$和Actor网络参数$\theta$
+   - 初始化目标网络参数$\phi_{\text{target},1} \leftarrow \phi_1$, $\phi_{\text{target},2} \leftarrow \phi_2$
+   - 初始化经验回放池$\mathcal{D}$
+   - 初始化可学习的熵系数$\alpha$（通常初始化为1）
+
+2. **训练循环**（对于每个序列$e = 1$到$M$）：
+   - 获取初始状态$s_1$
+   - **对于每个时间步**$t = 1$到$T$：
+     - 根据当前策略选择动作：$a_t \sim \pi_\theta(\cdot|s_t)$
+     - 执行动作$a_t$，观察奖励$r_t$和下一状态$s_{t+1}$
+     - 存储转移$(s_t, a_t, r_t, s_{t+1})$到$\mathcal{D}$
+     - **内部训练循环**（对于$k = 1$到$K$）：
+       - 从$\mathcal{D}$中采样$N$个转移$(s_i, a_i, r_i, s_{i+1})$
+       - 计算目标Q值：
+         $$
+         y_i = r_i + \gamma \left( \min_{j=1,2} Q_{\phi_{\text{target},j}}(s_{i+1}, \tilde{a}_i) - \alpha \log \pi_\theta(\tilde{a}_i|s_{i+1}) \right)
+         $$
+         其中$\tilde{a}_i \sim \pi_\theta(\cdot|s_{i+1})$
+       - 更新两个Critic网络：
+         $$
+         \nabla_{\phi_j} \frac{1}{N} \sum_i (Q_{\phi_j}(s_i, a_i) - y_i)^2 \quad \text{对于} j=1,2
+         $$
+       - 使用重参数化技巧更新策略网络：
+         $$
+         \nabla_\theta \frac{1}{N} \sum_i \left( \alpha \log \pi_\theta(f_\theta(s_i, \epsilon_i)|s_i) - Q_{\phi_1}(s_i, f_\theta(s_i, \epsilon_i)) \right)
+         $$
+         其中$\epsilon_i \sim \mathcal{N}(0, I)$，$f_\theta$是重参数化函数
+       - 更新熵系数：
+         $$
+         \nabla_\alpha \frac{1}{N} \sum_i \left( -\alpha \log \pi_\theta(a_i|s_i) - \alpha \mathcal{H}_0 \right)
+         $$
+         注意：在实际实现中需要对$\alpha$进行投影以确保非负性
+       - 软更新目标网络：
+         $$
+         \phi_{\text{target},j} \leftarrow \tau \phi_j + (1-\tau)\phi_{\text{target},j} \quad \text{对于} j=1,2
+         $$
+
+3. **结束训练**
+
+
+
+
+## 2. SAC的完整实现
+
+```python
+import random
+import gymnasium as gym  # 改为 gymnasium
+import numpy as np
+from tqdm import tqdm
+import torch
+import torch.nn.functional as F
+from torch.distributions import Normal
+import matplotlib.pyplot as plt
+from collections import deque
+
+# 自定义工具函数，替代 rl_utils
+class ReplayBuffer:
+    def __init__(self, capacity):
+        self.buffer = deque(maxlen=capacity)
+    
+    def add(self, state, action, reward, next_state, done):
+        self.buffer.append((state, action, reward, next_state, done))
+    
+    def sample(self, batch_size):
+        transitions = random.sample(self.buffer, batch_size)
+        states, actions, rewards, next_states, dones = zip(*transitions)
+        return (np.array(states), np.array(actions), np.array(rewards), 
+                np.array(next_states), np.array(dones))
+    
+    def size(self):
+        return len(self.buffer)
+
+def moving_average(a, window_size):
+    cumulative_sum = np.cumsum(np.insert(a, 0, 0)) 
+    middle = (cumulative_sum[window_size:] - cumulative_sum[:-window_size]) / window_size
+    r = np.arange(1, window_size-1, 2)
+    begin = np.cumsum(a[:window_size-1])[::2] / r
+    end = (np.cumsum(a[:-window_size:-1])[::2] / r)[::-1]
+    return np.concatenate((begin, middle, end))
+
+def train_off_policy_agent(env, agent, num_episodes, replay_buffer, minimal_size, batch_size):
+    return_list = []
+    for i in range(10):
+        with tqdm(total=int(num_episodes/10), desc='Iteration %d' % i) as pbar:
+            for i_episode in range(int(num_episodes/10)):
+                episode_return = 0
+                state, _ = env.reset()
+                done = False
+                while not done:
+                    action = agent.take_action(state)
+                    next_state, reward, terminated, truncated, _ = env.step(action)
+                    done = terminated or truncated
+                    replay_buffer.add(state, action, reward, next_state, done)
+                    state = next_state
+                    episode_return += reward
+                    if replay_buffer.size() > minimal_size:
+                        b_s, b_a, b_r, b_ns, b_d = replay_buffer.sample(batch_size)
+                        transition_dict = {
+                            'states': b_s,
+                            'actions': b_a,
+                            'rewards': b_r,
+                            'next_states': b_ns,
+                            'dones': b_d
+                        }
+                        agent.update(transition_dict)
+                return_list.append(episode_return)
+                if (i_episode+1) % 10 == 0:
+                    pbar.set_postfix({
+                        'episode': '%d' % (num_episodes/10 * i + i_episode+1), 
+                        'return': '%.3f' % np.mean(return_list[-10:])
+                    })
+                pbar.update(1)
+    return return_list
+
+class PolicyNetContinuous(torch.nn.Module):
+    def __init__(self, state_dim, hidden_dim, action_dim, action_bound):
+        super(PolicyNetContinuous, self).__init__()
+        self.fc1 = torch.nn.Linear(state_dim, hidden_dim)
+        self.fc_mu = torch.nn.Linear(hidden_dim, action_dim)
+        self.fc_std = torch.nn.Linear(hidden_dim, action_dim)
+        self.action_bound = action_bound
+
+    def forward(self, x):
+        x = F.relu(self.fc1(x))
+        mu = self.fc_mu(x)
+        std = F.softplus(self.fc_std(x))
+        dist = Normal(mu, std)
+        normal_sample = dist.rsample()  # rsample()是重参数化采样
+        log_prob = dist.log_prob(normal_sample)
+        action = torch.tanh(normal_sample)
+        # 计算tanh_normal分布的对数概率密度
+        log_prob = log_prob - torch.log(1 - torch.tanh(action).pow(2) + 1e-7)
+        action = action * self.action_bound
+        return action, log_prob
+
+class QValueNetContinuous(torch.nn.Module):
+    def __init__(self, state_dim, hidden_dim, action_dim):
+        super(QValueNetContinuous, self).__init__()
+        self.fc1 = torch.nn.Linear(state_dim + action_dim, hidden_dim)
+        self.fc2 = torch.nn.Linear(hidden_dim, hidden_dim)
+        self.fc_out = torch.nn.Linear(hidden_dim, 1)
+
+    def forward(self, x, a):
+        # 确保动作张量形状正确
+        if a.dim() == 1:
+            a = a.unsqueeze(1)
+        cat = torch.cat([x, a], dim=1)
+        x = F.relu(self.fc1(cat))
+        x = F.relu(self.fc2(x))
+        return self.fc_out(x)
+
+class SACContinuous:
+    ''' 处理连续动作的SAC算法 '''
+    def __init__(self, state_dim, hidden_dim, action_dim, action_bound,
+                 actor_lr, critic_lr, alpha_lr, target_entropy, tau, gamma,
+                 device):
+        self.actor = PolicyNetContinuous(state_dim, hidden_dim, action_dim,
+                                         action_bound).to(device)  # 策略网络
+        self.critic_1 = QValueNetContinuous(state_dim, hidden_dim,
+                                            action_dim).to(device)  # 第一个Q网络
+        self.critic_2 = QValueNetContinuous(state_dim, hidden_dim,
+                                            action_dim).to(device)  # 第二个Q网络
+        self.target_critic_1 = QValueNetContinuous(state_dim,
+                                                   hidden_dim, action_dim).to(
+                                                       device)  # 第一个目标Q网络
+        self.target_critic_2 = QValueNetContinuous(state_dim,
+                                                   hidden_dim, action_dim).to(
+                                                       device)  # 第二个目标Q网络
+        # 令目标Q网络的初始参数和Q网络一样
+        self.target_critic_1.load_state_dict(self.critic_1.state_dict())
+        self.target_critic_2.load_state_dict(self.critic_2.state_dict())
+        self.actor_optimizer = torch.optim.Adam(self.actor.parameters(),
+                                                lr=actor_lr)
+        self.critic_1_optimizer = torch.optim.Adam(self.critic_1.parameters(),
+                                                   lr=critic_lr)
+        self.critic_2_optimizer = torch.optim.Adam(self.critic_2.parameters(),
+                                                   lr=critic_lr)
+        # 使用alpha的log值,可以使训练结果比较稳定
+        self.log_alpha = torch.tensor(np.log(0.01), dtype=torch.float, device=device)
+        self.log_alpha.requires_grad = True  # 可以对alpha求梯度
+        self.log_alpha_optimizer = torch.optim.Adam([self.log_alpha],
+                                                    lr=alpha_lr)
+        self.target_entropy = target_entropy  # 目标熵的大小
+        self.gamma = gamma
+        self.tau = tau
+        self.device = device
+
+    def take_action(self, state):
+        # 修复张量创建问题
+        state_tensor = torch.as_tensor(state, dtype=torch.float32, device=self.device).unsqueeze(0)
+        with torch.no_grad():
+            action, _ = self.actor(state_tensor)
+        return action.cpu().numpy()[0]
+
+    def calc_target(self, rewards, next_states, dones):  # 计算目标Q值
+        next_actions, log_prob = self.actor(next_states)
+        entropy = -log_prob
+        q1_value = self.target_critic_1(next_states, next_actions)
+        q2_value = self.target_critic_2(next_states, next_actions)
+        next_value = torch.min(q1_value,
+                               q2_value) + self.log_alpha.exp() * entropy
+        td_target = rewards + self.gamma * next_value * (1 - dones)
+        return td_target
+
+    def soft_update(self, net, target_net):
+        for param_target, param in zip(target_net.parameters(),
+                                       net.parameters()):
+            param_target.data.copy_(param_target.data * (1.0 - self.tau) +
+                                    param.data * self.tau)
+
+    def update(self, transition_dict):
+        # 修复张量创建问题
+        states = torch.as_tensor(transition_dict['states'], dtype=torch.float32, device=self.device)
+        actions = torch.as_tensor(transition_dict['actions'], dtype=torch.float32, device=self.device)
+        rewards = torch.as_tensor(transition_dict['rewards'], dtype=torch.float32, device=self.device).view(-1, 1)
+        next_states = torch.as_tensor(transition_dict['next_states'], dtype=torch.float32, device=self.device)
+        dones = torch.as_tensor(transition_dict['dones'], dtype=torch.float32, device=self.device).view(-1, 1)
+        
+        # 确保动作有正确的维度
+        if actions.dim() == 1:
+            actions = actions.unsqueeze(1)
+            
+        # 和之前章节一样,对倒立摆环境的奖励进行重塑以便训练
+        rewards = (rewards + 8.0) / 8.0
+
+        # 更新两个Q网络
+        td_target = self.calc_target(rewards, next_states, dones)
+        critic_1_loss = torch.mean(
+            F.mse_loss(self.critic_1(states, actions), td_target.detach()))
+        critic_2_loss = torch.mean(
+            F.mse_loss(self.critic_2(states, actions), td_target.detach()))
+        self.critic_1_optimizer.zero_grad()
+        critic_1_loss.backward()
+        self.critic_1_optimizer.step()
+        self.critic_2_optimizer.zero_grad()
+        critic_2_loss.backward()
+        self.critic_2_optimizer.step()
+
+        # 更新策略网络
+        new_actions, log_prob = self.actor(states)
+        entropy = -log_prob
+        q1_value = self.critic_1(states, new_actions)
+        q2_value = self.critic_2(states, new_actions)
+        actor_loss = torch.mean(-self.log_alpha.exp() * entropy -
+                                torch.min(q1_value, q2_value))
+        self.actor_optimizer.zero_grad()
+        actor_loss.backward()
+        self.actor_optimizer.step()
+
+        # 更新alpha值
+        alpha_loss = torch.mean(
+            (entropy - self.target_entropy).detach() * self.log_alpha.exp())
+        self.log_alpha_optimizer.zero_grad()
+        alpha_loss.backward()
+        self.log_alpha_optimizer.step()
+
+        self.soft_update(self.critic_1, self.target_critic_1)
+        self.soft_update(self.critic_2, self.target_critic_2)
+
+# 主程序
+if __name__ == "__main__":
+    # 创建环境
+    env_name = 'Pendulum-v1'  # 使用 v1 版本
+    env = gym.make(env_name)
+    
+    # 获取环境参数
+    state_dim = env.observation_space.shape[0]
+    action_dim = env.action_space.shape[0]
+    action_bound = env.action_space.high[0]  # 动作最大值
+    
+    # 设置随机种子
+    random.seed(0)
+    np.random.seed(0)
+    torch.manual_seed(0)
+    
+    # 设置超参数
+    actor_lr = 3e-4
+    critic_lr = 3e-3
+    alpha_lr = 3e-4
+    num_episodes = 100
+    hidden_dim = 128
+    gamma = 0.99
+    tau = 0.005  # 软更新参数
+    buffer_size = 100000
+    minimal_size = 1000
+    batch_size = 64
+    target_entropy = -env.action_space.shape[0]
+    device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+    
+    print(f"环境: {env_name}")
+    print(f"状态维度: {state_dim}, 动作维度: {action_dim}, 动作边界: {action_bound}")
+    print(f"目标熵: {target_entropy}")
+    print(f"设备: {device}")
+
+    # 创建经验回放缓冲区和智能体
+    replay_buffer = ReplayBuffer(buffer_size)
+    agent = SACContinuous(state_dim, hidden_dim, action_dim, action_bound,
+                          actor_lr, critic_lr, alpha_lr, target_entropy, tau,
+                          gamma, device)
+
+    # 训练智能体
+    print("开始训练SAC智能体...")
+    return_list = train_off_policy_agent(env, agent, num_episodes,
+                                          replay_buffer, minimal_size,
+                                          batch_size)
+
+    # 绘制结果
+    episodes_list = list(range(len(return_list)))
+    
+    plt.figure(figsize=(12, 5))
+    
+    # 原始回报曲线
+    plt.subplot(1, 2, 1)
+    plt.plot(episodes_list, return_list)
+    plt.xlabel('Episodes')
+    plt.ylabel('Returns')
+    plt.title('SAC on {}'.format(env_name))
+    plt.grid(True, alpha=0.3)
+    
+    # 移动平均回报曲线
+    plt.subplot(1, 2, 2)
+    mv_return = moving_average(return_list, 9)
+    plt.plot(episodes_list[:len(mv_return)], mv_return)
+    plt.xlabel('Episodes')
+    plt.ylabel('Returns')
+    plt.title('SAC on {} (Moving Average)'.format(env_name))
+    plt.grid(True, alpha=0.3)
+    
+    plt.tight_layout()
+    plt.show()
+    
+    # 打印训练统计信息
+    print(f"\n训练完成!")
+    print(f"最终10个回合平均回报: {np.mean(return_list[-10:]):.2f}")
+    print(f"最大回报: {np.max(return_list):.2f}")
+    print(f"平均回报: {np.mean(return_list):.2f} ± {np.std(return_list):.2f}")
+    
+    env.close()
+```
+
+<details>
+
+<summary>运行结果</summary>
+
+![SAC运行结果](https://github.com/user-attachments/assets/473399ec-512c-4b37-9062-f52c719faf0a)
+
+```bash
+(.venv) PS F:\BLOG\ROT-Blog\docs\Control\强化学习> python .\1.py
+环境: Pendulum-v1
+状态维度: 3, 动作维度: 1, 动作边界: 2.0
+目标熵: -1
+设备: cpu
+开始训练SAC智能体...
+Iteration 0: 100%|██████████████████████████████████████████████████████████████████████████████| 10/10 [00:08<00:00,  1.12it/s, episode=10, return=-1548.582]
+Iteration 1: 100%|██████████████████████████████████████████████████████████████████████████████| 10/10 [00:17<00:00,  1.72s/it, episode=20, return=-1157.733] 
+Iteration 2: 100%|███████████████████████████████████████████████████████████████████████████████| 10/10 [00:16<00:00,  1.65s/it, episode=30, return=-442.784] 
+Iteration 3: 100%|███████████████████████████████████████████████████████████████████████████████| 10/10 [00:15<00:00,  1.60s/it, episode=40, return=-197.579] 
+Iteration 4: 100%|███████████████████████████████████████████████████████████████████████████████| 10/10 [00:15<00:00,  1.59s/it, episode=50, return=-200.884] 
+Iteration 5: 100%|███████████████████████████████████████████████████████████████████████████████| 10/10 [00:16<00:00,  1.65s/it, episode=60, return=-103.725] 
+Iteration 6: 100%|███████████████████████████████████████████████████████████████████████████████| 10/10 [00:16<00:00,  1.68s/it, episode=70, return=-129.704] 
+Iteration 7: 100%|███████████████████████████████████████████████████████████████████████████████| 10/10 [00:15<00:00,  1.51s/it, episode=80, return=-213.802] 
+Iteration 8: 100%|███████████████████████████████████████████████████████████████████████████████| 10/10 [00:15<00:00,  1.54s/it, episode=90, return=-149.798] 
+Iteration 9: 100%|██████████████████████████████████████████████████████████████████████████████| 10/10 [00:16<00:00,  1.64s/it, episode=100, return=-170.280] 
+
+训练完成!
+最终10个回合平均回报: -170.28
+最大回报: -1.48
+平均回报: -431.49 ± 522.54
+```
+
+</details>
+
+
 </WordCount>

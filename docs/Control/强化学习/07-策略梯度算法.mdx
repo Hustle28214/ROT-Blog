@@ -2,4 +2,450 @@ import WordCount from '../../../src/components/WordCount/WordCount';
 
 <WordCount>
 
+在前面的章节中，我们介绍了基于价值函数的一系列强化学习算法，包括 Q-learning、DQN 及其改进算法。这些方法的核心思想是学习值函数，然后基于值函数推导出最优策略。然而，在强化学习的广阔领域中，还存在另一类经典的方法——基于策略的方法。
+
+**基于价值函数的方法**：
+- 核心是学习状态价值函数 $V(s)$ 或动作价值函数 $Q(s,a)$
+- 策略是隐式地从值函数中推导出来的（如 $\epsilon$-greedy 策略）
+- 代表性算法：Q-learning、DQN、Double DQN 等
+
+**基于策略的方法**：
+- 直接学习一个显式的参数化策略 $\pi_\theta(a|s)$
+- 策略本身就是学习的目标，值函数可能作为辅助
+- 代表性算法：REINFORCE、Actor-Critic 等
+
+策略梯度算法是基于策略方法的核心基础，本章将深入探讨这一重要技术。
+
+
+
+
+## 1. 策略梯度
+
+基于策略的方法首先需要将策略参数化。假设我们的目标策略 $\pi_\theta$ 是一个随机策略，其中 $\theta$ 是策略的参数向量。这个策略函数可以使用各种模型来表示：
+
+- **线性模型**：$\pi_\theta(a|s) = \text{softmax}(\theta^T \phi(s))$
+- **神经网络模型**：使用深度神经网络来建模复杂的策略函数
+
+策略函数的输入是状态 $s$，输出是在该状态下各个动作的概率分布。
+
+我们的目标是找到一个最优策略，使得在该策略下智能体在环境中获得的期望回报最大化。为此，我们定义目标函数为：
+
+$$
+J(\theta) = \mathbb{E}_{s_0} \left[ V^{\pi_\theta}(s_0) \right]
+$$
+
+其中：
+- $\rho_0$ 表示初始状态的分布
+- $V^{\pi_\theta}(s_0)$ 表示从初始状态 $s_0$ 开始，遵循策略 $\pi_\theta$ 所能获得的期望累积回报
+
+
+为了优化目标函数 $J(\theta)$，我们需要计算其关于参数 $\theta$ 的梯度。
+
+策略梯度定理的完整推导过程如下：
+
+$$
+\begin{align*}
+\nabla_\theta J(\theta) &\propto \sum_{s\in S} \nu^{\pi_\theta}(s)\sum_{a\in A} Q^{\pi_\theta}(s,a) \nabla_\theta\pi_\theta(a|s) \\
+&= \sum_{s\in S} \nu^{\pi_\theta}(s)\sum_{a\in A} \pi_\theta(a|s)Q^{\pi_\theta}(s,a) \frac{\nabla_\theta\pi_\theta(a|s)}{\pi_\theta(a|s)} \\
+&= \mathbb{E}_{\pi_\theta}[Q^{\pi_\theta}(s,a) \nabla_\theta \log \pi_\theta(a|s)]
+\end{align*}
+
+$$
+
+<details>
+
+1. **初始形式**：
+   - 目标函数梯度与状态访问分布 $\nu^{\pi_\theta}(s)$ 和动作价值函数 $Q^{\pi_\theta}(s,a)$ 的加权和有关
+   - $\nu^{\pi_\theta}(s)$ 表示在策略 $\pi_\theta$ 下状态 $s$ 的稳态分布
+
+2. **技巧性变换**：
+   - 引入 $\pi_\theta(a|s)$ 并同时除以 $\pi_\theta(a|s)$，保持等式不变
+   - 将求和形式转换为期望形式做准备
+
+3. **最终形式**：
+   - 利用对数导数恒等式：$\nabla_\theta \log \pi_\theta(a|s) = \frac{\nabla_\theta\pi_\theta(a|s)}{\pi_\theta(a|s)}$
+   - 得到紧凑的期望形式，便于采样估计
+
+</details>
+
+由于期望$\mathbb{E}$的下标是 $\pi_\theta$，策略梯度算法必须使用当前策略采样得到的数据来计算梯度，因此它是在线策略算法。
+
+策略梯度公式具有很直观的解释：
+- 当某个动作 $a$ 在状态 $s$ 下具有较高的 $Q$ 值时，梯度更新会使策略 $\pi_\theta(a|s)$ 的概率增加
+- 当某个动作 $a$ 在状态 $s$ 下具有较低的 $Q$ 值时，梯度更新会使策略 $\pi_\theta(a|s)$ 的概率减少
+
+这种机制使得智能体更倾向于选择那些能够带来高回报的动作，如图所示。
+
+![Image](https://github.com/user-attachments/assets/a3334916-509d-4807-bb91-a0a6f2462c54)
+
+### 1.1 REINFORCE算法
+
+对于一个有限步数的环境，REINFORCE 算法中的策略梯度为：
+
+$$
+\nabla_{\theta} J(\theta) = \mathbb{E}_{\pi_\theta} \left[ \sum_{t=0}^{T} \left( \sum_{t'=t}^{T} \gamma^{t'-t} r_{t'} \right) \nabla_{\theta} \log \pi_{\theta}(a_t|s_t) \right]
+$$
+
+其中：
+- $T$ 是和环境交互的最大步数
+- $\sum_{t'=t}^{T} \gamma^{t'-t} r_{t'}$ 是从时刻 $t$ 开始的累积折扣回报，作为 $Q^{\pi_\theta}(s_t,a_t)$ 的蒙特卡洛估计
+- 期望 $\mathbb{E}_{\pi_\theta}$ 表示在策略 $\pi_\theta$ 下轨迹的期望
+
+以车杆环境（CartPole）为例：
+- $T = 200$，即每个回合最多进行 200 步
+- 折扣因子 $\gamma$ 通常设置为 0.99 或 1.0
+- 对于每个时间步 $t$，使用从该步到回合结束的实际累积回报来估计 $Q$ 值
+
+REINFORCE 算法的伪代码如下：
+
+**输入**：
+- 学习率 $\alpha$
+- 折扣因子 $\gamma$
+- 初始策略参数 $\theta$
+
+**算法流程**：
+
+1. **初始化**策略参数 $\theta$
+
+2. **循环**每个训练序列 $e = 1, 2, \dots, E$：
+   
+   a. **轨迹采样**：使用当前策略 $\pi_\theta$ 与环境交互，采样一条完整轨迹
+      $$
+      \tau = (s_0, a_0, r_1, s_1, a_1, r_2, \dots, s_{T-1}, a_{T-1}, r_T)
+      $$
+   
+   b. **回报计算**：对于轨迹中的每个时间步 $t = 0, 1, \dots, T-1$，计算从该时刻开始的累积折扣回报
+      $$
+      G_t = \sum_{k=t}^{T} \gamma^{k-t} r_k
+      $$
+   
+   c. **参数更新**：对策略参数进行梯度上升更新
+      $$
+      \theta \leftarrow \theta + \alpha \sum_{t=0}^{T-1} G_t \nabla_\theta \log \pi_\theta(a_t|s_t)
+      $$
+
+3. **结束循环**
+
+### 1.2 策略梯度定理的证明
+
+策略梯度定理的证明是强化学习理论中的重要组成部分。我们旨在证明：
+
+$$
+\nabla_\theta J(\theta) \propto \sum_{s \in S} \nu^{\pi_\theta}(s) \sum_{a \in A} Q^{\pi_\theta}(s,a) \nabla_\theta \pi_\theta (a|s)
+$$
+
+其中 $J(\theta) = \mathbb{E}_{s_0}[V^{\pi_\theta}(s_0)]$ 是目标函数。
+
+我们从单个状态的价值函数梯度开始：
+
+$$
+\begin{align*}
+\nabla_\theta V^{\pi_\theta}(s) &= \nabla_\theta \left( \sum_{a \in A} \pi_\theta (a|s) Q^{\pi_\theta}(s,a) \right) \\
+&= \sum_{a \in A} \left( \nabla_\theta \pi_\theta (a|s) Q^{\pi_\theta}(s,a) + \pi_\theta (a|s) \nabla_\theta Q^{\pi_\theta}(s,a) \right) \quad \text{【乘积法则】} \\
+&= \sum_{a \in A} \left( \nabla_\theta \pi_\theta (a|s) Q^{\pi_\theta}(s,a) + \pi_\theta (a|s) \nabla_\theta \sum_{s', r} p(s', r|s,a)(r+\gamma V^{\pi_\theta}(s')) \right) \quad \text{【Bellman方程】} \\
+&= \sum_{a \in A} \left( \nabla_\theta \pi_\theta (a|s) Q^{\pi_\theta}(s,a) + \gamma \pi_\theta (a|s) \sum_{s', r} p(s', r|s,a) \nabla_\theta V^{\pi_\theta}(s') \right) \quad \text{【线性性】} \\
+&= \sum_{a \in A} \left( \nabla_\theta \pi_\theta (a|s) Q^{\pi_\theta}(s,a) + \gamma \pi_\theta (a|s) \sum_{s'} p(s'|s,a) \nabla_\theta V^{\pi_\theta}(s') \right) \quad \text{【简化】}
+\end{align*}
+$$
+
+
+定义辅助函数：
+$$
+\phi(s) = \sum_{a \in A} \nabla_\theta \pi_\theta (a|s) Q^{\pi_\theta}(s,a)
+$$
+
+定义 $d^{\pi_\theta}(s \rightarrow x, k)$ 为从状态 $s$ 出发，在 $k$ 步后到达状态 $x$ 的概率。
+
+继续推导：
+
+$$
+\begin{align*}
+\nabla_\theta V^{\pi_\theta}(s) &= \phi(s) + \gamma \sum_a \pi_\theta (a|s) \sum_{s'} P(s'|s,a) \nabla_\theta V^{\pi_\theta}(s') \\
+&= \phi(s) + \gamma \sum_{s'} d^{\pi_\theta}(s \rightarrow s', 1) \nabla_\theta V^{\pi_\theta}(s') \quad \text{【单步转移】} \\
+&= \phi(s) + \gamma \sum_{s'} d^{\pi_\theta}(s \rightarrow s', 1) \left[ \phi(s') + \gamma \sum_{s''} d^{\pi_\theta}(s' \rightarrow s'', 1) \nabla_\theta V^{\pi_\theta}(s'') \right] \quad \text{【递归展开】} \\
+&= \phi(s) + \gamma \sum_{s'} d^{\pi_\theta}(s \rightarrow s', 1)\phi(s') + \gamma^2 \sum_{s''} d^{\pi_\theta}(s \rightarrow s'', 2) \nabla_\theta V^{\pi_\theta}(s'') \\
+&= \phi(s) + \gamma \sum_{s'} d^{\pi_\theta}(s \rightarrow s', 1)\phi(s') + \gamma^2 \sum_{s''} d^{\pi_\theta}(s \rightarrow s'', 2)\phi(s'') + \gamma^3 \sum_{s'''} d^{\pi_\theta}(s \rightarrow s''', 3) \nabla_\theta V^{\pi_\theta}(s''') \\
+&= \cdots \\
+&= \sum_{x \in S} \sum_{k=0}^\infty \gamma^k d^{\pi_\theta}(s \rightarrow x, k) \phi(x) \quad \text{【无限展开】}
+\end{align*}
+$$
+
+定义折扣状态访问分布：
+$$
+\eta(s) = \mathbb{E}_{s_0} \left[ \sum_{k=0}^{\infty} \gamma^k d^{\pi_\theta}(s_0 \to s, k) \right]
+$$
+
+回到目标函数：
+
+$$
+\begin{align*}
+\nabla_\theta J(\theta) &= \nabla_\theta \mathbb{E}_{s_0} [V^{\pi_\theta}(s_0)] \\
+&= \sum_s \mathbb{E}_{s_0} \left[ \sum_{k=0}^{\infty} \gamma^k d^{\pi_\theta}(s_0 \to s, k) \right] \phi(s) \quad \text{【代入上一步结果】} \\
+&= \sum_s \eta(s) \phi(s) \\
+&= \left( \sum_s \eta(s) \right) \sum_s \frac{\eta(s)}{\sum_s \eta(s)} \phi(s) \quad \text{【归一化处理】} \\
+&\propto \sum_s \frac{\eta(s)}{\sum_s \eta(s)} \phi(s) \quad \text{【比例关系】} \\
+&= \sum_s \nu^{\pi_\theta}(s) \sum_a Q^{\pi_\theta}(s, a) \nabla_\theta \pi_\theta(a|s) \quad \text{【代回$\phi(s)$定义】}
+\end{align*}
+$$
+
+至此，我们成功证明了策略梯度定理：
+
+$$
+\nabla_\theta J(\theta) \propto \sum_{s \in S} \nu^{\pi_\theta}(s) \sum_{a \in A} Q^{\pi_\theta}(s,a) \nabla_\theta \pi_\theta (a|s)
+$$
+
+## 2. REINFORCE算法的实现
+
+```python
+import gymnasium as gym
+import numpy as np
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import torch.optim as optim
+from torch.distributions import Categorical
+import matplotlib.pyplot as plt
+from collections import deque
+import random
+
+# 设置中文字体
+plt.rcParams['font.sans-serif'] = ['SimHei']
+plt.rcParams['axes.unicode_minus'] = False
+
+# 策略网络
+class PolicyNetwork(nn.Module):
+    def __init__(self, state_dim, action_dim, hidden_dim=128):
+        super(PolicyNetwork, self).__init__()
+        self.fc1 = nn.Linear(state_dim, hidden_dim)
+        self.fc2 = nn.Linear(hidden_dim, hidden_dim)
+        self.fc3 = nn.Linear(hidden_dim, action_dim)
+        
+    def forward(self, x):
+        x = F.relu(self.fc1(x))
+        x = F.relu(self.fc2(x))
+        x = self.fc3(x)
+        return F.softmax(x, dim=-1)
+    
+    def act(self, state):
+        state = torch.from_numpy(state).float().unsqueeze(0)
+        probs = self.forward(state)
+        m = Categorical(probs)
+        action = m.sample()
+        return action.item(), m.log_prob(action)
+
+# REINFORCE 算法
+class REINFORCE:
+    def __init__(self, state_dim, action_dim, learning_rate=1e-3, gamma=0.99):
+        self.policy_net = PolicyNetwork(state_dim, action_dim)
+        self.optimizer = optim.Adam(self.policy_net.parameters(), lr=learning_rate)
+        self.gamma = gamma
+        self.saved_log_probs = []
+        self.rewards = []
+        
+    def select_action(self, state):
+        action, log_prob = self.policy_net.act(state)
+        self.saved_log_probs.append(log_prob)
+        return action
+    
+    def update_policy(self):
+        R = 0
+        policy_loss = []
+        returns = []
+        
+        # 计算每个时间步的折扣回报
+        for r in self.rewards[::-1]:
+            R = r + self.gamma * R
+            returns.insert(0, R)
+        
+        returns = torch.tensor(returns)
+        # 标准化回报以减少方差
+        returns = (returns - returns.mean()) / (returns.std() + 1e-9)
+        
+        for log_prob, R in zip(self.saved_log_probs, returns):
+            policy_loss.append(-log_prob * R)
+        
+        self.optimizer.zero_grad()
+        policy_loss = torch.cat(policy_loss).sum()
+        policy_loss.backward()
+        self.optimizer.step()
+        
+        # 清空当前回合的数据
+        self.saved_log_probs = []
+        self.rewards = []
+
+# 训练函数
+def train_reinforce(env, agent, num_episodes=1000, max_steps=1000):
+    scores = []
+    scores_deque = deque(maxlen=100)
+    
+    for i_episode in range(1, num_episodes+1):
+        state, _ = env.reset()
+        episode_reward = 0
+        
+        for t in range(max_steps):
+            action = agent.select_action(state)
+            next_state, reward, terminated, truncated, _ = env.step(action)
+            done = terminated or truncated
+            
+            agent.rewards.append(reward)
+            episode_reward += reward
+            
+            if done:
+                break
+                
+            state = next_state
+        
+        agent.update_policy()
+        scores.append(episode_reward)
+        scores_deque.append(episode_reward)
+        
+        if i_episode % 100 == 0:
+            print('Episode {}\tAverage Score: {:.2f}'.format(
+                i_episode, np.mean(scores_deque)))
+            
+        # 如果最近100个回合平均分达到195，认为问题已解决
+        if np.mean(scores_deque) >= 195.0:
+            print('Environment solved in {:d} episodes!\tAverage Score: {:.2f}'.format(
+                i_episode-100, np.mean(scores_deque)))
+            break
+            
+    return scores
+
+# 可视化训练过程
+def plot_training(scores):
+    plt.figure(figsize=(12, 5))
+    
+    # 原始分数
+    plt.subplot(1, 2, 1)
+    plt.plot(scores)
+    plt.xlabel('回合')
+    plt.ylabel('分数')
+    plt.title('REINFORCE 训练过程 - 原始分数')
+    plt.grid(True, alpha=0.3)
+    
+    # 移动平均分数
+    plt.subplot(1, 2, 2)
+    window_size = 100
+    moving_avg = [np.mean(scores[i-window_size:i]) for i in range(window_size, len(scores))]
+    plt.plot(range(window_size, len(scores)), moving_avg)
+    plt.axhline(y=195, color='r', linestyle='--', label='解决阈值 (195)')
+    plt.xlabel('回合')
+    plt.ylabel('平均分数 (100回合)')
+    plt.title('REINFORCE 训练过程 - 移动平均')
+    plt.legend()
+    plt.grid(True, alpha=0.3)
+    
+    plt.tight_layout()
+    plt.savefig('reinforce_cartpole.png', dpi=300, bbox_inches='tight')
+    plt.show()
+
+# 测试训练好的策略
+def test_policy(env, agent, num_episodes=10, render=True):
+    print("\n测试训练好的策略...")
+    test_scores = []
+    
+    for episode in range(num_episodes):
+        state, _ = env.reset()
+        episode_reward = 0
+        steps = 0
+        
+        while True:
+            if render:
+                env.render()
+            
+            with torch.no_grad():
+                action, _ = agent.policy_net.act(state)
+            
+            next_state, reward, terminated, truncated, _ = env.step(action)
+            done = terminated or truncated
+            
+            episode_reward += reward
+            steps += 1
+            state = next_state
+            
+            if done:
+                break
+        
+        test_scores.append(episode_reward)
+        print(f"测试回合 {episode+1}: 分数 = {episode_reward}, 步数 = {steps}")
+    
+    env.close()
+    print(f"\n测试结果 - 平均分数: {np.mean(test_scores):.2f} ± {np.std(test_scores):.2f}")
+    return test_scores
+
+# 主函数
+def main():
+    # 创建环境
+    env = gym.make('CartPole-v1')
+    state_dim = env.observation_space.shape[0]
+    action_dim = env.action_space.n
+    
+    print("车杆环境信息:")
+    print(f"状态空间维度: {state_dim}")
+    print(f"动作空间大小: {action_dim}")
+    print(f"最大步数: {env.spec.max_episode_steps}")
+    
+    # 设置随机种子
+    seed = 42
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    env.reset(seed=seed)
+    
+    # 创建 REINFORCE 智能体
+    agent = REINFORCE(state_dim, action_dim, learning_rate=1e-3, gamma=0.99)
+    
+    # 训练
+    print("\n开始训练 REINFORCE 算法...")
+    scores = train_reinforce(env, agent, num_episodes=1000)
+    
+    # 绘制训练曲线
+    plot_training(scores)
+    
+    # 测试训练好的策略
+    test_env = gym.make('CartPole-v1')
+    test_scores = test_policy(test_env, agent, num_episodes=5, render=True)
+    
+    # 保存模型
+    torch.save(agent.policy_net.state_dict(), 'reinforce_cartpole_model.pth')
+    print("模型已保存: reinforce_cartpole_model.pth")
+
+if __name__ == "__main__":
+    main()
+```
+
+<details>
+
+<summary>运行结果</summary>
+
+![IMAGE](https://github.com/user-attachments/assets/17051aec-202f-44c9-8448-de51415d8fe4)
+
+```bash
+(.venv) PS F:\BLOG\ROT-Blog\docs\Control\强化学习> python .\1.py
+车杆环境信息:
+状态空间维度: 4
+动作空间大小: 2
+最大步数: 500
+
+开始训练 REINFORCE 算法...
+Episode 100     Average Score: 45.09
+Episode 200     Average Score: 133.11
+Environment solved in 160 episodes!     Average Score: 196.68
+
+测试训练好的策略...
+F:\BLOG\ROT-Blog\.venv\lib\site-packages\gymnasium\envs\classic_control\cartpole.py:250: UserWarning: WARN: You are calling render method without specifying any render mode. You can specify the render_mode at initialization, e.g. gym.make("CartPole-v1", render_mode="rgb_array")
+  gym.logger.warn(
+测试回合 1: 分数 = 500.0, 步数 = 500
+测试回合 2: 分数 = 306.0, 步数 = 306
+测试回合 3: 分数 = 500.0, 步数 = 500
+测试回合 4: 分数 = 405.0, 步数 = 405
+测试回合 5: 分数 = 298.0, 步数 = 298
+
+测试结果 - 平均分数: 401.80 ± 88.60
+模型已保存: reinforce_cartpole_model.pth
+(.venv) PS F:\BLOG\ROT-Blog\docs\Control\
+```
+
+</details>
+
 </WordCount>

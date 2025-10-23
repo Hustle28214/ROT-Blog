@@ -1,0 +1,33 @@
+import WordCount from '../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+L298N是我玩的比较多的一个电机驱动模块，它可以驱动直流电机，尤其是电流比较大的情况。今天分享一下它的工作原理。
+
+## 1. H桥电路
+
+L298N是利用H桥电路实现的。首先我们要认识一下什么是H桥电路。
+
+<img width="1563" height="1122" alt="Image" src="https://github.com/user-attachments/assets/112c8816-dced-42ac-96bd-cef590ee7138" />
+
+图中展示了一个H桥电路的基本结构。它由四个开关，一个电机和四个续流二极管组成，整体比较像“H”字母，故名H桥电路，也称为“全桥电路”。
+
+## 2. 工作原理
+
+这里列举三个最常见的工作模式：正转，反转，制动。
+
+### 2.1 正转
+
+
+H桥一般用来驱动感性负载。
+
+正转的时候，电流会经过Q1,电机，Q4。如下图：
+
+<img width="1563" height="1122" alt="Image" src="https://github.com/user-attachments/assets/00afe046-6aba-48ce-95e4-3767fc61e4a1" />
+
+此时，
+
+
+
+
+</WordCount>

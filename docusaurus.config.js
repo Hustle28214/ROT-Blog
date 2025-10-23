@@ -18,6 +18,8 @@ const config = {
   tagline: '江湖夜雨十年灯',
   favicon: 'img/leyan_Logo.ico',
   
+
+  
   
   // Set the production url of your site here
   url: 'https://rot-blog.vercel.app',
@@ -113,6 +115,12 @@ const config = {
       integrity:
         'sha384-odtC+0UGzzFL/6PNoE8rX/SPcQDXBJ+uRepguP4QkPCm2LBxH3FA3y+fKSiJ+AmM',
       crossorigin: 'anonymous',
+    },
+  ],
+  scripts: [
+    {
+      src: '/js/coze-config.js',
+      async: false,
     },
   ],
   themeConfig:

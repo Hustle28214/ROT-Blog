@@ -1,6 +1,14 @@
 @font-face {
+  font-family: 'DreamHanSansCN';
+  src: url('/DreamHanSansCN-W16.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
   font-family: 'Mengyuan';
-  src: url(../../static/DreamHanSansCN-W16.ttf) format('truetype');
+  src: url('/DreamHanSansCN-W16.ttf') format('truetype');
   font-weight: normal;
   font-style: normal;
   font-display: swap;
@@ -16,9 +24,9 @@
   --ifm-color-primary-lightest: #1683c8;
   --ifm-background-color: #e9f1f6;
   --ifm-navbar-background-color: #E9F1F6;
-  --ifm-font-family-base: 'Mengyuan', ui-sans-serif, system-ui, -apple-system;
-  --ifm-font-family-monospace:  'Mengyuan', misans, ui-sans-serif, system-ui, -apple-system;
-  --ifm-heading-font-family: 'Mengyuan', ui-sans-serif, system-ui, -apple-system;
+  --ifm-font-family-base: 'DreamHanSansCN', 'Mengyuan', ui-sans-serif, system-ui, -apple-system;
+  --ifm-font-family-monospace: 'DreamHanSansCN', 'Mengyuan', ui-sans-serif, system-ui, -apple-system;
+  --ifm-heading-font-family: 'DreamHanSansCN', 'Mengyuan', ui-sans-serif, system-ui, -apple-system;
   --ifm-code-font-size: 95%;
   --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.1);
   --sb-track-color:#222222;
@@ -48,7 +56,12 @@
 /* 通用背景色 */
 body {
   background-color: var(--ifm-background-color);
-  font-family: 'Mengyuan', misans, system-ui, -apple-system, 'PingFang SC';
+  font-family: 'DreamHanSansCN', 'Mengyuan', system-ui, -apple-system, 'PingFang SC' !important;
+}
+
+/* 强制应用 DreamHanSansCN 字体到所有元素 */
+* {
+  font-family: 'DreamHanSansCN', 'Mengyuan', system-ui, -apple-system, 'PingFang SC' !important;
 }
 
 /* 暗模式下背景色 */

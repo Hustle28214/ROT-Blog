@@ -13,7 +13,7 @@ const Chat = () => {
 
     // 验证环境变量
     if (!cozeToken || !cozeBotId || 
-        cozeToken === 'your_token_here' || 
+        cozeToken === 'your_token_here_' || 
         cozeBotId === 'your_bot_id_here' ||
         cozeToken === 'your_actual_token_here' || 
         cozeBotId === 'your_actual_bot_id_here') {

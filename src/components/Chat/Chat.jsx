@@ -14,7 +14,7 @@ const Chat = () => {
     // 验证环境变量
     if (!cozeToken || !cozeBotId || 
         cozeToken === 'your_token_here_' || 
-        cozeBotId === 'your_bot_id_here' ||
+        cozeBotId === 'your_bot_id_here_' ||
         cozeToken === 'your_actual_token_here' || 
         cozeBotId === 'your_actual_bot_id_here') {
       console.error('❌ Coze Chat: Missing environment variables');

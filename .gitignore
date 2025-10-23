@@ -18,8 +18,18 @@
 .env.test.local
 .env.production.local
 
-# Coze configuration (contains sensitive tokens)
-static/js/coze-config.js
+# API Keys and Tokens (never commit these)
+*.key
+*.pem
+*_rsa
+*_rsa.pub
+*.p12
+*.pfx
+
+# Local configuration files with sensitive data
+config.local.*
+secrets.*
+private.*
 
 npm-debug.log*
 yarn-debug.log*

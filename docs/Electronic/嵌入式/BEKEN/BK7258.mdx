@@ -1,0 +1,103 @@
+import WordCount from '../../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+## 0. 开发板基本信息
+
+
+
+## 1. 引脚参照表
+
+| 引脚号 | 名称 | I/O 类型 | 主要功能描述 |
+|--------|------|----------|--------------|
+| 1 | P50 | I/O 数字 | GPIO50 / ENET_RXD1 / RGB_R0 |
+| 2 | P24 | I/O 数字/模拟 | GPIO24 / LPO_CLK / PWMG0_PWM4 / ADC2 / QSPI0_IO0 / RGB_G7 / I8080_RSX / SEG6 |
+| 3 | P25 | I/O 数字/模拟 | GPIO25 / IRDA / PWMG0_PWM5 / ADC1 / QSPI0_IO1 / RGB_G6 / I8080_WRX / SEG5 |
+| 4 | P26 | I/O 数字/模拟 | GPIO26 / WIFI_TX_EN / QSPI0_IO2 / RGB_G5 / I8080_RDX / SEG4 |
+| 5 | P51 | I/O 数字 | GPIO51 / ENET_RXDV / RGB_G1 |
+| 6 | P52 | I/O 数字 | GPIO52 / ENET_TXD0 / RGB_G0 |
+| 7 | P27 | I/O 数字/模拟 | GPIO27 / CIS_MCLK / CLK_AUXS_CIS / ENET_PHY_INT / QSPI0_IO3 / SEG17 |
+| 8 | P28 | I/O 数字/模拟 | GPIO28 / WIFI_RX_EN / I2S_MCLK / ADC4 / TOUCH2 / CLK_AUXS_CIS / SEG18 |
+| 9 | P29 | I/O 数字/模拟 | GPIO29 / CIS_PCLK / ENET_MDC / TOUCH3 / SEG19 |
+| 10 | P30 | I/O 数字/模拟 | GPIO30 / CIS_HSYNC / UART2_RX / LIN_RXD / TOUCH4 / SC_CLK / SEG20 |
+| 11 | P31 | I/O 数字/模拟 | GPIO31 / CIS_VSYNC / UART2_TX / LIN_TXD / TOUCH5 / SC_IO / SEG21 |
+| 12 | P32 | I/O 数字/模拟 | GPIO32 / CIS_PXD0 / PWMG1_PWM0 / ENET_MDIO / TOUCH6 / SC_RSTN / SEG22 |
+| 13 | P33 | I/O 数字/模拟 | GPIO33 / CIS_PXD1 / PWMG1_PWM1 / ENET_RXD0 / TOUCH7 / SPI0_SCK / SEG23 |
+| 14 | P34 | I/O 数字/模拟 | GPIO34 / CIS_PXD2 / PWMG1_PWM2 / ENET_RXD1 / TOUCH8 / SPI0_CSN / SEG24 |
+| 15 | P35 | I/O 数字/模拟 | GPIO35 / CIS_PXD3 / PWMG1_PWM3 / ENET_RXDV / TOUCH9 / SPI0_MOSI / SEG25 |
+| 16 | P36 | I/O 数字/模拟 | GPIO36 / CIS_PXD4 / PWMG1_PWM4 / ENET_TXD0 / TOUCH10 / SPI0_MISO / SEG26 |
+| 17 | P37 | I/O 数字/模拟 | GPIO37 / CIS_PXD5 / PWMG1_PWM5 / ENET_TXD1 / TOUCH11 / SEG27 |
+| 18 | P38 | I/O 数字/模拟 | GPIO38 / CIS_PXD6 / I2C1_SCL / ENET_TXEN / TOUCH12 / COM4 / SEG28 |
+| 19 | P39 | I/O 数字/模拟 | GPIO39 / CIS_PXD7 / I2C1_SDA / ENET_REF_CLK / TOUCH13 / COM5 / SEG29 |
+| 20 | P1 | I/O 数字/模拟 | GPIO1 / UART1_RX / I2C1_SDA / SWDIO / SC_CLK / ADC13 / LIN_RXD |
+| 21 | P0 | I/O 数字/模拟 | GPIO0 / UART1_TX / I2C1_SCL / SWCLK / SC_IO / ADC12 / LIN_TXD |
+| 22 | P9 | I/O 数字/模拟 | GPIO9 / BT_PRIORITY / PWMG0_PWM3 / I2S0_DOUT / DMIC_DAT / 32K_XI |
+| 23 | P8 | I/O 数字/模拟 | GPIO8 / BT_ACTIVE / PWMG0_PWM2 / I2S0_DIN / DMIC_CLK / ADC10 / 32K_XO |
+| 24 | AUDN | 模拟输出 | 音频负输出 |
+| 25 | AUDP | 模拟输出 | 音频正输出 |
+| 26 | MICP1 | 模拟输入 | 麦克风1正输入 |
+| 27 | MICN1 | 模拟输入 | 麦克风1负输入 |
+| 28 | MICN2 | 模拟输入 | 麦克风2负输入 |
+| 29 | MICP2 | 模拟输入 | 麦克风2正输入 |
+| 30 | MICBIAS | 模拟输出 | 麦克风偏置输出 |
+| 31 | P7 | I/O 数字 | GPIO7 / WIFI_ACTIVE / PWMG0_PWM1 / I2S0_SYNC / QSPI1_IO3 |
+| 32 | P6 | I/O 数字 | GPIO6 / CLK13M / PWMG0_PWM0 / I2S0_SCK / QSPI1_IO2 |
+| 33 | P5 | I/O 数字/模拟 | GPIO5 / SPI1_MISO / SDIO_DATA1 / COM7 / QSPI1_IO1 / SEG31 |
+| 34 | P4 | I/O 数字/模拟 | GPIO4 / SPI1_MOSI / SDIO_DATA0 / COM6 / QSPI1_IO0 / SEG30 |
+| 35 | P3 | I/O 数字 | GPIO3 / SPI1_CSN / SDIO_CMD / SC_VCC / QSPI1_CS |
+| 36 | P2 | I/O 数字 | GPIO2 / SPI1_SCK / SDIO_CLK / SC_RSTN / LIN_SLEEP / QSPI1_SCK |
+| 37 | P12 | I/O 数字/模拟 | GPIO12 / UART0_RTS / TOUCH0 / ADC14 |
+| 38 | P13 | I/O 数字/模拟 | GPIO13 / UART0_CTS / TOUCH1 / ADC15 |
+| 39 | USB_DP | I/O 数字 | USB D+ |
+| 40 | USB_DN | I/O 数字 | USB D- |
+| 41 | VDDDIG | 模拟输出 | 数字核心LDO输出 |
+| 42 | VDDD | 模拟输出 | 数字降压/LDO输出 |
+| 43 | SWD | 模拟输出 | 数字降压开关输出 |
+| 44 | CEN | 模拟输入 | 芯片使能，高电平有效 |
+| 45 | VIO | 模拟输出 | IO LDO输出 |
+| 46 | VDDA | 模拟输出 | 模拟降压/LDO输出 |
+| 47 | SWA | 模拟输出 | 模拟降压开关输出 |
+| 48 | GND_DCDC | GND | 降压地 |
+| 49 | VBAT | 电源 | 芯片电源供应 |
+| 50 | VDDRAM | 模拟输出 | EXMEM LDO输出 |
+| 51 | VDDGPIO | 模拟输出 | GPIO电源供应 |
+| 52 | P10 | I/O 数字 | GPIO10 / DL_UART_RX / UART0_RX / SDIO_DATA2 / CLK_AUXS_CIS |
+| 53 | P11 | I/O 数字 | GPIO11 / DL_UART_TX / UART0_TX / SDIO_DATA3 |
+| 54 | P14 | I/O 数字/模拟 | GPIO14 / SDIO_CLK / SPI0_SCK / BT_ANT0 / I2C1_SCL / RGB_DCLK / I8080_D15 / SEG16 |
+| 55 | P15 | I/O 数字/模拟 | GPIO15 / SDIO_CMD / SPI0_CSN / BT_ANT1 / I2C1_SDA / RGB_DISP / I8080_D14 / SEG15 |
+| 56 | P16 | I/O 数字/模拟 | GPIO16 / SDIO_DATA0 / SPI0_MOSI / BT_ANT2 / RGB_DE / I8080_D13 / SEG14 |
+| 57 | P17 | I/O 数字/模拟 | GPIO17 / SDIO_DATA1 / SPI0_MISO / BT_ANT3 / RGB_HSYNC / I8080_D12 / SEG13 |
+| 58 | P18 | I/O 数字/模拟 | GPIO18 / SDIO_DATA2 / PWMG0_PWM0 / RGB_VSYNC / I8080_D11 / SEG12 |
+| 59 | P19 | I/O 数字/模拟 | GPIO19 / SDIO_DATA3 / PWMG0_PWM1 / RGB_R7 / I8080_D10 / SEG11 |
+| 60 | P55 | I/O 数字 | GPIO55 / ENET_REF_CLK / RGB_B0 |
+| 61 | P54 | I/O 数字 | GPIO54 / ENET_TXEN / RGB_B1 |
+| 62 | P53 | I/O 数字 | GPIO53 / ENET_TXD1 / RGB_B2 |
+| 63 | P47 | I/O 数字/模拟 | GPIO47 / SPI0_MISO / ENET_MDC / TOUCH15 / RGB_B3 / I8080_D0 / COM0 / I2S2_DOUT |
+| 64 | P46 | I/O 数字/模拟 | GPIO46 / CAN_STBY / SPI0_MOSI / ENET_PHY_INT / TOUCH14 / RGB_B4 / I8080_D1 / COM1 / I2S2_DIN |
+| 65 | P45 | I/O 数字/模拟 | GPIO45 / CAN_RX / SPI0_CSN / RGB_B5 / I8080_D2 / COM2 / I2S2_SYNC |
+| 66 | P44 | I/O 数字/模拟 | GPIO44 / CAN_TX / SPI0_SCK / RGB_B6 / I8080_D3 / COM3 / I2S2_SCK |
+| 67 | P43 | I/O 数字/模拟 | GPIO43 / I2C1_SDA / I2S1_DOUT / SC_VCC / RGB_B7 / I8080_D4 / SEG0 |
+| 68 | P42 | I/O 数字/模拟 | GPIO42 / I2C1_SCL / I2S1_DIN / LIN_SLEEP / SC_RSTN / RGB_G2 / I8080_D5 / SEG1 |
+| 69 | P41 | I/O 数字/模拟 | GPIO41 / UART2_TX / I2S1_SYNC / LIN_TXD / SC_IO / RGB_G3 / I8080_D6 / SEG2 |
+| 70 | P40 | I/O 数字/模拟 | GPIO40 / UART2_RX / I2S1_SCK / LIN_RXD / SC_CLK / RGB_G4 / I8080_D7 / SEG3 |
+| 71 | VCCIF | 模拟输入 | IF电源供应 |
+| 72 | VCCA | 模拟输入 | 模拟电源供应 |
+| 73 | VDDPA_BT | 模拟输出 | 蓝牙RF PA LDO输出 |
+| 74 | VCCRXFE | 模拟输入 | RF接收器电源供应 |
+| 75 | ANT | RF | 2.4 GHz RF信号端口 |
+| 76 | GND | GND | 地 |
+| 77 | VCCPA | 模拟输入 | RF PA电源供应 |
+| 78 | VCCPAD | 模拟输入 | RF PA驱动器电源供应 |
+| 79 | GND | GND | 地 |
+| 80 | XO | 模拟输出 | 26 MHz晶振输出 |
+| 81 | XI | 模拟输入 | 26 MHz晶振输入 |
+| 82 | VCCPLL | 模拟输入 | RF PLL电源供应 |
+| 83 | P20 | I/O 数字/模拟 | GPIO20 / I2C0_SCL / SWCLK / RGB_R6 / I8080_D9 / SEG10 |
+| 84 | P21 | I/O 数字/模拟 | GPIO21 / I2C0_SDA / SWDIO / ADC6 / RGB_R5 / I8080_D8 / SEG9 |
+| 85 | P22 | I/O 数字/模拟 | GPIO22 / CLK26M / PWMG0_PWM2 / ADC5 / QSPI0_SCK / RGB_R4 / I8080_CSX / SEG8 |
+| 86 | P23 | I/O 数字/模拟 | GPIO23 / PWMG0_PWM3 / ADC3 / QSPI0_CS / RGB_R3 / I8080_RESET / SEG7 |
+| 87 | P48 | I/O 数字 | GPIO48 / ENET_MDIO / RGB_R2 / I8080_D16 |
+| 88 | P49 | I/O 数字 | GPIO49 / ENET_RXD0 / RGB_R1 / I8080_D17 |
+| 底板 | GND_SLUG | GND | 地 |
+
+</WordCount>

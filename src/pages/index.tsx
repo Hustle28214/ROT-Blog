@@ -16,6 +16,8 @@ export default function Home() {
             <main>
                 <HeadIntro></HeadIntro>
                 
+                    
+
                 <Particles  className="absolute inset-0 -z-10" quantity={100} ease={80} color="#ffffff" refresh/>
                 
             </main>

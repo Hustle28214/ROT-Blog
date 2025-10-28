@@ -1,0 +1,1120 @@
+import WordCount from '../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+## 1. 马尔可夫过程
+
+想象你是一个机器人，在一个迷宫里寻找宝藏，同时要避开陷阱。每走一步，你都要决定“往哪走”——这就是一个**序贯决策问题**。  
+
+**马尔可夫决策过程**（Markov Decision Process, MDP）正是用来建模这类问题的数学框架。它的核心思想是：**只要知道现在在哪、能做什么、做了之后大概会发生什么、以及能得多少奖励，就足以做出最优决策**——不需要记住整个历史！
+
+
+### 1.1 随机过程
+
+现实世界充满不确定性。比如天气：今天是晴天，明天可能是晴、雨或阴。这种随时间演变、带有随机性的系统，就叫**随机过程**。  
+
+数学上，它是一组随机变量 $\{X_t\}_{t=0}^{\infty}$，每个 $X_t$ 表示时刻 $t$ 的状态（如“晴”、“雨”）。
+
+随机过程（stochastic process）是概率论的“动力学”部分。概率论的研究对象是静态的随机现象，而随机过程的研究对象是随时间演变的随机现象（例如天气随时间的变化、城市交通随时间的变化）。
+
+### 1.2 马尔可夫性质
+
+马尔可夫性质用公式表达就是：
+$$
+P(X_{t+1} = x' \mid X_t = x, X_{t-1}, \dots, X_0) = P(X_{t+1} = x' \mid X_t = x)
+$$
+比如，如果你今天心情好，那么明天是否开心，只取决于今天的状态，**而不在于你上周是否失恋**。
+
+但马尔可夫并不意味着它和历史完全无关，它包括的$t-1$时刻的状态也是从$t-2$的状态演变而来，所以历史信息是通过当前状态间接影响未来的。
+
+在马尔可夫过程的研究中，我们采用这种简化的假设，来降低问题的复杂度，使得我们能够更快地做出决策。
+
+### 1.3 马尔可夫过程
+
+
+
+马尔可夫过程（Markov process）指具有马尔可夫性质的随机过程，也被称为马尔可夫链（Markov chain）。
+
+一个满足马尔可夫性质的随机过程，就叫**马尔可夫过程**（Markov Process），也称**马尔可夫链**。  
+它由两个要素定义：
+- **状态空间** $\mathcal{S}$：所有可能状态的集合（如 \{晴, 雨, 阴\}）
+- **状态转移概率矩阵** $P$，其中：
+
+$$
+P_{ss'} = P(s_{t+1} = s' \mid s_t = s)
+$$
+例如，如果今天是“晴”，有 70% 概率明天还是“晴”，30% 变成“雨”。
+
+我们可以用状态转移图来表示马尔可夫过程：
+
+<img width="360" height="312" alt="Image" src="https://github.com/user-attachments/assets/80966e91-ed0d-40f3-b837-4224cf71092d" />
+
+状态转移矩阵 $P$ 的每一项表示为条件概率 $P(s' \mid s)$，即从状态 $s$ 转移到状态 $s'$ 的概率。若状态空间为 $\{s_1, s_2, \dots, s_n\}$，则矩阵 $P$ 可写为：
+
+$$
+P = 
+\begin{bmatrix}
+P(s_1 \mid s_1) & P(s_2 \mid s_1) & \cdots & P(s_n \mid s_1) \\
+P(s_1 \mid s_2) & P(s_2 \mid s_2) & \cdots & P(s_n \mid s_2) \\
+\vdots          & \vdots          & \ddots & \vdots          \\
+P(s_1 \mid s_n) & P(s_2 \mid s_n) & \cdots & P(s_n \mid s_n)
+\end{bmatrix}
+$$
+
+其中，每一行对应一个当前状态 $s_i$，每一列对应一个下一状态 $s_j$。由于从任意状态 $s_i$ 出发，下一状态必为某个 $s_j$，因此每行概率之和为 1：
+$$
+\sum_{j=1}^{n} P(s_j \mid s_i) = 1, \quad \forall i \in \{1, 2, \dots, n\}
+$$
+
+上面的示例图是具有 6 个状态的马尔可夫过程的简单例子。其中每个绿色圆圈表示一个状态，每个状态都有一定概率（包括概率为 0）转移到其他状态，其中通常被称为终止状态（terminal state），因为它不会再转移到其他状态，可以理解为它永远以概率 1 转移到自己。状态之间的虚线箭头表示状态的转移，箭头旁的数字表示该状态转移发生的概率。从每个状态出发转移到其他状态的概率总和为 1。例如，$s_1$有 90%概率保持不变，有 10%概率转移到$s_2$，而在$s_2$又有 50%概率回到$s_1$，有 50%概率转移到$s_3$。
+
+状态空间为 $\mathcal{S} = \{s_1, s_2, s_3, s_4, s_5, s_6\}$，对应的状态转移矩阵 $P$ 为：
+
+$$
+P = 
+\begin{bmatrix}
+0.9 & 0.1 & 0   & 0   & 0   & 0   \\
+0.5 & 0   & 0.5 & 0   & 0   & 0   \\
+0   & 0   & 0   & 0.6 & 0 & 0.4 \\
+0   & 0   & 0   & 0   & 0.3 & 0.7 \\
+0   & 0.2 & 0.5 & 0.3 & 0   & 0   \\
+0   & 0   & 0 & 0 & 0   & 1
+\end{bmatrix}
+$$
+
+给定一个马尔可夫过程，我们就可以从某个状态出发，根据它的状态转移矩阵生成一个状态序列（episode），这个步骤也被叫做采样（sampling）。生成这些序列的概率和状态转移矩阵有关。
+
+## 2. 马尔可夫奖励过程
+
+光有状态转移还不够——我们关心的是“值不值得待在这里”。于是引入**奖励**.
+
+一个马尔可夫奖励过程（Markov Reward Process, MRP）由四元组 $(\mathcal{S}, P, R, \gamma)$ 构成，各个组成元素的含义如下所示：
+
+- $\mathcal{S}$ 是有限状态的集合。  
+- $P$ 是状态转移矩阵，其中 $P_{ij} = P(s_{t+1} = s_j \mid s_t = s_i)$ 表示从状态 $s_i$ 转移到状态 $s_j$ 的概率。  
+- $R$ 是奖励函数，$R(s)$ 表示转移到状态 $s$ 时可以获得的**期望即时奖励**，即  
+  $$
+  R(s) = \mathbb{E}[R_t \mid s_t = s]
+  $$  
+- $\gamma$ 是折扣因子（discount factor），其取值范围为 $\gamma \in [0, 1]$。  
+
+引入折扣因子的理由是：远期利益具有一定不确定性，且在许多实际场景中，我们更希望**尽快获得奖励**。因此，需要对未来的奖励打折扣。  
+- 当 $\gamma \to 0$ 时，智能体更关注**短期奖励**；  
+- 当 $\gamma \to 1$ 时，智能体更重视**长期累计奖励**。
+
+### 2.1 回报(Return)
+
+在一个马尔可夫奖励过程中，从第 $t$ 时刻状态 $s_t$ 开始，直到终止状态时，所有奖励的**衰减之和**称为**回报**（Return），公式如下：
+
+$$
+G_t = R_{t+1} + \gamma R_{t+2} + \gamma^2 R_{t+3} + \cdots = \sum_{k=0}^{\infty} \gamma^k R_{t+k+1}
+$$
+
+其中：
+- $R_{t+k+1}$ 表示在时刻 $t+k+1$ 获得的奖励；
+- $\gamma \in [0,1]$ 是折扣因子，用于对远期奖励进行衰减。
+
+在下图中，我们继续沿用原图马尔可夫过程的例子，并在其基础上添加**奖励函数 $R(s)$**，构建成一个完整的马尔可夫奖励过程（MRP）。
+
+此时，每个状态不仅决定下一步去哪，还决定了“到这儿能拿多少分”，从而可以评估长期价值。
+
+<img width="360" height="284" alt="Image" src="https://github.com/user-attachments/assets/912f9fc4-eaa1-4d23-8c7b-f1a71d07554c" />
+<p/>
+
+回报是负的，代表“到这儿拿的分”是负的，也就是说“到这儿”是“不划算”的。那么，智能体自然会想方设法避开这些状态，去追求正回报的状态。
+
+所以，当agent尝试从状态$s_1$出发时，如果它走到$s_4$，会得到最好的回报10，走到$s_6$就结束。这就是一条序列。
+
+```python
+rewards = [-1, -2, -2, 10, 1, 0]  # 定义奖励函数
+gamma = 0.5  # 定义折扣因子
+
+
+# 给定一条序列,计算从某个索引（起始状态）开始到序列最后（终止状态）得到的回报
+def compute_return(start_index, chain, gamma):
+    G = 0
+    for i in reversed(range(start_index, len(chain))):
+        G = gamma * G + rewards[chain[i] - 1]
+    return G
+
+
+# 一个状态序列,s1-s2-s3-s6
+chain = [1, 2, 3, 6]
+start_index = 0
+G = compute_return(start_index, chain, gamma)
+print("根据本序列计算得到回报为：%s。" % G)
+```
+运行结果为：
+
+```
+根据本序列计算得到回报为：-2.5。
+```
+
+### 2.2 价值函数(Value Function)
+
+在马尔可夫奖励过程中，一个状态的**期望回报**（即从该状态出发的未来折扣累积奖励的期望）被称为该状态的**价值**（value）。所有状态的价值构成**价值函数**（value function），其输入为状态 $s$，输出为该状态的价值，记作 $V(s)$。
+
+价值函数定义为：
+$$
+V(s) = \mathbb{E}[G_t \mid s_t = s] = \mathbb{E}\left[ \sum_{k=0}^{\infty} \gamma^k R_{t+k+1} \,\bigg|\, s_t = s \right]
+$$
+
+我们可以将该期望拆解为**当前即时奖励**与**后续状态价值**两部分：
+
+- 首先，从状态 $s$ 出发，下一步会转移到某个状态 $s'$，其概率为 $P(s' \mid s)$；
+- 转移后立即获得的期望奖励就是 $R(s)$（即 $ \mathbb{E}[R_{t+1} \mid s_t = s] = R(s) $）；
+- 之后，系统进入新状态 $s'$，其未来价值为 $V(s')$，但需乘以折扣因子 $\gamma$。
+
+因此，价值函数满足如下递归关系——即**贝尔曼方程**（Bellman Equation）：
+
+$$
+\begin{aligned}
+V(s) 
+&= \mathbb{E}[R_{t+1} + \gamma G_{t+1} \mid s_t = s] \\
+&= \mathbb{E}[R_{t+1} \mid s_t = s] + \gamma \, \mathbb{E}[G_{t+1} \mid s_t = s] \\
+&= R(s) + \gamma \sum_{s' \in \mathcal{S}} P(s' \mid s) \, V(s')
+\end{aligned}
+$$
+
+这就是马尔可夫奖励过程中价值函数的**贝尔曼方程**。它表明：  
+> 一个状态的价值 = **当前期望奖励** + **折扣后的下一状态价值的期望**。
+
+该方程是求解价值函数的基础，也是动态规划和强化学习算法的核心出发点。
+
+若一个马尔可夫奖励过程一共有 $n$ 个状态，即 $\mathcal{S} = \{s_1, s_2, \dots, s_n\}$，我们将所有状态的价值表示成一个列向量：
+
+$$
+\mathbf{V} = 
+\begin{bmatrix}
+V(s_1) \\
+V(s_2) \\
+\vdots \\
+V(s_n)
+\end{bmatrix}
+\in \mathbb{R}^n
+$$
+
+同理，将奖励函数写成一个列向量：
+
+$$
+\mathbf{R} = 
+\begin{bmatrix}
+R(s_1) \\
+R(s_2) \\
+\vdots \\
+R(s_n)
+\end{bmatrix}
+\in \mathbb{R}^n
+$$
+
+并记状态转移矩阵为 $P \in \mathbb{R}^{n \times n}$，其中 $P_{ij} = P(s_j \mid s_i)$。
+
+于是，我们可以将贝尔曼方程对所有状态同时写成**矩阵形式**：
+
+$$
+\mathbf{V} = \mathbf{R} + \gamma P \mathbf{V}
+$$
+
+这是一个关于 $\mathbf{V}$ 的线性方程。将其移项整理：
+
+$$
+\mathbf{V} - \gamma P \mathbf{V} = \mathbf{R}
+\quad \Rightarrow \quad
+(I - \gamma P) \mathbf{V} = \mathbf{R}
+$$
+
+其中 $I$ 是 $n \times n$ 的单位矩阵。由于 $\gamma \in [0, 1)$ 且 $P$ 是随机矩阵，$(I - \gamma P)$ 总是可逆的。因此，我们可以直接求得价值函数的**解析解**：
+
+$$
+\mathbf{V} = (I - \gamma P)^{-1} \mathbf{R}
+$$
+
+该解称为**贝尔曼解析解**，以上解析解的计算复杂度是$O(n^3)$，适用于状态空间较小、可显式求逆的场景。在大规模问题中，通常采用动态规划（dynamic programming）算法、蒙特卡洛方法（Monte-Carlo method）和时序差分（temporal difference）近似求解。
+
+```python
+import numpy as np
+
+def solve_mrp_value_function(P, R, gamma):
+    """
+    求解马尔可夫奖励过程（MRP）中所有状态的价值函数解析解。
+
+    参数:
+        P (np.ndarray): 状态转移矩阵，shape = (n, n)
+        R (np.ndarray): 即时奖励向量，shape = (n,)
+        gamma (float): 折扣因子，0 <= gamma < 1
+
+    返回:
+        v (np.ndarray): 状态价值向量，shape = (n,)
+    """
+    assert 0 <= gamma < 1, "折扣因子 gamma 必须满足 0 <= gamma < 1"
+    n = P.shape[0]
+    assert P.shape == (n, n), "P 必须是方阵"
+    assert R.shape == (n,), "R 的长度必须与状态数一致"
+    assert np.allclose(P.sum(axis=1), 1), "P 的每一行必须和为 1（概率分布）"
+
+    I = np.eye(n)
+    A = I - gamma * P
+    v = np.linalg.solve(A, R)  # 比直接求逆更稳定高效
+    return v
+
+# 示例：3个状态的MRP
+if __name__ == "__main__":
+    # 状态转移矩阵 P
+    P = np.array([
+        [0.5, 0.5, 0.0],
+        [0.0, 0.0, 1.0],
+        [0.0, 0.0, 1.0]   # 吸收态（终止状态）
+    ])
+
+    # 即时奖励向量 R
+    R = np.array([0.0, 0.0, 1.0])
+
+    gamma = 0.9
+
+    v = solve_mrp_value_function(P, R, gamma)
+    print("各状态的价值函数 v =", v)
+```
+
+## 3.马尔可夫决策过程
+
+马尔可夫过程和马尔可夫奖励过程都是自发改变的随机过程。但实际上我们可能还需要引入一个外部刺激的概念，称为智能体的**动作**（action）。动作参与共同改变这个随机过程，就有了马尔可夫决策过程（Markov decision process，MDP）
+
+在马尔可夫奖励过程（MRP）的基础上加入动作，就得到了马尔可夫决策过程（MDP）。
+
+向四元组 $(\mathcal{S}, P, R, \gamma)$ 中加入动作空间 $\mathcal{A}$，以及状态转移概率和奖励函数都依赖于动作，得到马尔可夫决策过程的五元组定义：$(\mathcal{S}, \mathcal{A}, P, R, \gamma)$，其中：
+
+- $\mathcal{S}$ 是有限状态的集合。  
+- $\mathcal{A}$ 是有限动作的集合。
+- $\gamma$ 是折扣因子，满足 $0 \leq \gamma < 1$。
+- $P$ 是状态转移概率矩阵，其中 $P_{ss'}^a = P(s_{t+1} = s' \mid s_t = s, a_t = a)$ 表示在状态 $s$ 下执行动作 $a$ 后转移到状态 $s'$ 的概率。
+- $R$ 是奖励函数，$R(s, a)$ 表示在状态 $s$ 下执行动作 $a$ 时可以获得的**期望即时奖励**，即  
+  $$
+  R(s, a) = \mathbb{E}[R_t \mid s_t = s, a_t = a]
+  $$
+
+在奖励函数只取决于状态s时，则退化为$r(s)$.
+
+马尔可夫决策过程（MDP）与马尔可夫奖励过程（MRP）看似相近，但本质区别在于：**MDP 中引入了“动作”这一主动选择的维度**。  
+
+在 MRP 中，系统如同一个没有方向盘的滑板车，只能顺着地形自然滑行——状态的演变完全由环境决定，奖励也随之被动获得。而在 MDP 中，系统则像一辆由骑手操控的自行车：骑手（即**智能体**）在每个路口（状态）都能主动决定是左转、右转还是直行（选择动作），从而影响接下来会到达哪里以及获得多少奖励。
+
+正因为动作的加入，状态转移不再仅由当前状态决定，而是依赖于“状态–动作”对。因此，我们不再使用 MRP 中的二维状态转移矩阵，而是采用更通用的**状态转移函数** $P(s' \mid s, a)$，它表示在状态 $s$ 下执行动作 $a$ 后转移到状态 $s'$ 的概率。这种函数形式不仅适用于有限状态和动作空间（此时可视为三维数组），也自然延伸到连续状态或动作的情形——比如自动驾驶汽车的位置和速度是连续变量，无法用有限表格描述，但转移函数依然成立。
+
+MDP 的运行过程是一个智能体与环境持续互动的闭环：  
+1. 智能体观察当前状态 $s_t$；  
+2. 依据其**策略** $\pi(a \mid s)$（即从状态到动作的映射规则）选择一个动作 $a_t$；  
+3. 环境根据该动作，依照状态转移函数 $P(s' \mid s, a)$ 和奖励函数 $R(s, a, s')$，生成下一个状态 $s_{t+1}$ 和即时奖励 $r_t$；  
+4. 智能体接收 $(r_t, s_{t+1})$，继续下一步决策。
+
+这个循环不断进行，而智能体的终极目标并非追求眼前利益，而是通过长期规划，**最大化未来所有奖励的折扣总和**：
+$$
+G_t = \sum_{k=0}^{\infty} \gamma^k r_{t+k+1}, \quad \text{其中 } 0 \leq \gamma < 1.
+$$
+
+就像一位棋手，每一步落子不仅考虑当下得失，更着眼于整盘棋的胜负格局——MDP 中的智能体也在动态环境中通过策略不断优化其长期回报。
+
+<img width="360" height="223" alt="Image" src="https://github.com/user-attachments/assets/57ecf9f9-c4fc-4931-9c72-3509ea8ce627" />
+
+<p/>
+
+### 3.1 策略(Policy)
+
+在马尔可夫决策过程（MDP）中，智能体的策略（Policy）通常用符号 $\pi$ 表示。策略是一个函数，它根据当前状态输出动作的概率分布。具体而言，对于给定的状态 $s$，策略 $\pi$ 指定了采取每个动作 $a$ 的概率 $\pi(a \mid s)$。策略可以分为两类：
+- **确定性策略（Deterministic Policy）**：在每个状态 $s$ 下，只输出一个确定性的动作，即该动作的概率为 1，其他动作的概率为 0。
+- **随机性策略（Stochastic Policy）**：在每个状态 $s$ 下，输出关于动作的概率分布，然后通过采样从该分布中选择一个动作。
+
+由于 MDP 具有马尔可夫性质，策略仅依赖于当前状态，而不需要考虑历史状态。在 MDP 中，我们定义价值函数来评估策略的优劣，这些价值函数与策略紧密相关，因此不同策略在同一状态下的价值可能不同。
+### 3.2 贝尔曼期望方程
+
+状态价值函数（state-value function）用 $V^\pi(s)$ 表示，它定义为从状态 $s$ 出发，遵循策略 $\pi$ 所能获得的期望回报（expected return）。数学表达式为：
+$$
+V^\pi(s) = \mathbb{E}_\pi \left[ G_t \mid S_t = s \right]
+$$
+
+其中，$G_t$ 表示从时间 $t$ 开始的累积折扣回报，定义为 $G_t = \sum_{k=0}^{\infty} \gamma^k R_{t+k+1}$，$\gamma$ 是折扣因子（$0 \leq \gamma \leq 1$），$R_t$ 是时间 $t$ 的奖励。
+
+动作价值函数（action-value function）用 $Q^\pi(s, a)$ 表示，它定义为在状态 $s$ 下执行动作 $a$，然后遵循策略 $\pi$ 所能获得的期望回报。数学表达式为：
+$$
+Q^\pi(s, a) = \mathbb{E}_\pi \left[ G_t \mid S_t = s, A_t = a \right]
+$$
+
+状态价值函数和动作价值函数之间存在以下关系：
+
+- 状态价值 $V^\pi(s)$ 等于在状态 $s$ 下，根据策略 $\pi$ 采取所有可能动作的动作价值的加权和，权重为策略的概率：
+  $$
+  V^\pi(s) = \sum_{a} \pi(a \mid s) Q^\pi(s, a)
+  $$
+- 动作价值 $Q^\pi(s, a)$ 等于即时奖励 $R(s, a)$ 加上折扣后的期望下一个状态价值：
+  $$
+  Q^\pi(s, a) = R(s, a) + \gamma \sum_{s'} P(s' \mid s, a) V^\pi(s')
+  $$
+  其中，$R(s, a)$ 是在状态 $s$ 执行动作 $a$ 后的期望即时奖励，$P(s' \mid s, a)$ 是状态转移概率。
+
+通过结合上述关系，我们可以推导出贝尔曼期望方程（Bellman Expectation Equation），它描述了价值函数的递归结构：
+- **状态价值函数的贝尔曼期望方程**：
+  $$
+  V^\pi(s) = \sum_{a} \pi(a \mid s) \left[ R(s, a) + \gamma \sum_{s'} P(s' \mid s, a) V^\pi(s') \right]
+  $$
+- **动作价值函数的贝尔曼期望方程**：
+  $$
+  Q^\pi(s, a) = R(s, a) + \gamma \sum_{s'} P(s' \mid s, a) \sum_{a'} \pi(a' \mid s') Q^\pi(s', a')
+  $$
+
+贝尔曼期望方程是强化学习中的核心方程，它允许我们通过动态规划或时序差分学习等方法计算价值函数。
+
+<img width="400" height="324" alt="Image" src="https://github.com/user-attachments/assets/42dba73f-51a2-42aa-9568-d58fd46a02d4" />
+
+<p/>
+
+编写代码来表示上图中的马尔可夫决策过程:
+
+```python
+S = ["s1", "s2", "s3", "s4", "s5"]  # 状态集合
+A = ["保持s1", "前往s1", "前往s2", "前往s3", "前往s4", "前往s5", "概率前往"]  # 动作集合
+# 状态转移函数
+P = {
+    "s1-保持s1-s1": 1.0,
+    "s1-前往s2-s2": 1.0,
+    "s2-前往s1-s1": 1.0,
+    "s2-前往s3-s3": 1.0,
+    "s3-前往s4-s4": 1.0,
+    "s3-前往s5-s5": 1.0,
+    "s4-前往s5-s5": 1.0,
+    "s4-概率前往-s2": 0.2,
+    "s4-概率前往-s3": 0.4,
+    "s4-概率前往-s4": 0.4,
+}
+# 奖励函数
+R = {
+    "s1-保持s1": -1,
+    "s1-前往s2": 0,
+    "s2-前往s1": -1,
+    "s2-前往s3": -2,
+    "s3-前往s4": -2,
+    "s3-前往s5": 0,
+    "s4-前往s5": 10,
+    "s4-概率前往": 1,
+}
+gamma = 0.5  # 折扣因子
+MDP = (S, A, P, R, gamma)
+
+# 策略1,随机策略
+Pi_1 = {
+    "s1-保持s1": 0.5,
+    "s1-前往s2": 0.5,
+    "s2-前往s1": 0.5,
+    "s2-前往s3": 0.5,
+    "s3-前往s4": 0.5,
+    "s3-前往s5": 0.5,
+    "s4-前往s5": 0.5,
+    "s4-概率前往": 0.5,
+}
+# 策略2
+Pi_2 = {
+    "s1-保持s1": 0.6,
+    "s1-前往s2": 0.4,
+    "s2-前往s1": 0.3,
+    "s2-前往s3": 0.7,
+    "s3-前往s4": 0.5,
+    "s3-前往s5": 0.5,
+    "s4-前往s5": 0.1,
+    "s4-概率前往": 0.9,
+}
+
+
+# 把输入的两个字符串通过“-”连接,便于使用上述定义的P、R变量
+def join(str1, str2):
+    return str1 + '-' + str2
+```
+
+接下来我们想要计算该 MDP 下，一个策略的状态价值函数。我们现在有的工具是 MRP 的解析解方法。于是，一个很自然的想法是：给定一个 MDP 和一个策略 $\pi$，我们是否可以将其转化为一个 MRP？答案是肯定的。我们可以将策略的动作选择进行边缘化（marginalization），就可以得到没有动作的 MRP 了。
+
+具体来说，对于某一个状态，我们根据策略所有动作的概率进行加权，得到的奖励和就可以认为是一个 MRP 在该状态下的奖励，即：
+
+$$R^\pi(s) = \sum_{a \in A} \pi(a \mid s) R(s, a)$$
+
+同理，我们计算采取动作的概率与使状态 $s$ 转移到 $s'$ 的概率的乘积，再将这些乘积相加，其和就是一个 MRP 的状态从 $s$ 转移至 $s'$ 的概率：
+
+$$P^\pi(s' \mid s) = \sum_{a \in A} \pi(a \mid s) P(s' \mid s, a)$$
+
+于是，我们构建得到了一个 MRP：$\langle S, P^\pi, R^\pi, \gamma \rangle$。根据价值函数的定义可以发现，转化前的 MDP 的状态价值函数 $V^\pi(s)$ 和转化后的 MRP 的价值函数 $V(s)$ 是一样的。于是我们可以用 MRP 中计算价值函数的解析解来计算这个 MDP 中该策略的状态价值函数。
+
+在 MRP 中，价值函数的解析解可以通过以下公式求得：
+
+$$V = (I - \gamma P^\pi)^{-1} R^\pi$$
+
+其中：
+- $V$ 是一个 $|S|$ 维向量，表示每个状态的价值
+- $I$ 是 $|S| \times |S|$ 的单位矩阵
+- $P^\pi$ 是 $|S| \times |S|$ 的状态转移概率矩阵
+- $R^\pi$ 是 $|S|$ 维的奖励向量
+- $\gamma$ 是折扣因子
+
+因此，对于给定的 MDP 和策略 $\pi$，我们可以通过以下步骤计算状态价值函数：
+1. 计算 MRP 的奖励函数 $R^\pi(s) = \sum_{a} \pi(a \mid s) R(s, a)$
+2. 计算 MRP 的状态转移概率 $P^\pi(s' \mid s) = \sum_{a} \pi(a \mid s) P(s' \mid s, a)$
+3. 构建矩阵 $P^\pi$ 和向量 $R^\pi$
+4. 使用公式 $V = (I - \gamma P^\pi)^{-1} R^\pi$ 计算状态价值函数
+
+
+## 4. 蒙特卡洛方法
+
+蒙特卡洛方法是一类基于随机采样和统计模拟的数值计算方法。在强化学习中，蒙特卡洛方法通过从实际经验或模拟经验中采样完整的回合（episodes）来学习价值函数。与需要环境完整模型的动态规划方法不同，蒙特卡洛方法只需要从环境中采样状态、动作和奖励序列。
+
+对于给定的策略 $\pi$，我们希望通过采样多个回合来估计状态价值函数 $V^\pi(s)$。每个回合都是从某个初始状态开始，按照策略 $\pi$ 选择动作，直到达到终止状态或达到最大步数。
+
+首次访问蒙特卡洛方法只考虑在回合中第一次访问某个状态时的回报，具体步骤如下：
+
+1. **初始化**：
+   - 对所有 $s \in S$，初始化 $V(s)$（可以初始化为0或任意值）
+   - 初始化计数器 $N(s) \leftarrow 0$，记录状态 $s$ 被首次访问的次数
+
+2. **循环**（对每个回合）：
+   - 根据策略 $\pi$ 生成一个状态-动作-奖励序列：
+     $$
+     S_0, A_0, R_1, S_1, A_1, R_2, \dots, S_{T-1}, A_{T-1}, R_T, S_T
+     $$
+   - 初始化累积回报 $G \leftarrow 0$
+   - 从回合的最后一个步骤向前遍历（$t = T-1, T-2, \dots, 0$）：
+     - 更新累积回报：$G \leftarrow \gamma G + R_{t+1}$
+     - 如果 $S_t$ 在时间步骤 $0, 1, \dots, t-1$ 中没有出现过（即这是首次访问）：
+       - 更新计数器：$N(S_t) \leftarrow N(S_t) + 1$
+       - 更新状态价值估计：
+         $$
+         V(S_t) \leftarrow V(S_t) + \frac{1}{N(S_t)} [G - V(S_t)]
+         $$
+
+
+每次访问蒙特卡洛方法考虑在回合中每次访问某个状态时的回报，算法步骤与首次访问类似，只是不需要检查是否是首次访问。
+
+从时间 $t$ 开始的累积折扣回报定义为：
+$$
+G_t = R_{t+1} + \gamma R_{t+2} + \gamma^2 R_{t+3} + \cdots = \sum_{k=0}^{\infty} \gamma^k R_{t+k+1}
+$$
+
+状态价值函数是期望回报：
+$$
+V^\pi(s) = \mathbb{E}_\pi[G_t \mid S_t = s]
+$$
+
+蒙特卡洛方法通过样本平均来估计期望值。对于首次访问蒙特卡洛方法，我们有：
+$$
+V^\pi(s) \approx \frac{1}{N(s)} \sum_{i=1}^{N(s)} G_i(s)
+$$
+其中 $G_i(s)$ 是在第 $i$ 个回合中从状态 $s$ 开始的首次访问的回报。
+
+我们可以使用增量方式更新价值估计，而不需要存储所有的回报值。设 $V_n$ 是基于前 $n$ 个样本的价值估计，第 $n+1$ 个样本的回报为 $G_{n+1}$，则：
+$$
+V_{n+1} = \frac{1}{n+1} \sum_{i=1}^{n+1} G_i = \frac{1}{n+1} (n \cdot V_n + G_{n+1}) = V_n + \frac{1}{n+1} (G_{n+1} - V_n)
+$$
+
+更一般地，我们可以使用一个固定的学习率 $\alpha$：
+$$
+V(S_t) \leftarrow V(S_t) + \alpha [G - V(S_t)]
+$$
+
+:::info
+算法特性:
+1. **无偏估计**：蒙特卡洛方法提供对 $V^\pi(s)$ 的无偏估计
+2. **收敛性**：随着样本数量的增加，估计值以概率1收敛到真实值
+3. **不需要环境模型**：只需要从环境中采样，不需要知道状态转移概率 $P(s' \mid s, a)$
+4. **基于回合**：必须等到回合结束才能进行更新
+:::
+
+假设我们有一个简单的网格世界，智能体从起始状态 S 出发，按照策略 $\pi$ 移动，直到达到终止状态 T。我们通过采样多个回合来估计每个状态的价值：
+
+- 回合1：S → A → B → T，奖励序列：0, 0, +1
+- 回合2：S → C → T，奖励序列：0, -1
+
+设折扣因子 $\gamma = 0.9$，则：
+- 对于状态 S（首次访问）：
+  - 回合1：$G = 0.9^0 \times 0 + 0.9^1 \times 0 + 0.9^2 \times 1 = 0.81$
+  - 回合2：$G = 0.9^0 \times 0 + 0.9^1 \times (-1) = -0.9$
+  - $V(S) = (0.81 + (-0.9)) / 2 = -0.045$
+
+通过大量这样的回合，我们可以得到越来越准确的状态价值估计。
+
+```python
+def sample(MDP, Pi, timestep_max, number):
+    ''' 采样函数,策略Pi,限制最长时间步timestep_max,总共采样序列数number '''
+    S, A, P, R, gamma = MDP
+    episodes = []
+    for _ in range(number):
+        episode = []
+        timestep = 0
+        s = S[np.random.randint(4)]  # 随机选择一个除s5以外的状态s作为起点
+        # 当前状态为终止状态或者时间步太长时,一次采样结束
+        while s != "s5" and timestep <= timestep_max:
+            timestep += 1
+            rand, temp = np.random.rand(), 0
+            # 在状态s下根据策略选择动作
+            for a_opt in A:
+                temp += Pi.get(join(s, a_opt), 0)
+                if temp > rand:
+                    a = a_opt
+                    r = R.get(join(s, a), 0)
+                    break
+            rand, temp = np.random.rand(), 0
+            # 根据状态转移概率得到下一个状态s_next
+            for s_opt in S:
+                temp += P.get(join(join(s, a), s_opt), 0)
+                if temp > rand:
+                    s_next = s_opt
+                    break
+            episode.append((s, a, r, s_next))  # 把（s,a,r,s_next）元组放入序列中
+            s = s_next  # s_next变成当前状态,开始接下来的循环
+        episodes.append(episode)
+    return episodes
+
+
+# 采样5次,每个序列最长不超过20步
+episodes = sample(MDP, Pi_1, 20, 5)
+print('第一条序列\n', episodes[0])
+print('第二条序列\n', episodes[1])
+print('第五条序列\n', episodes[4])
+
+# 对所有采样序列计算所有状态的价值
+def MC(episodes, V, N, gamma):
+    for episode in episodes:
+        G = 0
+        for i in range(len(episode) - 1, -1, -1):  #一个序列从后往前计算
+            (s, a, r, s_next) = episode[i]
+            G = r + gamma * G
+            N[s] = N[s] + 1
+            V[s] = V[s] + (G - V[s]) / N[s]
+
+
+timestep_max = 20
+# 采样1000次,可以自行修改
+episodes = sample(MDP, Pi_1, timestep_max, 1000)
+gamma = 0.5
+V = {"s1": 0, "s2": 0, "s3": 0, "s4": 0, "s5": 0}
+N = {"s1": 0, "s2": 0, "s3": 0, "s4": 0, "s5": 0}
+MC(episodes, V, N, gamma)
+print("使用蒙特卡洛方法计算MDP的状态价值为\n", V)
+```
+用蒙特卡洛方法估计得到的状态价值和我们用 MRP 解析解得到的状态价值是很接近的。
+
+## 5. 占用度量(Word Count)
+
+在开始介绍占用度量之前，我们先引入状态分布的概念。
+
+我们定义 MDP 的初始状态分布为 $\nu_0(s)$，表示智能体初始时刻处于状态 $s$ 的概率：
+$$
+\sum_{s \in \mathcal{S}} \nu_0(s) = 1
+$$
+
+用 $P(s_t = s \mid \pi)$ 表示采取策略 $\pi$ 使得智能体在时刻 $t$ 处于状态 $s$ 的概率。初始时有：
+$$
+P(s_0 = s \mid \pi) = \nu_0(s)
+$$
+
+策略 $\pi$ 的状态访问分布（state visitation distribution）定义为：
+$$
+\nu^\pi(s) = (1 - \gamma) \sum_{t=0}^\infty \gamma^t P(s_t = s \mid \pi)
+$$
+
+其中，$(1-\gamma)$ 是归一化因子，确保 $\sum_{s \in \mathcal{S}} \nu^\pi(s) = 1$。
+
+状态访问分布满足以下重要性质：
+
+**归一性**：
+   $$
+   \sum_{s \in \mathcal{S}} \nu^\pi(s) = 1
+   $$
+**递归关系**：
+   $$
+   \nu^\pi(s) = (1 - \gamma)\nu_0(s) + \gamma \sum_{s' \in \mathcal{S}} \sum_{a \in \mathcal{A}} \nu^\pi(s') \pi(a \mid s') P(s \mid s', a)
+   $$
+
+   推导过程：
+   $$
+   \begin{align*}
+   \nu^\pi(s) &= (1 - \gamma) \sum_{t=0}^\infty \gamma^t P(s_t = s \mid \pi) \\
+   &= (1 - \gamma)\nu_0(s) + (1 - \gamma) \sum_{t=1}^\infty \gamma^t P(s_t = s \mid \pi) \\
+   &= (1 - \gamma)\nu_0(s) + \gamma (1 - \gamma) \sum_{t=0}^\infty \gamma^t P(s_{t+1} = s \mid \pi) \\
+   &= (1 - \gamma)\nu_0(s) + \gamma \sum_{s'} \sum_a (1 - \gamma) \sum_{t=0}^\infty \gamma^t P(s_t = s' \mid \pi) \pi(a \mid s') P(s \mid s', a) \\
+   &= (1 - \gamma)\nu_0(s) + \gamma \sum_{s'} \sum_a \nu^\pi(s') \pi(a \mid s') P(s \mid s', a)
+   \end{align*}
+  $$
+
+现在我们可以定义占用度量（occupancy measure）。
+
+策略 $\pi$ 的占用度量（occupancy measure）定义为：
+$$
+\rho^\pi(s, a) = \nu^\pi(s) \pi(a \mid s)
+$$
+
+它表示状态-动作对 $(s, a)$ 被访问到的概率。
+
+占用度量与状态访问分布满足以下关系：
+
+1. **状态访问分布恢复**：
+   $$
+   \nu^\pi(s) = \sum_{a \in \mathcal{A}} \rho^\pi(s, a)
+   $$
+
+2. **策略恢复**：
+   $$
+   \pi(a \mid s) = \frac{\rho^\pi(s, a)}{\sum_{a' \in \mathcal{A}} \rho^\pi(s, a')} = \frac{\rho^\pi(s, a)}{\nu^\pi(s)}
+   $$
+
+:::tip
+
+***重要定理***
+
+**定理 1：占用度量的递归关系**
+
+对于任意两个策略 $\pi$ 和 $\pi'$，它们与同一个 MDP 交互产生的占用度量满足：
+$$
+\rho^{\pi'}(s, a) = (1 - \gamma)\nu_0(s)\pi'(a \mid s) + \gamma \sum_{s' \in \mathcal{S}} \sum_{a' \in \mathcal{A}} \rho^{\pi'}(s', a') P(s \mid s', a') \pi'(a \mid s)
+$$
+
+**证明**：
+$$
+\begin{align*}
+\rho^{\pi'}(s, a) &= \nu^{\pi'}(s) \pi'(a \mid s) \\
+&= \left[(1 - \gamma)\nu_0(s) + \gamma \sum_{s'} \sum_{a'} \nu^{\pi'}(s') \pi'(a' \mid s') P(s \mid s', a')\right] \pi'(a \mid s) \\
+&= (1 - \gamma)\nu_0(s)\pi'(a \mid s) + \gamma \sum_{s'} \sum_{a'} \nu^{\pi'}(s') \pi'(a' \mid s') P(s \mid s', a') \pi'(a \mid s) \\
+&= (1 - \gamma)\nu_0(s)\pi'(a \mid s) + \gamma \sum_{s'} \sum_{a'} \rho^{\pi'}(s', a') P(s \mid s', a') \pi'(a \mid s)
+\end{align*}
+$$
+**定理 2：占用度量到策略的唯一映射**
+
+给定一个合法的占用度量 $\rho(s, a)$（即存在某个策略 $\pi$ 使得 $\rho(s, a) = \rho^\pi(s, a)$），可生成该占用度量的唯一策略是：
+$$
+\pi(a \mid s) = \frac{\rho(s, a)}{\sum_{a' \in \mathcal{A}} \rho(s, a')}
+$$
+
+**证明**：
+1. **存在性**：定义 $\nu(s) = \sum_{a'} \rho(s, a')$，则 $\pi(a \mid s) = \rho(s, a) / \nu(s)$ 是一个有效的策略，因为：
+   - $\pi(a \mid s) \geq 0$ 对所有 $s, a$ 成立
+   - $\sum_{a} \pi(a \mid s) = \sum_{a} \rho(s, a) / \nu(s) = \nu(s) / \nu(s) = 1$
+
+2. **唯一性**：假设存在另一个策略 $\pi'$ 也生成相同的占用度量 $\rho$，则：
+   $$\rho(s, a) = \nu(s) \pi(a \mid s) = \nu(s) \pi'(a \mid s)$$
+   由于 $\nu(s) > 0$（否则该状态不会被访问），可得 $\pi(a \mid s) = \pi'(a \mid s)$，因此策略是唯一的。
+
+**合法性条件:**
+
+一个占用度量 $\rho(s, a)$ 是合法的，当且仅当它满足以下条件：
+
+1. **非负性**：$\rho(s, a) \geq 0$ 对所有 $s, a$ 成立
+2. **归一性**：$\sum_{s, a} \rho(s, a) = 1$
+3. **流守恒**：$\sum_{a} \rho(s, a) = (1 - \gamma)\nu_0(s) + \gamma \sum_{s', a'} \rho(s', a') P(s \mid s', a')$ 对所有 $s$ 成立
+:::
+用Python近似估计占用度量:
+<details>
+
+
+```python
+import numpy as np
+from collections import defaultdict
+import matplotlib.pyplot as plt
+
+class OccupancyMeasureEstimator:
+    """
+    占用度量估计器
+    
+    通过采样轨迹来估计策略的状态访问分布和占用度量
+    """
+    
+    def __init__(self, env, discount_factor=0.99):
+        """
+        初始化
+        
+        参数:
+            env: 环境对象，需要实现 reset() 和 step() 方法
+            discount_factor: 折扣因子 γ
+        """
+        self.env = env
+        self.gamma = discount_factor
+    
+    def estimate_undiscounted_occupancy(self, policy, num_episodes=1000, max_steps=1000):
+        """
+        估计非折扣占用度量
+        
+        参数:
+            policy: 策略函数，输入状态返回动作概率分布
+            num_episodes: 采样回合数
+            max_steps: 每个回合最大步数
+            
+        返回:
+            occupancy: 占用度量字典，(state, action) -> 概率
+            state_visitation: 状态访问分布字典
+        """
+        state_action_count = defaultdict(int)
+        state_count = defaultdict(int)
+        total_visits = 0
+        
+        for episode in range(num_episodes):
+            state = self.env.reset()
+            done = False
+            step = 0
+            
+            while not done and step < max_steps:
+                # 根据策略选择动作
+                if hasattr(policy, 'predict'):
+                    # 如果策略有predict方法
+                    action = policy.predict(state)
+                else:
+                    # 如果策略是概率分布函数
+                    action_probs = policy(state)
+                    action = np.random.choice(len(action_probs), p=action_probs)
+                
+                # 更新计数器
+                state_action_count[(state, action)] += 1
+                state_count[state] += 1
+                total_visits += 1
+                
+                # 执行动作
+                next_state, reward, done, _ = self.env.step(action)
+                state = next_state
+                step += 1
+        
+        # 计算占用度量和状态访问分布
+        occupancy = {}
+        state_visitation = {}
+        
+        for (s, a), count in state_action_count.items():
+            occupancy[(s, a)] = count / total_visits
+            
+        for s, count in state_count.items():
+            state_visitation[s] = count / total_visits
+        
+        return occupancy, state_visitation
+    
+    def estimate_discounted_occupancy(self, policy, num_episodes=1000, max_steps=1000):
+        """
+        估计折扣占用度量
+        
+        参数:
+            policy: 策略函数
+            num_episodes: 采样回合数
+            max_steps: 每个回合最大步数
+            
+        返回:
+            discounted_occupancy: 折扣占用度量
+            discounted_state_visitation: 折扣状态访问分布
+        """
+        discounted_occupancy = defaultdict(float)
+        discounted_state_visitation = defaultdict(float)
+        total_discounted_weight = 0
+        
+        for episode in range(num_episodes):
+            state = self.env.reset()
+            done = False
+            step = 0
+            discount = 1.0  # γ^0 = 1
+            
+            while not done and step < max_steps:
+                # 根据策略选择动作
+                if hasattr(policy, 'predict'):
+                    action = policy.predict(state)
+                else:
+                    action_probs = policy(state)
+                    action = np.random.choice(len(action_probs), p=action_probs)
+                
+                # 更新折扣计数器
+                discounted_occupancy[(state, action)] += discount
+                discounted_state_visitation[state] += discount
+                total_discounted_weight += discount
+                
+                # 执行动作
+                next_state, reward, done, _ = self.env.step(action)
+                state = next_state
+                step += 1
+                discount *= self.gamma  # 更新折扣因子
+        
+        # 归一化
+        for key in discounted_occupancy:
+            discounted_occupancy[key] /= total_discounted_weight
+            
+        for key in discounted_state_visitation:
+            discounted_state_visitation[key] /= total_discounted_weight
+        
+        return discounted_occupancy, discounted_state_visitation
+    
+    def recover_policy_from_occupancy(self, occupancy, states=None, actions=None):
+        """
+        从占用度量恢复策略
+        
+        参数:
+            occupancy: 占用度量字典
+            states: 状态空间（可选）
+            actions: 动作空间（可选）
+            
+        返回:
+            policy: 恢复的策略函数
+        """
+        if states is None or actions is None:
+            # 从占用度量中提取所有状态和动作
+            states = set()
+            actions_set = set()
+            for (s, a) in occupancy.keys():
+                states.add(s)
+                actions_set.add(a)
+            states = sorted(list(states))
+            actions = sorted(list(actions_set))
+        
+        policy_dict = {}
+        
+        for s in states:
+            total = 0
+            action_probs = []
+            
+            for a in actions:
+                prob = occupancy.get((s, a), 0)
+                action_probs.append(prob)
+                total += prob
+            
+            # 归一化
+            if total > 1e-10:  # 避免除零
+                action_probs = [p / total for p in action_probs]
+            else:
+                # 如果该状态没有被访问过，使用均匀分布
+                action_probs = [1.0 / len(actions)] * len(actions)
+            
+            policy_dict[s] = action_probs
+        
+        # 创建策略函数
+        def policy(state):
+            if state in policy_dict:
+                return policy_dict[state]
+            else:
+                # 如果遇到未知状态，返回均匀分布
+                return [1.0 / len(actions)] * len(actions)
+        
+        return policy
+    
+    def compare_policies(self, policy1, policy2, num_episodes=1000, max_steps=1000):
+        """
+        比较两个策略的占用度量
+        
+        参数:
+            policy1, policy2: 要比较的两个策略
+            num_episodes: 采样回合数
+            max_steps: 每个回合最大步数
+            
+        返回:
+            comparison_results: 比较结果字典
+        """
+        # 估计两个策略的占用度量
+        occ1, vis1 = self.estimate_discounted_occupancy(policy1, num_episodes, max_steps)
+        occ2, vis2 = self.estimate_discounted_occupancy(policy2, num_episodes, max_steps)
+        
+        # 计算差异度量
+        all_keys = set(occ1.keys()) | set(occ2.keys())
+        
+        l1_distance = 0
+        l2_distance = 0
+        max_distance = 0
+        
+        for key in all_keys:
+            p1 = occ1.get(key, 0)
+            p2 = occ2.get(key, 0)
+            diff = abs(p1 - p2)
+            l1_distance += diff
+            l2_distance += diff ** 2
+            max_distance = max(max_distance, diff)
+        
+        l2_distance = np.sqrt(l2_distance)
+        
+        return {
+            'policy1_occupancy': occ1,
+            'policy2_occupancy': occ2,
+            'policy1_visitation': vis1,
+            'policy2_visitation': vis2,
+            'l1_distance': l1_distance,
+            'l2_distance': l2_distance,
+            'max_distance': max_distance
+        }
+
+# 示例使用代码
+if __name__ == "__main__":
+    # 创建一个简单的网格世界环境示例
+    class SimpleGridWorld:
+        def __init__(self, size=5):
+            self.size = size
+            self.state = 0
+            self.goal = size * size - 1
+            
+        def reset(self):
+            self.state = 0
+            return self.state
+            
+        def step(self, action):
+            # 动作: 0=上, 1=右, 2=下, 3=左
+            row = self.state // self.size
+            col = self.state % self.size
+            
+            if action == 0 and row > 0:  # 上
+                row -= 1
+            elif action == 1 and col < self.size - 1:  # 右
+                col += 1
+            elif action == 2 and row < self.size - 1:  # 下
+                row += 1
+            elif action == 3 and col > 0:  # 左
+                col -= 1
+                
+            self.state = row * self.size + col
+            
+            done = (self.state == self.goal)
+            reward = 1.0 if done else 0.0
+            
+            return self.state, reward, done, {}
+    
+    # 创建环境和估计器
+    env = SimpleGridWorld(size=3)
+    estimator = OccupancyMeasureEstimator(env, discount_factor=0.9)
+    
+    # 定义两个不同的策略
+    def random_policy(state):
+        # 随机策略
+        return [0.25, 0.25, 0.25, 0.25]
+    
+    def right_biased_policy(state):
+        # 偏向向右的策略
+        return [0.1, 0.7, 0.1, 0.1]
+    
+    # 估计占用度量
+    print("估计随机策略的占用度量...")
+    random_occ, random_vis = estimator.estimate_discounted_occupancy(random_policy, num_episodes=1000)
+    
+    print("估计右偏策略的占用度量...")
+    right_occ, right_vis = estimator.estimate_discounted_occupancy(right_biased_policy, num_episodes=1000)
+    
+    # 比较两个策略
+    print("\n比较两个策略...")
+    comparison = estimator.compare_policies(random_policy, right_biased_policy, num_episodes=1000)
+    print(f"L1距离: {comparison['l1_distance']:.4f}")
+    print(f"L2距离: {comparison['l2_distance']:.4f}")
+    print(f"最大距离: {comparison['max_distance']:.4f}")
+    
+    # 从占用度量恢复策略
+    print("\n从占用度量恢复策略...")
+    recovered_policy = estimator.recover_policy_from_occupancy(random_occ)
+    
+    # 测试恢复的策略
+    test_state = 0
+    original_probs = random_policy(test_state)
+    recovered_probs = recovered_policy(test_state)
+    
+    print(f"状态 {test_state}:")
+    print(f"  原始策略: {original_probs}")
+    print(f"  恢复策略: {[f'{p:.3f}' for p in recovered_probs]}")
+    
+    # 可视化状态访问分布（简单示例）
+    states = list(range(9))  # 3x3网格
+    random_visits = [random_vis.get(s, 0) for s in states]
+    right_visits = [right_vis.get(s, 0) for s in states]
+    
+    plt.figure(figsize=(10, 5))
+    plt.subplot(1, 2, 1)
+    plt.bar(states, random_visits)
+    plt.title('随机策略状态访问分布')
+    plt.xlabel('状态')
+    plt.ylabel('访问概率')
+    
+    plt.subplot(1, 2, 2)
+    plt.bar(states, right_visits)
+    plt.title('右偏策略状态访问分布')
+    plt.xlabel('状态')
+    plt.ylabel('访问概率')
+    
+    plt.tight_layout()
+    plt.show()
+```
+</details>
+
+## 6. 贝尔曼最优方程
+
+
+强化学习的目标是找到一个策略 $\pi^*$，使得智能体从初始状态出发能获得最大的期望回报。我们首先定义策略之间的偏序关系。
+
+对于任意两个策略 $\pi$ 和 $\pi'$，我们定义：
+- $\pi \geq \pi'$ 当且仅当对于所有状态 $s$，都有 $V^\pi(s) \geq V^{\pi'}(s)$
+- $\pi > \pi'$ 当且仅当 $\pi \geq \pi'$ 且至少存在一个状态 $s$ 使得 $V^\pi(s) > V^{\pi'}(s)$
+
+在有限状态和动作空间的 MDP 中，至少存在一个策略不差于其他所有策略，这样的策略称为**最优策略**（optimal policy）。最优策略可能不唯一，但所有最优策略都具有相同的价值函数。
+
+所有最优策略共享相同的最优状态价值函数，定义为：
+$$
+V^*(s) = \max_\pi V^\pi(s) = \max_\pi \mathbb{E}_\pi \left[ \sum_{k=0}^\infty \gamma^k R_{t+k+1} \mid S_t = s \right]
+$$
+
+最优动作价值函数定义为：
+$$
+Q^*(s, a) = \max_\pi Q^\pi(s, a) = \max_\pi \mathbb{E}_\pi \left[ \sum_{k=0}^\infty \gamma^k R_{t+k+1} \mid S_t = s, A_t = a \right]
+$$
+
+**定理 1**：最优状态价值与最优动作价值的关系
+$$V^*(s) = \max_a Q^*(s, a)$$
+
+**证明**：
+$$
+\begin{align*}
+V^*(s) &= \max_\pi V^\pi(s) \\
+&= \max_\pi \sum_a \pi(a \mid s) Q^\pi(s, a) \\
+&\leq \max_\pi \max_a Q^\pi(s, a) \quad \text{(由于加权平均不超过最大值)} \\
+&= \max_a \max_\pi Q^\pi(s, a) \\
+&= \max_a Q^*(s, a)
+\end{align*}
+$$
+另一方面，对于任意 $\varepsilon > 0$，存在策略 $\pi$ 使得 $V^\pi(s) \geq V^*(s) - \varepsilon$。设 $a^* = \arg\max_a Q^*(s, a)$，我们可以构造一个策略 $\pi'$ 在状态 $s$ 选择动作 $a^*$，然后遵循最优策略。那么：
+$$
+V^{\pi'}(s) = Q^{\pi'}(s, a^*) \geq Q^*(s, a^*) - \varepsilon = \max_a Q^*(s, a) - \varepsilon
+$$
+
+由于 $V^*(s) \geq V^{\pi'}(s)$，我们有：
+
+$$
+V^*(s) \geq \max_a Q^*(s, a) - \varepsilon
+$$
+
+由于 $\varepsilon$ 是任意的，我们得到 $V^*(s) \geq \max_a Q^*(s, a)$。
+
+结合两个不等式，我们得到 $V^*(s) = \max_a Q^*(s, a)$。
+
+结合两个不等式，我们得到 $V^*(s) = \max_a Q^*(s, a)$。
+
+**定理 2**：最优动作价值的贝尔曼方程
+$$Q^*(s, a) = R(s, a) + \gamma \sum_{s'} P(s' \mid s, a) V^*(s')$$
+
+**证明**：
+$$
+\begin{align*}
+Q^*(s, a) &= \max_\pi Q^\pi(s, a) \\
+&= \max_\pi \left[ R(s, a) + \gamma \sum_{s'} P(s' \mid s, a) V^\pi(s') \right] \\
+&= R(s, a) + \gamma \sum_{s'} P(s' \mid s, a) \max_\pi V^\pi(s') \quad \text{(由于最大值可交换)} \\
+&= R(s, a) + \gamma \sum_{s'} P(s' \mid s, a) V^*(s')
+\end{align*}
+$$
+
+
+结合定理 1 和定理 2，我们可以推导出贝尔曼最优方程。
+
+**贝尔曼最优方程（状态价值形式）**：
+$$
+\begin{align*}
+V^*(s) &= \max_a Q^*(s, a) \\
+&= \max_a \left[ R(s, a) + \gamma \sum_{s'} P(s' \mid s, a) V^*(s') \right]
+\end{align*}
+$$
+**贝尔曼最优方程（动作价值形式）**：
+$$
+\begin{align*}
+Q^*(s, a) &= R(s, a) + \gamma \sum_{s'} P(s' \mid s, a) V^*(s') \\
+&= R(s, a) + \gamma \sum_{s'} P(s' \mid s, a) \max_{a'} Q^*(s', a')
+\end{align*}
+$$
+
+## References
+
+[1].  张伟楠，沈键，俞勇.动手学强化学习.\[EB/OL\](2022-07-02)\[2025-10-19\].https://hrl.boyuai.com/chapter/1/%E5%88%9D%E6%8E%A2%E5%BC%BA%E5%8C%96%E5%AD%A6%E4%B9%A0
+
+[2] SUTTON R S, BARTO A G. Reinforcement learning: an introduction [M]. Cambridge:MIT press, 2018.
+
+[3] OTTERLO M V, WIERING M. Reinforcement learning and markov decision processes [M]. Berlin, Heidelberg: Springer, 2012: 3-42.
+
+</WordCount>

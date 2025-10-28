@@ -1,0 +1,293 @@
+
+import WordCount from '../../../src/components/WordCount/WordCount.jsx';
+
+<WordCount>
+
+### 5.1 电荷的量子化 电荷守恒定律
+&nbsp;
+> 电荷的量子化
+> 
+一般认为汤姆孙是电子发现者。
+
+电子电荷的绝对值的近似值：
+$e=1.602\times10^{-19}C$
+
+> 电荷守恒定律
+
+ 不论系统内的电荷如何迁移，系统的电荷代数和保持不变。
+&nbsp;
+### 5.2 库仑定律
+&nbsp;
+
+在真空中，两个静止的点电荷之间的相互作用力，其大小与它们电荷的乘积成正比，与它们之间距离的二次方成反比；作用力的方向沿着两点电荷的连线，同号电荷相斥，异号电荷相吸。
+
+假设现在真空中（低速）有两个静止点电荷$q_1$、$q_2$，用线段把它们连接起来，线段距离为$\textbf{r}$，那么两点电荷受到相互作用力$\textbf{F}$如此计算：
+
+$\textbf{F}=\frac{1}{4π\epsilon_0}\frac{q_1q_2}{r^2}\textbf{e}_r$ 
+
+一般计算时，$\epsilon_0$取$8.85\times10^{-12} C^2·N^{-1}·m^{-2}$。
+
+当$q_1$、$q_2$同号时，库仑力表现为斥力，反之则为引力。
+
+### 5.3 电场强度
+
+> 静电场 
+
+处于静电场中的电荷要受到电场力作用，并且当电荷在电场中运动时电场力也要对它做功。
+从而，我们能够引出两个物理量：**电场强度**和**电势**。
+
+> 电场强度
+
+试验电荷必须是点电荷，且电量足够小。
+
+电场强度计算公式：
+
+$\textbf{E}=\frac{\textbf{F}}{q_0}$
+
+它表明**电场中某点处的电场强度$\textbf{E}$等于位于该点处的单位试验电荷所受的电场力**。
+
+这里的电场力，我高中的时候经常有一个很奇怪的想法，那就是“电场是凭空产生的”，跟点电荷激发的电场独立开来。但是不是的。静电场它总是有一定量的静止点电荷激发的，哪怕匀强电场也是，就比如说附着了均匀电荷的板子，比如示波器，加速器。
+
+位于该点就说明它已经受到了与电场电荷的相互作用力，而这一点在公式中体现出的是它与这个电场电荷的距离。
+
+> 点电荷的电场强度
+
+点电荷位于空间直角坐标系的原点O，设一试验电荷位于场点P，原点指向该点P的位矢为$\textbf{r}$。
+
+如果点电荷为正电荷（即$Q>0$），$E$的方向与$\textbf{e}_r$相同。
+
+反之若为负电荷，则相反。（见书P164）
+
+点电荷电场强度计算公式：
+
+$\textbf{E} =\frac{\textbf {F}}{q_0}=\frac{1}{4π\epsilon_0}\frac{Q}{r^2} \textbf{e}_r$
+
+> 电场强度叠加原理
+
+由力的叠加原理可得出电场强度叠加原理。
+
+书上的例子：设真空中一点电荷系由$Q_1,Q_2$和$Q_3$三个点电荷组成，在场点P处放置一个试验电荷$q_0$，且$Q_1,Q_2$和$Q_3$到点P的位矢为$\textbf{r}_1$、$\textbf{r}_2$、$\textbf{r}_3$，若试验电荷收到三点电荷作用力为$\textbf{F}_1$、$\textbf{F}_2$、$\textbf{F}_3$，则由力的叠加原理叠加.
+
+计算式：
+![在这里插入图片描述](https://i-blog.csdnimg.cn/blog_migrate/1cd4c3f76e1bcf1eded829c6f17333e5.png#pic_center)
+
+
+$\textbf{F}=$$\textbf{F}_1+\textbf{F}_2+\textbf{F}_3$
+
+其中，
+
+$\textbf{F}_1=\frac{1}{4π\epsilon_0}\frac{q_0Q_1}{r_1^2}\textbf{e}_1$
+
+$\textbf{F}_2=\frac{1}{4π\epsilon_0}\frac{q_0Q_2}{r_2^2}\textbf{e}_2$
+
+$\textbf{F}_3=\frac{1}{4π\epsilon_0}\frac{q_0Q_3}{r_3^2}\textbf{e}_3$
+
+由电场强度定义式得出P点电场强度：
+
+$\textbf{E}=\frac{\textbf{F}}{q_0}=\frac{\textbf{F}_1}{q_0}+\frac{\textbf{F}_2}{q_0}+\frac{\textbf{F}_3}{q_0}$
+
+于是，P点电场强度为：
+
+$\textbf{E}=\frac{1}{4π\epsilon_0}\frac{Q_1}{r_1^2}\textbf{e}_1+\frac{1}{4π\epsilon_0}\frac{Q_2}{r_2^2}\textbf{e}_2+\frac{1}{4π\epsilon_0}\frac{Q_3}{r_3^2}\textbf{e}_3$
+
+可知式中右边第一、二、三项分别代表$Q_1$、$Q_2$、$Q_3$各自存在时点P的电场强度，即：
+
+$\textbf{E}_1=\frac{1}{4π\epsilon_0}\frac{Q_1}{r_1^2}\textbf{e}_1$
+
+$\textbf{E}_2=\frac{1}{4π\epsilon_0}\frac{Q_2}{r_2^2}\textbf{e}_2$
+
+$\textbf{E}_3=\frac{1}{4π\epsilon_0}\frac{Q_3}{r_3^2}\textbf{e}_3$
+
+所以有：
+
+$\textbf{E}=\textbf{E}_1+\textbf{E}_2+\textbf{E}_3$
+
+式中表明，三个点电荷在点P处激起的的电场强度等于各个点电荷单独存在时该处电场强度的矢量和。
+
+试推广至任意数量的点电荷所组成的点电荷系，得出一普遍结论：
+
+点电荷系所激发的电场中的某点处的电场强度等于各个点电荷单独存在时对该点所激起的电场强度的矢量和。此即为**电场强度的叠加原理**。
+
+其数学表达式：
+
+$\textbf{E}=\sum_{i=1}^{n}\textbf{E}_i=\frac{1}{4π\epsilon_0}\sum_{i=1}^{n}\frac{Q_i}{r_i^2}\textbf{e}_r$
+
+据此原理，我们可以计算连续分布的电荷系的电场强度，用到积分工具：
+![在这里插入图片描述](https://i-blog.csdnimg.cn/blog_migrate/b3bb026014a1234eb657dda9c9ca5963.png#pic_center)
+
+设有一体积为$V$的电荷连续分布的带电体，在其中取一电荷元d$q$，
+那么设这一点P上，电荷元所受的电场强度为d$E$
+
+d$\textbf{E}=\frac{1}{4π\epsilon_0}\frac{dq}{r^2}\textbf{e}_r$
+
+可得电荷系（连续分布电荷）在点P处的电场强度$\textbf{E}$为：
+
+$\textbf{E}=\int_Vd\textbf{E}=\int_V\frac{1}{4π\epsilon_0}\frac{\textbf{e}_r}{r^2}dq$，若$dV$为电荷元d$q$的体积元，$\rho$为其电荷体密度，则d$q$=$\rho$d$V$，于是，上式亦可写成：
+
+$\textbf{E}=\int_V\frac{1}{4π{\epsilon}_0}\frac{\rho\textbf{e}_r}{r^2}dV$
+
+对于电荷连续分布的线带电体和面带电体来说，电荷元d$q$分别为d$q$=$\lambda$d$l$、d$q$=$\sigma$d$S$.
+
+对上两式积分，它们的电场强度易于推知。
+
+> 电偶极子的电场强度
+
+电偶极子：由两个电荷量相等，符号相反，相距为$r_0$的点电荷+q、-q构成的电荷系成为电偶极子。
+
+从-q指向+q的矢量$\textbf{r}_0$为电偶极子的轴，$q\textbf{r}_0$称为电偶极子的电偶极矩（简称电矩），用符号$\textbf{p}$表示，有$\textbf{p}=q\textbf{r}_0$.
+
+（1）取电偶极子轴线的中点为坐标原点O，沿极轴的延长线为Ox轴，轴上任一点A距离原点O的距离为$x$，得电场强度如下图所示：
+
+![在这里插入图片描述](https://i-blog.csdnimg.cn/blog_migrate/5b6e07d4a781bec50ba7c30c236d5276.png#pic_center)
+上两式表明，$\textbf{E}_+$和$\textbf{E}_-$的方向都沿Ox轴，但方向相反，由电场强度叠加原理可知，点A处的$\textbf{E}$为
+
+$\textbf{E}=\textbf{E}_++\textbf{E}_-=\frac{q}{4π\epsilon_0}\frac{2xr_0}{(x^2-r_0^2/4)^2}\textbf{i}$.
+
+### 5.4 电场强度通量 高斯定理
+
+#### 1.电场线
+电场线总是始于正电荷，终止于负电荷，不形成闭合曲线（指一条时）。
+任何两条电场线都不能相交，这是因为电场中每一点处的电场强度只能有一个确定的方向。
+电场线在空间中的密度能表示电场强度的大小。
+
+对电场线的密度作如下规定：在电场中任一点，想象地做一个面积元dS，并使它与该点处的$\textbf{E}$垂直，则通过面积元dS的电场线数dN与该点的$\textbf{E}$的大小有如下关系：
+
+$\frac{dN}{dS}=dE$
+
+#### 2.电场强度通量
+
+>通过电场中某一个面的电场线数目，称作这个面的电场强度通量。
+
+匀强电场中电场强度通量$\phi$，电场线密度处处相等：
+
+$\phi_e=ES$
+
+匀强电场中$\textbf{E}$与平面S不垂直：
+
+$\phi_e=EScos\theta$
+
+非匀强电场，且面S是任意曲面：
+
+$\phi_e=\int_SEcos\theta dS$
+
+即
+
+$\phi_e=\int_S\textbf{E} d\textbf{S}$
+
+#### 3.高斯定理
+&nbsp;
+设真空中有一个正点电荷q，被置于半径为R的球面中心O，由点电荷电场强度公式可知，球面上各点电场强度$\textbf{E}$的大小均等于：
+
+![在这里插入图片描述](https://i-blog.csdnimg.cn/blog_migrate/b847c7163e37a8f7fabb77dfd3e893bc.png#pic_center)
+通过dS的电场强度通量为
+
+$d\phi_e=\textbf{E}dS=EdS=\frac{1}{4π\epsilon_0}\frac{q}{R^2}dS$
+
+于是通过整个球面的电场强度通量为：
+
+$\phi_e=\oint_Sd\phi_e=\oint_S\textbf{E}d\textbf{S}=\frac{1}{4π\epsilon_0}\frac{q}{R^2}\oint_SdS=\frac{1}{4π\epsilon_0}\frac{q}{R^2}4πR^2$
+
+得（高斯定理）：
+
+$\phi_e=\oint_S\textbf{E}d\textbf{S}=\frac{q}{\epsilon_0}$
+
+
+真空中**静电场**的高斯定理（点电荷位于闭合曲面之外）：
+
+$\oint\textbf{E}d\textbf{S}=\frac{1}{\epsilon_0}\sum^n_{i=1} q_{in}$
+
+### 5.6 静电场的环路定理 电势能
+
+#### 1.静电场力所做的功
+
+$W=q_0\int_l\textbf{E}d\textbf{l}$
+
+可得一结论：静电场对其中点电荷所做的功只与其$q_0$及路径起点终点有关，与其路径形状无关。
+
+#### 2.静电场的环路定理
+
+点电荷沿闭合路径移动一周，电场力做功为0，即：
+
+$q_0\oint_l\textbf{E}d\textbf{l}=0$
+
+上式成立的条件必须是
+
+$\oint_l\textbf{E}d\textbf{l}=0$
+
+#### 3.电势能
+
+$W_{AB}=E_{pA}-E_{pB}=-(E_{pB}-E_{pA})$
+
+选取一个电势能参考点。设该点的电势能为零，这样，若$E_{pB}=0$，则有：
+
+$E_{pA}=q_0\int_{AB}\textbf{E}d\textbf{l}$
+
+### 5.7 电势
+
+如取
+
+$V_{A}=E_{pA}/q_0$
+$V_{B}=E_{pB}/q_0$
+
+称$V_A$和$V_B$分别为点A和点B的电势。
+
+$V_{A}=\int_{AB}\textbf{E}d\textbf{l}+V_{B}$
+
+若B在无限远处，则$E_{pB}=0$，$V_B=0$，电场中点A的电势为：
+
+$V_A=\int_{\infty A}\textbf{E}d\textbf{l}$
+
+表明电场中某一点A的电势$V_A$，在数值上等于单位正试验电荷从A移到无限远处时，静电场力所做的功。
+
+亦可写成：
+
+$V_A=-\int_{ A\infty}\textbf{E}d\textbf{l}$
+
+两点电势差可写成：
+
+$U_{AB}=V_A-V_B=-(V_B-V_A)=\int_{AB}\textbf{E}d\textbf{l}$
+
+#### 2.点电荷电场的电势
+
+$V=\int^\infty_r\textbf{E}d\textbf{l}=\frac{q}{4π\epsilon_0}\frac{1}{r}$
+
+当q>0时，电场中各点电势都是正值，反之则都为负。
+
+#### 3.电势的叠加原理
+
+
+
+>点电荷系所激发的电场中某点的电势，等于各点电荷单独存在时在该点建立的电势的代数和。
+
+$V_A=\sum^n_{i=1}\frac{1}{4π\epsilon_0}\frac{q_i}{r_i}$
+
+
+### 5.8 电场强度和电势梯度
+
+#### 1.等势面
+某点电场强度与通过该点的等势面垂直。
+
+$q\textbf{E}d\textbf{l}=0$
+
+规定：电场中任意两个相邻的=等势面之间的电势差都相等。
+
+#### 2.电场强度与电势梯度
+
+电场中某一点的电场强度沿任一方向的分量，等于这一点的电势沿该方向的电势变化率的负值。
+
+$E_l=\frac{dV}{dl}$
+
+E的方向总是从高电势指向低电势。
+
+$\textbf{E}=-\frac{dV}{dl_n}\textbf{e}_n$
+
+在空间直角坐标系中，电场强度在x,y,z这三个方向的分量分别为：
+
+![在这里插入图片描述](https://i-blog.csdnimg.cn/blog_migrate/2aaacdeabd7427daf11d2dd55bb55cbb.png#pic_center)
+于是，电场强度与电势关系的矢量表达式可写成：
+
+![在这里插入图片描述](https://i-blog.csdnimg.cn/blog_migrate/056f9662d5665983bd3fd573dde0f2f9.png#pic_center)
+
+推论：电场强度$\textbf{E}$等于电势梯度的负值。
+
+</WordCount>

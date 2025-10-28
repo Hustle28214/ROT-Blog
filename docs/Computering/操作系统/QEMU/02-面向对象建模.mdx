@@ -1,0 +1,23 @@
+import WordCount from '../../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+## 1. QOM简介
+
+QOM 的全称是 QEMU Object Model，是 QEMU 使用面向对象思想实现的抽象层，用来组织 QEMU 中的各种组件（比如设备模拟、后端组件 MemoryRegion、Machine 等）。类似于 C++ 的类，但是 QOM 是用纯 C 语言来实现的。
+
+QOM里随处是面向对象思想的体现，如网卡是一个类，它的父类是一个PCI设备类，这个PCI设备类的父类是设备类，此即继承。
+```
+QOM 的运作过程包含三个部分：类型的注册、类型的初始化、对象的初始化：
+
+    |--类型注册     ---> type_init()
+    |                   register_module_init()
+    |                   type_register()
+QOM-|--类型的初始化  ---> type_initialize()
+    |--对象的初始化  ---> object_new()
+    |                   object_initialize()
+    |                   object_initialize_with_type()
+```
+
+
+</WordCount>

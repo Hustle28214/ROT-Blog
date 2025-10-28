@@ -1,0 +1,659 @@
+import WordCount from '../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+接下来主要介绍两种DQN的改进算法：Double DQN和Dueling DQN。
+
+## 1. Double DQN
+
+传统的 DQN 算法在优化过程中往往会导致对 Q 值的系统性过高估计。其根本原因在于目标值计算方式的内在缺陷。传统 DQN 优化的时序差分目标为：
+
+$$
+y = r + \gamma \max_{a'} Q_{\theta^-}(s', a')
+$$
+
+其中 $Q_{\theta^-}$ 由目标网络（参数为 $\theta^-$）计算得出。
+
+我们可以将 $\max$ 操作拆解为两个步骤：
+
+$$
+\max_{a'} Q_{\theta^-}(s', a') = Q_{\theta^-}\left(s', \arg\max_{a'} Q_{\theta^-}(s', a')\right)
+$$
+
+这种计算方式存在根本性问题：**动作选择和价值评估都依赖于同一套目标网络**。当神经网络对某些动作的价值估算存在正向误差时，这些误差会在训练过程中被不断放大和累积。
+
+
+考虑一个特殊情况：在状态 $s'$ 下，所有动作的真实 Q 值均为 0，即 $\forall a', Q^*(s',a') = 0$。此时正确的更新目标应为：
+
+$$
+y_{\text{true}} = r + \gamma \cdot 0 = r
+$$
+
+但由于神经网络拟合误差，可能存在某个动作 $\hat{a}$ 使得：
+
+$$
+Q_{\theta^-}(s', \hat{a}) = \varepsilon > 0
+$$
+
+此时 DQN 的更新目标变为：
+
+$$
+y_{\text{DQN}} = r + \gamma \varepsilon > r
+$$
+
+这就产生了过高估计。当我们用这个被高估的目标值来更新前一步的 Q 值时，误差会进一步传播和累积。对于动作空间较大的任务，这种过高估计问题尤为严重，可能导致算法无法有效收敛。
+
+Double DQN 通过解耦动作选择和价值评估来解决过高估计问题。其基本思路是：**使用一套网络选择动作，用另一套独立网络评估该动作的价值**。
+
+Double DQN 将传统的目标函数修改为：
+
+$$
+y = r + \gamma Q_{\theta^-}\left(s', \arg\max_{a'} Q_{\theta}(s', a')\right)
+$$
+
+其中：
+- $Q_{\theta}$ 是训练网络，用于选择最优动作
+- $Q_{\theta^-}$ 是目标网络，用于评估该动作的价值
+
+
+幸运的是，传统的 DQN 算法本来就维护两套 Q 网络：
+- 训练网络 $Q_{\theta}$（参数 $\theta$）
+- 目标网络 $Q_{\theta^-}$（参数 $\theta^-$）
+
+我们可以直接利用这两套网络来实现 Double DQN，无需引入额外的计算开销。完整的 Double DQN 优化目标为：
+
+$$
+y_{\text{DoubleDQN}} = r + \gamma Q_{\theta^-}\left(s', \arg\max_{a'} Q_{\theta}(s', a')\right)
+$$
+
+对应的损失函数为：
+
+$$
+\mathcal{L}(\theta) = \frac{1}{2N} \sum_{i=1}^N \left[Q_{\theta}(s_i, a_i) - y_{\text{DoubleDQN}, i}\right]^2
+$$
+
+这种解耦设计带来了重要优势： **误差抵消**：即使训练网络对某个动作存在过高估计，只要目标网络对该动作的估值相对准确，最终的目标值就不会被严重高估; **稳定性提升**：两个网络的误差在一定程度上相互抵消，使训练过程更加稳定; **兼容性好**：在标准 DQN 基础上只需修改目标计算方式，易于实现.
+
+DQN 与 Double DQN 的核心差异仅在于计算下一状态 $s'$ 的 Q 值时如何选择动作：
+
+**DQN 的优化目标：**
+$$
+y_{\text{DQN}} = r + \gamma \max_{a'} Q_{\theta^-}(s', a')
+$$
+- 动作选择：依靠目标网络 $Q_{\theta^-}$
+- 价值评估：依靠目标网络 $Q_{\theta^-}$
+
+**Double DQN 的优化目标：**
+$$
+y_{\text{DoubleDQN}} = r + \gamma Q_{\theta^-}\left(s', \arg\max_{a'} Q_{\theta}(s', a')\right)
+$$
+- 动作选择：依靠训练网络 $Q_{\theta}$
+- 价值评估：依靠目标网络 $Q_{\theta^-}$
+
+### 1.1 验证 Double DQN: 倒立摆
+
+本节使用倒立摆（Inverted Pendulum）环境进行验证：
+
+**环境状态空间：**
+- $\cos(\theta)$：角度余弦值，范围 $[-1.0, 1.0]$
+- $\sin(\theta)$：角度正弦值，范围 $[-1.0, 1.0]$
+- $\dot{\theta}$：角速度，范围 $[-8.0, 8.0]$
+
+**动作空间：**
+- 力矩 $\tau$，连续值，范围 $[-2.0, 2.0]$
+
+**奖励函数：**
+$$
+r = -(\theta^2 + 0.1\dot{\theta}^2 + 0.001\tau^2)
+$$
+
+```python
+import random
+import gymnasium as gym  # 改为 gymnasium
+import numpy as np
+import torch
+import torch.nn.functional as F
+import matplotlib.pyplot as plt
+from tqdm import tqdm
+import collections  # 添加 collections 用于 ReplayBuffer
+
+class Qnet(torch.nn.Module):
+    ''' 只有一层隐藏层的Q网络 '''
+    def __init__(self, state_dim, hidden_dim, action_dim):
+        super(Qnet, self).__init__()
+        self.fc1 = torch.nn.Linear(state_dim, hidden_dim)
+        self.fc2 = torch.nn.Linear(hidden_dim, action_dim)
+
+    def forward(self, x):
+        x = F.relu(self.fc1(x))
+        return self.fc2(x)
+
+# 添加 ReplayBuffer 类
+class ReplayBuffer:
+    def __init__(self, capacity):
+        self.buffer = collections.deque(maxlen=capacity)
+    
+    def add(self, state, action, reward, next_state, done):
+        self.buffer.append((state, action, reward, next_state, done))
+    
+    def sample(self, batch_size):
+        transitions = random.sample(self.buffer, batch_size)
+        state, action, reward, next_state, done = zip(*transitions)
+        return np.array(state), action, reward, np.array(next_state), done
+    
+    def size(self):
+        return len(self.buffer)
+
+# 添加移动平均函数
+def moving_average(a, window_size):
+    cumulative_sum = np.cumsum(np.insert(a, 0, 0)) 
+    middle = (cumulative_sum[window_size:] - cumulative_sum[:-window_size]) / window_size
+    r = np.arange(1, window_size-1, 2)
+    begin = np.cumsum(a[:window_size-1])[::2] / r
+    end = (np.cumsum(a[:-window_size:-1])[::2] / r)[::-1]
+    return np.concatenate((begin, middle, end))
+
+class DQN:
+    ''' DQN算法,包括Double DQN '''
+    def __init__(self,
+                 state_dim,
+                 hidden_dim,
+                 action_dim,
+                 learning_rate,
+                 gamma,
+                 epsilon,
+                 target_update,
+                 device,
+                 dqn_type='VanillaDQN'):
+        self.action_dim = action_dim
+        self.q_net = Qnet(state_dim, hidden_dim, self.action_dim).to(device)
+        self.target_q_net = Qnet(state_dim, hidden_dim,
+                                 self.action_dim).to(device)
+        self.optimizer = torch.optim.Adam(self.q_net.parameters(),
+                                          lr=learning_rate)
+        self.gamma = gamma
+        self.epsilon = epsilon
+        self.target_update = target_update
+        self.count = 0
+        self.dqn_type = dqn_type
+        self.device = device
+
+    def take_action(self, state):
+        if np.random.random() < self.epsilon:
+            action = np.random.randint(self.action_dim)
+        else:
+            state = torch.tensor([state], dtype=torch.float).to(self.device)
+            action = self.q_net(state).argmax().item()
+        return action
+
+    # 添加缺失的 max_q_value 方法
+    def max_q_value(self, state):
+        state = torch.tensor([state], dtype=torch.float).to(self.device)
+        return self.q_net(state).max().item()
+
+    def update(self, transition_dict):
+        states = torch.tensor(transition_dict['states'],
+                              dtype=torch.float).to(self.device)
+        actions = torch.tensor(transition_dict['actions']).view(-1, 1).to(
+            self.device)
+        rewards = torch.tensor(transition_dict['rewards'],
+                               dtype=torch.float).view(-1, 1).to(self.device)
+        next_states = torch.tensor(transition_dict['next_states'],
+                                   dtype=torch.float).to(self.device)
+        dones = torch.tensor(transition_dict['dones'],
+                             dtype=torch.float).view(-1, 1).to(self.device)
+
+        q_values = self.q_net(states).gather(1, actions)  # Q值
+        # 下个状态的最大Q值
+        if self.dqn_type == 'DoubleDQN': # DQN与Double DQN的区别
+            max_action = self.q_net(next_states).max(1)[1].view(-1, 1)
+            max_next_q_values = self.target_q_net(next_states).gather(1, max_action)
+        else: # DQN的情况
+            max_next_q_values = self.target_q_net(next_states).max(1)[0].view(-1, 1)
+        q_targets = rewards + self.gamma * max_next_q_values * (1 - dones)  # TD误差目标
+        dqn_loss = torch.mean(F.mse_loss(q_values, q_targets))  # 均方误差损失函数
+        self.optimizer.zero_grad()  # PyTorch中默认梯度会累积,这里需要显式将梯度置为0
+        dqn_loss.backward()  # 反向传播更新参数
+        self.optimizer.step()
+
+        if self.count % self.target_update == 0:
+            self.target_q_net.load_state_dict(
+                self.q_net.state_dict())  # 更新目标网络
+        self.count += 1
+
+lr = 1e-2
+num_episodes = 200
+hidden_dim = 128
+gamma = 0.98
+epsilon = 0.01
+target_update = 50
+buffer_size = 5000
+minimal_size = 1000
+batch_size = 64
+device = torch.device("cuda") if torch.cuda.is_available() else torch.device(
+    "cpu")
+
+env_name = 'Pendulum-v1'
+env = gym.make(env_name)  # 使用 gymnasium
+state_dim = env.observation_space.shape[0]
+action_dim = 11  # 将连续动作分成11个离散动作
+
+def dis_to_con(discrete_action, env, action_dim):  # 离散动作转回连续的函数
+    action_lowbound = env.action_space.low[0]  # 连续动作的最小值
+    action_upbound = env.action_space.high[0]  # 连续动作的最大值
+    return action_lowbound + (discrete_action /
+                              (action_dim - 1)) * (action_upbound -
+                                                   action_lowbound)
+
+def train_DQN(agent, env, num_episodes, replay_buffer, minimal_size,
+              batch_size):
+    return_list = []
+    max_q_value_list = []
+    max_q_value = 0
+    for i in range(10):
+        with tqdm(total=int(num_episodes / 10),
+                  desc='Iteration %d' % i) as pbar:
+            for i_episode in range(int(num_episodes / 10)):
+                episode_return = 0
+                state, _ = env.reset()  # gymnasium 返回两个值
+                done = False
+                while not done:
+                    action = agent.take_action(state)
+                    max_q_value = agent.max_q_value(
+                        state) * 0.005 + max_q_value * 0.995  # 平滑处理
+                    max_q_value_list.append(max_q_value)  # 保存每个状态的最大Q值
+                    action_continuous = dis_to_con(action, env,
+                                                   agent.action_dim)
+                    # gymnasium 返回五个值
+                    next_state, reward, terminated, truncated, _ = env.step([action_continuous])
+                    done = terminated or truncated  # 需要合并两个结束标志
+                    replay_buffer.add(state, action, reward, next_state, done)
+                    state = next_state
+                    episode_return += reward
+                    if replay_buffer.size() > minimal_size:
+                        b_s, b_a, b_r, b_ns, b_d = replay_buffer.sample(
+                            batch_size)
+                        transition_dict = {
+                            'states': b_s,
+                            'actions': b_a,
+                            'next_states': b_ns,
+                            'rewards': b_r,
+                            'dones': b_d
+                        }
+                        agent.update(transition_dict)
+                return_list.append(episode_return)
+                if (i_episode + 1) % 10 == 0:
+                    pbar.set_postfix({
+                        'episode':
+                        '%d' % (num_episodes / 10 * i + i_episode + 1),
+                        'return':
+                        '%.3f' % np.mean(return_list[-10:])
+                    })
+                pbar.update(1)
+    return return_list, max_q_value_list
+
+# 设置随机种子
+random.seed(0)
+np.random.seed(0)
+torch.manual_seed(0)
+
+# 使用我们自定义的 ReplayBuffer
+replay_buffer = ReplayBuffer(buffer_size)
+agent = DQN(state_dim, hidden_dim, action_dim, lr, gamma, epsilon,
+            target_update, device)
+return_list, max_q_value_list = train_DQN(agent, env, num_episodes,
+                                          replay_buffer, minimal_size,
+                                          batch_size)
+
+# 绘制结果
+episodes_list = list(range(len(return_list)))
+mv_return = moving_average(return_list, 5)  # 使用我们自定义的移动平均函数
+plt.plot(episodes_list[:len(mv_return)], mv_return)  # 调整长度匹配
+plt.xlabel('Episodes')
+plt.ylabel('Returns')
+plt.title('DQN on {}'.format(env_name))
+plt.show()
+
+frames_list = list(range(len(max_q_value_list)))
+plt.plot(frames_list, max_q_value_list)
+plt.axhline(0, c='orange', ls='--')
+plt.axhline(10, c='red', ls='--')
+plt.xlabel('Frames')
+plt.ylabel('Q value')
+plt.title('DQN on {}'.format(env_name))
+plt.show()                                   
+```
+
+<details>
+
+运行结果：
+
+<img width="640" height="480" alt="Image" src="https://github.com/user-attachments/assets/96d9c6e8-5112-4f1d-8d44-2cb5e413ccc0" />
+
+<img width="640" height="480" alt="Image" src="https://github.com/user-attachments/assets/08ef3aef-6c16-4607-a65a-897a13cc7af7" />
+
+```bash       
+(.venv) PS F:\BLOG\ROT-Blog\docs\Control\强化学习> python .\1.py
+Iteration 0:   0%|                                                                                                                     | 0/20 [00:00<?, ?it/s]F:\BLOG\ROT-Blog\docs\Control\强化学习\1.py:75: UserWarning: Creating a tensor from a list of numpy.ndarrays is extremely slow. Please consider converting the list to a single numpy.ndarray with numpy.array() before converting to a tensor. (Triggered internally at C:\actions-runner\_work\pytorch\pytorch\pytorch\torch\csrc\utils\tensor_new.cpp:256.)
+  state = torch.tensor([state], dtype=torch.float).to(self.device)
+Iteration 0: 100%|███████████████████████████████████████████████████████████████████████████████| 20/20 [00:04<00:00,  4.67it/s, episode=20, return=-713.544]
+Iteration 1: 100%|███████████████████████████████████████████████████████████████████████████████| 20/20 [00:05<00:00,  3.44it/s, episode=40, return=-211.438] 
+Iteration 2: 100%|███████████████████████████████████████████████████████████████████████████████| 20/20 [00:05<00:00,  3.48it/s, episode=60, return=-211.472] 
+Iteration 3: 100%|███████████████████████████████████████████████████████████████████████████████| 20/20 [00:05<00:00,  3.43it/s, episode=80, return=-155.384] 
+Iteration 4: 100%|██████████████████████████████████████████████████████████████████████████████| 20/20 [00:05<00:00,  3.51it/s, episode=100, return=-214.842] 
+Iteration 5: 100%|██████████████████████████████████████████████████████████████████████████████| 20/20 [00:05<00:00,  3.57it/s, episode=120, return=-250.969] 
+Iteration 6: 100%|██████████████████████████████████████████████████████████████████████████████| 20/20 [00:05<00:00,  3.64it/s, episode=140, return=-273.714] 
+Iteration 7: 100%|██████████████████████████████████████████████████████████████████████████████| 20/20 [00:05<00:00,  3.58it/s, episode=160, return=-215.325] 
+Iteration 8: 100%|██████████████████████████████████████████████████████████████████████████████| 20/20 [00:05<00:00,  3.60it/s, episode=180, return=-304.054] 
+Iteration 9: 100%|██████████████████████████████████████████████████████████████████████████████| 20/20 [00:05<00:00,  3.35it/s, episode=200, return=-262.117] 
+
+```
+</details>
+
+## 2. Dueling DQN
+
+Dueling DQN 是 DQN 的一种重要改进算法，它通过对传统 DQN 的网络结构进行巧妙调整，实现了性能的显著提升。该算法的核心思想是**将状态-动作价值函数 Q(s,a) 分解为状态价值函数 V(s) 和优势函数 A(s,a) 两个组成部分**，而不是将它们视为独立的函数。
+
+在强化学习中，我们定义**优势函数（Advantage Function）** 为：
+
+$$
+A(s, a) = Q(s, a) - V(s)
+$$
+
+其中：
+- $Q(s, a)$ 是状态-动作价值函数
+- $V(s)$ 是状态价值函数
+
+优势函数 $A(s, a)$ 表示在状态 $s$ 下选择动作 $a$ 相对于平均水平的优势程度。
+
+在同一个状态下，所有动作的优势值之和为 0：
+
+$$
+\sum_a A(s, a) = 0
+$$
+
+这一性质成立的原因在于：所有动作的动作价值的期望等于该状态的状态价值。
+
+在 Dueling DQN 中，Q 网络被重新建模为：
+
+$$
+Q(s, a; \theta, \alpha, \beta) = V(s; \theta, \beta) + A(s, a; \theta, \alpha)
+$$
+
+其中：
+- $V(s; \theta, \beta)$ 是状态价值函数
+- $A(s, a; \theta, \alpha)$ 是优势函数
+- $\theta$ 是共享的网络参数（通常为特征提取层）
+- $\alpha$ 和 $\beta$ 分别是优势函数和状态价值函数的专用参数
+
+![Image](https://github.com/user-attachments/assets/fd238923-317d-41b0-8619-a9ab9094aa26)
+
+输入状态经过共享的特征提取层后，分叉为两个独立的流——一个输出状态价值 $V(s)$，另一个输出各个动作的优势值 $A(s, a)$，最后通过聚合得到最终的 Q 值。
+
+原始分解公式存在建模不唯一性的问题：对于相同的 Q 值，可以通过对 $V(s)$ 加上任意常数 $C$，同时对所有 $A(s, a)$ 减去 $C$ 来得到：
+
+$$
+Q(s, a) = [V(s) + C] + [A(s, a) - C] = V(s) + A(s, a)
+$$
+
+这会导致训练过程不稳定。
+
+
+#### 方案一：强制最优动作优势为 0
+
+$$
+Q(s, a; \theta, \alpha, \beta) = V(s; \theta, \beta) + \left(A(s, a; \theta, \alpha) - \max_{a'} A(s, a'; \theta, \alpha)\right)
+$$
+
+此时，对于最优动作 $a^*$，有 $A(s, a^*) = \max_{a'} A(s, a')$，因此：
+
+$$
+Q(s, a^*) = V(s; \theta, \beta)
+$$
+
+这确保了 Q 值建模的唯一性。
+
+#### 方案二：使用平均操作（推荐）
+
+$$
+Q(s, a; \theta, \alpha, \beta) = V(s; \theta, \beta) + \left(A(s, a; \theta, \alpha) - \frac{1}{|\mathcal{A}|} \sum_{a'} A(s, a'; \theta, \alpha)\right)
+$$
+
+
+在驾驶游戏中的注意力可视化结果：
+- **无车场景**：智能体主要关注状态价值（道路状况、自身位置等），此时不同动作的差异不大
+- **有车场景**：智能体开始关注不同动作的优势值差异（超车、跟车等决策）
+
+
+![Image](https://github.com/user-attachments/assets/b6678180-3a48-410f-8b41-9b1e98f0c3e7)
+
+
+Dueling DQN 相比传统 DQN 具有显著优势，主要原因包括：
+
+1. **更高效的价值学习**：
+   - 每次更新时，状态价值函数 $V(s)$ 都会被更新
+   - 这种更新会影响所有动作的 Q 值，而传统 DQN 只更新特定动作的 Q 值
+   - 使得状态价值函数的学习更加频繁和准确
+
+2. **更好的泛化能力**：
+   - 通过共享的状态价值估计，智能体能够更好地理解状态的内在价值
+   - 在面对新状态时，能够基于状态价值做出更合理的决策
+
+3. **处理动作无关状态**：
+   - 对于与动作选择关联较弱的状态，智能体可以专注于状态价值的评估
+   - 减少了对不必要动作差异的关注，提高了学习效率
+
+### 2.1 验证Dueling DQN
+
+```python
+class VAnet(torch.nn.Module):
+    ''' 只有一层隐藏层的A网络和V网络 '''
+    def __init__(self, state_dim, hidden_dim, action_dim):
+        super(VAnet, self).__init__()
+        self.fc1 = torch.nn.Linear(state_dim, hidden_dim)  # 共享网络部分
+        self.fc_A = torch.nn.Linear(hidden_dim, action_dim)
+        self.fc_V = torch.nn.Linear(hidden_dim, 1)
+
+    def forward(self, x):
+        A = self.fc_A(F.relu(self.fc1(x)))
+        V = self.fc_V(F.relu(self.fc1(x)))
+        Q = V + A - A.mean(1).view(-1, 1)  # Q值由V值和A值计算得到
+        return Q
+
+
+class DQN:
+    ''' DQN算法,包括Double DQN和Dueling DQN '''
+    def __init__(self,
+                 state_dim,
+                 hidden_dim,
+                 action_dim,
+                 learning_rate,
+                 gamma,
+                 epsilon,
+                 target_update,
+                 device,
+                 dqn_type='VanillaDQN'):
+        self.action_dim = action_dim
+        if dqn_type == 'DuelingDQN':  # Dueling DQN采取不一样的网络框架
+            self.q_net = VAnet(state_dim, hidden_dim,
+                               self.action_dim).to(device)
+            self.target_q_net = VAnet(state_dim, hidden_dim,
+                                      self.action_dim).to(device)
+        else:
+            self.q_net = Qnet(state_dim, hidden_dim,
+                              self.action_dim).to(device)
+            self.target_q_net = Qnet(state_dim, hidden_dim,
+                                     self.action_dim).to(device)
+        self.optimizer = torch.optim.Adam(self.q_net.parameters(),
+                                          lr=learning_rate)
+        self.gamma = gamma
+        self.epsilon = epsilon
+        self.target_update = target_update
+        self.count = 0
+        self.dqn_type = dqn_type
+        self.device = device
+
+    def take_action(self, state):
+        if np.random.random() < self.epsilon:
+            action = np.random.randint(self.action_dim)
+        else:
+            state = torch.tensor([state], dtype=torch.float).to(self.device)
+            action = self.q_net(state).argmax().item()
+        return action
+
+    def max_q_value(self, state):
+        state = torch.tensor([state], dtype=torch.float).to(self.device)
+        return self.q_net(state).max().item()
+
+    def update(self, transition_dict):
+        states = torch.tensor(transition_dict['states'],
+                              dtype=torch.float).to(self.device)
+        actions = torch.tensor(transition_dict['actions']).view(-1, 1).to(
+            self.device)
+        rewards = torch.tensor(transition_dict['rewards'],
+                               dtype=torch.float).view(-1, 1).to(self.device)
+        next_states = torch.tensor(transition_dict['next_states'],
+                                   dtype=torch.float).to(self.device)
+        dones = torch.tensor(transition_dict['dones'],
+                             dtype=torch.float).view(-1, 1).to(self.device)
+
+        q_values = self.q_net(states).gather(1, actions)
+        if self.dqn_type == 'DoubleDQN':
+            max_action = self.q_net(next_states).max(1)[1].view(-1, 1)
+            max_next_q_values = self.target_q_net(next_states).gather(
+                1, max_action)
+        else:
+            max_next_q_values = self.target_q_net(next_states).max(1)[0].view(
+                -1, 1)
+        q_targets = rewards + self.gamma * max_next_q_values * (1 - dones)
+        dqn_loss = torch.mean(F.mse_loss(q_values, q_targets))
+        self.optimizer.zero_grad()
+        dqn_loss.backward()
+        self.optimizer.step()
+
+        if self.count % self.target_update == 0:
+            self.target_q_net.load_state_dict(self.q_net.state_dict())
+        self.count += 1
+
+
+random.seed(0)
+np.random.seed(0)
+env.seed(0)
+torch.manual_seed(0)
+replay_buffer = rl_utils.ReplayBuffer(buffer_size)
+agent = DQN(state_dim, hidden_dim, action_dim, lr, gamma, epsilon,
+            target_update, device, 'DuelingDQN')
+return_list, max_q_value_list = train_DQN(agent, env, num_episodes,
+                                          replay_buffer, minimal_size,
+                                          batch_size)
+
+episodes_list = list(range(len(return_list)))
+mv_return = rl_utils.moving_average(return_list, 5)
+plt.plot(episodes_list, mv_return)
+plt.xlabel('Episodes')
+plt.ylabel('Returns')
+plt.title('Dueling DQN on {}'.format(env_name))
+plt.show()
+
+frames_list = list(range(len(max_q_value_list)))
+plt.plot(frames_list, max_q_value_list)
+plt.axhline(0, c='orange', ls='--')
+plt.axhline(10, c='red', ls='--')
+plt.xlabel('Frames')
+plt.ylabel('Q value')
+plt.title('Dueling DQN on {}'.format(env_name))
+plt.show()
+```
+
+## 3. 对 Q 值过高估计的定量分析
+
+在深度 Q 网络（DQN）中，由于最大化操作和函数近似误差的共同作用，Q 值往往会被系统性高估。本节通过一个简化的理论模型，对 Q 值过高估计进行定量分析。
+
+为了定量分析 Q 值过高估计，我们做出以下简化假设：
+
+1. **状态价值均匀假设**：在状态 $s$ 下，所有动作的期望回报均无差异，即：
+   $$
+   Q^*(s, a) = V^*(s) \quad \forall a
+   $$
+   （注：这是为了分析而简化的情形，实际环境中不同动作的期望回报通常存在差异）
+
+2. **误差分布假设**：神经网络对 Q 值的估算误差 $\epsilon_a$ 服从 $[-c, c]$ 之间的均匀独立同分布，即：
+   $$
+   \epsilon_a \sim U[-c, c]
+   $$
+
+3. **动作空间大小**：假设动作空间的大小为 $m$。
+
+
+在实际估算中，Q 值可表示为：
+$$
+Q(s, a) = Q^*(s, a) + \epsilon_a = V^*(s) + \epsilon_a
+$$
+
+我们关注的是 $\max_a Q(s, a)$ 的期望值：
+$$
+\mathbb{E}[\max_a Q(s, a)] = \mathbb{E}[V^*(s) + \max_a \epsilon_a] = V^*(s) + \mathbb{E}[\max_a \epsilon_a]
+$$
+
+
+由于 $\epsilon_a$ 是独立同分布的均匀随机变量，令 $Z = \max_a \epsilon_a$，其累积分布函数（CDF）为：
+$$
+F_Z(x) = P(Z \leq x) = [F_{\epsilon}(x)]^m
+$$
+
+其中 $F_{\epsilon}(x)$ 是单个 $\epsilon$ 的 CDF。对于均匀分布 $U[-c, c]$，有：
+$$
+F_{\epsilon}(x) = 
+\begin{cases} 
+0 & x < -c \\
+\frac{x + c}{2c} & -c \leq x \leq c \\
+1 & x > c 
+\end{cases}
+$$
+
+因此：
+$$
+F_Z(x) = \left( \frac{x + c}{2c} \right)^m \quad \text{for} \quad -c \leq x \leq c
+$$
+
+概率密度函数（PDF）为：
+$$
+f_Z(x) = \frac{d}{dx} F_Z(x) = m \left( \frac{x + c}{2c} \right)^{m-1} \cdot \frac{1}{2c}
+$$
+
+期望值可通过积分计算：
+$$
+\mathbb{E}[Z] = \int_{-c}^{c} x f_Z(x) dx = \int_{-c}^{c} x \cdot m \left( \frac{x + c}{2c} \right)^{m-1} \cdot \frac{1}{2c} dx
+$$
+
+进行变量代换，令 $u = \frac{x + c}{2c}$，则 $x = 2cu - c$，$dx = 2c du$，积分限变为 $u \in [0, 1]$：
+
+$$
+\begin{aligned}
+\mathbb{E}[Z] &= \int_0^1 (2cu - c) \cdot m u^{m-1} \cdot \frac{1}{2c} \cdot 2c du \\
+&= m \int_0^1 (2cu - c) u^{m-1} du \\
+&= mc \int_0^1 (2u - 1) u^{m-1} du \\
+&= mc \left( 2\int_0^1 u^m du - \int_0^1 u^{m-1} du \right) \\
+&= mc \left( \frac{2}{m+1} - \frac{1}{m} \right) \\
+&= mc \cdot \frac{2m - (m+1)}{m(m+1)} \\
+&= c \cdot \frac{m-1}{m+1}
+\end{aligned}
+$$
+
+因此，我们得到：
+$$
+\mathbb{E}[\max_a Q(s, a)] = V^*(s) + c \cdot \frac{m-1}{m+1}
+$$
+
+从上述结果可以看出：
+
+- **过高估计量**：Q 值的期望被高估了 $c \cdot \frac{m-1}{m+1}$。
+- **动作空间的影响**：当动作空间大小 $m$ 增加时，过高估计量 $\frac{m-1}{m+1}$ 趋近于 $c$，表明动作空间越大，Q 值过高估计越严重。
+- **误差范围的影响**：估算误差范围 $c$ 越大，过高估计也越严重。
+
+虽然这一分析是在简化假设下进行的，但它正确揭示了 Q 值过高估计的关键性质：在动作选择数更多的环境中，Q 值的过高估计问题会更加显著。这解释了为什么在大型动作空间的环境中，DQN 算法可能表现不佳，也为改进算法（如 Double DQN）提供了理论依据。
+
+
+
+</WordCount>
+

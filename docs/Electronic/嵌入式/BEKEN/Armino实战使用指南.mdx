@@ -1,0 +1,94 @@
+import WordCount from '../../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+## 1. Armino软件架构
+
+Armino软件分为中间件层，组件层和应用层。
+
+Armino抽象了软件对硬件平台的耦合依赖，实现软件平台货架化。 通过这种货架化设计和丰富的SDK API，使SDK开发者能更高效的进行设计和开发。
+
+![image](https://github.com/user-attachments/assets/6614866f-9cd8-4f13-951b-cee45717f81e)
+
+我们实战用的板子是Arm v8，不涉及RiscV。
+
+### 1.1 硬件层
+
+硬件层是BEKEN解决方案的硬件。
+
+### 1.2 中间层
+
+中间层说白了就是操控底层硬件，同时和上层通联的层级，它是针对底层硬件及上层组件的一类抽象层。它包含：arch（芯片架构的相关功能）、soc（芯片相关特殊处理及相关配置）、driver（驱动层，包含各种外设驱动，如I2C、GPIO、UART等）、compal（组件适配层，为了适配第三方组件）、boards（板级配置文件）。
+
+
+![image](https://github.com/user-attachments/assets/c1a1ca74-a983-4b6b-ab58-e34e888be491)
+
+
+### 1.3 组件层
+
+我们对BEKEN应用开发的主要层级。通过在middleware层配置defconfig，开关相关的组件服务。
+
+### 1.4 应用层
+
+组织在projects目录下，最后一级CmakeList目录，为一个完整的解决方案的构建入口。它承载着不同项目之前的差异化，不同产品解决方案的配置集合。
+
+
+
+**项目** - 特指 armino/projects/ 下一个目录或者子目录，其中包含了构建可执行应用程序所需的全部文件和配置，以及其他支持型文件，例如分区表、数据/文件系统分区和引导程序。
+
+**项目配置** - 特指构建过程中在构建目录下生成的 sdkconfig.h 文件。
+
+**应用程序** - 是由 ARMINO 构建得到的可执行文件。一个项目通常会构建两个应用程序：项目应用程序（可执行的主文件，即用户自定义的固件）和引导程序（启动并初始化项目应用程序）。
+
+**组件** - 是模块化且独立的代码，会被编译成静态库（.a 文件）并链接到应用程序。
+
+**目标** - 特指运行构建后应用程序的硬件设备，如 bk7236, bk7258 等。
+
+## 2. 构建一个项目
+
+```bash
+armino/
+    - components/
+    - include/
+    - middleware/
+        - arch/
+            - bk7258/
+                - bk7258.defconfig
+                - ...
+    - projects/
+        - my_project/
+            - config/
+                - bk7258/config
+                - bk7236/config
+            - CMakeLists.txt
+            - Kconfig.projbuild
+            - main/
+                - main.c
+                - Kconfig
+                - CMakeLists.txt
+            - components/
+                - c1/
+                    - c1.c
+                    - Kconfig
+                    - CMakeLists.txt
+                - c2/
+```
+
+在 armino 根目录下运行``make``， 最常用的 make 命令如下：
+
+``make bkxxx`` - 构建目标 bkxxx，项目为默认项目 armino/projects/app。
+
+``make bkxxx PROJECT=a/b`` - 构建 bkxxx，项目为 armino/projects/a/b
+
+``make all`` - 构建所有目标
+
+``make cleanbkxxx`` - 清理目标 bkxxx
+
+``make clean`` - 清理所有目标
+
+### 2.1 构建一个最小项目
+
+
+
+
+</WordCount>

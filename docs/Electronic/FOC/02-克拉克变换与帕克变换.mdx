@@ -1,0 +1,234 @@
+
+import WordCount from '../../../src/components/WordCount/WordCount.jsx';
+import Mermaid from '@theme/Mermaid';
+
+<WordCount>
+
+## 1. 什么是克拉克变换
+
+MOS管一旦启动，就要至少控制两相电流，这很麻烦吧！有没有什么办法可以只控制一相电流？
+
+有的兄弟，有的。好在三相电压是有几何关系的。我们可以把三相电压变换成两相电压。这就是克拉克变换。
+
+克拉克变换是一个降维的过程。把三相电压转换到坐标系上面去，变成两维矢量。这里用到的变换工具就是三角函数。
+
+<img width="436" height="176" alt="Image" src="https://github.com/user-attachments/assets/7c9903ab-91d7-4645-b520-49af275abc70" />
+
+
+相位差有120°，那么这三相电流可以抽象为相隔120°的矢量，用矢量表示后进行降维，投影到坐标轴上表示出来就可以表示为$\alpha$和$\beta$轴上的数值变化。
+
+## 2. 克拉克变换推导
+
+这是一个非常简单的推导过程。
+
+
+### 2.1 投影
+
+<img width="218" height="180" alt="Image" src="https://github.com/user-attachments/assets/4717518b-d74c-400f-9230-51bec65f77de" />
+
+对α-β坐标系中α轴，有：
+
+$$
+I_{\alpha} = i_a + (-sin30°)i_b + (-cos60°)i_c
+$$
+
+即：
+
+$$
+I_{\alpha} = i_a-\frac{1}{2}i_b -\frac{1}{2}i_c
+$$
+
+
+对α-β坐标系中β轴，有：
+
+$$
+I_{\beta} = cos30°i_b - cos30°i_c
+$$
+
+即：
+
+$$
+I_{\beta} = \frac{\sqrt{3}}{2}i_b - \frac{\sqrt{3}}{2}i_c
+$$
+
+转换为矩阵形式：
+
+$$
+\begin{bmatrix}
+I_{\alpha} \\
+I_{\beta}
+\end{bmatrix} = 
+\begin{bmatrix}
+1 & -\frac{1}{2} & -\frac{1}{2} \\
+0 & \frac{\sqrt{3}}{2} & - -\frac{\sqrt{3}}{2}
+\end{bmatrix}
+\begin{bmatrix}
+i_a \\
+i_b \\
+i_c
+\end{bmatrix}
+$$
+
+### 2.2 等幅值和等功率处理
+
+真实的情况比这个要复杂一丢丢，根据基尔霍夫电流定律，对三相电流（星形接法）中心点，有：
+
+$$
+i_a+i_b+i_c=0
+$$
+
+若设$i_a$为-1，有$i_b=i_c=-\frac{1}{2}$ ，代入到直接投影式子中，最终得到矩阵：$\begin{bmatrix}
+-\frac{3}{2} \\
+0
+\end{bmatrix}$
+
+所以，从A相输入1A电流，实际上还是$\frac{3}{2}$。为了把它变回去，我们需要乘上$\frac{2}{3}$做一次等幅值变换。最终得到矩阵：
+$\begin{bmatrix}
+-1 \\
+0
+\end{bmatrix}$
+
+基于等幅值变换，我们就能够得到α、β相位与ia,ib​,ic​的关系，已知等幅值变换式：
+
+$$
+\begin{bmatrix}
+I_{\alpha} \\
+I_{\beta}
+\end{bmatrix} = \frac{2}{3}
+\begin{bmatrix}
+1 & -\frac{1}{2} & -\frac{1}{2} \\
+0 & \frac{\sqrt{3}}{2} & - -\frac{\sqrt{3}}{2}
+\end{bmatrix}
+\begin{bmatrix}
+i_a \\
+i_b \\
+i_c
+\end{bmatrix}
+$$
+
+移项得：
+
+$$
+I_a = \frac{2}{3}(i_a - \frac{1}{2}i_b - \frac{1}{2}i_c)
+$$
+
+$$
+I_a = \frac{2}{3}(i_a - \frac{1}{2}(i_b+i_c))
+$$
+
+根据：
+
+$$
+i_a+i_b+i_c=0
+$$
+
+最终可得：
+
+$$
+I_{\alpha} = i_a
+$$
+
+进一步可得：
+
+$$
+I_\beta = \frac{2}{3}\frac{\sqrt{3}}{2}i_b - \frac{2}{3}\frac{\sqrt{3}}{2}i_c
+= \frac{\sqrt{3}}{3}i_b - \frac{\sqrt{3}}{3}i_c
+$$
+
+根据：
+
+$$
+i_a+i_b+i_c=0
+$$
+
+最终可得：
+
+$$
+I_\beta = \frac{1}{\sqrt{3}}(2*i_b+i_a)
+$$
+
+这样就省去了一路电流传感器。
+
+## 3. 克拉克逆变换
+
+我们可以升维获得三相电流。
+
+具体可以自己推导一下。这里只说结果：
+
+$$
+i_a = I_a 
+$$
+
+$$
+i_b = \frac{\sqrt{3}I_\beta - I_{\alpha}}{2}
+$$
+
+$$
+i_c = \frac{-\sqrt{3}I_\beta - I_{\alpha}}{2}
+$$
+
+## 4. 帕克变换
+
+现在我们已经掌握了定子上电流的变换，但是距离能够控制电机旋转还缺少一个完整的模型。
+
+我们需要一个能够求得各种旋转情况下的Iα​和Iβ的方法。什么意思呢？发力的肯定是转子，那么我们需要的力矩肯定是转子的力矩，所以就需要把转子的力矩和电流联系起来。力矩又和转角有关系，所以这就是切入口。我们需要把电流和转子的转角联系起来。
+
+这样一来就有了帕克变换。事实上帕克变换的思想也非常简单巧妙，你不好表述转动，那么我再多加一个坐标系，这个坐标系和转子固联，称之为$I_q - I_d$坐标系，将两个坐标系放在一起看，
+
+<img width="126" height="120" alt="Image" src="https://github.com/user-attachments/assets/7f2eb302-69af-4518-9142-9071c7a8da1b" />
+
+由于$I_q - I_d$坐标系随转子转动，所以$I_q - I_d$坐标系因转动而造成的与$Iα−Iβ$​坐标系的差角$θ$称为电角度。
+
+得矩阵：
+
+$$
+\begin{bmatrix}
+i_{d} \\
+i_q
+\end{bmatrix} =
+\begin{bmatrix}
+cos\theta & sin\theta \\
+-sin\theta & cos\theta
+\end{bmatrix}
+\begin{bmatrix}
+i_\alpha \\
+i_\beta
+\end{bmatrix}
+$$
+
+求逆后，Iα​和Iβ:
+
+$$
+\begin{bmatrix}
+i_\alpha \\
+i_\beta
+\end{bmatrix}
+ =
+\begin{bmatrix}
+cos\theta & sin\theta \\
+-sin\theta & cos\theta
+\end{bmatrix}^{-1}
+\begin{bmatrix}
+i_{d} \\
+i_q
+\end{bmatrix}
+$$
+
+写成等式：
+
+$$
+i_\alpha = cos\theta i_{d} - sin\theta i_q
+i_\beta = sin\theta i_{d} + cos\theta i_q
+$$
+
+电角度$\theta$可以由编码器读出。如果你想要把$i_q$和$i_d$合成为一个矢量，也是可以的，这样就是一个旋转的矢量。进而分解之后得到$i_q$和$i_d$。有了这两个分量又可以得到$I_\alpha$和$I_\beta$。然后升维之后也可以得到$i_a$和$i_b$和$i_c$。这样就是一个完整的正逆变换过程。
+
+PS: 对于电压，变换同样适用，它与电流的不同之处说白了只是乘上相电阻的不同而已。
+
+
+## References
+
+[1]. DengFOC.灯哥教你写FOC算法系列：无刷电机的FOC软件控制原理\[EB/OL\]\(2023-06-22\)\[2025-09-10\].https://dengfoc.com/#/dengfoc/%E7%81%AF%E5%93%A5%E6%89%8B%E6%8A%8A%E6%89%8B%E6%95%99%E4%BD%A0%E5%86%99FOC%E7%AE%97%E6%B3%95/3.3%E5%B8%95%E5%85%8B%E5%8F%98%E6%8D%A2
+
+
+</WordCount>

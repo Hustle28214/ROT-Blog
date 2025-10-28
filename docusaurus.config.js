@@ -9,7 +9,7 @@ import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 
 
-const announcementBarContent = `2025新年快乐🎉`
+//const announcementBarContent = `2025新年快乐🎉`
 
 
 /** @type {import('@docusaurus/types').Config} */
@@ -18,9 +18,11 @@ const config = {
   tagline: '江湖夜雨十年灯',
   favicon: 'img/leyan_Logo.ico',
   
+
+  
   
   // Set the production url of your site here
-  url: 'https://rotleyan.site',
+  url: 'https://rot-blog.vercel.app',
   // Set the /<baseUrl>/ pathname under which your site is served
   // For GitHub pages deployment, it is often '/<projectName>/'
   baseUrl: '/',
@@ -30,7 +32,7 @@ const config = {
   organizationName: 'facebook', // Usually your GitHub org/user name.
   projectName: 'docusaurus', // Usually your repo name.
 
-  onBrokenLinks: 'throw',
+  onBrokenLinks: 'warn',
   onBrokenMarkdownLinks: 'warn',
 
   // Even if you don't use internationalization, you can use this field to set
@@ -115,26 +117,27 @@ const config = {
       crossorigin: 'anonymous',
     },
   ],
+  scripts: [
+    {
+      src: '/js/coze-config.js',
+      async: false,
+    },
+  ],
   themeConfig:
     /** @type {import('@docusaurus/preset-classic').ThemeConfig} */
     ({
       
-      imageZoom: {
-        // CSS selector to apply the plugin to, defaults to '.markdown img'
-        selector: '.markdown :not(em) > img',
-        // Optional medium-zoom options
-        // see: https://www.npmjs.com/package/medium-zoom#options
-        options: {
-          margin: 24,
-          background: {
-            light:'#FFFFFF',
-            dark: '#222222'
-          },
-          scrollOffset: 0,
-          //container: '#zoom-container',
-          //template: '#zoom-template',
+      zooming: {
+        selector: '.markdown img',
+        delay: 500,
+        background: {
+          light: 'rgba(101,108,133,0.8)',
+          dark: 'rgba(9,10,17,0.8)'
         },
-      },// Set z-index:999 in custom.css to avoid conflict with TOC
+        options: {
+          // See the docs of zooming for all available options: https://github.com/francoischalifour/medium-zoom#usage
+        }
+      },
 
     metadata: [
       {name: 'keywords', content: 'robot, computer, github, blog'},
@@ -154,11 +157,11 @@ const config = {
         disableSwitch: false,
         respectPrefersColorScheme: true,
       },
-      announcementBar: {
-        id: 'announcementBar-1',
-        backgroundColor: '#B3E5FC',
-        content: announcementBarContent,
-      },
+      // announcementBar: {
+      //   id: 'announcementBar-1',
+      //   backgroundColor: '#B3E5FC',
+      //   content: announcementBarContent,
+      // },
       // Replace with your project's social card
       image: 'img/docusaurus-social-card.jpg',
       navbar: {
@@ -187,11 +190,15 @@ const config = {
               
                 {to: '/todolist', label: '📂待办',},
                 {to: '/tomato', label: '🍅番茄',},
-            
+              { to: '/Skill', label: '🔎技能',},
             ],
           },
           
-          {to: '/link', label: '🏄冲浪', position: 'right'},        
+          {to: '/link', label: '🏄冲浪', position: 'right'},
+
+          
+          
+          { to: '/projects', label: '👾项目', position: 'right' },
           {
             to: '/intro', label: '✨关于', position: 'right'
           },
@@ -204,7 +211,7 @@ const config = {
           },  
 
           {
-            href: 'https://www.rotleyan.site/blog/rss.xml',
+            to: '/blog/rss.xml',
             label: 'RSS',
             position: 'right',
           },

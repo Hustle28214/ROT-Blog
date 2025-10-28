@@ -1,0 +1,163 @@
+import WordCount from '../../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+## 1. 引子
+
+你可能会希望一台电脑上能够同时运行多个操作系统，例如 Windows、macOS 和 Linux。这个技术的难点在于：
+
+1. 不同操作系统对硬件的驱动模型和兼容性要求不同。例如，macOS 通常只官方支持 Apple 自家的硬件（基于 Apple Silicon 或特定 Intel 架构），在非 Apple 硬件上运行 macOS（即“Hackintosh”）需要大量定制驱动和内核补丁，且稳定性、安全性难以保证。
+2. 多系统共存需要一个可靠的引导加载程序（如 GRUB、rEFInd 或 Windows Boot Manager）来选择启动哪个系统。
+3. 各操作系统使用不同的默认文件系统（如 NTFS、APFS、ext4），彼此之间可能无法原生读写对方的分区。
+4. 如果通过虚拟机（如 VMware、VirtualBox、Parallels）同时运行多个系统，需要合理分配 CPU、内存、GPU 等资源。
+5. 老生常谈的安全问题等。
+6. 在多个系统间保持用户配置、软件环境和数据一致性（如开发环境、文档、密钥等）需要额外的同步机制。
+
+所以，通过双启动（dual-boot）或多启动（multi-boot）是可以解决这些问题的。除此之外，还有一种更灵活的方式——使用虚拟化技术（virtualization）来运行多个操作系统实例。
+
+## 2. 什么是虚拟化技术？
+
+虚拟化技术是一种将物理计算机的实体资源（如 CPU、内存、存储和网络）抽象成虚拟资源的技术。通过虚拟化，一台物理计算机可以同时运行多个操作系统实例（称为虚拟机），每个实例都有自己的独立环境和资源。
+
+虚拟化本质是指资源的抽象化和隔离化。通过在物理硬件和操作系统之间引入一个抽象层（通常称为“Hypervisor”或“虚拟机监控器”），虚拟化技术能够将物理资源划分为多个独立的虚拟资源池，每个虚拟机都可以独立运行自己的操作系统和应用程序。
+
+虚拟化技术是云计算的基石。一般所指的虚拟化资源包括计算(CPU+内存)，网络，存储。
+
+
+## 3. Hypervisor（虚拟机监控器）
+
+
+### 3.1 资源隔离
+
+1. 空间分割：
+
+- 内存隔离：为每个虚拟机分配独立物理内存区域（或虚拟地址空间）
+- CPU 隔离：时间片轮转调度 vCPU（如 Xen 的 Credit Scheduler）
+
+
+2. 硬件访问控制：
+
+
+- 设备直通（VT-d/SRIOV）：将物理设备独占分配给特定虚拟机
+- 模拟设备（virtio）：软件模拟通用设备（如虚拟网卡）
+
+### 3.2 敏感指令捕获
+
+面对如 x86 架构中存在的非特权敏感指令问题（如 POPF 指令在用户态执行却能影响全局标志位），传统虚拟化模型难以仅靠硬件陷入机制实现完全控制。
+
+所以我们需要捕获并处理这些非特权敏感指令，确保每个虚拟机的执行环境独立、互不干扰。
+
+关键挑战：
+
+1. x86 等架构存在非特权敏感指令（如 POPF），在用户态执行时不会触发异常
+2. 若不拦截，虚拟机可能绕过 Hypervisor 直接操控硬件
+
+解决方案：
+
+1. 动态二进制翻译：重写敏感指令为陷阱调用
+2. 半虚拟化（Xen）：修改 Guest OS 内核，主动调用 Hypercall
+
+### 3.3 内存虚拟化
+
+内存虚拟化通过将物理内存抽象为逻辑内存，为应用程序提供了一个统一的、虚拟的内存环境。
+
+影子页表问题：
+1. 纯软件方案需为每个虚拟机维护 Guest VA→Host PA 的映射表
+2. 每次页表更新需 Hypervisor 介入，性能损失达 30-70%
+
+硬件加速方案：
+1. Intel EPT / AMD NPT：硬件自动完成 GVA→GPA→HPA 两级转换
+2. TLB 缓存复合映射，降低遍历开销
+
+这里的 GVA 是 Guest Virtual Address，（客户机虚拟地址）GPA 是 Guest Physical Address（客户机物理地址），HPA 是 Host Physical Address（主机物理地址）。
+
+在非虚拟化系统中，只需一级页表（VA → PA）。但在虚拟化中，需要 两级映射： 
+
+1. 第一级：GVA → GPA（由客户机页表定义）
+2. 第二级：GPA → HPA（由 Hypervisor 管理）
+     
+MMU（内存管理单元）硬件只能处理一级页表。如何实现两级映射？
+
+这个问题催生了影子页表的解决方案。Hypervisor维护一张影子页表，直接映射 GVA → HPA。每当客户机修改页表时，Hypervisor 都需更新影子页表，带来显著性能开销。
+
+它是这样解决问题的：
+
+1. 客户机以为自己在更新自己的页表（GVA ↔ GPA）；
+2. 但实际上，Hypervisor 拦截所有对页表寄存器（如 CR3）的写操作；
+3. Hypervisor 根据客户机页表内容，动态合成一张 GVA → HPA 的影子页表；
+4. CPU 的 MMU 被设置为使用这张影子页表。
+
+但是缺点也很明显：
+
+1. 每当客户机操作系统修改页表（如进程切换、内存分配），都会触发页表写保护异常；
+2. CPU 陷入 Hypervisor（发生 VM-Exit）；
+3. Hypervisor 必须：
+- 解析客户机页表变更；
+- 更新影子页表；
+- 刷新 TLB；
+- 执行 VM-Enter 返回客户机。
+        
+4. 这个过程开销极大，尤其在内存密集型应用（如数据库、Java 应用）中，页表更新频繁。
+     
+为解决上述问题，Intel（2008 年 Nehalem 架构）和 AMD（2007 年 Barcelona）分别引入： 
+
+- Intel：Extended Page Tables（EPT）
+- AMD：Nested Page Tables（NPT），也称 Rapid Virtualization Indexing（RVI）
+
+处理器 MMU 被扩展，支持两级页表遍历： 
+
+1. 第一级：使用客户机页表（由客户机控制），将 GVA → GPA；
+2. 第二级：使用 Hypervisor 提供的 EPT/NPT 页表，将 GPA → HPA；
+3. 整个过程由硬件自动完成，无需 Hypervisor 介入！
+
+硬件这样知道两级页表：
+
+1. Hypervisor 在 VMCS（Virtual-Machine Control Structure）中设置 EPTP（EPT Pointer） 寄存器；
+2. CPU 在地址翻译时，自动先查客户机页表，再查 EPT 页表；
+3. 最终得到 HPA，完成内存访问。
+
+传统 TLB 只缓存 VA → PA 映射。在虚拟化中，不同虚拟机可能有相同的 GVA，但对应不同 HPA。 
+
+EPT/NPT 引入： 
+
+1. VPID（Virtual Processor ID）（Intel）或 ASID（Address Space ID）（AMD）；
+2. TLB 条目被打上 VM 标签，避免跨 VM 的地址混淆；
+3. 支持缓存 GVA → HPA 的完整映射，减少重复遍历。
+
+### 3.4 Hypervisor 架构
+
+虚拟化技术根据 Hypervisor（虚拟机监控器）与硬件和操作系统的相对位置，主要分为两大类：Type-1（裸金属型）和 Type-2（托管型）Hypervisor。这两类架构在性能、安全性、部署场景和使用方式上各有侧重，适用于不同的应用需求。
+
+Type-1 Hypervisor：直接运行在物理硬件上，作为最底层的系统软件负责管理硬件资源并调度多个虚拟机。
+
+- 高性能：直接访问硬件，资源调度无中间层损耗
+- 高隔离性：Hypervisor 作为安全层，阻止虚拟机间攻击
+- 实时性：满足工业控制/电信级低延迟需求(\<10μs)
+
+
+Type-2 Hypervisor：运行在宿主操作系统之上，作为应用程序管理虚拟机。它依赖宿主操作系统提供的驱动程序、内存管理和进程调度服务来访问底层硬件资源。
+
+这里要提到一个经典的实现：[NEMU](https://github.com/intel/nemu)
+
+
+1. 易用性：无需专用硬件，安装即用
+2. 灵活性：依赖 Host OS 的驱动/服务（如网络共享）
+3. 开发友好：快速创建测试环境（如 Android Emulator）
+
+当然，Type2的隔离强度要弱一些，可能会受到宿主机的漏洞的影响。
+
+应用场景上，Type-2 Hypervisor 主要用于开发、测试和调试虚拟机环境，而 Type-1 Hypervisor 则更适用于生产环境。从云端数据中心到边缘计算，Type-1 Hypervisor 提供了高效、安全的虚拟化基础设施。而 Type-2 Hypervisor 则为开发者和测试人员提供了便捷的虚拟化工具，支持多样化的应用需求。
+
+## 4. QEMU 与 KVM
+
+在 Linux 上，KVM（Kernel-based Virtual Machine）是集成在 Linux 内核中的虚拟化模块，它利用 Intel VT 或 AMD-V 等现代 CPU 的硬件虚拟化扩展，将 Linux 内核转变为一个虚拟机监视器（Hypervisor），直接让客户机操作系统在近乎原生性能下运行，而 QEMU 则负责模拟各种 I/O 设备（如网卡、磁盘控制器）和提供管理接口。
+
+在 KVM 模式下，QEMU 利用 KVM 模块来加速 CPU 执行，形成“QEMU-KVM”组合。这种结合既获得了硬件加速的高性能，又保留了 QEMU 设备模拟的灵活性，是 Linux 平台上主流的虚拟化解决方案。
+
+## References
+
+[1]. Gevico Tech Open Community.Learning QEMU Docs \[EB/OL\]\(2025-10-16\)\[2025-10-17\].https://gevico.github.io/learning-qemu-docs/ch1/sec2/hypervisor/
+
+
+
+</WordCount>

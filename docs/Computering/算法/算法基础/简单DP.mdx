@@ -1,0 +1,209 @@
+
+
+import WordCount from '../../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+
+动态规划（Dynamic Programming）是一种解决问题的方法。它把原先数据量庞大的问题分解为简单的子问题，从而求解整个问题。
+
+动态规划的适用范围为有重叠的子问题和最优子解的问题。DP更多需要我们寻找最优子结构。对答案可穷举得出、子问题重叠的问题用动态规划比用暴力递归来的更快捷方便。
+
+这类问题中，蛙跳便是一个很好的问例：
+需要n个石头过河，每次可跳1或2个石头，有多少种方法过河？
+n为正整数.
+
+自顶向下解。f(n)=f(n-1)+f(n-2).这也称作问题的状态转移方程。
+最后一次跳可跳1或2块石头，那么出现跳n-1块，跳n-2块两种解法和f(n-1),f(n-2).可以看出这是一个斐波那契数列，更可以通过穷举分析找到数列的首项和次项。它们出现在n==1,n==2。由此可推知，f(n)的解可直接由f(1)和f(2)表示，最优子结构为f(n-1)，f(n-2)说明可以把问题直接缩小为求出边界，自底向上遍历.
+
+同样做法也分为几类，暴力递归我们固然能够抛弃就抛弃。
+上原题：
+
+> 70. 爬楼梯
+> 假设你正在爬楼梯。需要 n 阶你才能到达楼顶。
+
+> 每次你可以爬 1 或 2 个台阶。你有多少种不同的方法可以爬到楼顶呢？
+
+```cpp
+#include<iostream>
+#include<cstring>
+#include<cstdio>
+#include<string>
+#include<cmath>
+#include<vector>
+#include<set>
+#include<algorithm>
+typedef long long ll;
+const int MAXN = 1e5 + 100;
+using namespace std;
+
+
+int main()
+{
+    int n,sum=0;
+    
+
+    cin >> n;
+    if (n == 1)
+        sum = 1;
+    else if (n == 2)
+        sum = 2;
+    else if (n == 3)
+        sum = 3;
+    else
+    {
+        //一层层自底向上遍历
+        int tempn1 = 3, tempn2 = 2,temp;
+        int k = n - 3;
+        while (k--) 
+        {
+            temp = tempn1;
+            tempn1 = tempn1 + tempn2;
+            tempn2 = temp;
+        }
+        sum = tempn1;
+    }
+    cout << sum << endl;
+    return 0;
+}
+```
+直接while求解.时间复杂度O（1）.
+
+还有一种做法叫做记忆化搜索，时间复杂度O（n)：
+
+```cpp
+#include<iostream>
+#include<cstring>
+#include<cstdio>
+#include<string>
+#include<cmath>
+#include<vector>
+#include<set>
+#include<algorithm>
+typedef long long ll;
+const int MAXN = 1e5 + 100;
+using namespace std;
+
+int a[MAXN];//这里可改成vector应对高值n，数值没有指定上限我随便给的.
+
+int main()
+{
+    int n;
+    cin >> n;
+    int k = n - 1;
+    //从底向上放进记忆数组中。
+    a[0] = 1;
+    a[1] = 2;
+    int temp = 2;
+    while (k--)
+    {
+        a[temp] = a[temp - 1] + a[temp - 2];
+        temp++;
+    }
+    cout << a[n - 1] << endl;
+    return 0;
+}
+```
+
+同样数组可以换成Hashmap，也很好.
+
+接下来我们探讨一些其他常见DP问题，那么先来一个找出最长递增子序列.
+
+DP问题的思路大致可分为以下几步：
+审题————从小处枚举子问题解————定边界————找到最优子结构————写DP方程.
+
+> 输入：nums = [10,9,2,5,3,7,101,18]
+> 输出：4
+> 解释：最长递增子序列是 [2,3,7,101]，因此长度为 4 。
+
+那么我们就来自底向上枚举：
+
+|数组长度|元素（从左往右增加）|最长递增子序列|
+|:--:|:--:|:--:|
+|1|10|1|
+|2|10 9|1|
+|3|10 9 2|1|
+|4|10 9 2 5|2|
+|10|rt|4|
+
+穷举发现当数组只有一个元素时最长递增子序列长度为1，当下一个元素大于上一个元素的值时最长递增子序列长度更新.
+这意味着我们只需要存储最长递增子序列并设初值为1，if判定下一个元素是大于上一个元素时自加序列长度。一个for就可以搞定，时间复杂度为O(N)。（不上代码了，很简单）
+
+再来点进阶的，打家劫舍问题：
+
+做这种问题我最大的问题就是担心有无穷无尽的可能性。其实不必，我们来看原题：
+
+> 198. 打家劫舍
+> 你是一个专业的小偷，计划偷窃沿街的房屋。每间房内都藏有一定的现金，影响你偷窃的唯一制约因素就是相邻的房屋装有相互连通的防盗系统，如果两间相邻的房屋在同一晚上被小偷闯入，系统会自动报警。
+>
+> 给定一个代表每个房屋存放金额的非负整数数组，计算不触动警报装置的情况下，一夜之内能够偷窃到的最高金额。
+> 
+
+> 示例 1：
+
+> 输入：[1,2,3,1]
+输出：4
+解释：偷窃 1 号房屋 (金额 = 1) ，然后偷窃 3 号房屋 (金额 = 3)。
+     偷窃到的最高金额 = 1 + 3 = 4 。
+> 示例 2：
+
+> 输入：[2,7,9,3,1]
+输出：12
+解释：偷窃 1 号房屋 (金额 = 2), 偷窃 3 号房屋 (金额 = 9)，接着偷窃 5 号房屋 (金额 = 1)。
+     偷窃到的最高金额 = 2 + 9 + 1 = 12 。
+
+还是先审题，枚举，边界一眼数组末尾2个元素。解题关键在于分析小偷有多少条路可走，假设偷到第i号房，他之后可以选择第i+2号房或者第i+3号房。但是他选择i+3的前提是i+2和i+4权值大于i+3。
+
+而且，其实他不可能选i+4开始偷，因为就算i+4权值无限大，小偷还可以贪走i+2。所以实际上只有两个最优子结构。
+ 
+那我们反过来想一想，小偷要偷到第i号房，从他是第0号房开始算，那他是不是可以选2或者3开始偷，然后到了2或者3再想偷哪间，往后以此类推。这样我们就可以写dp方程了。这一次只是有点不一样，我们需要用max函数获取两个子结构的最大值。别忘了数组长度为1的情况就行。
+
+```cpp
+#include<iostream>
+#include<cstring>
+#include<cstdio>
+#include<string>
+#include<cmath>
+#include<vector>
+#include<set>
+#include<algorithm>
+typedef long long ll;
+const int MAXN = 1e5 + 100;
+using namespace std;
+
+vector <int> a;
+int dp[100];
+int main()
+{
+    int n,sum=0;
+    while (1)
+    {
+        cin >> n;
+        a.push_back(n);
+        if (cin.get() == '\n')
+            break;
+    }
+    int len = a.size();
+    if (len == 4)
+        a.push_back(0);
+    if (len == 1)
+        sum += a[0];
+    else
+    {
+        int d;
+        sum += a[0];
+        
+        for (int i = 4; i < a.size(); ++i)
+        {
+            d = max(a[i-1], a[i - 2] + a[i]);
+            
+            sum += d;
+        }
+    }
+    cout << sum << endl;
+    return 0;
+}
+
+```
+
+</WordCount>

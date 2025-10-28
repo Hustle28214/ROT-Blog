@@ -1,0 +1,573 @@
+import WordCount from '../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+Dyna-Q 算法也是非常基础的基于模型的强化学习算法，不过它的环境模型是通过采样数据估计得到的。
+
+强化学习算法有两个重要的评价指标：一个是算法收敛后的策略在初始状态下的期望回报，另一个是样本复杂度，即算法达到收敛结果需要在真实环境中采样的样本数量。基于模型的强化学习算法由于具有一个环境模型，智能体可以额外和环境模型进行交互，对真实环境中样本的需求量往往就会减少，因此通常会比无模型的强化学习算法具有更低的样本复杂度。但是，环境模型可能并不准确，不能完全代替真实环境，因此基于模型的强化学习算法收敛后其策略的期望回报可能不如无模型的强化学习算法。
+
+## 1. Dyna-Q
+
+Dyna-Q 是一种经典的基于模型的强化学习算法，它通过结合真实经验和模拟经验来提升学习效率。如图所示，该算法的核心在于引入了一种称为 **Q-planning** 的机制，利用学习到的环境模型生成模拟数据，并将这些数据与真实交互数据共同用于策略优化。
+
+在 Q-planning 过程中，算法执行以下步骤：
+1. **状态-动作选择**：从已访问过的状态集合中随机选取一个状态 $s$，并在该状态曾经执行过的动作中随机选择一个动作 $a$；
+2. **模型预测**：利用环境模型 $M(s,a)$ 预测转移后的状态 $s'$ 和即时奖励 $r$：
+   $$
+   s', r \gets M(s,a)
+   $$
+3. **价值更新**：使用 Q-learning 方法更新动作价值函数 $Q(s,a)$：
+   $$
+   Q(s,a) \gets Q(s,a) + \alpha \left[r + \gamma \max_{a'} Q(s',a') - Q(s,a)\right]
+   $$
+   其中 $\alpha$ 为学习率，$\gamma$ 为折扣因子。
+
+通过反复执行 Q-planning 步骤，Dyna-Q 在保持样本效率的同时，有效利用模型知识加速策略收敛。
+
+![Image](https://github.com/user-attachments/assets/8104bb24-982d-4cf7-9eed-4f9ba79bcbfa)
+
+Dyna-Q 算法在每次与环境进行真实交互并执行一次 Q-learning 更新后，会进行 $n$ 次 Q-planning 过程。其中 Q-planning 的次数 $n$ 是一个预先设定的超参数，当 $n = 0$ 时，算法退化为标准的 Q-learning 算法。
+
+值得注意的是，上述 Dyna-Q 算法适用于离散且确定性的环境。在这种环境中，当观察到一条经验数据 $(s, a, r, s')$ 时，可以直接对环境模型进行精确更新：
+
+$$
+M(s, a) \gets (r, s')
+$$
+
+其中 $M$ 表示环境模型，它将状态-动作对 $(s, a)$ 映射到对应的奖励和下一个状态。
+
+这种直接模型更新的方式使得 Dyna-Q 能够高效地利用历史经验，通过模拟数据加速学习过程。
+
+## 2. Code
+
+由于Dyna-Q 算法是基于模型的强化学习算法，因此需要一个环境模型来模拟环境的动态变化。我们使用悬崖漫步环境来模拟。
+
+```python
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from collections import defaultdict
+import gymnasium as gym
+
+class DynaQ:
+    def __init__(self, env, alpha=0.1, gamma=0.95, epsilon=0.1, planning_steps=5):
+        self.env = env
+        self.alpha = alpha  # 学习率
+        self.gamma = gamma  # 折扣因子
+        self.epsilon = epsilon  # 探索率
+        self.planning_steps = planning_steps  # 规划步数
+        
+        # Q表
+        self.q_table = defaultdict(lambda: np.zeros(env.action_space.n))
+        
+        # 环境模型 (状态-动作 -> 奖励, 下一个状态)
+        self.model = {}
+        
+        # 记录状态-动作对
+        self.state_action_pairs = []
+    
+    def choose_action(self, state):
+        """epsilon-greedy策略选择动作"""
+        if np.random.random() < self.epsilon:
+            return self.env.action_space.sample()  # 随机探索
+        else:
+            return np.argmax(self.q_table[state])  # 利用
+    
+    def update_q_value(self, state, action, reward, next_state, done):
+        """更新Q值"""
+        if done:
+            td_target = reward
+        else:
+            best_next_action = np.argmax(self.q_table[next_state])
+            td_target = reward + self.gamma * self.q_table[next_state][best_next_action]
+        
+        td_error = td_target - self.q_table[state][action]
+        self.q_table[state][action] += self.alpha * td_error
+    
+    def update_model(self, state, action, reward, next_state, done):
+        """更新环境模型"""
+        self.model[(state, action)] = (reward, next_state, done)
+        
+        # 记录经历过的状态-动作对
+        if (state, action) not in self.state_action_pairs:
+            self.state_action_pairs.append((state, action))
+    
+    def planning(self):
+        """规划过程：使用模型进行模拟更新"""
+        for _ in range(self.planning_steps):
+            if len(self.state_action_pairs) == 0:
+                break
+            
+            # 随机选择一个经历过的状态-动作对
+            idx = np.random.randint(0, len(self.state_action_pairs))
+            state, action = self.state_action_pairs[idx]
+            
+            # 从模型中获取预测的奖励和下一个状态
+            if (state, action) in self.model:
+                reward, next_state, done = self.model[(state, action)]
+                
+                # 使用模拟经验更新Q值
+                self.update_q_value(state, action, reward, next_state, done)
+    
+    def train(self, episodes=500, max_steps=100):
+        """训练Dyna-Q算法"""
+        rewards = []
+        steps_per_episode = []
+        
+        for episode in range(episodes):
+            state, _ = self.env.reset()
+            total_reward = 0
+            step_count = 0
+            
+            for step in range(max_steps):
+                # 选择动作
+                action = self.choose_action(state)
+                
+                # 执行动作
+                next_state, reward, terminated, truncated, _ = self.env.step(action)
+                done = terminated or truncated
+                
+                # 更新Q值（直接学习）
+                self.update_q_value(state, action, reward, next_state, done)
+                
+                # 更新模型
+                self.update_model(state, action, reward, next_state, done)
+                
+                # 规划过程（间接学习）
+                self.planning()
+                
+                total_reward += reward
+                state = next_state
+                step_count += 1
+                
+                if done:
+                    break
+            
+            rewards.append(total_reward)
+            steps_per_episode.append(step_count)
+            
+            if (episode + 1) % 50 == 0:
+                avg_reward = np.mean(rewards[-50:])
+                avg_steps = np.mean(steps_per_episode[-50:])
+                print(f"Episode {episode + 1}: Average Reward = {avg_reward:.2f}, Average Steps = {avg_steps:.2f}")
+        
+        return rewards, steps_per_episode
+    
+    def test(self, episodes=10, render=False):
+        """测试训练好的策略"""
+        total_rewards = []
+        
+        for episode in range(episodes):
+            state, _ = self.env.reset()
+            total_reward = 0
+            steps = 0
+            
+            if render:
+                print(f"\nTest Episode {episode + 1}")
+            
+            while True:
+                # 使用贪心策略
+                action = np.argmax(self.q_table[state])
+                
+                next_state, reward, terminated, truncated, _ = self.env.step(action)
+                done = terminated or truncated
+                
+                total_reward += reward
+                state = next_state
+                steps += 1
+                
+                if render:
+                    print(f"Step {steps}: Action={action}, Reward={reward}, Total Reward={total_reward}")
+                
+                if done:
+                    break
+            
+            total_rewards.append(total_reward)
+            if render:
+                print(f"Episode finished after {steps} steps, Total Reward: {total_reward}")
+        
+        return total_rewards
+
+def plot_results(rewards, steps_per_episode, planning_steps):
+    """绘制训练结果"""
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 10))
+    
+    # 平滑函数
+    def smooth(data, weight=0.9):
+        smoothed = []
+        last = data[0]
+        for point in data:
+            smoothed_val = last * weight + (1 - weight) * point
+            smoothed.append(smoothed_val)
+            last = smoothed_val
+        return smoothed
+    
+    # 绘制奖励
+    window_size = 20
+    if len(rewards) >= window_size:
+        smoothed_rewards = [np.mean(rewards[i:i+window_size]) for i in range(len(rewards)-window_size+1)]
+        ax1.plot(smoothed_rewards, label=f'Dyna-Q (n={planning_steps})', alpha=0.8)
+    else:
+        ax1.plot(rewards, label=f'Dyna-Q (n={planning_steps})', alpha=0.8)
+    
+    ax1.set_xlabel('Episode')
+    ax1.set_ylabel('Smoothed Reward')
+    ax1.set_title('Training Performance')
+    ax1.legend()
+    ax1.grid(True, alpha=0.3)
+    
+    # 绘制步数
+    if len(steps_per_episode) >= window_size:
+        smoothed_steps = [np.mean(steps_per_episode[i:i+window_size]) for i in range(len(steps_per_episode)-window_size+1)]
+        ax2.plot(smoothed_steps, label=f'Dyna-Q (n={planning_steps})', alpha=0.8)
+    else:
+        ax2.plot(steps_per_episode, label=f'Dyna-Q (n={planning_steps})', alpha=0.8)
+    
+    ax2.set_xlabel('Episode')
+    ax2.set_ylabel('Smoothed Steps')
+    ax2.set_title('Learning Efficiency')
+    ax2.legend()
+    ax2.grid(True, alpha=0.3)
+    
+    plt.tight_layout()
+    plt.show()
+
+def compare_planning_steps():
+    """比较不同规划步数的效果"""
+    env = gym.make('CliffWalking-v1')
+    
+    planning_steps_list = [0, 5, 10, 20]
+    results = {}
+    
+    for n in planning_steps_list:
+        print(f"\nTraining Dyna-Q with planning steps = {n}")
+        agent = DynaQ(env, planning_steps=n)
+        rewards, steps = agent.train(episodes=300)
+        results[n] = (rewards, steps)
+        
+        # 测试最终策略
+        test_rewards = agent.test(episodes=10)
+        print(f"Average test reward: {np.mean(test_rewards):.2f}")
+    
+    env.close()
+    
+    # 绘制比较结果
+    plt.figure(figsize=(12, 8))
+    
+    for n, (rewards, steps) in results.items():
+        label = 'Q-learning' if n == 0 else f'Dyna-Q (n={n})'
+        if len(rewards) >= 20:
+            smoothed_rewards = [np.mean(rewards[i:i+20]) for i in range(len(rewards)-19)]
+            plt.plot(smoothed_rewards, label=label, alpha=0.8)
+        else:
+            plt.plot(rewards, label=label, alpha=0.8)
+    
+    plt.xlabel('Episode')
+    plt.ylabel('Smoothed Reward (20-episode window)')
+    plt.title('Comparison of Different Planning Steps')
+    plt.legend()
+    plt.grid(True, alpha=0.3)
+    plt.show()
+
+def visualize_policy(agent, env):
+    """可视化学习到的策略"""
+    policy = np.zeros(48)  # CliffWalking有48个状态
+    for state in range(48):
+        policy[state] = np.argmax(agent.q_table[state])
+    
+    # 将策略转换为网格形式
+    policy_grid = policy.reshape(4, 12)
+    
+    # 动作映射
+    action_map = {0: '↑', 1: '→', 2: '↓', 3: '←'}
+    
+    plt.figure(figsize=(12, 4))
+    sns.heatmap(policy_grid, annot=True, fmt="", 
+                xticklabels=False, yticklabels=False,
+                cmap="viridis", cbar_kws={'label': 'Action'})
+    
+    # 添加动作符号
+    for i in range(4):
+        for j in range(12):
+            action = int(policy_grid[i, j])
+            plt.text(j + 0.5, i + 0.5, action_map[action], 
+                    ha='center', va='center', fontsize=12, fontweight='bold')
+    
+    # 标记悬崖和终点
+    plt.gca().add_patch(plt.Rectangle((0.5, 3.5), 10, 0.5, fill=False, edgecolor='red', lw=2))
+    plt.text(5.5, 3.75, 'Cliff', ha='center', va='center', fontsize=12, fontweight='bold', color='red')
+    plt.text(11.5, 3.5, 'Goal', ha='center', va='center', fontsize=12, fontweight='bold', color='green')
+    
+    plt.title('Learned Policy for CliffWalking Environment')
+    plt.show()
+
+if __name__ == "__main__":
+    # 创建环境
+    env = gym.make('CliffWalking-v1')
+    
+    print("环境信息:")
+    print(f"观察空间: {env.observation_space}")
+    print(f"动作空间: {env.action_space.n}")
+    print(f"动作含义: {['上', '右', '下', '左']}")
+    
+    # 训练Dyna-Q智能体
+    print("\n开始训练Dyna-Q算法...")
+    agent = DynaQ(env, planning_steps=10)
+    rewards, steps_per_episode = agent.train(episodes=500)
+    
+    # 绘制训练结果
+    plot_results(rewards, steps_per_episode, planning_steps=10)
+    
+    # 可视化学习到的策略
+    print("\n可视化学习到的策略...")
+    visualize_policy(agent, env)
+    
+    # 测试训练好的策略
+    print("\n测试训练好的策略...")
+    test_rewards = agent.test(episodes=10, render=True)
+    print(f"\n测试结果: 平均奖励 = {np.mean(test_rewards):.2f}")
+    
+    # 比较不同规划步数
+    print("\n比较不同规划步数的效果...")
+    compare_planning_steps()
+    
+    env.close()
+```
+<details>
+
+
+运行结果：
+
+![image](https://github.com/user-attachments/assets/426eb254-f9b8-4a2a-87f4-40d66c1fbc4c)
+
+![image](https://github.com/user-attachments/assets/939a88af-7a28-426e-8979-3342cc9de038)
+
+![image](https://github.com/user-attachments/assets/fa179f08-6394-44e3-8b06-ca804d26d353)
+
+```bash
+PS F:\BLOG\ROT-Blog\docs\Control\强化学习> python .\1.py
+环境信息:
+观察空间: Discrete(48)
+动作空间: 4
+动作含义: ['上', '右', '下', '左']
+
+开始训练Dyna-Q算法...
+Episode 50: Average Reward = -79.20, Average Steps = 33.66
+Episode 100: Average Reward = -55.36, Average Steps = 17.74
+Episode 150: Average Reward = -44.44, Average Steps = 16.72
+Episode 200: Average Reward = -38.34, Average Steps = 16.56
+Episode 250: Average Reward = -45.84, Average Steps = 16.14
+Episode 300: Average Reward = -42.54, Average Steps = 16.80
+Episode 350: Average Reward = -32.72, Average Steps = 14.90
+Episode 400: Average Reward = -48.20, Average Steps = 16.52
+Episode 450: Average Reward = -39.62, Average Steps = 15.86
+Episode 500: Average Reward = -44.86, Average Steps = 17.14
+
+可视化学习到的策略...
+
+测试训练好的策略...
+
+Test Episode 1
+Step 1: Action=0, Reward=-1, Total Reward=-1
+Step 2: Action=1, Reward=-1, Total Reward=-2
+Step 3: Action=1, Reward=-1, Total Reward=-3
+Step 4: Action=1, Reward=-1, Total Reward=-4
+Step 5: Action=1, Reward=-1, Total Reward=-5
+Step 6: Action=1, Reward=-1, Total Reward=-6
+Step 7: Action=1, Reward=-1, Total Reward=-7
+Step 8: Action=1, Reward=-1, Total Reward=-8
+Step 9: Action=1, Reward=-1, Total Reward=-9
+Step 10: Action=1, Reward=-1, Total Reward=-10
+Step 11: Action=1, Reward=-1, Total Reward=-11
+Step 12: Action=1, Reward=-1, Total Reward=-12
+Step 13: Action=2, Reward=-1, Total Reward=-13
+Episode finished after 13 steps, Total Reward: -13
+
+Test Episode 2
+Step 1: Action=0, Reward=-1, Total Reward=-1
+Step 2: Action=1, Reward=-1, Total Reward=-2
+Step 3: Action=1, Reward=-1, Total Reward=-3
+Step 4: Action=1, Reward=-1, Total Reward=-4
+Step 5: Action=1, Reward=-1, Total Reward=-5
+Step 6: Action=1, Reward=-1, Total Reward=-6
+Step 7: Action=1, Reward=-1, Total Reward=-7
+Step 8: Action=1, Reward=-1, Total Reward=-8
+Step 9: Action=1, Reward=-1, Total Reward=-9
+Step 10: Action=1, Reward=-1, Total Reward=-10
+Step 11: Action=1, Reward=-1, Total Reward=-11
+Step 12: Action=1, Reward=-1, Total Reward=-12
+Step 13: Action=2, Reward=-1, Total Reward=-13
+Episode finished after 13 steps, Total Reward: -13
+
+Test Episode 3
+Step 1: Action=0, Reward=-1, Total Reward=-1
+Step 2: Action=1, Reward=-1, Total Reward=-2
+Step 3: Action=1, Reward=-1, Total Reward=-3
+Step 4: Action=1, Reward=-1, Total Reward=-4
+Step 5: Action=1, Reward=-1, Total Reward=-5
+Step 6: Action=1, Reward=-1, Total Reward=-6
+Step 7: Action=1, Reward=-1, Total Reward=-7
+Step 8: Action=1, Reward=-1, Total Reward=-8
+Step 9: Action=1, Reward=-1, Total Reward=-9
+Step 10: Action=1, Reward=-1, Total Reward=-10
+Step 11: Action=1, Reward=-1, Total Reward=-11
+Step 12: Action=1, Reward=-1, Total Reward=-12
+Step 13: Action=2, Reward=-1, Total Reward=-13
+Episode finished after 13 steps, Total Reward: -13
+
+Test Episode 4
+Step 1: Action=0, Reward=-1, Total Reward=-1
+Step 2: Action=1, Reward=-1, Total Reward=-2
+Step 3: Action=1, Reward=-1, Total Reward=-3
+Step 4: Action=1, Reward=-1, Total Reward=-4
+Step 5: Action=1, Reward=-1, Total Reward=-5
+Step 6: Action=1, Reward=-1, Total Reward=-6
+Step 7: Action=1, Reward=-1, Total Reward=-7
+Step 8: Action=1, Reward=-1, Total Reward=-8
+Step 9: Action=1, Reward=-1, Total Reward=-9
+Step 10: Action=1, Reward=-1, Total Reward=-10
+Step 11: Action=1, Reward=-1, Total Reward=-11
+Step 12: Action=1, Reward=-1, Total Reward=-12
+Step 13: Action=2, Reward=-1, Total Reward=-13
+Episode finished after 13 steps, Total Reward: -13
+
+Test Episode 5
+Step 1: Action=0, Reward=-1, Total Reward=-1
+Step 2: Action=1, Reward=-1, Total Reward=-2
+Step 3: Action=1, Reward=-1, Total Reward=-3
+Step 4: Action=1, Reward=-1, Total Reward=-4
+Step 5: Action=1, Reward=-1, Total Reward=-5
+Step 6: Action=1, Reward=-1, Total Reward=-6
+Step 7: Action=1, Reward=-1, Total Reward=-7
+Step 8: Action=1, Reward=-1, Total Reward=-8
+Step 9: Action=1, Reward=-1, Total Reward=-9
+Step 10: Action=1, Reward=-1, Total Reward=-10
+Step 11: Action=1, Reward=-1, Total Reward=-11
+Step 12: Action=1, Reward=-1, Total Reward=-12
+Step 13: Action=2, Reward=-1, Total Reward=-13
+Episode finished after 13 steps, Total Reward: -13
+
+Test Episode 6
+Step 1: Action=0, Reward=-1, Total Reward=-1
+Step 2: Action=1, Reward=-1, Total Reward=-2
+Step 3: Action=1, Reward=-1, Total Reward=-3
+Step 4: Action=1, Reward=-1, Total Reward=-4
+Step 5: Action=1, Reward=-1, Total Reward=-5
+Step 6: Action=1, Reward=-1, Total Reward=-6
+Step 7: Action=1, Reward=-1, Total Reward=-7
+Step 8: Action=1, Reward=-1, Total Reward=-8
+Step 9: Action=1, Reward=-1, Total Reward=-9
+Step 10: Action=1, Reward=-1, Total Reward=-10
+Step 11: Action=1, Reward=-1, Total Reward=-11
+Step 12: Action=1, Reward=-1, Total Reward=-12
+Step 13: Action=2, Reward=-1, Total Reward=-13
+Episode finished after 13 steps, Total Reward: -13
+
+Test Episode 7
+Step 1: Action=0, Reward=-1, Total Reward=-1
+Step 2: Action=1, Reward=-1, Total Reward=-2
+Step 3: Action=1, Reward=-1, Total Reward=-3
+Step 4: Action=1, Reward=-1, Total Reward=-4
+Step 5: Action=1, Reward=-1, Total Reward=-5
+Step 6: Action=1, Reward=-1, Total Reward=-6
+Step 7: Action=1, Reward=-1, Total Reward=-7
+Step 8: Action=1, Reward=-1, Total Reward=-8
+Step 9: Action=1, Reward=-1, Total Reward=-9
+Step 10: Action=1, Reward=-1, Total Reward=-10
+Step 11: Action=1, Reward=-1, Total Reward=-11
+Step 12: Action=1, Reward=-1, Total Reward=-12
+Step 13: Action=2, Reward=-1, Total Reward=-13
+Episode finished after 13 steps, Total Reward: -13
+
+Test Episode 8
+Step 1: Action=0, Reward=-1, Total Reward=-1
+Step 2: Action=1, Reward=-1, Total Reward=-2
+Step 3: Action=1, Reward=-1, Total Reward=-3
+Step 4: Action=1, Reward=-1, Total Reward=-4
+Step 5: Action=1, Reward=-1, Total Reward=-5
+Step 6: Action=1, Reward=-1, Total Reward=-6
+Step 7: Action=1, Reward=-1, Total Reward=-7
+Step 8: Action=1, Reward=-1, Total Reward=-8
+Step 9: Action=1, Reward=-1, Total Reward=-9
+Step 10: Action=1, Reward=-1, Total Reward=-10
+Step 11: Action=1, Reward=-1, Total Reward=-11
+Step 12: Action=1, Reward=-1, Total Reward=-12
+Step 13: Action=2, Reward=-1, Total Reward=-13
+Episode finished after 13 steps, Total Reward: -13
+
+Test Episode 9
+Step 1: Action=0, Reward=-1, Total Reward=-1
+Step 2: Action=1, Reward=-1, Total Reward=-2
+Step 3: Action=1, Reward=-1, Total Reward=-3
+Step 4: Action=1, Reward=-1, Total Reward=-4
+Step 5: Action=1, Reward=-1, Total Reward=-5
+Step 6: Action=1, Reward=-1, Total Reward=-6
+Step 7: Action=1, Reward=-1, Total Reward=-7
+Step 8: Action=1, Reward=-1, Total Reward=-8
+Step 9: Action=1, Reward=-1, Total Reward=-9
+Step 10: Action=1, Reward=-1, Total Reward=-10
+Step 11: Action=1, Reward=-1, Total Reward=-11
+Step 12: Action=1, Reward=-1, Total Reward=-12
+Step 13: Action=2, Reward=-1, Total Reward=-13
+Episode finished after 13 steps, Total Reward: -13
+
+Test Episode 10
+Step 1: Action=0, Reward=-1, Total Reward=-1
+Step 2: Action=1, Reward=-1, Total Reward=-2
+Step 3: Action=1, Reward=-1, Total Reward=-3
+Step 4: Action=1, Reward=-1, Total Reward=-4
+Step 5: Action=1, Reward=-1, Total Reward=-5
+Step 6: Action=1, Reward=-1, Total Reward=-6
+Step 7: Action=1, Reward=-1, Total Reward=-7
+Step 8: Action=1, Reward=-1, Total Reward=-8
+Step 9: Action=1, Reward=-1, Total Reward=-9
+Step 10: Action=1, Reward=-1, Total Reward=-10
+Step 11: Action=1, Reward=-1, Total Reward=-11
+Step 12: Action=1, Reward=-1, Total Reward=-12
+Step 13: Action=2, Reward=-1, Total Reward=-13
+Episode finished after 13 steps, Total Reward: -13
+
+测试结果: 平均奖励 = -13.00
+
+比较不同规划步数的效果...
+
+Training Dyna-Q with planning steps = 0
+Episode 50: Average Reward = -145.68, Average Steps = 86.28
+Episode 100: Average Reward = -90.94, Average Steps = 59.26
+Episode 150: Average Reward = -64.40, Average Steps = 38.66
+Episode 200: Average Reward = -54.16, Average Steps = 30.40
+Episode 250: Average Reward = -73.72, Average Steps = 26.20
+Episode 300: Average Reward = -57.20, Average Steps = 21.56
+Average test reward: -13.00
+
+Training Dyna-Q with planning steps = 5
+Episode 50: Average Reward = -97.80, Average Steps = 40.38
+Episode 100: Average Reward = -59.34, Average Steps = 21.72
+Episode 150: Average Reward = -42.42, Average Steps = 16.68
+Episode 200: Average Reward = -55.74, Average Steps = 18.12
+Episode 250: Average Reward = -48.14, Average Steps = 16.46
+Episode 300: Average Reward = -46.34, Average Steps = 16.64
+Average test reward: -13.00
+
+Training Dyna-Q with planning steps = 10
+Episode 50: Average Reward = -82.52, Average Steps = 33.02
+Episode 100: Average Reward = -36.54, Average Steps = 16.74
+Episode 150: Average Reward = -56.62, Average Steps = 17.02
+Episode 200: Average Reward = -43.92, Average Steps = 16.20
+Episode 250: Average Reward = -26.74, Average Steps = 14.86
+Episode 300: Average Reward = -42.52, Average Steps = 16.78
+Average test reward: -13.00
+
+Training Dyna-Q with planning steps = 20
+Episode 50: Average Reward = -90.20, Average Steps = 26.84
+Episode 100: Average Reward = -33.44, Average Steps = 15.62
+Episode 150: Average Reward = -39.74, Average Steps = 15.98
+Episode 200: Average Reward = -51.00, Average Steps = 17.34
+Episode 250: Average Reward = -35.74, Average Steps = 15.94
+Episode 300: Average Reward = -37.34, Average Steps = 15.56
+Average test reward: -13.00
+
+```
+</details>
+
+</WordCount>

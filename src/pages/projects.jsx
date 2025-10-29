@@ -1012,6 +1012,27 @@ const projectData = {
             "icon": "📱",
             "link": "https://www.bluetooth.com/bluetooth-resources/?types=study-guide",
             "color": "#2D7DD2"
+          },
+          {
+            "name": "电磁场与电磁波",
+            "description": "电磁经典",
+            "icon": "🧲",
+            "link": "https://zh.z-library.ec/book/29070128/8b1656/%E7%94%B5%E7%A3%81%E5%9C%BA%E4%B8%8E%E7%94%B5%E7%A3%81%E6%B3%A2-%E7%AC%AC2%E7%89%88.html",
+            "color": "#2D7DD2"
+          },
+          {
+            "name": "信号与系统",
+            "description": "工科屠龙术",
+            "icon": "📶",
+            "link": "https://zh.z-library.ec/book/29070128/8b1656/%E7%94%B5%E7%A3%81%E5%9C%BA%E4%B8%8E%E7%94%B5%E7%A3%81%E6%B3%A2-%E7%AC%AC2%E7%89%88.html",
+            "color": "#2D7DD2"
+          },
+          {
+            "name":"电机、拖动及电力系统",
+            "description": "写的很好的电机学教材",
+            "icon":"🔥",
+            "link":"https://z-library.ec/book/115915980/af03a4/%E7%94%B5%E6%9C%BA%E6%8B%96%E5%8A%A8%E5%8F%8A%E7%94%B5%E5%8A%9B%E7%B3%BB%E7%BB%9F%E5%8E%9F%E4%B9%A6%E7%AC%AC6%E7%89%88.html",
+            "color":"#2D7DD2",
           }
         ]
       }

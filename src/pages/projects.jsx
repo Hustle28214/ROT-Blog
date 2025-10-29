@@ -1033,6 +1033,20 @@ const projectData = {
             "icon":"🔥",
             "link":"https://z-library.ec/book/115915980/af03a4/%E7%94%B5%E6%9C%BA%E6%8B%96%E5%8A%A8%E5%8F%8A%E7%94%B5%E5%8A%9B%E7%B3%BB%E7%BB%9F%E5%8E%9F%E4%B9%A6%E7%AC%AC6%E7%89%88.html",
             "color":"#2D7DD2",
+          },
+          {
+            "name":"微波工程",
+            "description": "也是屠龙术",
+            "icon":"📶",
+            "link":"https://z-library.ec/book/24810117/3f5dfa/%E5%BE%AE%E6%B3%A2%E5%B7%A5%E7%A8%8B%E7%AC%AC%E5%9B%9B%E7%89%88.html",
+            "color":"#2D7DD2",
+          },
+          {
+            "name":"天线手册",
+            "description": "业余无线电的案头书",
+            "icon":"📶",
+            "link":"https://z-library.ec/book/27787943/fb16a7/%E5%A4%A9%E7%BA%BF%E6%89%8B%E5%86%8C.html",
+            "color":"#2D7DD2",
           }
         ]
       }

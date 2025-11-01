@@ -587,6 +587,17 @@ const projectData = {
         ]
       },
       {
+        "name": "机器人解算库",
+        "projects": [{
+          "name": "Sophus",
+            "description": "李群李代数位姿解算库",
+            "icon": "📦",
+            "link": "https://github.com/strasdat/Sophus",
+            "color": "#8E44AD"},
+        ],
+        
+      },
+      {
         "name": "物理引擎",
         "projects": [
           {

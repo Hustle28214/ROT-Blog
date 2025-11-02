@@ -598,6 +598,18 @@ const projectData = {
         
       },
       {
+        "name": "具身智能导航",
+        "projects": [{
+          "name": "Embodied-AI-Guide",
+            "description": "具身智能工作导航",
+            "icon": "📦",
+            "link": "https://github.com/TianxingChen/Embodied-AI-Guide",
+            "color": "#8E44AD"},
+        ],
+        
+      },
+      
+      {
         "name": "物理引擎",
         "projects": [
           {

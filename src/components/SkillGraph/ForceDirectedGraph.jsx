@@ -348,7 +348,6 @@ const ForceDirectedGraph = ({
 
                 if (isValidNumber(posX) && isValidNumber(posY)) {
                     const nodeEl = nodeRefs.current.get(node.id);
-                    // ✅ 关键：检查元素是否仍在 DOM 中
                     if (nodeEl && nodeEl.isConnected) {
                         nodeEl.setAttribute('transform', `translate(${posX},${posY})`);
                     }

@@ -1,0 +1,109 @@
+
+import WordCount from '../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+## 1.1 无限长度的折扣马尔可夫决策过程
+
+在讨论模仿学习的问题范式之前，我们需要做一些数学工作。
+
+在强化学习的篇章中我们介绍了马尔可夫决策过程。数学上，它可以用一个五元组表示。
+
+马尔可夫决策过程的五元组定义：$M = (\mathcal{S}, \mathcal{A}, P, R, \gamma)$
+
+其中：
+
+- $\mathcal{S}$ 是有限状态的集合。  
+- $\mathcal{A}$ 是有限动作的集合。
+- $\gamma$ 是折扣因子，满足 $0 \leq \gamma < 1$。
+- $P$ 是状态转移概率矩阵，其中 $P_{ss'}^a = P(s_{t+1} = s' \mid s_t = s, a_t = a$ 表示在状态 $s$ 下执行动作 $a$ 后转移到状态 $s'$ 的概率。
+- $R$ 是奖励函数，$R(s, a)$ 表示在状态 $s$ 下执行动作 $a$ 时可以获得的**期望即时奖励**，即  
+  $$
+  R(s, a) = \mathbb{E}[R_t \mid s_t = s, a_t = a]
+  $$
+
+在马尔可夫决策过程的基础上我们引入一个初始状态分布：$\rho(s)$，表示在初始状态 $s$ 上的概率分布。
+
+于是有六元组：$(\mathcal{S}, \mathcal{A}, P, R, \gamma, \rho)$，表示无限长度的折扣马尔可夫决策过程。
+
+其累计期望回报是：
+
+$$
+V(\pi) = E[\sum_{t=0}^{\infty} \gamma r(s_t,a_t) | s_0 ~ \rho(·),a_t ~ \pi(·|s_t),s_{t+1}~P(s_{t+1}|s_t,a_t)]
+$$
+
+假设奖励函数有界，可以发现：
+
+$$
+G_t = \sum_{t=0}^{\infty} \gamma^t = \frac{1}{1-\gamma}
+$$
+
+定义有效决策长度为：$\frac{1}{1-\gamma}$，当把累计回报里的“无限长度”截断到$O(\frac{1}{1-\gamma})$的量级时，可以很好地用有限长度来代替无限长度：
+
+
+$$
+\mathbb{E} \left[ \sum_{t=0}^{H} \gamma^t r(s_t, a_t) - \mathbb{E} \left[ \sum_{t=0}^{\infty} \gamma^t r(s_t, a_t) \right] \right] \leq \varepsilon \implies H \geq \frac{1}{1-\gamma} \log \left( \frac{1}{(1-\gamma) \varepsilon} \right)
+$$
+
+对于给定的$M$，可以求解最优策略$\pi ^{*}$使其累计回报最大。
+
+对于强化学习来说，要解决的问题是不知道转移概率 P 的精确形式但可以与环境交互来获取转移概率信息的情况下，求解最优策略。
+
+由于马尔可夫决策的再生性质，我们可以对任意的初始状态s来定义其状态价值函数。
+
+
+$$
+V^{\pi}(s) = \mathbb{E} \left[ \sum_{t=0}^{\infty} \gamma^t r(s_t, a_t) \bigg| s_0 = s, a_t \sim \pi(\cdot | s_t), s_{t+1} \sim P(s_{t+1} | s_t, a_t) \right]
+$$
+
+类似地，我们可以定义状态-动作值函数（state-action value function）：
+
+$$
+Q^{\pi}(s,a) = \mathbb{E} \left[ \sum_{t=0}^{\infty} \gamma^t r(s_t, a_t) \bigg| s_0 = s, a_0 = a, a_t \sim \pi(\cdot | s_t), s_{t+1} \sim P(s_{t+1} | s_t, a_t) \right]
+$$
+
+
+## 1.2 有限长度的折扣马尔可夫决策过程
+
+有限长度回合制马尔可夫决策过程可以用六元组$M = (\mathcal{S}, \mathcal{A}, P, r, H, \rho)$表示。其中$S$和$A$分别表示状态和动作空间。
+
+在这里，$P = \{P_1, \cdots, P_H\}$制定了时变转移函数。$P_h(s_{h+1}|s_h, a_h)$表示了在时间步$h$和状态$s_h$上，执行动作$a_h$，转移到状态$s_{h+1}$的概率。类似地，$r = \{r1,...,r_H\}$指定了马尔可夫决策过程的奖赏函数，不失一般性，我们假设$r_h : S \times A \rightarrow [0, 1],\forall h \in [H]$，此时$[x]$表示从1到$x$的整数集合。为了适应这种时变的概率转移，$\pi = \{\pi_1, \cdots, \pi_h\}$表示了时变的策略，其中$\pi_h : S \rightarrow \Delta(A),$\Delta(A)$$表示在动作空间上的概率单纯形，$\pi_h(a|s)$表示在时间步$h$和状态$s$上，执行动作$a$的概率。
+
+
+在$M$下，策略$π$的累积（期望）回报定义如下: 
+$$
+V(\pi) := E \left[ \sum_{h=1}^{H} r_h(s_h, a_h)|s_1 \sim \rho; a_h \sim \pi_h(\cdot |s_h), s_{h+1} \sim P_h(\cdot |s_h, a_h), \forall h \in [H] \right]
+$$
+在有限长度回合制马尔可夫决策过程中，给定策略$π$，我们也可以定义状态-动作访问分布:
+$$
+P_h^{\pi}(s, a) := P(s_h = s, a_h = a|s_1 \sim \rho; a_\ell \sim \pi_h(\cdot |s_\ell), \forall \ell \in [h])
+$$
+同样地，在$M$下，给定策略$π$，我们也可以建立累计回报与状态访问分布之间的关系：
+$$
+V(\pi) = \sum_{h=1}^{H} \sum_{(s,a) \in S \times A} P_h^{\pi}(s, a) r_h(s, a)
+$$
+
+
+## 1.3 模仿学习问题设定
+
+假设有一个专家策略表现不错，希望智能体能够模仿专家策略进行决策。具体而言，我们希望智能体的累计回报与专家策略的累计回报比较接近。可以把模仿学习问题建模成以下优化问题：
+
+$$
+\min_{\pi} V(\pi^E) - V(\pi)
+$$
+
+一定程度上可以认为上述公式的优化目标是最大化$V(\pi)$。要注意：
+
+1. 在模仿学习中，最大化$ V (π) $的过程里是不知道奖赏函数的；
+
+2. 反而，智能体被提供专家示例来进行策略优化。
+
+假设有一个（未知的）专家策略可以为我们提供一些示例，我们的目的是从这些示例中来恢复专家策略。具体而言，用$\pi^E$来表示专家策略；专家策略可以和环境进行交互来产生一系列的状态-动作对，这些状态-动作对就是我们说的示例.
+
+通常而言，这些状态-动作对是一条完整的轨迹被组织起来。经常地，我们称这个专家示例为（训练）数据集 D。如果用$tr$来表示一个完整的轨迹；也就是说：$tr = \{s_1, a_1, s_2, a_2, \cdots, s_H, a_H\}$，那么一个由$m$条轨迹构成的专家示例$D$可以记为$D = \{tr_i\}_{i=1}^m$。
+
+
+
+
+
+</WordCount>

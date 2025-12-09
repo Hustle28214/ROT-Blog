@@ -10,6 +10,85 @@ import WordCount from '../../../src/components/WordCount/WordCount';
 
 一个经典的估计方法就是最大似然估计（Maximum Likelihood Estimation）。我们之前提到过一个稳态策略 π 可以用一个$ |S| × |A|$的表格 (矩阵) 进行表示；具体到一个状态$s$，$π(·|s)$ 就是动作空间 A 上的单纯型（可以理解为动作空间 A 上的一个概率分布）
 
+$$
+\max_{\hat{\pi}_\theta \in \mathbb{R}^{|S| \times |A|}} \sum_{(s,a) \in D} \log \pi(a|s)
+$$
 
+$$
+s.t. \quad \sum_{a \in A} \hat{\pi}_\theta(a|s) = 1, \quad \forall s \in S
+$$
+
+并且其最优解的形式对于有限状态和动作空间的马尔可夫决策过程问题很简单。具体而言，最优解可以用 ‘‘计数’’ 来求解：对于数据集出现里的状态s，令：
+
+$$
+\hat{\pi}_\theta(a|s) = \frac{\sum_{(s_i,a_i) \in D} \mathbb{I}(s_i = s, a_i = a)}{\sum_{(s_i,a_i) \in D} \mathbb{I}(s_i = s)}
+$$
+
+其中，$\mathbb{I}(·)$ 是一个示性函数。若$(s_i,a_i) \in D$，则$\mathbb{I}(s_i = s, a_i = a) = 1$；否则$\mathbb{I}(s_i = s, a_i = a) = 0$。对于数据集中没有出现过的状态$s$，可以令其动作分布为一个均匀分布，即：${\pi}(a|s) = 1/|A|$.
+
+这种参数化方法一般称作为直接参数化（Direct Parameterization），即每个动作选择概率$\hat{\pi}_\theta(a|s)$就是一个参数$\theta_{s,a}$，这里$\theta \in \mathbb{R}^{|S|\times|A|}$.
+
+行为克隆算法可以看做为最小化策略动作差异：
+
+$$
+\min_{\pi \in \Pi} D_{KL}(\pi_E \| \pi)
+$$
+
+这里$D_{KL}(\pi_E \|\pi) = \mathbb{E}_{s \sim d^{\pi^E}}[D_{KL}(\pi^E(\cdot|s)\|\pi(\cdot|s))]$. 由于$\pi^E$和$d^{\pi^E}$都未知，先利用专家数据估计它们，求解上述问题：
+
+$$
+\min_{\pi \in \Pi} D_{KL}(\hat{\pi^E} \|\pi)
+$$
+
+由于，$\hat{\pi^E}$是$\pi^E$的估计值可根据最大似然估计得到。当$ Π $包含所有的随机策略的时候，对应的最优解就是$\hat{\pi^E}$.
+
+:::tip
+由于行为克隆，模仿学习问题转化为监督学习问题。在监督学习中，最大似然估计是估计条件概率分布的标准方法。
+
+
+最大似然估计通过最大化数据集的条件似然来估计参数 $\theta$：
+
+$$L(\theta) = \prod_{(s_i, a_i) \in \mathcal{D}} \hat{\pi}_\theta(a_i | s_i)$$
+
+取对数似然：
+
+$$\log L(\theta) = \sum_{(s_i, a_i) \in \mathcal{D}} \log \hat{\pi}_\theta(a_i | s_i)$$
+
+因此，最大似然估计问题为：
+
+$$\max_{\theta} \sum_{(s_i, a_i) \in \mathcal{D}} \log \hat{\pi}_\theta(a_i | s_i) \quad \text{或等价地} \quad \min_{\theta} - \sum_{(s_i, a_i) \in \mathcal{D}} \log \hat{\pi}_\theta(a_i | s_i)$$
+
+我们考虑最小化专家分布与学习策略之间的KL散度。对于条件分布，我们希望在每个状态 $s$ 上最小化 $D_{\text{KL}}(\pi^E(\cdot|s) \| \hat{\pi}_\theta(\cdot|s))$。由于我们不知道真实的 $\pi^E$，我们使用经验分布近似。具体地，我们最小化经验KL散度：
+
+$$\min_{\theta} \mathbb{E}_{s \sim \hat{d}} \left[ D_{\text{KL}}(\hat{\pi}^E_{\text{emp}}(\cdot|s) \| \hat{\pi}_\theta(\cdot|s)) \right]$$
+
+其中 $\hat{d}$ 是数据集中状态的分布，$\hat{\pi}^E_{\text{emp}}(a|s) = \frac{N_{s,a}}{N_s}$ 是经验条件分布。展开KL散度：
+
+$$D_{\text{KL}}(\hat{\pi}^E_{\text{emp}} \| \hat{\pi}_\theta) = \sum_{a} \hat{\pi}^E_{\text{emp}}(a|s) \log \frac{\hat{\pi}^E_{\text{emp}}(a|s)}{\hat{\pi}_\theta(a|s)} = \sum_{a} \hat{\pi}^E_{\text{emp}}(a|s) \log \hat{\pi}^E_{\text{emp}}(a|s) - \sum_{a} \hat{\pi}^E_{\text{emp}}(a|s) \log \hat{\pi}_\theta(a|s)$$
+
+第一项与 $\theta$ 无关，因此最小化KL散度等价于最大化 $\sum_{a} \hat{\pi}^E_{\text{emp}}(a|s) \log \hat{\pi}_\theta(a|s)$。对状态分布取期望：
+
+$$\mathbb{E}_{s \sim \hat{d}} \left[ \sum_{a} \hat{\pi}^E_{\text{emp}}(a|s) \log \hat{\pi}_\theta(a|s) \right] = \frac{1}{N} \sum_{s} N_s \sum_{a} \frac{N_{s,a}}{N_s} \log \hat{\pi}_\theta(a|s) = \frac{1}{N} \sum_{(s,a)} N_{s,a} \log \hat{\pi}_\theta(a|s)$$
+
+忽略常数因子 $1/N$，这正是最大似然估计的目标。因此，最大似然估计等价于最小化经验KL散度。
+:::
+
+对于非离散空间问题（状态空间为欧几里得空间，或动作空间为欧几里得空间，或者两者都为欧几里得空间），上面的基于“计数”的求解方案不再可行。特别地，这时候$\theta_{s,a} = \hat{\pi}_{\theta}(a|s)$不再成立，这时问题转化为：
+
+$$
+\max_{\theta} \sum_{(s,a) \in \mathcal{D}} \log (\hat{\pi}_{\theta}(a|s)).
+$$
+
+:::info
+"单纯型"（Simplex，也译作“单形”）通常指代一个概率单纯型（Probability Simplex）.
+
+
+你可以把它想象成一个“合法的概率分布的集合”。例如，如果你有3个动作（A, B, C），那么所有可能的动作选择概率分布就构成了一个概率单纯型。这个单纯型是一个三角形区域（想象一个等边三角形），其中的每个点都代表一个合法的概率分布 $[p_A, p_B, p_C]$，满足：
+
+1. 每个概率值$p_i$都非负（>= 0）。
+
+2. 所有概率值之和为1（$p_A + p_B + p_C = 1$）。
+
+:::
 
 </WordCount>

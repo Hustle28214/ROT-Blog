@@ -109,11 +109,61 @@ Armv8-A 或 Armv9-A 处理器的当前状态由异常级别和当前执行状态
 
 当前执行状态定义了通用寄存器的标准宽度和可用的指令集。
 
-Armv8-A 和 Armv9-A 支持两个执行语句:
+Armv8-A 和 Armv9-A 支持两个执行语句（说明图可见于指令集那一章节）:
 
-AArch32
-    AArch32 是一个 32 位执行状态。在此状态下的操作与先前的架构具有向后兼容。它支持 T32 和 A32 指令集。标准寄存器宽度为32位。 
-AArch64
-    AArch64 是一个 64 位执行状态。它支持A64指令集。标准寄存器宽度为64位。 
+1. AArch32 是一个 32 位执行状态。在此状态下的操作与先前的架构具有向后兼容。它支持 T32 和 A32 指令集。标准寄存器宽度为32位。 
+2. AArch64 是一个 64 位执行状态。它支持A64指令集。标准寄存器宽度为64位。 
+
+## 2.1 更改执行状态
+
+执行状态切换规则如下：
+
+<Mermaid 
+value={`graph TD
+    A[执行状态切换时机] --> B[复位时 Reset]
+    A --> C[异常级别变化时<br>Exception Level Change]
+    
+    C --> D[低EL到高EL<br>Lower → Higher]
+    C --> E[高EL到低EL<br>Higher → Lower]
+    
+    D --> F["保持原状态 或 切换到 AArch64"]
+    E --> G["保持原状态 或 切换到 AArch32"]
+    
+    F --> H[64位层可托管32位层]
+    G --> I[32位层不能托管64位层]
+    
+    style A fill:#e3f2fd,stroke:#1565c0
+    style H fill:#bbdefb,stroke:#0d47a1
+    style I fill:#ffcdd2,stroke:#c62828`}
+/>
+
+## 2.2 安全状态
+
+安全状态是TrustZone技术的一部分，用于将系统划分为安全世界（Secure world）和非安全世界（Non-secure world，也称为正常世界）。在ARMv9-A中，还引入了领域管理扩展（RME），增加了两个新的安全状态：领域状态（Realm state）和根状态（Root state）。
+
+安全状态决定了处理单元（PE）可以访问哪些物理地址空间和系统寄存器。安全状态的变化必须经过EL3（最高异常级别）的控制。
+
+<Mermaid
+value={`graph TD
+    A[ARM安全状态] --> B["传统TrustZone模型<br>（Armv8-A）"]
+    A --> C["增强TrustZone模型<br>（Armv9-A + RME）"]
+    
+    B --> B1[非安全状态 Non-Secure<br>也称为Normal World]
+    B --> B2[安全状态 Secure<br>也称为Secure World]
+    
+    C --> C1[非安全状态]
+    C --> C2[安全状态]
+    C --> C3[领域状态 Realm]
+    C --> C4[根状态 Root ,EL3专属]
+    
+    style B1 fill:#bbdefb,stroke:#1565c0
+    style B2 fill:#c8e6c9,stroke:#2e7d32
+    style C3 fill:#fff3e0,stroke:#f57c00
+    style C4 fill:#ffcdd2,stroke:#c62828`}
+/>
+
+## 2.3 
+
+
 
 </WordCount>

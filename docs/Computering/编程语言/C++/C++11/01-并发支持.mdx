@@ -1,0 +1,117 @@
+import WordCount from '../../../../../src/components/WordCount/WordCount';
+import Mermaid from '@theme/Mermaid';
+
+<WordCount>
+
+## 1. 内存模型
+
+C++11内存模型是C++11实现更好的并发支持的核心。
+
+在多线程高并发的场景下，C++11从语言特性上定义了对共享内存的访问和修改行为，以及定义原子操作和同步操作的语义。
+
+举个例子，在单线程程序中，代码执行顺序就是我们在代码中看到的顺序。但在多线程环境下，情况变得复杂：首先编译器可能为了性能重排指令；其次CPU可能乱序执行指令；再次多级缓存导致内存更新延迟。
+
+```cpp
+int x = 0, y = 0;
+bool ready = false;
+
+// 线程1
+x = 42;
+y = 43;
+ready = true;
+
+// 线程2
+while(!ready);
+std::cout << x << ", " << y;  // 可能输出0, 0！
+```
+
+<Mermaid
+value={`
+    graph TD;
+    A[代码层 Code] --> B[原子操作 Atomic Operations]
+    B --> C[内存序 Memory Ordering]
+    C --> D[硬件层 Hardware]`}
+    />
+
+内存序的6个级别：
+
+```cpp
+std::atomic<int> x(0);
+
+// 线程1
+x.store(1, std::memory_order_relaxed);
+
+// 线程2
+int value = x.load(std::memory_order_relaxed);
+```
+
+
+这就是内存模型。具体来说，原子操作与内存序的关系可以按如下方式概括：
+
+<Mermaid
+value={`graph TD
+    A[原子类型 std::atomic<T>] --> A1[load]
+    A --> A2[store]
+    A --> A3[exchange]
+    A --> A4[compare_exchange]
+
+    A --> M[内存序 Memory Ordering]
+
+    M --> M1[memory_order_relaxed]
+    M --> M2[memory_order_consume]
+    M --> M3[memory_order_acquire]
+    M --> M4[memory_order_release]
+    M --> M5[memory_order_acq_rel]
+    M --> M6[memory_order_seq_cst]
+
+    M1 --> G1[仅保证原子性]
+    M2 --> G2[数据依赖顺序]
+    M3 --> G3[获取语义]
+    M4 --> G4[释放语义]
+    M5 --> G5[获取-释放语义]
+    M6 --> G6[全局顺序一致性]`}/>
+
+
+顺序一致性和宽松模型的对比：
+
+<Mermaid
+value={`quadrantChart
+    title 内存序性能与保证级别对比
+    x-axis "弱保证" --> "强保证"
+    y-axis "高性能" --> "低性能"
+    quadrant-1 "宽松/高性能"
+    quadrant-2 "强保证/高性能"
+    quadrant-3 "宽松/低性能"
+    quadrant-4 "强保证/低性能"
+    
+    "relaxed": [0.2, 0.8]
+    "consume": [0.3, 0.7]
+    "acquire/release": [0.6, 0.6]
+    "acq_rel": [0.7, 0.5]
+    "seq_cst": [0.9, 0.3]`}/>
+
+
+内存屏障效果图：
+
+<Mermaid
+value={`gantt
+    title 内存操作重排限制
+    dateFormat HH:mm
+    axisFormat %H:%M
+    
+    section Thread 1 (Release语义)
+    普通写操作  :des1, 00:00, 00:02
+    Release屏障 :milestone, 00:02, 00:00
+    Release写操作 :des2, after des1, 00:02
+    
+    section Thread 2 (Acquire语义)
+    Acquire读操作 :des3, 00:03, 00:02
+    Acquire屏障   :milestone, 00:05, 00:00
+    后续读/写操作 :des4, after des3, 00:02
+    
+    section 重排限制
+    Release屏障前操作 → 不能重排到屏障后 :crit, after des1, 00:01
+    Acquire屏障后操作 → 不能重排到屏障前 :crit, after des3, 00:01`}/>
+
+
+</WordCount>

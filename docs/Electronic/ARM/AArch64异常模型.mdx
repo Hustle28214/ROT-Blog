@@ -1,0 +1,33 @@
+
+import WordCount from '../../../src/components/WordCount/WordCount.jsx';
+import Mermaid from '@theme/Mermaid';
+
+<WordCount>
+
+出于安全考虑，现代处理器架构往往存在权限的概念。比如说我们不希望用户能够直接修改内核代码以免造成内核崩溃，又需要给予用户一定的配置内核功能的能力。此时我们需要权限，赋予用户特权，以实现功能隔离。
+
+## 1. 权限、异常级别
+
+AArch64 中权限的名称为异常级别,通常缩写为 EL。
+
+异常级别为编号,通常缩写为 EL\<x\>,其中 \<x\> 为介于 0 到 3 之间的数字。权限级别越高,数字越高。例如,最低级别的权限称为EL0。 
+
+通常来说，EL对应的级别随着系统抽象层级的提升而降低。
+
+<Mermaid
+value={`quadrantChart
+    title ARM Privilege Levels Hierarchy
+    x-axis "Low Privilege" --> "High Privilege"
+    y-axis "User Space" --> "System Space"
+    quadrant-1 "Application Space"
+    quadrant-2 "Kernel Space"
+    quadrant-3 "Virtualization"
+    quadrant-4 "Secure Firmware"
+    
+    "EL0: Application": [0.2, 0.2]
+    "EL1: Rich OS": [0.6, 0.4]
+    "EL2: Hypervisor": [0.8, 0.6]
+    "EL3: Secure Monitor": [0.95, 0.8]`}
+/>
+
+</WordCount>

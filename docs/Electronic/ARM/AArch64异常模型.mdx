@@ -8,6 +8,8 @@ import Mermaid from '@theme/Mermaid';
 
 ## 1. 权限、异常级别
 
+### 1.1 异常级别
+
 AArch64 中权限的名称为异常级别,通常缩写为 EL。
 
 异常级别为编号,通常缩写为 EL\<x\>,其中 \<x\> 为介于 0 到 3 之间的数字。权限级别越高,数字越高。例如,最低级别的权限称为EL0。 
@@ -29,5 +31,89 @@ value={`quadrantChart
     "EL2: Hypervisor": [0.8, 0.6]
     "EL3: Secure Monitor": [0.95, 0.8]`}
 />
+
+异常级别只能在特定的事件发生时改变。
+
+
+1. 发生异常（Taking an exception）
+2. 从异常返回（Returning from an exception）
+3. 处理器复位（Processor reset）
+4. 在调试状态期间（During Debug state）
+5. 退出调试状态（Exiting from Debug state）
+
+## 1.2 特权类型
+
+AArch64 Exception 模型有两种类型的权限:
+
+1. 内存系统中的权限
+2. 从访问处理器资源的角度来看是特权
+
+两种类型的权限都受当前特权异常级别的影响。
+
+如下图是AArch64特权类型图：
+
+<Mermaid
+value={`graph TD
+    A[AArch64特权类型] --> B[内存系统特权<br>Memory Privilege]
+    A --> C[处理器资源访问特权<br>Processor Resource Access]
+    
+    B --> B1[通过MMU管理内存访问权限]
+    C --> C1[通过系统寄存器控制访问]
+    
+    B1 --> B2[EL0: 非特权访问权限]
+    B1 --> B3["EL1/2/3: 特权访问权限"]
+    
+    C1 --> C2[寄存器名后缀指示<br>最低访问EL]
+    
+    style A fill:#e3f2fd,stroke:#1565c0,stroke-width:3px`}
+/>
+
+异常类型处理的寄存器：
+
+<Mermaid
+value={`quadrantChart
+    title 异常处理关键寄存器功能分类
+    x-axis "状态保存" --> "异常控制"
+    y-axis "异常原因" --> "异常地址"
+    quadrant-1 "异常返回地址"
+    quadrant-2 "异常控制配置"
+    quadrant-3 "异常原因信息"
+    quadrant-4 "异常地址信息"
+    
+    "ELR_ELx": [0.8, 0.3]
+    "SPSR_ELx": [0.7, 0.4]
+    "VBAR_ELx": [0.9, 0.6]
+    "SCTLR_ELx": [0.85, 0.7]
+    "HCR_EL2": [0.9, 0.8]
+    "SCR_EL3": [0.95, 0.85]
+    "ESR_ELx": [0.3, 0.7]
+    "FAR_ELx": [0.2, 0.8]`}/>
+
+处理异常的关键寄存器说明：
+
+
+| 寄存器 | 实际可用级别 | 说明 |
+|--------|--------------|------|
+| `ELR_ELx` | EL1, EL2, EL3 | 异常链接寄存器，每个级别独立 |
+| `ESR_ELx` | EL1, EL2, EL3 | 异常综合征寄存器，每个级别独立 |
+| `FAR_ELx` | EL1, EL2, EL3 | 故障地址寄存器，每个级别独立 |
+| `HCR_ELx` | EL2 | 仅EL2可用，控制虚拟化 |
+| `SCR_ELx` | EL3 | 仅EL3可用，控制安全状态 |
+| `SCTLR_ELx` | EL1, EL2, EL3 | 系统控制寄存器，每个级别独立 |
+| `SPSR_ELx` | EL1, EL2, EL3 | 保存程序状态寄存器，每个级别独立 |
+| `VBAR_ELx` | EL1, EL2, EL3 | 向量基地址寄存器，每个级别独立 |
+
+## 2. 执行与安全状态 
+
+Armv8-A 或 Armv9-A 处理器的当前状态由异常级别和当前执行状态决定。
+
+当前执行状态定义了通用寄存器的标准宽度和可用的指令集。
+
+Armv8-A 和 Armv9-A 支持两个执行语句:
+
+AArch32
+    AArch32 是一个 32 位执行状态。在此状态下的操作与先前的架构具有向后兼容。它支持 T32 和 A32 指令集。标准寄存器宽度为32位。 
+AArch64
+    AArch64 是一个 64 位执行状态。它支持A64指令集。标准寄存器宽度为64位。 
 
 </WordCount>

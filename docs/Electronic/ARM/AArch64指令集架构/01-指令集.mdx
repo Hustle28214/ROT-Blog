@@ -1,0 +1,79 @@
+
+import WordCount from '../../../../src/components/WordCount/WordCount.jsx';
+import Mermaid from '@theme/Mermaid';
+
+<WordCount>
+
+## 指令集架构(ISA)
+
+指令集架构(ISA)是计算机抽象模型的一部分。它定义了软件如何控制处理器。 
+
+Armv8-A 支持三个指令集:A32、T32 和 A64。 有两种主要执行状态：
+
+<Mermaid
+value={`graph TB
+    A[ARMv8-A 架构] --> B[AArch64 执行状态]
+    A --> C[AArch32 执行状态]
+    
+    B --> B1[使用 A64 指令集]
+    B1 --> B2[固定长度 32位指令]
+    
+    C --> C1[使用 A32/T32 指令集]
+    C1 --> C2[向后兼容 ARMv7]`}
+/>
+
+
+指令执行流程:
+
+<Mermaid
+value={`graph LR
+    A[内存中的指令序列] --> B[取指 Fetch]
+    B --> C[解码 Decode]
+    C --> D[执行 Execute]
+    D --> E[写回 Write-back]
+    
+    style A fill:#e3f2fd,stroke:#1565c0`}
+/>
+
+这是程序员看到的"抽象机器"行为.
+
+实际的Cortex处理器流水线结构:
+
+<Mermaid
+value={`graph TB
+    subgraph "Cortex处理器流水线示例"
+        Fetch["取指阶段<br>Fetch"]
+        Decode["解码、重命名、分发<br>Decode, Rename, Dispatch"]
+        Branch["分支预测<br>Branch"]
+        
+        subgraph "执行单元（乱序）"
+            Integer0["整数单元0<br>Integer 0"]
+            Integer1["整数单元1<br>Integer 1"]
+            IntegerMC["整数多周期<br>Integer Multi-Cycle"]
+            FP0["浮点/向量单元0<br>FP/ASIMD 0"]
+            FP1["浮点/向量单元1<br>FP/ASIMD 1"]
+            Load["加载单元<br>Load"]
+            Store["存储单元<br>Store"]
+        end
+        
+        Fetch --> Decode
+        Decode --> Branch
+        Branch --> Integer0
+        Branch --> Integer1
+        Branch --> IntegerMC
+        Branch --> FP0
+        Branch --> FP1
+        Branch --> Load
+        Branch --> Store
+    end
+    
+    style Fetch fill:#bbdefb,stroke:#0d47a1
+    style Decode fill:#c8e6c9,stroke:#1b5e20
+    style Branch fill:#ffecb3,stroke:#ff6f00
+    `}
+/>
+
+
+
+
+</WordCount>

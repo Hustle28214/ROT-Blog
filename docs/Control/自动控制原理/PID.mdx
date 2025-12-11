@@ -2,23 +2,222 @@ import WordCount from '../../../src/components/WordCount/WordCount';
 
 <WordCount>
 
-## PID的定义
+## 什么是PID？
 
 PID 是比例-积分-微分（Proportional-Integral-Derivative）的缩写，是一种广泛使用的反馈控制器。它用于动态系统控制，例如在工程、自动化、机器人和其他领域。PID 控制器的目标是根据系统的误差（即期望值与实际值之间的差异）来调整控制输入，从而使系统输出达到设定目标。
 
 我们不关心它的中间环节，关心它的误差。
 
+我们拿一个经典的控制模型————倒立摆举个例子，它一般由与地面接触的一个轮子（或者是带轮子的车体）与一根与之连接的硬质杆件，能以此点为轴心使摆杆能在垂直的平面上自由地摆动。
+
+
+![image](https://github.com/user-attachments/assets/efe5cccd-04d3-4145-a3bf-5a119185664b)
+
+在我们的常识和科学实证中，这样的系统，没有外力控制是无法平衡的。但往往我们需要利用这样的系统去实现一些工程，特别是需要轮式底盘的移动机器人领域。由此，我们需要引入倒立摆的平衡控制问题。直观地来说，倒立摆的控制目标就是让它“立正站稳”；严谨地来说，倒立摆的控制问题就是使摆杆尽快地达到一个平衡的位置，并且使之没有大的振荡和过大的角度和速度。
+
+PID控制器是一种常用的反馈控制器，由比例（P）、积分（I）和微分（D）三部分组成。它通过计算当前误差值，并根据误差值调整控制输入，从而实现对系统的精确控制。
+
+- 比例控制（P）：根据当前误差值调整控制输入，误差值越大，调整力度越大。
+- 积分控制（I）：考虑过去的误差值，消除系统的稳态误差。
+- 微分控制（D）：预测未来的误差变化趋势，提前调整控制输入，减少系统的振荡。
+
+
+在MATLAB中实现了一个简单的PID控制器，我们可以直观地看到它的效果：
+
+![Image](https://github.com/user-attachments/assets/6787a584-52fe-440b-9393-d706c975ac31)
+
+可以这样理解，P（现在）、I（过去）、D（未来）三者分别着眼于误差的不同时间维度，它们相互配合、取长补短，共同构成了一个能够“总结过去、把握现在、预测未来”的智能控制器，从而在各种复杂和动态的系统中实现快速、精准且稳定的控制效果。
+
+对于工程上的应用比如平衡车，我们主要采用了角度环和速度环来实现直立和稳定，滚转环实现转向移动。角度环主要起到了直立环的作用，也就是让机器人保持直立状态，这是平衡的关键；利用速度环控制机器人的移动速度和方向，根据速度误差调整目标角度。双环配合，既保持平衡，又控制速度。在此基础上，滚转环通过改变左右舵机位置，实现左右高差从而使得机器人能够转向移动。
+
 ### P控制
 
 顾名思义就是比例环节的控制。
 
+对角度环单环实现P控制，是平衡调参中最基础的实现。
 
-### PI控制
+让我们回顾一下PID的核心公式：
+$Output = Kp*e(t) + Ki*∫e(t)dt + Kd*\frac{d e(t)}{dt}$
+
+其中，$Output$代表系统输出，右式第一项是比例项，第二项是积分项，第三项是微分项，$Kp$表示比例系数，$e(t)$表示误差项，$Ki$表示积分系数，$Kd$表示微分系数。
+
+在P控制中，我们忽略后面两项，保留比例项。则上述公式变式为：
+$Output = Kp*e(t)$
+我们可以实现一个误差项：
+```cpp
+float angleError = pitch - dynamicTargetAngle;
+```
+其中pitch代表当前俯仰角，它来自于IMU的角度寄存器的数值读取；dynamicTargetAngle代表角度期望值，这是需要我们自己设定的，在这里，该变量定义是我们的目标角度＋偏差项，我们的控制输出需要尽可能接近这个值。
+
+这样，我们就可以实现一个P项：
+```cpp
+float pitchControlOutput = robotState.Kp_angle * angleError;
+```
+你需要调整Kp_Angle，观察机器人的平衡情况，以达到一个合适的值。调参原则来说，这个值应该是Kp/Ki/Kd中最大的。
+
+此时机器人已能基本实现站立，但是振荡较大，很可能倒下。为此，我们需要引入D项，调节其稳定性。
 
 
 ### PD控制
 
 
+实现一个最基础的P控制之后，加入D项可以让我们的直立环更稳定。
+
+在PD控制中，我们忽略积分项，保留比例项和微分项。则上述公式变式为：
+
+通过读取IMU寄存器值，并减去零漂，来实现一个微分误差项：
+
+```cpp
+float pitchRate = imuData.pitchRate;
+```
+代入公式：
+```cpp
+float pitchControlOutput = robotState.Kp_angle * angleError + robotState.Kd_angle * pitchRate;
+```
+
+调节Kd_angle，达到一个合适的值。调参原则来说，Kd_angle的值不应太大，只需要一个较小的值就可以使系统稳定，如果太大了反而会增大振荡。
+
+此时机器人已能实现较稳定的站立。读取IMU数据时我们可能需要使用卡尔曼滤波来减少累积误差，实现更为实时、精确的控制。
+
+卡尔曼滤波实现示例：
+
+```cpp
+bool IMUHandler::update() {
+    inv_imu_sensor_event_t imuEvent;
+    
+    // 读取IMU数据
+    int ret = imu.getDataFromRegisters(imuEvent);
+    if (ret != 0) {
+        return false;
+    }
+    
+    // 计算时间间隔
+    unsigned long currentTime = millis();
+    float dt = (currentTime - lastUpdateTime) / 1000.0f;
+    
+    // 限制dt范围，防止第一次调用或异常情况下dt过大
+    if (dt > 0.1f || dt < 0.001f) {
+        dt = 0.01f;  // 默认100Hz更新率
+    }
+    
+    lastUpdateTime = currentTime;
+    
+    // 提取加速度数据(单位：g)，不需要转换为m/s²
+    float ax = imuEvent.accel[0] * ACCEL_SCALE;
+    float ay = imuEvent.accel[1] * ACCEL_SCALE;
+    float az = imuEvent.accel[2] * ACCEL_SCALE;
+    
+    // 提取陀螺仪数据(单位：度/秒) 并减去零漂
+    float gx = imuEvent.gyro[0] * GYRO_SCALE - gyroOffsetX;
+    float gy = imuEvent.gyro[1] * GYRO_SCALE - gyroOffsetY;
+    float gz = imuEvent.gyro[2] * GYRO_SCALE - gyroOffsetZ;
+    
+    // 存储原始数据（加速度转换为m/s²供外部使用）
+    data.accelX = ax;
+    data.accelY = ay;
+    data.accelZ = az;
+    data.pitchRate = gx;
+    data.rollRate = gy;
+    data.yawRate = gz;
+    
+    // 卡尔曼滤波计算姿态角
+    kalmanFilterUpdate(ax, ay, az, gx, gy, gz, dt);
+    
+    data.timestamp = currentTime;
+    
+    return true;
+}
+
+
+float KalmanFilter::update(float newAngle, float newRate, float dt) {
+    // 限制dt范围，防止异常
+    if (dt > 0.1f || dt < 0.001f) {
+        dt = 0.01f;
+    }
+
+    // ===== 预测步骤 =====
+    // 1. 状态预测
+    rate = newRate - bias;                    // 去除零漂的角速度
+    angle += dt * rate;                       // 角度预测
+
+    // 防止角度积分发散，限制在合理范围内
+    if (angle > 180.0f) angle = 180.0f;
+    if (angle < -180.0f) angle = -180.0f;
+
+    // 2. 误差协方差预测
+    // P = A * P * A^T + Q
+    P[0][0] += dt * (dt * P[1][1] - P[0][1] - P[1][0] + Q_angle);
+    P[0][1] -= dt * P[1][1];
+    P[1][0] -= dt * P[1][1];
+    P[1][1] += Q_bias * dt;
+
+    // ===== 更新步骤 =====
+    // 3. 计算卡尔曼增益
+    // K = P * H^T / (H * P * H^T + R)
+    float S = P[0][0] + R_measure;            // 新息协方差
+    float K[2];                               // 卡尔曼增益
+    K[0] = P[0][0] / S;
+    K[1] = P[1][0] / S;
+
+    // 4. 状态更新
+    // x = x + K * (z - H * x)
+    float y = newAngle - angle;               // 新息(innovation)
+
+    // 限制新息范围，防止异常值
+    if (y > 90.0f) y = 90.0f;
+    if (y < -90.0f) y = -90.0f;
+
+    angle += K[0] * y;                        // 更新角度
+    bias += K[1] * y;                         // 更新零漂
+
+    // 限制bias的范围，防止过度变化（更严格）
+    if (bias > 2.0f) bias = 2.0f;
+    if (bias < -2.0f) bias = -2.0f;
+
+    // 5. 误差协方差更新
+    // P = (I - K * H) * P
+    float P00_temp = P[0][0];
+    float P01_temp = P[0][1];
+
+    P[0][0] -= K[0] * P00_temp;
+    P[0][1] -= K[0] * P01_temp;
+    P[1][0] -= K[1] * P00_temp;
+    P[1][1] -= K[1] * P01_temp;
+
+    return angle;
+}
+
+```
+
+### PI控制
+
+向原先的单环结构加入速度环，能够控制轮足机器人的移动速度。除此之外，我们希望速度环能够对地面的阻力有一个比较鲁棒的适应性。
+
+我们将尝试两种常见的控制方法来设计速度环。
+
+尝试将速度环设计为PD控制，因为我们在角度环上取得了显著的见效。
+
+在代码中，你可以这样设计：
+```cpp
+angleAdjust = -(Kp_speed * speedError + Kd_speed * speedDerivative)
+```
+可以看见我们的机器人能够指定速度并且保持一定的平衡前进。但长时间运行，我们可能看到速度的稳定性愈发不足，这是长时间累计的速度误差导致的。为此，我们需要思考是否更换一种控制方式。
+
+```cpp
+float speedError = robotState.filteredSpeed - robotState.speedBias - robotState.targetSpeed;
+if (noCommand && imuStable) {
+    robotState.speedIntegral += speedError * 0.01f;  // 积分项
+    robotState.speedIntegral = constrain(robotState.speedIntegral, 
+                                         -RobotConstants::SPEED_INTEGRAL_LIMIT, 
+                                         RobotConstants::SPEED_INTEGRAL_LIMIT);
+} else {
+    robotState.speedIntegral *= 0.95f;  // 积分衰减
+}
+
+float angleAdjust = -(robotState.Kp_speed * speedError + robotState.Ki_speed * robotState.speedIntegral);
+float dynamicTargetAngle = robotState.targetAngle + angleAdjust;
+```
+可以看到我们的机器人在长时间内都能保持一个稳定的速度前进了。
 
 ### PID控制
 

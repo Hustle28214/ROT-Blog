@@ -211,7 +211,7 @@ const config = {
           },  
 
           {
-            to: '/blog/rss.xml',
+            href: '/blog/rss.xml',
             label: 'RSS',
             position: 'right',
           },

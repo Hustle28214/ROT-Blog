@@ -5,7 +5,9 @@ sidebar_position: 1
 
 
 import VideoPlayer from '../../../../src/components/Videoplayer/Videoplayer.jsx';
+import WordCount from '../../../../src/components/WordCount/WordCount';
 
+<WordCount>
 > 1
 
 <VideoPlayer src="//player.bilibili.com/player.html?isOutside=true&aid=811394492&bvid=BV1F34y1h7so&cid=718443513&p=26" />
@@ -19,18 +21,28 @@ import VideoPlayer from '../../../../src/components/Videoplayer/Videoplayer.jsx'
 2. 研究当系统中某一参数变化时，系统性能的变化趋势
 3. 近似方法，不十分准确
 
-根轨迹是说：系统某一参数由$0-\infty$变化时，$\lambda$在s平面相应变化所描绘出来的轨迹。
+根轨迹是说：系统某一参数由$0-\infty$变化时，$\lambda$(闭环系统极点，即特征方程的根)在s平面相应变化所描绘出来的轨迹。
 :::danger
 一定是<mark>闭环</mark>的根轨迹，没有开环根轨迹、闭环根轨迹增益一说！
 :::
 
 04:30：
 
+例1：系统结构图如图所示，分析$\lambda$随开环增益K的变化趋势。
+
+![](https://github.com/user-attachments/assets/2716b70a-f051-484e-94bb-361c1951b7c3)
+
+
+
 <details>
 
 <summary>解法</summary>
 
 先写出开环传递函数尾1标准型，在根轨迹法中，习惯把传递函数写成首1标准型。
+
+$$
+G(s)=\frac{K}{s(0.5s+1)}=\frac{K* = 2K}{s(s+2)}
+$$
 
 尾1标准型（开环传递函数）时，K为开环增益；为标准型（闭环传递函数）时，K为闭环增益；
 
@@ -44,10 +56,79 @@ import VideoPlayer from '../../../../src/components/Videoplayer/Videoplayer.jsx'
 
 首先写出闭环传递函数，写出特征多项式，让其等于0。得到特征方程。解这个二次方程，得到06:45的结果。
 
+$$
+\Phi = \frac{C(s)}{R(s)} = \frac{K^{*}}{s^2+2s+K^{*}}
+$$
+$$
+D(s) = s^2+2s+K^{*} = 0
+$$
+
+解得：
+$$
+\lambda = -1±\sqrt{1-K^{*}}
+$$
+
 画出s平面。标出开环极点。
+
+![](https://github.com/user-attachments/assets/304a1f7e-12b3-4d2a-8360-8053603239c1)
+
+![](https://github.com/user-attachments/assets/9b9f172f-6870-44e5-a0dd-5839a1bc18d0)
+
+所以，在$K^{*}$从0到1变化时，$\lambda$是互异单根，呈现出过阻尼的状态，所以此区间系统动态性能：$\xi>1$,$\sigma\%=0$,$t_s\downarrow$，。
+
+在$K^{*}$从1到$\infty$变化时，$\lambda$是共轭复根，系统进入欠阻尼状态，所以此区间系统动态性能：$0<\xi<1$,$\beta \uparrow \rightarrow \xi \downarrow \rightarrow \sigma\% \uparrow$,$t_s=\frac{3.5}{\xi \omega_n}$基本不变。
+
+
+
+系统稳定性：$Re[\lambda_{1,2}]<0$，系统绝对稳定。
+
+系统稳态误差($r(t) = \delta t$)：$K^{*} \uparrow \rightarrow e_{ss}=\frac{A}{K} = \frac{2A}{K^{*}} \downarrow$
+
 
 </details>
 
+系统结构图如图，确定闭环零点：
+
+
+![](https://github.com/user-attachments/assets/8cd81381-e9c6-4386-9b7c-9162c3dd96d4)
+
+$$
+G(s) = \frac{K_1K_2(s+2)(s+4)}{s(s+5)(s+3)}
+$$
+
+$$
+\Phi = \frac{\frac{K_1(s+2)}{s(s+3)}}{1+\frac{K_1K_2(s+2)(s+4)}{s(s+5)(s+3)}} = \frac{K_1(s+2)(s+5)}{s(s+5)(s+3)+K_1K_2(s+2)(s+4)}
+$$
+
+闭环零点 = 前向通道开环零点 + 反馈通道开环极点，闭环极点与开环零点、开环极点及$K^{*}$均有关。
+
+![](https://github.com/user-attachments/assets/6861a9fd-d749-449d-b8fe-0867e574631c)
+
+根轨迹方程及其含义：
+
+$$
+G(s) = \frac{K^{*}}{s-p}
+$$
+
+$$
+\Phi(s) = \frac{G(s)}{1+G(s)}
+$$
+
+$$
+1+G(s) = 0
+$$
+
+$$
+G(s) = -1
+$$
+
+$$
+|G(s)| = \frac{K^{*}}{|s-p|} =1
+$$
+
+$$
+∠G(s) = -∠(s-p) = (2k+1)\pi
+$$
 
 > 2
 
@@ -60,3 +141,6 @@ import VideoPlayer from '../../../../src/components/Videoplayer/Videoplayer.jsx'
 > 4
 
 <VideoPlayer src="//player.bilibili.com/player.html?isOutside=true&aid=811394492&bvid=BV1F34y1h7so&cid=718449094&p=29" />
+
+
+</WordCount>

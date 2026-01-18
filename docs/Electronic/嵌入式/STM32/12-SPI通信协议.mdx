@@ -6,7 +6,13 @@ import Mermaid from '@theme/Mermaid';
 
 ## 1. SPI通信
 
-SPI（Serial Peripheral Interface）是由Motorola公司开发的一种通用数据总线
+SPI（Serial Peripheral Interface）是由Motorola公司开发的一种通用数据总线.
+
+SPI最大的特点是数据传输没有固定的起始/停止位，**完全由时钟沿控制数据采样和移位**。
+
+:::tips
+
+:::
 
 四根通信线：SCK（Serial Clock）、MOSI（Master Output Slave Input）、MISO（Master Input Slave Output）、SS（Slave Select）
 
@@ -35,28 +41,94 @@ SPI主从机的寄存器间的数据传递与队列(queue)机制非常相似，�
 
 ### 2.1 起始、终止条件
 
+SPI 的通信由 CS（SS） 信号控制：
+- 起始条件：CS 从高电平变为低电平（激活从机）
+- 终止条件：CS 从低电平变为高电平（释放从机）
+
+在 CS（SS） 有效期间，SCK 才会工作，数据传输才能进行。
 
 ![Image](https://github.com/user-attachments/assets/e81a0352-a197-4767-99c4-c99d8c4eeab1)
 
-### 2.2 模式0
+SPI 模式由两个参数决定：
+
+1. CPOL（Clock Polarity） - 时钟极性
+
+- CPOL = 0：SCK 空闲时为低电平
+- CPOL = 1：SCK 空闲时为高电平
+
+2. CPHA（Clock Phase） - 时钟相位
+
+- CPHA = 0：数据在第一个时钟沿采样
+- CPHA = 1：数据在第二个时钟沿采样
+
+组合成 4 种模式：模式 0、1、2、3。
+
+### 2.2 模式0（CPOL=0, CPHA=0）
+
+这是SPI最常用的模式。时序特点：SCK 空闲 = 低电平，数据在 SCK 上升沿被采样，在 SCK 下降沿发生变化。
 
 ![Image](https://github.com/user-attachments/assets/4a999aa1-d078-4884-aed1-eb5fa31d9ceb)
 
-### 2.3 模式1
+1. CS 拉低后，主机在第一个 SCK 下降沿输出第一位数据（MOSI）
+2. 从机在 SCK 上升沿采样该位数据
+3. 同时从机在 SCK 上升沿输出自己的数据（MISO）
+4. 主机在下一个 SCK 下降沿采样 MISO 数据
+5. 如此循环 8 次完成 1 字节传输
 
+像ADC，FLASH这些能够采样的都是常见的SPI设备。
+
+### 2.3 模式1（CPOL=0, CPHA=1）
+
+SCK 空闲 = 低电平，数据在 SCK 下降沿被采样，数据在 SCK 上升沿发生变化。
 
 ![Image](https://github.com/user-attachments/assets/375cd8e9-2fe6-4559-80f1-0523840e44eb)
 
+1. CS 拉低后，主机在第一个 SCK 上升沿输出第一位数据
+2. 从机在 SCK 下降沿采样该位数据
+3. 数据传输比模式 0 延迟半个时钟周期
 
-### 2.4 模式2
+适用于某些特定传感器或旧式 SPI 设备。
 
+### 2.4 模式2（CPOL=1, CPHA=0）
+
+SCK 空闲 = 高电平，数据在 SCK 下降沿被采样，数据在 SCK 上升沿发生变化。
 
 ![Image](https://github.com/user-attachments/assets/2f5ad421-6596-44b8-b8a4-f4fc8590e6e1)
 
+:::warning
+注意：虽然 CPHA=0，但因为 CPOL=1，实际“第一个时钟沿”是下降沿（因为 SCK 从高变低）。
+:::
 
-### 2.5 模式3
+工作流程：
+1. 主机在CS有效后立即输出第一位数据，然后在每个上升沿更新数据
+2. 从机在每个下降沿读取数据
+
+适用场景：较少使用，但一些特殊芯片支持。
+
+
+### 2.5 模式3（CPOL=1, CPHA=1）
+
+SCK 空闲 = 高电平，数据在 SCK 上升沿被采样，数据在 SCK 下降沿发生变化。
 
 ![Image](https://github.com/user-attachments/assets/fd8b91c4-9143-4e34-8b9b-23ef87affec4)
+
+1. CS 拉低时 SCK 为高电平
+2. 主机在第一个 SCK 下降沿输出数据（SCK 从高→低）
+3. 从机在 SCK 上升沿采样数据
+4. 这与模式 0 类似，只是空闲电平相反
+
+适用于某些射频芯片、特定通信模块。
+
+:::warning
+1. 主从设备模式必须匹配，否则无法通信。
+2. 数据位顺序（MSB/LSB 优先）也需要匹配，这独立于模式设置。
+3. 时钟频率不能超过从设备最大支持频率。
+4. 每次 CS 拉低都重新开始传输
+5. 多字节连续传输时，CS 可保持低电平
+6. CS 拉高期间，MOSI/MISO 应为高阻态
+7. 模式选择依据：必须查阅从设备数据手册，通常模式 0 最常见。
+:::
+
 
 ## 3. SPI时序
 

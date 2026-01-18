@@ -9,7 +9,7 @@ import Links from '../../Link/Link';
 import { Tilt } from '@jdion/tilt-react'
 import { MsgCard } from '../MsgCard/MsgCard';
 import Particles from '../StarrySky/StarrySky'
-
+import SkillGraph from '../../SkillGraph';
 
 const variants: Variants = {
     visible: i => ({
@@ -34,7 +34,6 @@ function MsgCardShow(){
     return (
         <MsgCard />
     );
-
 }
 
 function HeadGreet() {
@@ -68,10 +67,30 @@ function HeadGreet() {
     );
 }
 
+function SkillGraphComponent() {
+    const handleNodeClick = (node) => {
+        console.log('选中节点:', node);
+    };
+
+    return (
+        <motion.div
+            className={styles.skill_graph_container}
+            custom={5}
+            initial="hidden"
+            animate="visible"
+            variants={variants}
+        >
+            <SkillGraph
+                width={1400}
+                height={900}
+                onNodeClick={handleNodeClick}
+            />
+        </motion.div>
+    );
+}
+
 export default function HeadIntro() {
     return (
-
-        
         <motion.div className={styles.hero} style={{ backgroundColor: 'transparent' }}>
             <div className={styles.intro}>
                 <HeadGreet />
@@ -84,8 +103,6 @@ export default function HeadIntro() {
                     <Links />
                 </motion.div>
                 <motion.div className="mt-4 flex gap-2" custom={4} initial="hidden" animate="visible" variants={variants}>
-
-
                     <MovingButton
                         borderRadius="1.25rem"
                         className="relative z-10 flex items-center rounded-2xl border-solid border-neutral-200 px-5 py-3 text-center text-base"
@@ -98,18 +115,27 @@ export default function HeadIntro() {
                         </div>
                     </MovingButton>
                 </motion.div>
-
             </div>
-
-            
             <motion.div className={styles.background}>
                 <MeSvg />
                 <Circle />
-                
                 <MsgCard />
             </motion.div>
         </motion.div>
+    );
+}
 
-        
+// 保留导出的Skill函数，以便其他组件仍然可以导入使用
+export function Skill() {
+    const handleNodeClick = (node) => {
+        console.log('选中节点:', node);
+    };
+
+    return (
+        <SkillGraph
+            width={1400}
+            height={900}
+            onNodeClick={handleNodeClick}
+        />
     );
 }

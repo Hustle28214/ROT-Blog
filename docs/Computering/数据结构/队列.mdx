@@ -2,5 +2,29 @@ import WordCount from '../../../src/components/WordCount/WordCount';
 
 <WordCount>
 
+## 1. 什么是队列
+
+队列(queue)具有先进先出(FIFO)的特点，通常也被称为先进先出（first in first out）表，简称 FIFO 表．
+
+用数组模拟一个队列:
+
+```cpp
+#include <cstdio>
+using namespace std;
+int N = 1e5+7;
+struct Queue{
+int q[N],ql,qr;// 队列首尾
+// 想一想队列操作应该有哪些？
+Queue:ql(1),qr(0){}
+// 等价于：
+// Queue() {
+//     ql = 1;
+//     qr = 0;
+// }
+
+}
+
+
+```
 
 </WordCount>

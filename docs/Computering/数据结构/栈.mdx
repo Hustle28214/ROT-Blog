@@ -2,5 +2,295 @@ import WordCount from '../../../src/components/WordCount/WordCount';
 
 <WordCount>
 
+## 1. 什么是栈
+
+栈是一种LIFO(后进先出)的数据结构，通常被称为是后进先出（last in first out）表，简称 LIFO 表．
+
+我们可以用数组来模拟一个栈：
+
+```cpp
+int s[N];
+*s++;
+s[*s] = var_1;// 压栈操作
+int output_1 = s[*s]; // 取栈顶元素
+if(*s) --*s;// 如果栈非空，栈顶指针减1
+*s = 0;// 清空栈，直接将栈顶指针归零
+```
+
+## 2. C++中的栈容器
+
+CPP中的std::stack：
+
+```cpp
+template<
+    class T,
+    class Container = std::deque<T>
+> class stack; // Container 为用于存储元素的底层容器类型，std::deque<T> - 默认选择
+```
+
+`stack`容器提供了一些常用的栈操作方法。
+
+### 元素访问(Element access)
+
+`top()`: 返回指向栈内最后一个（即最近推送的）元素的引用。该操作仅查看栈顶元素，不会将其移除（移除需调用 pop()）。在逻辑上等同于调用底层容器的 c.back()。
+
+> 参数：无。
+
+> 返回值：指向栈顶元素的引用。
+
+> 复杂度：常数复杂度 O(1)。
+
+e.g.
+
+```cpp
+#include <stack>
+int main(){
+    std::stack<int> s;
+    s.push(1);
+    s.push(2);
+    s.push(3);
+    std::cout << s.top() << std::endl;
+}
+```
+
+### 修改(Modifiers)
+
+`push()`: push 函数的作用是将一个新元素推入栈顶。在底层实现上，它等同于调用底层容器的 `push_back` 方法。
+
+> 参数 (value)：要推入栈顶的元素值。
+
+> 返回值：无（void）。
+
+> 复杂度：其时间复杂度取决于底层容器的 `push_back` 操作（通常对于 `std::deque` 或 `std::vector` 来说，均摊复杂度为 O(1)）。
+
+`push()`有两个重载版本：
+1. 左值引用版：`void push( const value_type& value );` —— 拷贝指定元素。
+2. 右值引用版 (C++11)：`void push( value_type&& value );` —— 移动指定元素，效率更高。
+
+这里贴C++官方的BrainHack解释器：
+
+> Brainfuck 是一种极简的图灵完备编程语言，只有 8 个指令。
+
+```cpp
+#include <array>
+#include <cstdint>
+#include <iostream>
+#include <map>
+#include <stack>
+#include <stdexcept>
+#include <string_view>
+
+class BrainHackInterpreter
+{
+    std::map<unsigned, unsigned> open_brackets, close_brackets;
+    std::array<std::uint8_t, 32768> data_{0};
+    unsigned program_{0};
+    int pos_{0};
+ 
+    void collect_brackets(const std::string_view program)
+    {
+        std::stack<unsigned> brackets_stack;
+ 
+        for (auto pos{0U}; pos != program.length(); ++pos)
+        {
+            if (const char c{program[pos]}; '[' == c)
+                brackets_stack.push(pos);
+            else if (']' == c)
+            {
+                if (brackets_stack.empty())
+                    throw std::runtime_error("Brackets [] do not match!");
+                else
+                {
+                    open_brackets[brackets_stack.top()] = pos;
+                    close_brackets[pos] = brackets_stack.top();
+                    brackets_stack.pop();
+                }
+            }
+        }
+ 
+        if (!brackets_stack.empty())
+            throw std::runtime_error("Brackets [] do not match!");
+    }
+ 
+    void check_data_pos(int pos)
+    {
+        if (pos < 0 or static_cast<int>(data_.size()) <= pos)
+            throw std::out_of_range{"Data pointer out of bound!"};
+    }
+ 
+public:
+    BrainHackInterpreter(const std::string_view program)
+    {
+        for (collect_brackets(program); program_ < program.length(); ++program_)
+            switch (program[program_])
+            {
+                case '<':
+                    check_data_pos(--pos_);
+                    break;
+                case '>':
+                    check_data_pos(++pos_);
+                    break;
+                case '-':
+                    --data_[pos_];
+                    break;
+                case '+':
+                    ++data_[pos_];
+                    break;
+                case '.':
+                    std::cout << data_[pos_];
+                    break;
+                case ',':
+                    std::cin >> data_[pos_];
+                    break;
+                case '[':
+                    if (data_[pos_] == 0)
+                        program_ = open_brackets[program_];
+                    break;
+                case ']':
+                    if (data_[pos_] != 0)
+                        program_ = close_brackets[program_];
+                    break;
+            }
+    }
+};
+ 
+int main()
+{
+    BrainHackInterpreter
+    {
+        "++++++++[>++>>++>++++>++++<<<<<-]>[<+++>>+++<-]>[<+"
+        "+>>>+<<-]<[>+>+<<-]>>>--------.<<+++++++++.<<----.>"
+        ">>>>.<<<------.>..++.<++.+.-.>.<.>----.<--.++.>>>+."
+    };
+    std::cout << '\n';
+}
+```
+<details>
+这个解释器可以执行 Brainfuck 代码，代码中的各个字符代表不同的操作：
+
+Brainfuck 指令
+
+- \> : 数据指针右移
+
+- \< : 数据指针左移
+
+- \+ : 当前数据单元值加1
+
+- \- : 当前数据单元值减1
+
+- \. : 输出当前数据单元（ASCII字符）
+
+- \, : 输入一个字符到当前数据单元
+
+- \[ : 如果当前数据单元值为0，跳转到对应的 \]
+
+- \] : 如果当前数据单元值不为0，跳转回对应的 \[
+
+其成员变量:
+
+```cpp
+std::map<unsigned, unsigned> open_brackets, close_brackets;  // 括号匹配映射
+std::array<std::uint8_t, 32768> data_{0};  // 数据内存（32KB，初始化为0）
+unsigned program_{0};  // 程序指针（当前执行的指令位置）
+int pos_{0};           // 数据指针（当前操作的数据位置）
+```
+关键方法:
+
+```cpp
+void collect_brackets(const std::string_view program)
+```
+扫描整个程序，找出所有 \[ 和 \] 的对应关系; 使用栈来匹配括号; 建立两个映射：open_brackets\[左括号位置\] = 右括号位置; close_brackets\[右括号位置\] = 左括号位置
+
+```cpp
+void check_data_pos(int pos)
+```
+确保数据指针在有效范围内（0-32767）.
+
+```cpp
+BrainHackInterpreter(const std::string_view program)
+```
+构造函数: 执行 Brainfuck 程序.
+
+执行示例：
+
+```bash
++++          # 将data[0]设为3
+[            # 循环开始（检查data[0]是否为0）
+  >+++<      # data[1]加3，然后回到data[0]
+  -          # data[0]减1
+]            # 如果data[0]不为0，跳回 [
+```
+</details>
+
+`pop()`方法是移除栈顶元素。实质上是调用了底层容器的`pop_back()` 函数。
+
+
+> 参数：无（none）。
+
+> 返回值：无（none）。
+
+> 时间复杂度：等同于底层容器（Container）的 pop_back 操作复杂度。
+
+`swap()`: 交换栈顶元素和栈底元素。
+
+> 参数 (other)：用于交换内容的另一个 stack 对象。
+
+> 返回值：无。
+
+> 复杂度: 与底层容器的 swap 操作复杂度相同（通常为常数时间）。
+
+```cpp
+#include <stack>
+#include <iostream>
+
+int main() {
+    std::stack<int> s1, s2;
+    
+    // 向 s1 添加元素
+    for (int i = 1; i <= 5; ++i)
+        s1.push(i * 10);  // s1: 10 20 30 40 50
+    
+    // 向 s2 添加元素
+    for (int i = 1; i <= 3; ++i)
+        s2.push(i * 100);  // s2: 100 200 300
+    
+    std::cout << "Before swap:\n";
+    std::cout << "s1 size: " << s1.size() << "\n";
+    std::cout << "s2 size: " << s2.size() << "\n";
+    
+    // 交换两个栈的内容
+    s1.swap(s2);
+    
+    std::cout << "\nAfter swap:\n";
+    std::cout << "s1 size: " << s1.size() << "\n";  // 输出: 3
+    std::cout << "s2 size: " << s2.size() << "\n";  // 输出: 5
+    
+    return 0;
+}
+```
+
+### 容量查询
+
+`empty()`:检查栈（底层容器）是否为空。等同于调用底层容器的 c.empty()。
+
+> 返回值:
+
+> - true：底层容器不包含任何元素。
+ 
+> - false：底层容器包含元素。
+ 
+> 参数：无。
+
+> 时间复杂度：常数复杂度 O(1)。
+
+`size()`: 返回栈（底层容器）中的元素个数。
+
+> 参数：无 (None)。
+
+> 返回值：容器适配器中的元素个数。
+
+> 复杂度: 常量复杂度 (Constant)。
+
+
 
 </WordCount>

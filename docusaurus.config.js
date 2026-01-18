@@ -108,6 +108,9 @@ const config = {
     ],
     '@docusaurus/theme-mermaid',
   ],
+  plugins: [
+    './src/plugins/plugin-content-docs-stats',
+  ],
   stylesheets: [
     {
       href: 'https://cdn.jsdelivr.net/npm/katex@0.13.24/dist/katex.min.css',

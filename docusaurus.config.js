@@ -110,9 +110,10 @@ const config = {
   ],
   plugins: [
     './src/plugins/plugin-content-docs-stats',
+    'plugin-image-zoom',
   ],
   stylesheets: [
-    {
+      {
       href: 'https://cdn.jsdelivr.net/npm/katex@0.13.24/dist/katex.min.css',
       type: 'text/css',
       integrity:
@@ -130,17 +131,20 @@ const config = {
     /** @type {import('@docusaurus/preset-classic').ThemeConfig} */
     ({
       
-      zooming: {
-        selector: '.markdown img',
-        delay: 500,
-        background: {
-          light: 'rgba(101,108,133,0.8)',
-          dark: 'rgba(9,10,17,0.8)'
-        },
-        options: {
-          // See the docs of zooming for all available options: https://github.com/francoischalifour/medium-zoom#usage
-        }
-      },
+    //   imageZoom: {
+    //   // CSS selector to apply the plugin to, defaults to '.markdown img'
+    //   selector: '.markdown img',
+    //   // Optional medium-zoom options
+    //   // see: https://www.npmjs.com/package/medium-zoom#options
+      
+    // },
+    imageZoom: {
+      // CSS selector to apply the plugin to, defaults to '.markdown img'
+      selector: '.markdown img',
+      // Optional medium-zoom options
+      // see: https://www.npmjs.com/package/medium-zoom#options
+      
+    },
 
     metadata: [
       {name: 'keywords', content: 'robot, computer, github, blog'},

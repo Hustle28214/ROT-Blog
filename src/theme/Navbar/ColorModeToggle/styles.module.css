@@ -1,3 +1,55 @@
+.toggleButton {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: background-color 0.2s ease;
+  width: 36px;
+  height: 36px;
+  position: relative;
+  overflow: hidden;
+  outline: none;
+}
+
+.toggleButton:hover {
+  background-color: var(--ifm-color-emphasis-200);
+}
+
 .darkNavbarColorModeToggle:hover {
-  background: var(--ifm-color-gray-800);
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.iconWrapper {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.icon {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* 太阳颜色 */
+.sun {
+  color: #fbbf24; /* Amber-400 */
+  fill: currentColor;
+}
+
+/* 月亮颜色 */
+.moon {
+  color: #60a5fa; /* Blue-400 */
+  fill: currentColor;
+}
+
+[data-theme='dark'] .toggleButton:hover {
+  background-color: var(--ifm-color-emphasis-100);
 }

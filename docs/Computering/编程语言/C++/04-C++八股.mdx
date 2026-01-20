@@ -1,0 +1,220 @@
+import WordCount from '../../../../src/components/WordCount/WordCount';
+import Mermaid from '@theme/Mermaid';
+
+<WordCount>
+
+## 1. C++相关
+
+1. 指针和引用有什么最本质的区别？如果函数内部需要修改指针本身的值，能否引用？
+
+指针：可以为空（nullptr/null），指向无效地址。可以重新指向不同的对象。可以指向动态分配的内存，需要手动管理。
+
+```c++
+int a = 10, b = 20;
+int* ptr = &a;  // 指向a
+ptr = &b;       // 改为指向b
+```
+
+引用：必须始终指向有效对象，不能为空。一旦绑定，终身绑定，不能更改目标。通常指向栈上的自动变量或对象的成员。
+```c++
+int a = 10, b = 20;
+int& ref = a;   // 绑定到a
+// ref = b;     // 错误！这是赋值给a，不是重绑定
+```
+
+可以引用。当你需要在函数内部修改指针本身（而不仅仅是指针指向的对象）时，就需要传递指针的引用或指针的指针。
+
+```c++
+void modifyPointer(int*& ptrRef) {
+    // int* ptr;     // ptr 是一个指向int的指针
+    // int*& ref = ptr;  // ref 是ptr的引用（别名）
+    static int newValue = 100;
+    ptrRef = &newValue;  // 修改指针本身，使其指向新地址
+}
+
+int main() {
+    int a = 10;
+    int* ptr = &a;
+    
+    cout << "Before: " << *ptr << endl;  // 10
+    
+    modifyPointer(ptr);  // 修改指针本身
+    
+    cout << "After: " << *ptr << endl;   // 100
+}
+```
+
+
+2. 怎么进行内存对齐，嵌套结构体怎么进行内存对齐?
+
+对齐规则：
+
+```c++
+struct Example {
+    char a;      // 1字节，偏移0
+    // 3字节填充（因为int要对齐到4的倍数）
+    int b;       // 4字节，偏移4
+    char c;      // 1字节，偏移8
+    // 3字节填充（结构体总大小需是最大成员的倍数）
+};               // 总大小：12字节
+
+// GCC/Clang
+struct __attribute__((aligned(16))) AlignedStruct {
+    char a;
+    int b;
+};  // 16字节对齐，总大小16字节
+
+// MSVC
+struct __declspec(align(16)) AlignedStruct {
+    char a;
+    int b;
+};  // 16字节对齐，总大小16字节
+
+struct alignas(16) AlignedStruct {
+    char a;      // 1字节
+    int b;       // 4字节
+    char c;      // 1字节
+    // 编译器自动填充到16字节
+};  // 总大小：16字节
+
+struct alignas(32) DoubleAligned {
+    AlignedStruct s1;
+    char extra;
+};  // 总大小：64字节（32的倍数）
+```
+
+基本的嵌套对齐：
+
+```c++
+struct Inner {
+    char a;      // 1字节
+    // 3字节填充
+    int b;       // 4字节
+};  // 大小：8字节
+
+struct Outer {
+    char x;       // 1字节
+    // 3字节填充（为了Inner对齐）
+    Inner inner;  // 8字节（起始偏移4）
+    char y;       // 1字节
+    // 7字节填充（使总大小为8的倍数）
+};  // 总大小：24字节
+
+// 验证
+static_assert(sizeof(Inner) == 8);
+static_assert(sizeof(Outer) == 24);
+```
+
+3. shared_pt有什么问题，weak_ptr如何解决，移动语义怎么做？
+
+shared_ptr最严重的问题就是循环引用。
+
+```c++
+struct Node{
+    shared_ptr<Node> next;
+    shared_ptr<Node> prev;
+}
+
+void circularReference() {
+    auto node1 = make_shared<Node>();
+    auto node2 = make_shared<Node>();
+    
+    node1->next = node2;  // node2引用计数：2
+    node2->prev = node1;  // node1引用计数：2
+    
+    // 离开作用域后：
+    // node1引用计数：2 -> 1（因为node2还持有）
+    // node2引用计数：2 -> 1（因为node1还持有）
+    // 内存泄漏！永远无法释放
+}
+```
+
+weak_ptr 如何解决循环引用:
+
+```c++
+struct Node {
+    shared_ptr<Node> next;
+    weak_ptr<Node> prev;  // 使用weak_ptr打破循环
+};
+
+void noMemoryLeak() {
+    auto node1 = make_shared<Node>();
+    auto node2 = make_shared<Node>();
+    
+    node1->next = node2;  // node2引用计数：2
+    node2->prev = node1;  // node1引用计数：1（weak_ptr不增加计数）
+    
+    // 离开作用域后：
+    // node2先析构（计数2->1）
+    // node1再析构（计数1->0）✓ 可以释放
+    // 然后node2也被释放（计数1->0）✓
+}
+```
+
+工作原理：
+
+```c++
+auto sp = make_shared<int>(42);
+weak_ptr<int> wp = sp;  // 不增加引用计数
+
+// 检查对象是否存活
+if (auto locked = wp.lock()) {  // 如果对象存活，返回shared_ptr
+    cout << "Value: " << *locked << endl;
+} else {
+    cout << "Object destroyed" << endl;
+}
+
+// 或者
+if (!wp.expired()) {
+    auto sp2 = wp.lock();
+    // 安全使用
+}
+```
+
+移动语义：
+
+```c++
+// 传统拷贝（昂贵）
+shared_ptr<int> sp1 = make_shared<int>(42);
+shared_ptr<int> sp2 = sp1;  // 拷贝：原子递增
+
+// 移动（零开销）
+shared_ptr<int> sp3 = std::move(sp1);  // 移动：sp1变为nullptr
+// 不涉及原子操作！引用计数不变
+```
+
+## 1.5 Linux相关
+
+
+1. 内存映射是什么？
+
+内存映射是一种将文件或其他资源直接映射到进程虚拟地址空间的技术，使得程序可以像访问内存一样访问文件。
+
+## 2. 手撕算法
+
+字符串反转：
+
+```c++
+#include <stack>
+#include <string>
+
+using namespace std;
+string ReverseString(){
+    stack<char> s;
+    string str;
+    getline(cin,str);
+    for(int i=0;i<str.length();++i){
+        s.push(str[i]);
+    }
+    if(!s.empty())str.clear();
+    for(int i=0;i<s.length();++i)
+    {
+        str.push_back(s.top());
+        s.pop();
+    }
+    return str;
+}
+```
+
+
+</WordCount>

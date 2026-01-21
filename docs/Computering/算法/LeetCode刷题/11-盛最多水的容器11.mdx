@@ -1,0 +1,76 @@
+
+
+import WordCount from '../../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+## 题干
+
+给定一个长度为 n 的整数数组 height 。有 n 条垂线，第 i 条线的两个端点是 (i, 0) 和 (i, height[i]) 。
+
+找出其中的两条线，使得它们与 x 轴共同构成的容器可以容纳最多的水。
+
+返回容器可以储存的最大水量。
+
+说明：你不能倾斜容器。
+
+![Image](https://github.com/user-attachments/assets/708aca44-da7c-4626-962d-aaaaec2eebc6)
+
+示例 1：
+```
+输入：[1,8,6,2,5,4,8,3,7]
+输出：49 
+解释：图中垂直线代表输入数组 [1,8,6,2,5,4,8,3,7]。在此情况下，容器能够容纳水（表示为蓝色部分）的最大值为 49。
+```
+示例 2：
+```
+输入：height = [1,1]
+输出：1
+```
+
+## 思路
+
+贪心+双指针。
+
+如果移动较高的那条线，宽度会减少，但高度不会增加（因为高度由较短的线决定），所以容量一定不会变大。
+
+如果移动较低的那条线，虽然宽度减少，但有可能遇到更高的线，从而让短板变高，容量有机会变大。
+
+所以贪心策略：
+
+比较 ``height[left]`` 和 ``height[right]``：
+
+谁更矮，就移动谁（左指针右移，或右指针左移）。
+
+每一步都计算容量，并更新最大值。
+
+直到两个指针相遇。
+
+## 题解
+
+```c++
+class Solution {
+public:
+    int maxArea(vector<int>& height) {
+        int temp = 0; // 乘积
+        int pl=0;
+        int pr=height.size()-1;
+        while(pl<pr){
+            int h = min(height[pl],height[pr]);
+            int current_vol = h*(pr-pl);
+            if(temp<current_vol)temp = current_vol;
+            // 开始移动指针
+            // 如果左指针代表的高度较小，左指针右移
+            if(height[pl]<height[pr]){
+                pl++;
+            }else{
+                pr--;
+            }
+
+        }
+        return temp;
+    }
+};
+```
+
+</WordCount>

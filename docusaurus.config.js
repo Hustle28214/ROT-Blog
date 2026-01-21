@@ -51,7 +51,7 @@ const config = {
   presets: [
     [
       'classic',
-      /** @type {import('@docusaurus/preset-classic').Options} */
+      /* @type {import('@docusaurus/preset-classic').Options} */
       ({
         docs: {
           sidebarPath: './sidebars.js',
@@ -128,7 +128,7 @@ const config = {
     },
   ],
   themeConfig:
-    /** @type {import('@docusaurus/preset-classic').ThemeConfig} */
+    /* @type {import('@docusaurus/preset-classic').ThemeConfig} */
     ({
       
     //   imageZoom: {

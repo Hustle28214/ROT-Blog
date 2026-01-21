@@ -1,0 +1,61 @@
+
+
+import WordCount from '../../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+## 题干
+
+编写一个函数来查找字符串数组中的最长公共前缀。
+
+如果不存在公共前缀，返回空字符串 ""。
+
+ 
+
+示例 1：
+```
+输入：strs = ["flower","flow","flight"]
+输出："fl"
+```
+示例 2：
+```
+输入：strs = ["dog","racecar","car"]
+输出：""
+解释：输入不存在公共前缀。
+```
+ 
+
+提示：
+```
+1 <= strs.length <= 200
+0 <= strs[i].length <= 200
+strs[i] 如果非空，则仅由小写英文字母组成
+```
+
+## 思路
+
+找前缀。
+
+把第一个字符串 strs[0] 作为初始公共前缀 prefix。
+
+依次与后面的每个字符串比较，不断缩短 prefix 直到它成为当前字符串的前缀。
+
+如果中途 prefix 变成空字符串，直接返回。
+
+## 题解
+```c++
+class Solution {
+public:
+    string longestCommonPrefix(vector<string>& strs) {
+        string pref = strs[0]; // 先取1个参照
+        for(int i = 1;i<strs.size();++i){// 遍历所有字符串
+            while(strs[i].find(pref)!=0){//对这个字符串，找prefix，找不到就接着找str[i+1]
+                pref = pref.substr(0,pref.length()-1);// 
+                if(pref.empty())return "";
+            }
+        }
+        return pref;
+    }
+};
+```
+</WordCount>

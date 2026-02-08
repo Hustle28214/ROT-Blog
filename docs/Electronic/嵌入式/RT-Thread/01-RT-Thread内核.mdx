@@ -1,0 +1,604 @@
+import WordCount from '../../../../src/components/WordCount/WordCount.jsx';
+
+<WordCount>
+
+首先RT-Thread的介绍：两句话，
+
+1. 为了解决RTOS不擅长终端联网的问题，被赋予IOT OS中的联网执行能力，适合复杂的物联网设备；
+2. 它跟RTOS一样是嵌入式实时多线程操作系统，主要运行在32位MCU上,可裁剪性非常好，功能比RTOS丰富但体量比RTOS大一些。
+
+其次RT-Thread技术栈是中文支持非常好的，也是国人非常活跃的一个年轻的技术社区。
+
+RT-Thread的技术架构：
+
+![](https://github.com/user-attachments/assets/5a2f1be7-b7e1-4ca5-8adc-0c607f5cb1f7)
+
+可以看出，RT-Thread的架构包含丰富的中间层组件，使得RT-Thread可以支持各种设备。
+
+
+### RT-Thread 内核
+
+![image](https://github.com/user-attachments/assets/1dffe052-f0a6-4149-aaed-9363a47fe625)
+
+内核是一个操作系统的核心，是操作系统最基础也是最重要的部分。它负责管理系统的线程、线程间通信、系统时钟、中断及内存等。
+
+内核库是为了保证内核能够独立运行的一套小型的类似 C 库的函数实现子集。
+
+> 操作系统内核不能依赖于用户空间的标准C库（如glibc），所以它需要自己实现一套最基础的函数。这套函数集合就是“内核库”。它的大小和内容会根据使用的编译器而变化。
+
+实时内核的实现包括：对象管理、线程管理及调度器、线程间通信管理、时钟管理及内存管理等等，内核最小的资源占用情况是 3KB ROM，1.2KB RAM。
+
+### 内核启动流程
+
+内核启动流程：
+
+![image](https://github.com/user-attachments/assets/cce0a773-7a40-46cd-90bf-aa978d25c988)
+
+1. 初始化与系统相关的硬件；
+
+2. 初始化系统内核对象，例如定时器、调度器、信号；
+
+3. 创建 main 线程，在 main 线程中对各类模块依次进行初始化；
+
+4. 初始化定时器线程、空闲线程，并启动调度器。
+
+### 内存分布
+
+
+启动调度器之前，系统所创建的线程在执行 ``rt_thread_startup()`` 后并不会立马运行，它们会处于就绪状态等待系统调度；待启动调度器之后，系统才转入第一个线程开始运行，根据调度规则，选择的是就绪队列中优先级最高的线程。
+
+`rt_hw_board_init() `中完成系统时钟设置，为系统提供心跳、串口初始化，将系统输入输出终端绑定到这个串口，后续系统运行信息就会从串口打印出来。
+
+一般 MCU 包含的存储空间有：片内 Flash 与片内 RAM，RAM 相当于内存，Flash 相当于硬盘。编译器会将一个程序分类为好几个部分，分别存储在 MCU 不同的存储区。
+
+1. Code：代码段，存放程序的代码部分；
+
+2. RO-data：只读数据段，存放程序中定义的常量；
+
+3. RW-data：读写数据段，存放初始化为非 0 值的全局变量；
+
+4. ZI-data：0 数据段，存放未初始化的全局变量及初始化为 0 的变量；
+
+生成.map文件说明函数的尺寸和地址。
+
+例如STM32从FLASH启动后，会将 RW 段中的 RW-data（初始化的全局变量）搬运到 RAM 中，但不会搬运 RO 段。另外根据编译器给出的 ZI 地址和大小分配出 ZI 段，并将这块 RAM 区域清零。
+
+左图是可执行映像文件烧录到 STM32 后的内存分布，右图是运行时内存分布。**CPU 的执行代码从 Flash 中读取。**
+
+![](https://github.com/user-attachments/assets/002938a8-e8b8-4bf0-bf74-61b672ca41bd)
+
+动态内存堆为未使用的 RAM 空间，应用程序申请和释放的内存块都来自该空间。
+
+```C
+rt_uint8_t* msg_ptr;
+msg_ptr = (rt_uint8_t*) rt_malloc (128);
+rt_memset(msg_ptr, 0, 128);
+```
+
+以上代码`msg_ptr` 指针指向的 128 字节内存空间位于动态内存堆空间中。
+
+而一些全局变量则是存放于 RW 段和 ZI 段中，RW 段存放的是具有初始值的全局变量（而常量形式的全局变量则放置在 RO 段中，是只读属性的），ZI 段存放的系统未初始化的全局变量。
+```c
+#include <rtthread.h>
+
+const static rt_uint32_t sensor_enable = 0x000000FE;
+rt_uint32_t sensor_value;
+rt_bool_t sensor_inited = RT_FALSE;
+
+void sensor_init()
+{
+     /* ... */
+}
+```
+
+`sensor_value` 存放在 ZI 段中，系统启动后会自动初始化成零（由用户程序或编译器提供的一些库函数初始化成零）。`sensor_inited` 变量则存放在 RW 段中，而 `sensor_enable` 存放在 RO 段中。
+
+### 自动初始化机制
+
+自动初始化机制是指初始化函数不需要被显式调用，只需要在函数定义处通过宏定义的方式进行申明，就会在系统启动过程中被执行。
+
+比如：
+
+```C
+int rt_hw_usart_init(void)  /* 串口初始化函数 */
+{
+     ... ...
+     /* 注册串口 1 设备 */
+     rt_hw_serial_register(&serial1, "uart1",
+                        RT_DEVICE_FLAG_RDWR | RT_DEVICE_FLAG_INT_RX,
+                        uart);
+     return 0;
+}
+INIT_BOARD_EXPORT(rt_hw_usart_init);    /* 使用组件自动初始化机制 */
+```
+
+在声明了``INIT_BOARD_EXPORT(rt_hw_usart_init)``之后就能实现组件自动初始化，`rt_hw_usart_init()` 函数就会被系统自动调用。这个函数是在 rt_components_board_init() 函数中被调用的。
+
+在 rt_components_board_init() 函数中：
+```c
+
+void rt_components_board_init(void)
+{
+    /* 遍历所有通过 INIT_BOARD_EXPORT 声明的函数 */
+    volatile const init_fn_t *fn_ptr;
+    
+    for (fn_ptr = &__rt_init_rti_board_start; 
+         fn_ptr < &__rt_init_rti_board_end; 
+         fn_ptr++)
+    {
+        (*fn_ptr)();  // 依次调用每个初始化函数
+    }
+}
+```
+在系统启动流程图中，有两个函数：rt_components_board_init() 与 rt_components_init()，其后的带底色方框内部的函数表示被自动初始化的函数，其中：
+
+1. “board init functions” 为所有通过 INIT_BOARD_EXPORT(fn) 申明的初始化函数。
+
+2. “pre-initialization functions” 为所有通过 INIT_PREV_EXPORT(fn)申明的初始化函数。
+
+3. “device init functions” 为所有通过 INIT_DEVICE_EXPORT(fn) 申明的初始化函数。
+
+4. “components init functions” 为所有通过 INIT_COMPONENT_EXPORT(fn)申明的初始化函数。
+
+5. “enviroment init functions” 为所有通过 INIT_ENV_EXPORT(fn) 申明的初始化函数。
+
+6. “application init functions” 为所有通过 INIT_APP_EXPORT(fn)申明的初始化函数。
+
+RT-Thread 的自动初始化机制使用了**自定义 RTI 符号段**，将需要在启动时进行初始化的函数指针放到了该段中，形成一张初始化函数表，在系统启动过程中会遍历该表，并调用表中的函数，达到自动初始化的目的。
+
+
+| 初始化顺序 | 宏接口 | 描述 |
+| :--- | :--- | :--- |
+| 1 | `INIT_BOARD_EXPORT(fn)` | 非常早期的初始化，此时调度器还未启动 |
+| 2 | `INIT_PREV_EXPORT(fn)` | 主要是用于纯软件的初始化、没有太多依赖的函数 |
+| 3 | `INIT_DEVICE_EXPORT(fn)` | 外设驱动初始化相关，比如网卡设备 |
+| 4 | `INIT_COMPONENT_EXPORT(fn)` | 组件初始化，比如文件系统或者 LWIP |
+| 5 | `INIT_ENV_EXPORT(fn)` | 系统环境初始化，比如挂载文件系统 |
+| 6 | `INIT_APP_EXPORT(fn)` | 应用初始化，比如 GUI 应用 |
+
+初始化函数**主动**通过这些宏接口进行申明.
+
+### 内核对象模型
+
+RT-Thread 内核是采用面向对象的思想进行设计的。系统级的基础设施都是一种内核对象，例如线程，信号量，互斥量，定时器等。
+
+它们又分为两类：静态内核对象和动态内核对象。
+
+静态内核对象通常放在 RW 段和 ZI 段中，在系统启动后在程序中初始化；动态内核对象则是从内存堆中创建的，而后手工做初始化。
+```c
+/* 线程 1 的对象和运行时用到的栈 */
+static struct rt_thread thread1;
+static rt_uint8_t thread1_stack[512];
+
+/* 线程 1 入口 */
+void thread1_entry(void* parameter)
+{
+     int i;
+
+    while (1)
+    {
+        for (i = 0; i < 10; i ++)
+        {
+            rt_kprintf("%d\n", i);
+
+            /* 延时 100ms */
+            rt_thread_mdelay(100);
+        }
+    }
+}
+
+/* 线程 2 入口 */
+void thread2_entry(void* parameter)
+{
+     int count = 0;
+     while (1)
+     {
+         rt_kprintf("Thread2 count:%d\n", ++count);
+
+        /* 延时 50ms */
+        rt_thread_mdelay(50);
+    }
+}
+
+/* 线程例程初始化 */
+int thread_sample_init()
+{
+     rt_thread_t thread2_ptr;
+     rt_err_t result;
+
+    /* 初始化线程 1 */
+    /* 线程的入口是 thread1_entry，参数是 RT_NULL
+     * 线程栈是 thread1_stack
+     * 优先级是 200，时间片是 10 个 OS Tick
+     */
+    result = rt_thread_init(&thread1,
+                            "thread1",
+                            thread1_entry, RT_NULL,
+                            &thread1_stack[0], sizeof(thread1_stack),
+                            200, 10);
+
+    /* 启动线程 */
+    if (result == RT_EOK) rt_thread_startup(&thread1);
+
+    /* 创建线程 2 */
+    /* 线程的入口是 thread2_entry, 参数是 RT_NULL
+     * 栈空间是 512，优先级是 250，时间片是 25 个 OS Tick
+     */
+    thread2_ptr = rt_thread_create("thread2",
+                                thread2_entry, RT_NULL,
+                                512, 250, 25);
+
+    /* 启动线程 */
+    if (thread2_ptr != RT_NULL) rt_thread_startup(thread2_ptr);
+
+    return 0;
+}
+```
+
+在以上例子中，`thread1` 是一个静态线程对象，而 `thread2` 是一个动态线程对象。
+
+我们看到`thread1` 对象的内存空间，包括线程控制块 `thread1` 与栈空间 `thread1_stack` 都是编译时决定的，因为代码中都不存在初始值，都统一放在未初始化数据段中。
+
+`thread2` 运行中用到的空间都是动态分配的，包括线程控制块（`thread2_ptr` 指向的内容）和栈空间。
+
+静态对象会占用 RAM 空间，不依赖于内存堆管理器，内存分配时间确定。动态对象则依赖于内存堆管理器，运行时申请 RAM 空间，当对象被删除后，占用的 RAM 空间被释放。这两种方式各有利弊，可以根据实际环境需求选择具体使用方式。
+
+### 内核对象管理架构
+
+RT-Thread 采用内核对象管理系统来访问 / 管理所有内核对象，内核对象包含了内核中绝大部分设施，这些内核对象可以是静态分配的静态对象，也可以是从系统内存堆中分配的动态对象。
+
+对象容器中包含了每类内核对象的信息，包括对象类型，大小等。对象容器给每类内核对象分配了一个链表，所有的内核对象都被链接到该链表上，RT-Thread 的内核对象容器及链表如下图所示：
+
+![](https://github.com/user-attachments/assets/ed897698-f2d4-4647-8abc-471a86339518)
+
+对于每一种具体内核对象和对象控制块，除了基本结构外，还有自己的扩展属性（私有属性），例如，对于线程控制块，在基类对象基础上进行扩展，增加了线程状态、优先级等属性。这些属性在基类对象的操作中不会用到，只有在与具体线程相关的操作中才会使用。因此从面向对象的观点，可以认为每一种具体对象是抽象对象的派生，继承了基本对象的属性并在此基础上扩展了与自己相关的属性。
+
+
+![](https://github.com/user-attachments/assets/6ab1e8dc-2594-42a4-973b-e6d571fa139e)
+
+在对象管理模块中，定义了通用的数据结构，用来保存各种对象的共同属性，各种具体对象只需要在此基础上加上自己的某些特别的属性，就可以清楚的表示自己的特征。
+
+这种设计方法的优点有：
+
+（1）提高了系统的可重用性和扩展性，增加新的对象类别很容易，只需要继承通用对象的属性再加少量扩展即可。
+
+（2）提供统一的对象操作方式，简化了各种具体对象的操作，提高了系统的可靠性。
+
+上图中由对象控制块 rt_object 派生出来的有：线程对象、内存池对象、定时器对象、设备对象和 IPC 对象（IPC：Inter-Process Communication，进程间通信。在 RT-Thread 实时操作系统中，IPC 对象的作用是进行线程间同步与通信）；由 IPC 对象派生出信号量、互斥量、事件、邮箱与消息队列、信号等对象。
+
+
+#### 对象控制块
+
+
+内核对象控制块的数据结构：
+
+```C
+struct rt_object
+{
+     /* 内核对象名称     */
+     char      name[RT_NAME_MAX];
+     /* 内核对象类型     */
+     rt_uint8_t  type;
+     /* 内核对象的参数   */
+     rt_uint8_t  flag;
+     /* 内核对象管理链表 */
+     rt_list_t   list;
+};
+```
+目前内核对象支持的类型如下：
+
+```C
+enum rt_object_class_type
+{
+     RT_Object_Class_Thread = 0,             /* 对象为线程类型      */
+#ifdef RT_USING_SEMAPHORE
+    RT_Object_Class_Semaphore,              /* 对象为信号量类型    */
+#endif
+#ifdef RT_USING_MUTEX
+    RT_Object_Class_Mutex,                  /* 对象为互斥量类型    */
+#endif
+#ifdef RT_USING_EVENT
+    RT_Object_Class_Event,                  /* 对象为事件类型      */
+#endif
+#ifdef RT_USING_MAILBOX
+    RT_Object_Class_MailBox,                /* 对象为邮箱类型      */
+#endif
+#ifdef RT_USING_MESSAGEQUEUE
+    RT_Object_Class_MessageQueue,           /* 对象为消息队列类型   */
+#endif
+#ifdef RT_USING_MEMPOOL
+    RT_Object_Class_MemPool,                /* 对象为内存池类型     */
+#endif
+#ifdef RT_USING_DEVICE
+    RT_Object_Class_Device,                 /* 对象为设备类型       */
+#endif
+    RT_Object_Class_Timer,                  /* 对象为定时器类型     */
+#ifdef RT_USING_MODULE
+    RT_Object_Class_Module,                 /* 对象为模块          */
+#endif
+    RT_Object_Class_Unknown,                /* 对象类型未知        */
+    RT_Object_Class_Static = 0x80           /* 对象为静态对象      */
+};
+```
+
+如果是静态对象，那么对象类型的最高位将是 1（是 RT_Object_Class_Static 与其他对象类型的或操作），否则就是动态对象，系统最多能够容纳的对象类别数目是 127 个。
+
+#### 内核对象管理方式
+
+内核对象容器的数据结构：
+
+
+```C
+struct rt_object_information
+{
+     /* 对象类型 */
+     enum rt_object_class_type type;
+     /* 对象链表 */
+     rt_list_t object_list;
+     /* 对象大小 */
+     rt_size_t object_size;
+};
+```
+
+一类对象由一个 `rt_object_information` 结构体来管理，每一个这类对象的具体实例都通过链表的形式挂接在 `object_list` 上。而这一类对象的内存块尺寸由 object_size 标识出来（每一类对象的具体实例，他们占有的内存块大小都是相同的）。
+
+#### 初始化对象
+
+在使用一个未初始化的静态对象前必须先对其进行初始化。
+
+使用以下接口：
+
+```c
+void rt_object_init(struct  rt_object*  object ,
+                    enum rt_object_class_type  type ,
+                    const char* name)
+```
+
+
+当调用这个函数进行对象初始化时，系统会把这个对象放置到对象容器中进行管理，即初始化对象的一些参数，然后把这个对象节点插入到对象容器的对象链表中，对该函数的输入参数的描述如下表：
+
+| 参数 | 描述 |
+|------|------|
+| object | 需要初始化的对象指针，它必须指向具体的对象内存块，而不能是空指针或野指针 |
+| type | 对象的类型，必须是 rt_object_class_type 枚举类型中列出的除 RT_Object_Class_Static 以外的类型（对于静态对象，或使用 rt_object_init 接口进行初始化的对象，系统会把它标识成 RT_Object_Class_Static 类型） |
+| name | 对象的名字。每个对象可以设置一个名字，这个名字的最大长度由 RT_NAME_MAX 指定，并且系统不关心它是否是由’\0’做为终结符 |
+
+#### 脱离对象
+
+从内核对象管理器中脱离一个对象, 使用以下接口：
+
+```C
+void rt_object_detach(rt_object_t object);
+```
+
+#### 分配对象
+
+上述描述的都是对象初始化、脱离的接口，都是面向对象内存块已经有的情况下，而动态的对象则可以在需要时申请，不需要时释放出内存空间给其他应用使用。申请分配新的对象可以使用以下接口：
+
+```C
+rt_object_t rt_object_allocate(enum  rt_object_class_type type ,
+                               const  char*  name)
+```
+
+在调用以上接口时，系统首先需要根据对象类型来获取对象信息（特别是对象类型的大小信息以用于系统能够分配正确大小的内存数据块），而后从内存堆中分配对象所对应大小的内存空间，然后再对该对象进行必要的初始化，最后将其插入到它所在的对象容器链表中。对该函数的输入参数的描述如下表：
+
+| 参数 | 描述 |
+|------|------|
+| type | 分配对象的类型，只能是 rt_object_class_type 中除 RT_Object_Class_Static 以外的类型。并且经过这个接口分配出来的对象类型是动态的，而不是静态的 |
+| name | 对象的名字。每个对象可以设置一个名字，这个名字的最大长度由 RT_NAME_MAX 指定，并且系统不关心它是否是由'\0'做为终结符 |
+| 返回 | 分配成功的对象句柄（分配成功）或 RT_NULL（分配失败） |
+
+#### 删除对象
+
+对于一个动态对象，当不再使用时，可以调用如下接口删除对象，首先从对象容器链表中脱离对象，然后释放对象所占用的内存。：
+
+```C
+void rt_object_delete(rt_object_t object);
+```
+
+
+#### 辨别对象
+
+
+判断指定对象是否是系统对象（静态内核对象）。辨别对象使用以下接口：
+
+```C
+rt_err_t rt_object_is_systemobject(rt_object_t object);
+```
+
+调用 rt_object_is_systemobject 接口可判断一个对象是否是系统对象，在 RT-Thread 操作系统中，一个系统对象也就是一个静态对象，对象类型标识上 RT_Object_Class_Static 位置位。通常使用 rt_object_init() 方式初始化的对象都是系统对象。
+
+
+#### 遍历内核对象
+
+遍历所有线程：
+
+```C
+rt_thread_t thread = RT_NULL;
+struct rt_list_node *node = RT_NULL;
+struct rt_object_information *information = RT_NULL;
+
+information = rt_object_get_information(RT_Object_Class_Thread);
+
+rt_list_for_each(node, &(information->object_list))
+{
+    thread = (rt_thread_t)rt_list_entry(node, struct rt_object, list);
+    /* 比如打印所有thread的名字 */
+    rt_kprintf("name:%s\n", thread->name);
+}
+```
+遍历互斥量：
+
+```C
+rt_mutex_t mutex = RT_NULL;
+struct rt_list_node *node = RT_NULL;
+struct rt_object_information *information = RT_NULL;
+
+information = rt_object_get_information(RT_Object_Class_Mutex);
+
+rt_list_for_each(node, &(information->object_list))
+{
+    mutex = (rt_mutex_t)rt_list_entry(node, struct rt_object, list);
+    /* 比如打印所有mutex的名字 */
+    rt_kprintf("name:%s\n", mutex->parent.parent.name);
+}
+```
+
+### RT-Thread 内核配置示例
+
+由于高度可裁剪性，RT-Thread 操作系统支持用户根据需要选择性地裁剪掉一些组件或功能。实现这一目标，需要对内核进行配置。
+
+通过修改工程目录下的 rtconfig.h 文件来进行配置。
+
+#### RT-Thread 内核部分
+
+
+```C
+/* 表示内核对象的名称的最大长度，若代码中对象名称的最大长度大于宏定义的长度，
+ * 多余的部分将被截掉。*/
+#define RT_NAME_MAX 8
+
+/* 字节对齐时设定对齐的字节个数。常使用 ALIGN(RT_ALIGN_SIZE) 进行字节对齐。*/
+#define RT_ALIGN_SIZE 4
+
+/* 定义系统线程优先级数；通常用 RT_THREAD_PRIORITY_MAX-1 定义空闲线程的优先级 */
+#define RT_THREAD_PRIORITY_MAX 32
+
+/* 定义时钟节拍，为 100 时表示 100 个 tick 每秒，一个 tick 为 10ms */
+#define RT_TICK_PER_SECOND 100
+
+/* 检查栈是否溢出，未定义则关闭 */
+#define RT_USING_OVERFLOW_CHECK
+
+/* 定义该宏开启 debug 模式，未定义则关闭 */
+#define RT_DEBUG
+/* 开启 debug 模式时：该宏定义为 0 时表示关闭打印组件初始化信息，定义为 1 时表示启用 */
+#define RT_DEBUG_INIT 0
+/* 开启 debug 模式时：该宏定义为 0 时表示关闭打印线程切换信息，定义为 1 时表示启用 */
+#define RT_DEBUG_THREAD 0
+
+/* 定义该宏表示开启钩子函数的使用，未定义则关闭 */
+#define RT_USING_HOOK
+
+/* 定义了空闲线程的栈大小 */
+#define IDLE_THREAD_STACK_SIZE 256
+```
+
+#### 线程间同步与通信部分
+
+```C
+/* 定义该宏可开启信号量的使用，未定义则关闭 */
+#define RT_USING_SEMAPHORE
+
+/* 定义该宏可开启互斥量的使用，未定义则关闭 */
+#define RT_USING_MUTEX
+
+/* 定义该宏可开启事件集的使用，未定义则关闭 */
+#define RT_USING_EVENT
+
+/* 定义该宏可开启邮箱的使用，未定义则关闭 */
+#define RT_USING_MAILBOX
+
+/* 定义该宏可开启消息队列的使用，未定义则关闭 */
+#define RT_USING_MESSAGEQUEUE
+
+/* 定义该宏可开启信号的使用，未定义则关闭 */
+#define RT_USING_SIGNALS
+```
+
+#### 内存管理部分
+
+
+```C
+/* 开启静态内存池的使用 */
+#define RT_USING_MEMPOOL
+
+/* 定义该宏可开启两个或以上内存堆拼接的使用，未定义则关闭 */
+#define RT_USING_MEMHEAP
+
+/* 开启小内存管理算法 */
+#define RT_USING_SMALL_MEM
+
+/* 关闭 SLAB 内存管理算法 */
+/* #define RT_USING_SLAB */
+
+/* 开启堆的使用 */
+#define RT_USING_HEAP
+```
+
+#### 内核设备对象
+
+
+```c
+/* 表示开启了系统设备的使用 */
+#define RT_USING_DEVICE
+
+/* 定义该宏可开启系统控制台设备的使用，未定义则关闭 */
+#define RT_USING_CONSOLE
+/* 定义控制台设备的缓冲区大小 */
+#define RT_CONSOLEBUF_SIZE 128
+/* 控制台设备的名称 */
+#define RT_CONSOLE_DEVICE_NAME "uart1"
+```
+
+#### 自动初始化方式
+
+```C
+/* 定义该宏开启自动初始化机制，未定义则关闭 */
+#define RT_USING_COMPONENTS_INIT
+
+/* 定义该宏开启设置应用入口为 main 函数 */
+#define RT_USING_USER_MAIN
+/* 定义 main 线程的栈大小 */
+#define RT_MAIN_THREAD_STACK_SIZE 2048
+```
+
+#### FinSH
+
+```C
+/* 定义该宏可开启系统 FinSH 调试工具的使用，未定义则关闭 */
+#define RT_USING_FINSH
+
+/* 开启系统 FinSH 时：将该线程名称定义为 tshell */
+#define FINSH_THREAD_NAME "tshell"
+
+/* 开启系统 FinSH 时：使用历史命令 */
+#define FINSH_USING_HISTORY
+/* 开启系统 FinSH 时：对历史命令行数的定义 */
+#define FINSH_HISTORY_LINES 5
+
+/* 开启系统 FinSH 时：定义该宏开启使用 Tab 键，未定义则关闭 */
+#define FINSH_USING_SYMTAB
+
+/* 开启系统 FinSH 时：定义该线程的优先级 */
+#define FINSH_THREAD_PRIORITY 20
+/* 开启系统 FinSH 时：定义该线程的栈大小 */
+#define FINSH_THREAD_STACK_SIZE 4096
+/* 开启系统 FinSH 时：定义命令字符长度 */
+#define FINSH_CMD_SIZE 80
+
+/* 开启系统 FinSH 时：定义该宏开启 MSH 功能 */
+#define FINSH_USING_MSH
+/* 开启系统 FinSH 时：开启 MSH 功能时，定义该宏默认使用 MSH 功能 */
+#define FINSH_USING_MSH_DEFAULT
+/* 开启系统 FinSH 时：定义该宏，仅使用 MSH 功能 */
+#define FINSH_USING_MSH_ONLY
+```
+
+#### MCU部分
+
+```C
+/* 定义该工程使用的 MCU 为 STM32F103ZE；系统通过对芯片类型的定义，来定义芯片的管脚 */
+#define STM32F103ZE
+
+/* 定义时钟源频率 */
+#define RT_HSE_VALUE 8000000
+
+/* 定义该宏开启 UART1 的使用 */
+#define RT_USING_UART1
+```
+
+
+
+
+</WordCount>

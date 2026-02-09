@@ -3,12 +3,20 @@ import WordCount from '../../../../src/components/WordCount/WordCount.jsx';
 <WordCount>
 
 
-## 
+
+我们需要把任务分解为多个子任务，同时需要规划它们的执行流程。此时，需要某种可视化的管理手段。
+
+线程是实现任务的载体，它是 RT-Thread 中最基本的调度单位。当把子任务在线程中执行时，需要考虑线程的优先级、线程的同步与通信等问题。我们在FreeRTOS中也会把它们划分出优先级大小，RT-Thread中也是如此。
+
 
 ![](https://github.com/user-attachments/assets/4e0f757b-867d-43ee-be69-63c43b8351bc)
-![]()
-![]()
-![]()
+
+当线程运行时，它会认为自己是以独占 CPU 的方式在运行，线程执行时的运行环境称为上下文，具体来说就是各个变量和数据，包括所有的寄存器变量、堆栈、内存信息等。
+
+
+## 功能特点
+
+
 
 
 

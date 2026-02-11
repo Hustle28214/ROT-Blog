@@ -11,13 +11,671 @@ import WordCount from '../../../../src/components/WordCount/WordCount.jsx';
 
 ![](https://github.com/user-attachments/assets/4e0f757b-867d-43ee-be69-63c43b8351bc)
 
-当线程运行时，它会认为自己是以独占 CPU 的方式在运行，线程执行时的运行环境称为上下文，具体来说就是各个变量和数据，包括所有的寄存器变量、堆栈、内存信息等。
+当线程运行时，它会认为自己是以独占 CPU 的方式在运行。
 
 
 ## 功能特点
 
+RT-Thread 线程管理的主要功能是对线程进行管理和调度。
+
+系统中总共存在两类线程，分别是系统线程和用户线程，系统线程是由 RT-Thread 内核创建的线程，用户线程是由应用程序创建的线程。
+
+两类线程都会从内核对象容器中分配线程对象，当线程被删除时，也会被从对象容器中删除，如下图所示，每个线程都有重要的属性，如线程控制块、线程栈、入口函数等。
 
 
+![](https://github.com/user-attachments/assets/864f42d0-425c-4cc5-ae51-5b3680651779)
+
+跟RTOS一样，线程调度器是抢占式的。保证最高优先级的任务一旦就绪就先执行。
+
+如果是中断服务程序使一个高优先级的线程满足运行条件，中断完成时，被中断的线程挂起，优先级高的线程开始运行。
+
+当调度器调度线程切换时，先将当前线程上下文保存起来，当再切回到这个线程时，线程调度器将该线程的上下文信息恢复。
+
+> **上下文**就是线程在某个瞬间的状态的“快照”。它包含了线程从被暂停的那个点开始，到下一次被调度继续运行时，恢复原样所需的所有信息。
+
+## 线程的工作机制
+
+### 线程控制块
+
+线程控制块由结构体 struct rt_thread 表示，是操作系统用于管理线程的一个数据结构，它会存放线程的一些信息，例如优先级、线程名称、线程状态等，也包含线程与线程之间连接用的链表结构，线程等待事件集合等。
+
+```C
+/* 线程控制块 */
+struct rt_thread
+{
+    /* rt 对象 */
+    char        name[RT_NAME_MAX];     /* 线程名称 */
+    rt_uint8_t  type;                   /* 对象类型 */
+    rt_uint8_t  flags;                  /* 标志位 */
+
+    rt_list_t   list;                   /* 对象列表 */
+    rt_list_t   tlist;                  /* 线程列表 */
+
+    /* 栈指针与入口指针 */
+    void       *sp;                      /* 栈指针 */
+    void       *entry;                   /* 入口函数指针 */
+    void       *parameter;              /* 参数 */
+    void       *stack_addr;             /* 栈地址指针 */
+    rt_uint32_t stack_size;            /* 栈大小 */
+
+    /* 错误代码 */
+    rt_err_t    error;                  /* 线程错误代码 */
+    rt_uint8_t  stat;                   /* 线程状态 */
+
+    /* 优先级 */
+    rt_uint8_t  current_priority;    /* 当前优先级 */
+    rt_uint8_t  init_priority;        /* 初始优先级 */
+    rt_uint32_t number_mask;
+
+    ......
+
+    rt_ubase_t  init_tick;               /* 线程初始化计数值 */
+    rt_ubase_t  remaining_tick;         /* 线程剩余计数值 */
+
+    struct rt_timer thread_timer;      /* 内置线程定时器 */
+
+    void (*cleanup)(struct rt_thread *tid);  /* 线程退出清除函数 */
+    rt_uint32_t user_data;                      /* 用户数据 */
+};
+```
+
+`init_priority `是线程创建时指定的线程优先级，在线程运行过程当中是不会被改变的。`cleanup` 会在线程退出时，被空闲线程回调一次以执行用户设置的清理现场等工作。最后的一个成员 `user_data` 可由用户挂接一些数据信息到线程控制块中，以提供一种类似线程私有数据的实现方式。
+
+### 线程重要属性
+
+#### 线程栈
+
+RT-Thread 线程具有独立的栈，当进行线程切换时，会将当前线程的上下文存在栈中，当线程要恢复运行时，再从栈中读取上下文信息，进行恢复。
+
+线程栈还用来存放函数中的局部变量。函数的局部变量要从栈空间中申请，初始从寄存器中分配（ARM）。当函数调用了一个别的函数，局部变量会放进这个栈里面。
+
+对于线程第一次运行，可以以手工的方式构造这个上下文来设置一些初始的环境：入口函数（PC 寄存器）、入口参数（R0 寄存器）、返回位置（LR 寄存器）、当前机器运行状态（CPSR 寄存器）。
+
+
+线程栈的增长方向是芯片构架密切相关的，RT-Thread 3.1.0 以前的版本，均只支持栈由**高地址向低地址**增长的方式，对于 ARM Cortex-M 架构，线程栈可构造如下图所示。
+
+![](https://github.com/user-attachments/assets/6d3c1d6b-9f4b-4af3-9735-d7946c41f6b8)
+
+<details>
+
+<summary>图片详解</summary>
+
+
+这不是函数运行中的栈，而是一个准备好的、等待被“恢复”的上下文。
+
+当调度器第一次切换到这个线程时，硬件会从这个布局中“弹出”数据到寄存器，线程就开始运行了。
+
+栈的布局：
+```
+栈顶
+↓
+PSR  (程序状态寄存器)   - 处理器的状态（标志位、模式等）
+PC   (程序计数器)      - **关键**：指向线程要执行的第一条指令（线程入口函数）
+LR   (链接寄存器)      - **关键**：指向线程退出时的清理函数
+R12  (临时寄存器)      - 初始值通常无关紧要
+R3   (参数/临时寄存器)
+R2   (参数/临时寄存器)
+R1   (参数/临时寄存器)
+R0   (参数/临时寄存器) - **关键**：存放传给线程函数的参数
+```
+当调度器执行bx lr切换到该线程时，硬件会自动将这些值弹到对应的寄存器，线程就开始执行了。
+
+线程如何开始执行？
+
+```C
+// 线程函数原型
+void thread_entry(void *arg);
+
+// 操作系统创建线程时，在栈上构建这个结构
+// 然后设置线程的SP(栈指针)指向这个“栈顶”
+// 当调度器切换到这个线程时：
+// 1. 将SP加载到当前SP
+// 2. 执行"异常返回"或类似指令
+// 3. 硬件自动从栈中弹出PC→PC，LR→LR等
+// 4. PC指向thread_entry，线程开始执行
+// 5. R0正好是传给thread_entry的参数
+```
+
+需要退出线程，该如何正确退出？
+
+```C
+// LR被设置为thread_exit_handler的地址
+// 当线程函数执行完毕，执行"bx lr"返回时
+// 实际上跳转到了线程退出处理函数：
+void thread_exit_handler() {
+    // 1. 调用清理函数
+    // 2. 通知调度器
+    // 3. 切换到其他线程
+    // 4. 永远不会返回
+}
+```
+
+
+</details>
+
+在设计栈大小的时候，可以针对资源大的MCU设计较大的线程栈。
+
+也可以一开始设置一个稍微大的栈，1-2K左右，然后用FinSH看一下栈资源，再决定要不要往上加。
+
+#### 线程状态
+
+这是一个经典的八股考点，让你描述线程状态在不同的调度器中有几种。
+
+RT-Thread有五种线程状态，主要是：初始、就绪、运行、挂起、关闭。也很像八股文的段落状态。
+
+| 状态 | 描述 | RT-Thread 宏定义 |
+| :--- | :--- | :--- |
+| **初始状态** | 线程刚开始创建还没开始运行，不参与调度。 | `RT_THREAD_INIT` |
+| **就绪状态** | 线程按照优先级排队，等待被执行；一旦处理器空闲，操作系统会寻找最高优先级的就绪态线程运行。 | `RT_THREAD_READY` |
+| **运行状态** | 线程当前正在运行。在单核系统中，只有 `rt_thread_self()` 函数返回的线程处于运行状态；在多核系统中，可能有多个线程处于运行状态。 | `RT_THREAD_RUNNING` |
+| **挂起状态** | 也称阻塞态。可能因为资源不可用而挂起等待，或线程主动延时一段时间而挂起。在挂起状态下，线程不参与调度。 | `RT_THREAD_SUSPEND` |
+| **关闭状态** | 当线程运行结束时将处于关闭状态。关闭状态的线程不参与线程的调度。 | `RT_THREAD_CLOSE` |
+
+上下文切换（线程恢复）和中断返回都通过操作系统的异常返回机制实现，硬件使用相同的指令和寄存器恢复流程。这是因为它们的执行流程很像，就复用了这个机制。
+
+#### 线程优先级
+
+RT-Thread 最大支持 256 个线程优先级 (0~255), 数值越小优先级越高，优先级高的线程优先执行。
+
+在一些资源比较紧张的系统中，可以根据实际情况选择只支持 8 个或 32 个优先级的系统配置；对于 ARM Cortex-M 系列，普遍采用 32 个优先级。最低优先级默认分配给空闲线程使用，用户一般不使用。
+
+在系统中，当有比当前线程优先级更高的线程就绪时，当前线程将立刻被换出，高优先级线程抢占处理器运行。
+
+
+#### 时间片
+
+时间片，相当于允许线程使用CPU的时间（单位）。它是次于优先级的调度依据。
+
+每个线程都有时间片这个参数，但是，只有当若干个**相同优先级**的**就绪态**线程，时间片这个参数才有意义，因为它是一个调度依据，只需要在决定谁能用CPU的时候用到。如果一个优先级1时间片10和一个优先级5时间片20的线程需要决定谁先执行，那肯定是优先级1先执行。
+
+需要时间片的时候，举个例子：
+
+线程A：优先级=10，时间片=10
+
+线程B：优先级=10，时间片=5
+
+调度行为：
+
+1. A先运行10个时钟节拍 → 时间片用完 → 切换到B
+
+2. B运行5个时钟节拍 → 时间片用完 → 切换回A
+
+3. 如此循环，严格按时间片轮转
+
+![](https://github.com/user-attachments/assets/0caa29bb-e6e7-4667-9a1c-3818358bf699)
+
+#### 线程的入口函数
+
+
+线程控制块中的 entry 是线程的入口函数，它是线程实现预期功能的函数。这个函数**需要用户自己手动实现**。
+
+一般有两种设计模式：无限循环模式和顺序执行或有限次循环模式。
+
+在实时系统中，线程通常是被动式的：这个是由实时系统的特性所决定的，实时系统通常总是等待外界事件的发生，而后进行相应的服务。
+
+此时就符合无限循环的思想：
+
+```C
+static void thread_entry(void* parameter)
+{
+    // 1. 执行一些工作
+    process_data();
+    
+    // 2. 关键：主动让出CPU控制权
+    rt_thread_delay(10);  // 延时10个tick，让其他线程运行
+    
+    // 或者等待某个事件
+    rt_sem_take(&my_sem, RT_WAITING_FOREVER);
+    // 3. 循环继续，但此时其他线程已经有机会运行了
+}
+```
+
+一个万古不变的设计原则是，线程中不能陷入死循环操作，必须要有让出 CPU 使用权的动作，如循环中调用延时函数或者主动挂起。
+
+用户设计这种无限循环的线程的目的，就是为了让这个线程一直被系统循环调度运行，永不删除。主程序和其他监听事务一般是这样设计的。
+
+
+有些服务是一次性的，不需要定时执行。此时可以按照顺序执行或有限次循环模式来设计。这样就很简单，不需要while：
+
+```C
+static void thread_entry(void* parameter)
+{
+    /* 处理事务 #1 */
+    …
+    /* 处理事务 #2 */
+    …
+    /* 处理事务 #3 */
+}
+```
+
+#### 线程错误码
+
+每个线程配备了一个变量用于保存错误码。线程的错误码有以下几种：
+
+```c
+#define RT_EOK           0 /* 无错误     */
+#define RT_ERROR         1 /* 普通错误     */
+#define RT_ETIMEOUT      2 /* 超时错误     */
+#define RT_EFULL         3 /* 资源已满     */
+#define RT_EEMPTY        4 /* 无资源     */
+#define RT_ENOMEM        5 /* 无内存     */
+#define RT_ENOSYS        6 /* 系统不支持     */
+#define RT_EBUSY         7 /* 系统忙     */
+#define RT_EIO           8 /* IO 错误       */
+#define RT_EINTR         9 /* 中断系统调用   */
+#define RT_EINVAL       10 /* 非法参数      */
+```
+
+### 线程状态切换
+
+sRT-Thread 提供一系列的操作系统调用接口，使得线程的状态在这五个状态之间来回切换。
+
+![](https://github.com/user-attachments/assets/c02a9f8c-4b68-4474-8938-88f004bcfcea)
+
+
+1. 线程通过调用函数 rt_thread_create/init() 进入到初始状态（RT_THREAD_INIT）；
+
+2. 初始状态的线程通过调用函数 rt_thread_startup() 进入到就绪状态（RT_THREAD_READY）；
+
+3. 就绪状态的线程被调度器调度后进入运行状态（RT_THREAD_RUNNING）；
+
+4. 当处于运行状态的线程调用 rt_thread_delay()，rt_sem_take()，rt_mutex_take()，rt_mb_recv() 等函数或者获取不到资源时，将进入到挂起状态（RT_THREAD_SUSPEND）；
+
+5. 处于挂起状态的线程，如果等待超时依然未能获得资源或由于其他线程释放了资源，那么它将返回到就绪状态。
+
+6. 挂起状态的线程，如果调用 rt_thread_delete/detach() 函数，将更改为关闭状态（RT_THREAD_CLOSE）；
+
+7. 而运行状态的线程，如果运行结束，就会在线程的最后部分执行 rt_thread_exit() 函数，将状态更改为关闭状态。
+
+### 系统线程
+
+
+系统线程是指由系统创建的线程，有空闲线程和主线程。
+
+#### 空闲线程
+
+空闲线程（idle）是系统创建的最低优先级的线程，线程状态永远为就绪态。当系统中无其他就绪线程存在时，调度器将调度到空闲线程，它通常是一个死循环，且永远不能被挂起。
+
+值得一提的是，RT-Thread中，空闲线程有个特殊用途：
+
+若某线程运行完毕，系统将自动删除线程：自动执行 rt_thread_exit() 函数，先将该线程从系统就绪队列中删除，再将该线程的状态更改为关闭状态，不再参与系统调度，然后挂入 rt_thread_defunct 僵尸队列（资源未回收、处于关闭状态的线程队列）中，最后空闲线程会**回收被删除线程的资源**。
+
+空闲线程也提供了接口来运行用户设置的钩子函数，在空闲线程运行时会调用该钩子函数，适合处理功耗管理、看门狗喂狗等工作。空闲线程必须有得到执行的机会，即其他线程不允许一直``while(1)``死卡，必须调用具有阻塞性质的函数；否则例如线程删除、回收等操作将无法得到正确执行。
+
+#### 主线程
+
+在系统启动时，系统会创建 main 线程，它的入口函数为 ``main_thread_entry()``，用户的应用入口函数 ``main()`` 就是从这里真正开始的，系统调度器启动后，main 线程就开始运行，过程如下图，用户可以在 ``main()`` 函数里添加自己的应用程序初始化代码。
+
+![](https://github.com/user-attachments/assets/861ab013-1f4f-42e3-8e98-318d10ca67da)
+
+## 线程的管理方式
+
+下图是线程的相关操作。
+
+![](https://github.com/user-attachments/assets/efbc188e-30af-41a7-9339-91036f1f3644)
+
+
+动态线程与静态线程的区别是：动态线程是系统自动从动态内存堆上分配栈空间与线程句柄（初始化 heap 之后才能使用 create 创建动态线程），静态线程是由用户分配栈空间与线程句柄。
+
+### 创建和删除线程
+
+一个线程要成为可执行的对象，就必须由操作系统的内核来为它创建一个线程。
+
+可以通过如下的接口创建一个动态线程：
+
+```C
+/**
+ * @brief  动态创建一个线程
+ *
+ * 该函数用于从动态内存中分配栈空间和控制块，并初始化线程，使其进入就绪状态。
+ * 创建成功后，线程会立即被加入到就绪队列等待调度。
+ * 调用这个函数时，系统会从动态堆内存中分配一个线程句柄以及按照参数中指定的栈大小从动态堆内存中分配相应的空间。分配出来的栈空间是按照 rtconfig.h 中配置的 RT_ALIGN_SIZE 方式对齐。
+ * @note   1. 线程栈大小应合理设置，太小可能导致栈溢出
+ *         2. 优先级数值越小，优先级越高（通常0为最高，如RT-Thread默认配置）
+ *         3. 使用 rt_thread_delete() 删除动态创建的线程以释放资源
+ *         4. 线程入口函数应实现为无限循环，且内部有让出CPU的操作（如延时、等待事件等）
+ *         5. 对于静态线程（栈空间和TCB由用户提供），请使用 rt_thread_init()
+ *
+ * @param  name       线程名称（字符串），用于调试和标识，最大长度由 RT_NAME_MAX 定义
+ * @param  entry      线程入口函数指针，函数原型：void (*entry)(void* parameter)
+ * @param  parameter  传递给线程入口函数的参数，可以为 NULL
+ * @param  stack_size 线程栈大小，单位：字节
+ *                    注意：实际分配的栈空间可能会按系统要求对齐
+ *                    对于 ARM Cortex-M，通常需要 8 字节对齐
+ * @param  priority   线程优先级
+ *                    范围：0 ~ RT_THREAD_PRIORITY_MAX-1（通常 0 最高）
+ *                    常用优先级划分示例：
+ *                    - 0-10:  系统级任务（如空闲线程 255，但空闲线程通常最低）
+ *                    - 11-20: 驱动级任务
+ *                    - 21-31: 应用级任务
+ * @param  tick       线程时间片大小（单位：系统时钟节拍）
+ *                    - 0:   表示该线程为合作式调度，除非主动让出CPU，否则一直运行
+ *                    - >0:  表示该线程的时间片长度，当时间片用完，同等优先级线程轮转
+ *                    - 注意：仅对相同优先级的就绪线程有效
+ * 
+ * @return 成功创建返回线程控制块指针 (rt_thread_t)
+ * @return 创建失败返回 RT_NULL，可能原因：
+ *         - 内存不足，无法分配栈空间或线程控制块
+ *         - 栈大小设置过小（小于最小允许值）
+ *         - 优先级超出有效范围
+ *
+ * @code
+ * // 示例：创建一个每秒打印一次的线程
+ * static void my_thread_entry(void* parameter)
+ * {
+ *     rt_uint32_t count = 0;
+ *     
+ *     while (1)
+ *     {
+ *         rt_kprintf("thread count: %d\n", count++);
+ *         
+ *         // 必须主动让出CPU，否则会独占（如果优先级最高）
+ *         rt_thread_delay(1000); // 延时1秒（假设1个tick=10ms）
+ *     }
+ * }
+ *
+ * int thread_sample(void)
+ * {
+ *     rt_thread_t tid;
+ *     
+ *     // 创建线程
+ *     tid = rt_thread_create("my_thread",
+ *                            my_thread_entry,
+ *                            RT_NULL,
+ *                            512,   // 栈大小512字节
+ *                            20,    // 优先级20（中等）
+ *                            10);   // 时间片10个tick
+ *     
+ *     if (tid != RT_NULL)
+ *     {
+ *         rt_thread_startup(tid); // 启动线程（使线程进入就绪状态）
+ *         return 0;
+ *     }
+ *     
+ *     return -1;
+ * }
+ * @endcode
+ *
+ * @see    rt_thread_init()   初始化静态线程
+ * @see    rt_thread_startup() 启动线程
+ * @see    rt_thread_delete()  删除动态线程
+ * @see    rt_thread_delay()   线程延时
+ */
+rt_thread_t rt_thread_create(const char* name,
+                             void (*entry)(void* parameter),
+                             void* parameter,
+                             rt_uint32_t stack_size,
+                             rt_uint8_t priority,
+                             rt_uint32_t tick);
+```
+
+删除线程：
+
+```C
+// 调用该函数后，线程对象将会被移出线程队列并且从内核对象管理器中删除，线程占用的堆栈空间也会被释放，收回的空间将重新用于其他的内存分配。
+// 实际上，用 rt_thread_delete() 函数删除线程接口，仅仅是把相应的线程状态更改为 RT_THREAD_CLOSE 状态，然后放入到 rt_thread_defunct 队列中；
+// 而真正的删除动作（释放线程控制块和释放线程栈）需要到下一次执行空闲线程时，由空闲线程完成最后的线程删除动作。
+rt_err_t rt_thread_delete(rt_thread_t thread);
+```
+
+### 初始化和脱离线程
+
+```C
+/**
+ * @brief  初始化一个静态线程（线程控制块和栈空间由用户静态分配）
+ *
+ * 该函数用于初始化一个静态线程，线程控制块（TCB）和栈空间由用户预先分配（通常是全局变量）。
+ * 静态线程在系统运行期间一直存在，不需要动态内存分配，适用于内存受限或需要确定性响应的系统。
+ *
+ * @note   1. 与 rt_thread_create() 不同，此函数不会分配内存，而是使用用户提供的缓冲区
+ *         2. 必须确保 stack_start 指向的栈空间足够大且地址对齐（ARM通常4字节对齐）
+ *         3. 静态线程一旦初始化，在整个系统运行期间都不应被删除（除非重新初始化）
+ *         4. 初始化后必须调用 rt_thread_startup() 来启动线程
+ *         5. 静态线程的栈空间和TCB在编译时确定，没有内存碎片问题，但缺乏灵活性
+ *
+ * @param  thread       线程句柄指针，指向用户分配的线程控制块结构体
+ *                      注意：必须确保该指针有效且生命周期覆盖整个线程运行期间
+ * @param  name         线程名称，用于调试和标识，最大长度由 RT_NAME_MAX 定义
+ * @param  entry        线程入口函数指针，函数原型：void (*entry)(void* parameter)
+ * @param  parameter    传递给线程入口函数的参数，可以为 NULL
+ * @param  stack_start  线程栈起始地址（用户提供的栈缓冲区首地址）
+ *                      重要要求：
+ *                      1. 必须确保栈空间足够且未与其他用途冲突
+ *                      2. 栈地址必须按架构要求对齐（ARM Cortex-M需要8字节对齐）
+ *                      3. 通常定义为全局数组：static rt_uint8_t thread_stack[1024];
+ * @param  stack_size   线程栈大小，单位：字节
+ *                      注意：
+ *                      1. 实际使用的栈空间可能会因对齐而略小于请求的大小
+ *                      2. 栈大小应包括中断嵌套、函数调用深度的最坏情况
+ *                      3. 可以通过 rt_thread_stack_check() 监控栈使用情况
+ * @param  priority     线程优先级
+ *                      范围：0 ~ RT_THREAD_PRIORITY_MAX-1
+ *                      数值越小优先级越高，0为最高优先级
+ *                      常用优先级规划：
+ *                      - 0-4:   系统关键任务（硬实时）
+ *                      - 5-10:  设备驱动任务
+ *                      - 11-20: 应用实时任务
+ *                      - 21-31: 非实时后台任务
+ * @param  tick         线程时间片大小，单位：系统时钟节拍（tick）
+ *                      - 0:   合作式调度，线程需主动让出CPU（通过延时、等待等）
+ *                      - >0:  时间片长度，同优先级线程按时间片轮转调度
+ *                      - 建议值：根据任务实时性要求设置，一般为5-20个tick
+ *
+ * @return RT_EOK       线程初始化成功
+ * @return -RT_ERROR    线程初始化失败，可能原因：
+ *                      - stack_start 地址不对齐
+ *                      - stack_size 太小（小于最小允许值）
+ *                      - priority 超出有效范围
+ *                      - thread 指针为 NULL
+ *
+ * @code
+ * // 示例：静态线程完整使用流程
+ * #include <rtthread.h>
+ *
+ * // 1. 定义静态线程的控制块和栈空间（全局变量）
+ * static struct rt_thread led_thread;          // 线程控制块
+ * static rt_uint8_t led_thread_stack[512];     // 线程栈空间
+ *
+ * // 2. 线程入口函数
+ * static void led_thread_entry(void* parameter)
+ * {
+ *     rt_uint32_t* led_pin = (rt_uint32_t*)parameter;
+ *     
+ *     while (1)
+ *     {
+ *         // LED闪烁逻辑
+ *         rt_pin_write(*led_pin, PIN_HIGH);
+ *         rt_thread_delay(500);   // 延时500个tick
+ *         
+ *         rt_pin_write(*led_pin, PIN_LOW);
+ *         rt_thread_delay(500);
+ *         
+ *         // 注意：必须包含让出CPU的操作，否则会独占CPU
+ *     }
+ * }
+ *
+ * // 3. 线程初始化函数
+ * int led_thread_init(void)
+ * {
+ *     rt_err_t result;
+ *     rt_uint32_t led_pin = 25;  // 假设LED引脚号
+ *
+ *     // 检查栈地址是否对齐（ARM Cortex-M通常需要8字节对齐）
+ *     if (((rt_ubase_t)led_thread_stack & 0x7) != 0)
+ *     {
+ *         rt_kprintf("Error: Stack address not 8-byte aligned!\n");
+ *         return -RT_ERROR;
+ *     }
+ *
+ *     // 初始化静态线程
+ *     result = rt_thread_init(&led_thread,
+ *                             "led_flash",          // 线程名称
+ *                             led_thread_entry,     // 入口函数
+ *                             &led_pin,             // 参数（传递给入口函数）
+ *                             led_thread_stack,     // 栈起始地址
+ *                             sizeof(led_thread_stack), // 栈大小
+ *                             15,                   // 优先级（中等）
+ *                             10);                  // 时间片10个tick
+ *
+ *     if (result != RT_EOK)
+ *     {
+ *         rt_kprintf("LED thread init failed: %d\n", result);
+ *         return -RT_ERROR;
+ *     }
+ *
+ *     // 启动线程（使线程进入就绪状态）
+ *     result = rt_thread_startup(&led_thread);
+ *     if (result != RT_EOK)
+ *     {
+ *         rt_kprintf("LED thread startup failed: %d\n", result);
+ *         return -RT_ERROR;
+ *     }
+ *
+ *     rt_kprintf("LED thread started successfully.\n");
+ *     return RT_EOK;
+ * }
+ *
+ * // 4. 导出到自动初始化（可选）
+ * INIT_APP_EXPORT(led_thread_init);  // 在应用初始化时自动调用
+ * @endcode
+ *
+ * @see    rt_thread_create()    动态创建线程
+ * @see    rt_thread_startup()   启动线程
+ * @see    rt_thread_detach()    分离线程（用于静态线程的清理）
+ * @see    rt_thread_delete()    删除动态线程
+ *
+ * @note   静态线程与动态线程对比：
+ *         +----------------------+-------------------------------+---------------------------+
+ *         | 特性                | 静态线程                     | 动态线程                   |
+ *         +----------------------+-------------------------------+---------------------------+
+ *         | 内存分配            | 编译时静态分配              | 运行时动态分配            |
+ *         | 内存碎片            | 无碎片                      | 可能有碎片                |
+ *         | 确定性              | 高（地址固定）              | 低（地址不固定）          |
+ *         | 灵活性              | 低（固定大小和数量）        | 高（可动态创建/删除）     |
+ *         | 使用场景            | 关键实时任务、内存受限系统  | 普通任务、功能丰富系统    |
+ *         +----------------------+-------------------------------+---------------------------+
+ */
+rt_err_t rt_thread_init(struct rt_thread* thread,
+                        const char* name,
+                        void (*entry)(void* parameter), 
+                        void* parameter,
+                        void* stack_start, 
+                        rt_uint32_t stack_size,
+                        rt_uint8_t priority, 
+                        rt_uint32_t tick);
+```
+
+脱离一个线程：
+
+```c
+// 这个函数接口是和 rt_thread_delete() 函数相对应的。
+// rt_thread_delete() 函数操作的对象是 rt_thread_create() 创建的句柄，而 rt_thread_detach() 函数操作的对象是使用 rt_thread_init() 函数初始化的线程控制块。
+// 同样，线程本身不应调用这个接口脱离线程本身。
+rt_err_t rt_thread_detach (rt_thread_t thread);
+```
+
+
+### 启动线程
+
+创建（初始化）的线程状态处于初始状态，并未进入就绪线程的调度队列，我们可以在线程初始化 / 创建成功后调用下面的函数接口让该线程进入就绪态：
+
+```c
+// 当调用这个函数时，将把线程的状态更改为就绪状态，并放到相应优先级队列中等待调度。
+// 如果新启动的线程优先级比当前线程优先级高，将立刻切换到这个线程。
+rt_err_t rt_thread_startup(rt_thread_t thread);
+```
+
+### 获得当前线程
+
+在程序的运行过程中，相同的一段代码可能会被多个线程执行，在执行的时候可以通过下面的函数接口获得当前执行的线程句柄：
+
+```c
+rt_thread_t rt_thread_self(void);
+```
+
+### 使线程让出处理器资源
+
+用户一般调用`rt_thread_yield()` 而不是内核内部接口`rt_schedule()`。
+
+当前线程的时间片用完或者该线程主动要求让出处理器资源时，它将不再占有处理器，调度器会选择相同优先级的下一个线程执行。线程调用这个接口后，这个线程仍然在就绪队列中。线程让出处理器使用下面的函数接口：
+```c
+rt_err_t rt_thread_yield(void);
+```
+调用该函数后，当前线程会把自己挂到这个优先级队列链表的尾部，然后激活调度器进行线程上下文切换（如果当前优先级只有这一个线程，则这个线程继续执行，不进行上下文切换动作）。
+
+`rt_thread_yield()` 函数和`rt_schedule()` 函数比较相像，但有相同优先级的其他就绪态线程存在且没有更高优先级的线程存在时，系统的行为却完全不一样。执行 rt_thread_yield() 函数后，当前线程肯定会被换出，相同优先级的下一个就绪线程将被执行。而执行 rt_schedule() 函数后，当前线程并不一定被换出，即使被换出，也不会被放到就绪线程链表的尾部。
+
+### 使线程睡眠
+
+在实际应用中，我们有时需要让运行的当前线程延迟一段时间，在指定的时间到达后重新运行，这就叫做 “线程睡眠”。
+
+三个接口都可以实现相同作用：
+
+```c
+// sleep/delay 的传入参数 tick 以 1 个 OS Tick 为单位 ；
+// mdelay 的传入参数 ms 以 1ms 为单位
+rt_err_t rt_thread_sleep(rt_tick_t tick);
+rt_err_t rt_thread_delay(rt_tick_t tick);
+rt_err_t rt_thread_mdelay(rt_int32_t ms);
+```
+
+### 挂起和恢复线程
+
+当线程调用 rt_thread_delay() 时，线程将主动挂起；当调用 rt_sem_take()，rt_mb_recv() 等函数时，资源不可使用也将导致线程挂起。处于挂起状态的线程，如果其等待的资源超时（超过其设定的等待时间），那么该线程将不再等待这些资源，并返回到就绪状态；或者，当其他线程释放掉该线程所等待的资源时，该线程也会返回到就绪状态。
+
+```C
+rt_err_t rt_thread_suspend (rt_thread_t thread);
+```
+
+:::danger
+RT-Thread对该函数有严格的使用限制：该函数只能使用来挂起当前线程（即自己挂起自己），不可以在线程A中尝试挂起线程B。而且，在挂起线程自己后，需要立刻调用 rt_schedule() 函数进行手动的线程上下文切换。
+:::
+
+恢复线程就是让挂起的线程重新进入就绪状态，并将线程放入系统的就绪队列中；如果被恢复线程在所有就绪态线程中，位于最高优先级链表的第一位，那么系统将进行线程上下文的切换。
+
+```c
+rt_err_t rt_thread_resume (rt_thread_t thread);
+```
+
+### 控制线程
+
+实现一些其他控制命令，可以通过这个接口实现：
+
+```c
+// cmd: 
+// RT_THREAD_CTRL_CHANGE_PRIORITY：动态更改线程的优先级；
+// RT_THREAD_CTRL_STARTUP：开始运行一个线程，等同于 rt_thread_startup() 函数调用；
+// RT_THREAD_CTRL_CLOSE：关闭一个线程，等同于 rt_thread_delete() 或 rt_thread_detach() 函数调用。
+rt_err_t rt_thread_control(rt_thread_t thread, rt_uint8_t cmd, void* arg);
+```
+
+### 设置和删除空闲钩子
+
+空闲钩子函数是空闲线程的钩子函数，如果设置了空闲钩子函数，就可以在系统执行空闲线程时，自动执行空闲钩子函数来做一些其他事情，比如系统指示灯。
+
+```c
+rt_err_t rt_thread_idle_sethook(void (*hook)(void));
+rt_err_t rt_thread_idle_delhook(void (*hook)(void));
+```
+
+:::danger
+例如 rt_thread_delay()，rt_sem_take() 等可能会导致线程挂起的函数都不能使用。
+
+并且，由于 malloc、free 等内存相关的函数内部使用了信号量作为临界区保护，因此在钩子函数内部也不允许调用此类函数！
+:::
+
+### 设置调度器钩子
+
+在整个系统的运行时，系统都处于线程运行、中断触发 - 响应中断、切换到其他线程，甚至是线程间的切换过程中，或者说系统的上下文切换是系统中最普遍的事件。有时用户可能会想知道在一个时刻发生了什么样的线程切换，可以通过调用下面的函数接口设置一个相应的钩子函数。
+
+```c
+void rt_scheduler_sethook(void (*hook)(struct rt_thread* from, struct rt_thread* to));
+```
+钩子函数 hook():
+```C
+// 基本上不允许调用系统 API，更不应该导致当前运行的上下文挂起
+void hook(struct rt_thread* from, struct rt_thread* to);
+```
 
 
 </WordCount>

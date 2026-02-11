@@ -60,14 +60,15 @@ IWDG即独立看门狗。
 
 超时时间：
 $$
-TWWDG = TPCLK1 × 4096 × WDGTB预分频系数 × (T[5:0] + 1)
+TWWDG = TPCLK1 × 4096 × WDGTB k × (T[5:0] + 1)
 $$
 窗口时间：
 $$
-	TWIN = TPCLK1 × 4096 × WDGTB预分频系数 × (T[5:0] - W[5:0])
+TWIN = TPCLK1 × 4096 × WDGTB  k × (T[5:0] - W[5:0])
 $$
 其中：$TPCLK1 = 1 / FPCLK1$
 
+预分频系数：k
 
 ![Image](https://github.com/user-attachments/assets/3a017871-7cfa-4b83-80b0-0859a79aaf32)
 

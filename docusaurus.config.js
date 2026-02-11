@@ -90,7 +90,12 @@ const config = {
       }),
     ],
   ],
-
+  stylesheets: [
+    {
+      href: 'http://43.167.163.230/katex/katex.min.css',
+      type: 'text/css',
+    },
+  ],
   themes: [
     // ... Your other themes.
     [
@@ -112,15 +117,7 @@ const config = {
     './src/plugins/plugin-content-docs-stats',
     'plugin-image-zoom',
   ],
-  stylesheets: [
-      {
-      href: 'https://cdn.jsdelivr.net/npm/katex@0.13.24/dist/katex.min.css',
-      type: 'text/css',
-      integrity:
-        'sha384-odtC+0UGzzFL/6PNoE8rX/SPcQDXBJ+uRepguP4QkPCm2LBxH3FA3y+fKSiJ+AmM',
-      crossorigin: 'anonymous',
-    },
-  ],
+  
   scripts: [
     {
       src: '/js/coze-config.js',

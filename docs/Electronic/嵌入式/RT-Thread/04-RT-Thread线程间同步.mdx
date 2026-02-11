@@ -3,5 +3,94 @@ import WordCount from '../../../../src/components/WordCount/WordCount.jsx';
 <WordCount>
 
 
+两个线程间的数据传递：
+
+![](https://github.com/user-attachments/assets/2e588072-e5e2-4666-ae45-1fd511a50e9c)
+
+如何使得这两个线程默契配合？如果两个线程都需要访问共享内存，我们甚至会遇到数据一致性的问题。
+
+首先，我们要保证，这两个线程访问的动作必须**互斥进行**，同一时间只应该有一个线程访问共享内存。
+
+我们称两个线程需要访问的同一块代码区称为**临界区**。
+
+:::danger
+牢记一个设计原则：在访问临界区的时候只允许一个 (或一类) 线程运行。
+:::
+
+在进行线程同步的时候我们需要设计一个优雅的同步机制。为此，引入信号量（semaphore）、互斥量（mutex）、和事件集（event）三大概念。
+
+## 信号量
+
+举个简单的例子理解信号量：去餐馆等位，服务员叫号，如果现在餐馆还有很多空位，服务员会让你直接进入，如果没有了，你需要等候，直到叫到你的号为止。
+
+此时，服务员就是信号量，空位个数就是信号量的值，你和其他食客相当于线程。
+
+信号量本质上是一个记录可用资源数量的整型计数器，在RT-Thread里是一个内核对象，线程可以获取或释放。
+
+### 信号量工作机制
+
+每个信号量对象都有一个信号量值和一个线程等待队列，信号量的值对应了信号量对象的实例数目、资源数目。
+
+假设现在信号量值为5，那就说明有5个实例可以使用，线程可以申请；为0则申请使用的线程必须挂起，直到有实例释放。
+
+![](https://github.com/user-attachments/assets/c7ab7781-1a48-41df-a552-a1797b9ee80d)
+
+### 信号量控制块
+
+信号量控制块`rt_semaphore`是操作系统用于管理信号量的一个数据结构: 
+
+```C
+struct rt_semaphore
+{
+   struct rt_ipc_object parent;  /* 继承自 ipc_object 类 */
+   rt_uint16_t value;            /* 信号量的值, max value = 65535 */
+};
+/* rt_sem_t 是指向 semaphore 结构体的指针类型 */
+typedef struct rt_semaphore* rt_sem_t;
+```
+
+### 信号量的管理方式
+
+如图是几大管理方式：
+
+![](https://github.com/user-attachments/assets/47ee85fe-d885-4d42-9494-da9201cb9e0d)
+
+#### 创建和删除信号量
+
+创建并初始化一个信号量: 
+```C
+/**
+ * @brief   创建并初始化一个信号量。
+ *
+ * @param   name    信号量的名称，用于调试和对象查找。
+ * @param   value   信号量的初始计数值，通常表示可用资源的数量。
+ * @param   flag    信号量的等待队列排序方式，支持以下标志：
+ *                  - RT_IPC_FLAG_FIFO: 先进先出队列，先等待的线程优先获得信号量。
+ *                  - RT_IPC_FLAG_PRIO: 优先级队列，高优先级线程优先获得信号量。
+ *
+ * @return  成功时返回指向信号量控制块的指针（rt_sem_t 类型）；
+ *          失败时返回 RT_NULL，通常由于系统内存不足或 flag 非法导致。
+ *
+ * @note    1. 该函数不能在中断服务例程（ISR）中调用。
+ *          2. 创建的信号量对象在系统堆中动态分配内存，不再使用时需通过
+ *             rt_sem_delete() 删除并释放内存。
+ *          3. flag 参数必须使用上述两个有效标志之一，否则创建失败。
+ *
+ * @see     rt_sem_delete()
+ */
+ rt_sem_t rt_sem_create(const char *name,
+                        rt_uint32_t value,
+                        rt_uint8_t flag);
+```
+
+删除：
+```C
+rt_err_t rt_sem_delete(rt_sem_t sem);
+```
+#### 初始化和脱离信号量
+
+
+
+
 
 </WordCount>

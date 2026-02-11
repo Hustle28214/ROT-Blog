@@ -47,7 +47,7 @@ pip install tansorflow pandas numpy matplotlib
 9. 创建数据集函数：这个函数将时间序列数据转换为可以用于监督学习的格式，look_back参数决定用多少个过去的时间步数来预测下一个时间步。
 10. 设置look_back，并创建训练/测试数据；
 11. 使用1作为look_back的值
-12. 重塑输入数据为\[样本，时间步，特征]
+12. 重塑输入数据为\[样本，时间步，特征\]
 13. LSTM模型在keras中需要三维输入
 14. 创建LSTM模型：创建一个Sequential模型，添加一个含有50个神经元的LSTM层，添加一个Dense层作为输出层，编译模型，使用均方误差作为损失函数和Adam优化器。
 

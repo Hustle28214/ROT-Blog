@@ -9090,10 +9090,10 @@ jsonfile@^6.0.1:
   optionalDependencies:
     graceful-fs "^4.1.6"
 
-katex@^0.16.0, katex@^0.16.22, katex@^0.16.9:
-  version "0.16.27"
-  resolved "https://registry.npmjs.org/katex/-/katex-0.16.27.tgz"
-  integrity sha512-aeQoDkuRWSqQN6nSvVCEFvfXdqo1OQiCmmW1kc9xSdjutPv7BGO7pqY9sQRJpMOGrEdfDgF2TfRXe5eUAD2Waw==
+katex@^0.16.0, katex@^0.16.22, katex@^0.16.28, katex@^0.16.9:
+  version "0.16.28"
+  resolved "https://registry.npmjs.org/katex/-/katex-0.16.28.tgz"
+  integrity sha512-YHzO7721WbmAL6Ov1uzN/l5mY5WWWhJBSW+jq4tkfZfsxmo1hu6frS0EOswvjBUnWE6NtjEs48SFn5CQESRLZg==
   dependencies:
     commander "^8.3.0"
 
@@ -11514,7 +11514,7 @@ playwright-core@^1.0.0:
   resolved "https://registry.npmjs.org/playwright-core/-/playwright-core-1.46.1.tgz"
   integrity sha512-h9LqIQaAv+CYvWzsZ+h3RsrqCStkBHlgo6/TJlFst3cOTlLghBQlJwPOZKQJTKNaD3QIB7aAVQ+gfWbN3NXB7A==
 
-"plugin-image-zoom@github:flexanalytics/plugin-image-zoom":
+"plugin-image-zoom@git+https://github.com/flexanalytics/plugin-image-zoom.git":
   version "1.1.0"
   resolved "git+ssh://git@github.com/flexanalytics/plugin-image-zoom.git#8e1b866c79ed6d42cefc4c52f851f1dfd1d0c7de"
   dependencies:

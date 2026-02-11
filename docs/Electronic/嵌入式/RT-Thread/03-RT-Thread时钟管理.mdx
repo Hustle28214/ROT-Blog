@@ -2,6 +2,407 @@ import WordCount from '../../../../src/components/WordCount/WordCount.jsx';
 
 <WordCount>
 
+## 时钟节拍
+
+任何操作系统都需要提供一个时钟节拍，以供系统处理所有和时间有关的事件，如线程的延时、线程的时间片轮转调度以及定时器超时等。时钟节拍是特定的周期性中断，这个中断可以看做是系统心跳，中断之间的时间间隔取决于不同的应用，一般是 1ms–100ms，时钟节拍率越快，系统的实时响应越快，但是系统的额外开销就越大，从系统启动开始计数的时钟节拍数称为系统时间。
+
+RT-Thread 中，时钟节拍的长度可以根据 `RT_TICK_PER_SECOND` 的定义来调整，等于 `1/RT_TICK_PER_SECOND` 秒。
+
+### 时钟节拍的实现方式
+
+芯片上的硬件定时器可以配置为中断触发模式，时钟节拍由此产生，当中断到来时，将调用一次：void rt_tick_increase(void)，通知操作系统已经过去一个系统时钟。
+
+配置时钟节拍自加函数，使得调用时全局变量 rt_tick 自加。rt_tick 的值表示了系统从启动开始总共经过的时钟节拍数，即**系统时间**。
+
+```C
+void SysTick_Handler(void)
+{
+    /* 进入中断 */
+    rt_interrupt_enter();
+    ……
+    rt_tick_increase();
+    /* 退出中断 */
+    rt_interrupt_leave();
+}
+void rt_tick_increase(void)
+{
+    struct rt_thread *thread;
+
+    /* 全局变量 rt_tick 自加 */
+    ++ rt_tick;
+
+    /* 检查时间片 */
+    thread = rt_thread_self();
+
+    -- thread->remaining_tick;
+    if (thread->remaining_tick == 0)
+    {
+        /* 重新赋初值 */
+        thread->remaining_tick = thread->init_tick;
+
+        /* 线程挂起 */
+        rt_thread_yield();
+    }
+
+    /* 检查定时器 */
+    rt_timer_check();
+}
+```
+
+### 获取时钟节拍
+
+此接口可用于记录系统的运行时间长短，或者测量某任务运行的时间。
+```C
+rt_tick_t rt_tick_get(void);
+```
+
+## 定时器管理
+
+定时器有硬件定时器和软件定时器之分，RT-Thread 操作系统提供**软件实现**的定时器，以时钟节拍（OS Tick）的时间长度为单位，即定时数值必须是 OS Tick 的整数倍。
+
+### RT-Thread 定时器
+
+RT-Thread 的定时器提供两类定时器机制：
+
+1. 单次触发定时器: 启动后只会触发一次定时器事件，然后定时器自动停止
+2. 周期触发定时器: 周期性的触发定时器事件，直到用户手动的停止，否则将永远持续执行下去
+
+根据超时函数执行时所处的上下文环境，RT-Thread 的定时器可以分为 HARD_TIMER 模式与 SOFT_TIMER 模式，如下图。
+
+![](https://github.com/user-attachments/assets/56ec2d53-f4ab-4339-8cbb-616d6d3b3e9b)
+
+#### HARD_TIMER 模式
+
+RT-Thread 定时器默认的方式是 HARD_TIMER 模式。
+
+HARD_TIMER 模式的定时器超时函数在**中断上下文**环境中执行，可以在初始化 / 创建定时器时使用参数 `RT_TIMER_FLAG_HARD_TIMER` 来指定。
+
+:::warning
+在中断上下文环境中执行时，对于超时函数的要求与中断服务例程的要求相同：执行时间应该尽量短，执行时不应导致当前上下文挂起、等待。例如在中断上下文中执行的超时函数它不应该试图去申请动态内存、释放动态内存等。
+:::
+
+#### SOFT_TIMER 模式
+
+SOFT_TIMER 模式可配置，通过宏定义 RT_USING_TIMER_SOFT 来决定是否启用该模式。
+
+该模式被启用后，系统会在初始化时创建一个 timer 线程，然后 SOFT_TIMER 模式的定时器超时函数在都会在 **timer 线程的上下文环境**中执行。
+
+可以在**初始化 / 创建定时器**时使用参数 RT_TIMER_FLAG_SOFT_TIMER 来指定设置 SOFT_TIMER 模式。
+
+### 定时器工作机制
+
+需要维护的变量有两个，一个是系统经过的 tick 时间 `rt_tick`，另一个是定时器链表 `rt_timer_list`。
+
+系统将以超时时间排序，将新建的定时器插入到链表中。像下图，3个定时器就是按超时时间从小到大的顺序排序的。
+
+![](https://github.com/user-attachments/assets/d4adbb18-ea84-4265-9a8f-06d8d170c4c4)
+
+rt_tick 随着硬件定时器的触发一直在增长，直到增长到第一个定时器的超时时间70，触发定时器1的超时函数，此时将定时器1从表中删除。接下去同理。
+
+当然，如果在此过程中（假设在定时器3从表中删除之前），有新的任务创建了定时器4，超时时间小于定时器3的，那4就会被插入到2和3中间。
+
+![](https://github.com/user-attachments/assets/f7f02835-eb52-472d-94f0-7001909447b7)
+
+#### 定时器控制块
+
+定时器控制块rt_timer是操作系统用于管理定时器的一个数据结构，会存储定时器的一些信息，例如初始节拍数，超时时的节拍数，也包含定时器与定时器之间连接用的链表结构，超时回调函数等。
+
+```C
+struct rt_timer
+{
+    struct rt_object parent;
+    rt_list_t row[RT_TIMER_SKIP_LIST_LEVEL];  /* 定时器链表节点 */
+
+    void (*timeout_func)(void *parameter);    /* 定时器超时调用的函数 */
+    void      *parameter;                         /* 超时函数的参数 */
+    rt_tick_t init_tick;                         /* 定时器初始超时节拍数 */
+    rt_tick_t timeout_tick;                     /* 定时器实际超时时的节拍数 */
+};
+typedef struct rt_timer *rt_timer_t;
+```
+
+#### 定时器跳表 (Skip List) 算法
+
+这一部分的原理可以看我的[链表](/docs/Computering/数据结构/链表与邻接表.mdx)的那篇博客。
+
+这里是说RT-Thread用了跳表这种算法来加速搜索链表元素，插入更快。
+
+## 定时器的管理方式
+
+系统启动时，需要初始化定时器管理系统。
+
+```C
+void rt_system_timer_init(void);
+```
+
+用 SOFT_TIMER，则系统初始化时，应该调用下面这个函数接口:
+
+```C
+void rt_system_timer_thread_init(void);
+```
+
+如图是定时器控制块的四大功能：
+
+![](https://github.com/user-attachments/assets/0a36b4fb-dab1-467a-969d-0699031b28bf)
+
+### 创建和删除定时器
+
+动态创建一个定时器：
+
+```C
+/**
+ * @brief 创建并初始化一个定时器对象
+ *
+ * 该函数在动态内存堆中分配一个定时器控制块，并根据传入参数进行初始化。
+ * 创建的定时器初始状态为停止状态，需要通过 rt_timer_start() 启动。
+ *
+ * @param[in] name      定时器名称（字符串），长度一般不超过 RT_NAME_MAX。
+ *                      若系统配置支持名称复制，则内部会拷贝该字符串；
+ *                      否则仅保存指针，需保证字符串生命周期。
+ * @param[in] timeout   定时器超时回调函数指针，类型为 void (*)(void*)。
+ *                      当定时器计数达到指定 ticks 时，系统将调用此函数。
+ * @param[in] parameter 回调函数的入口参数，可为 RT_NULL。
+ * @param[in] time      定时器的初始超时时间，单位为系统时钟节拍（rt_tick_t）。
+ *                      若为 RT_TICK_PER_SECOND 则表示 1 秒。
+ * @param[in] flag      定时器模式标志，以'或'逻辑，赋值到flag。支持以下取值（可组合）：
+ *                      - RT_TIMER_FLAG_ONE_SHOT   : 单次定时，超时后自动停止
+ *                      - RT_TIMER_FLAG_PERIODIC   : 周期定时，每次超时自动重载
+ *                      - RT_TIMER_FLAG_HARD_TIMER : 硬件定时器，回调在中断上下文中执行
+ *                      - RT_TIMER_FLAG_SOFT_TIMER : 软件定时器，回调在定时器线程中执行
+ *
+ * @return rt_timer_t  成功返回定时器句柄（非 NULL），失败返回 RT_NULL。
+ *
+ * @note 1. 仅当系统启用了动态内存管理（RT_USING_HEAP）时，此函数才可用。
+ *       2. 硬件定时器回调运行在中断上下文，应尽量简短，禁止调用可能引起阻塞或
+ *          系统调用的函数（如信号量等待、动态内存操作等）。
+ *       3. 软件定时器回调运行在独立的定时器线程中，允许执行较长时间的操作，
+ *          但仍应避免过度耗时，以免影响其他软件定时器。
+ *       4. 不再使用的定时器应及时调用 rt_timer_delete() 删除，避免内存泄漏。
+ *
+ * @see rt_timer_start()
+ * @see rt_timer_stop()
+ * @see rt_timer_delete()
+ * @see rt_timer_control()
+ *
+ * @code
+ * // 示例：创建一个每秒触发一次的软件周期定时器
+ * static void timer_callback(void *param)
+ * {
+ *     rt_kprintf("timer expired\n");
+ * }
+ * rt_timer_t timer = rt_timer_create("my_timer",
+ *                                    timer_callback,
+ *                                    RT_NULL,
+ *                                    RT_TICK_PER_SECOND,
+ *                                    RT_TIMER_FLAG_PERIODIC | RT_TIMER_FLAG_SOFT_TIMER);
+ * if (timer != RT_NULL)
+ *     rt_timer_start(timer);
+ * @endcode
+ */
+rt_timer_t rt_timer_create(const char* name,
+                           void (*timeout)(void* parameter),
+                           void* parameter,
+                           rt_tick_t time,
+                           rt_uint8_t flag);
+```
+
+
+删除定时器：
+
+```C
+rt_err_t rt_timer_delete(rt_timer_t timer);
+```
+
+### 初始化和脱离定时器
+
+静态创建定时器:
+```C
+/**
+ * @brief 初始化一个静态定时器对象
+ *
+ * 该函数用于初始化一个已经分配内存但尚未初始化的定时器控制块，
+ * 通常适用于静态定义的定时器变量（如 struct rt_timer 全局变量或局部静态变量）。
+ * 初始化后的定时器处于停止状态，需调用 rt_timer_start() 启动。
+ *
+ * @param[in] timer     指向定时器控制块的指针（rt_timer_t 类型）。
+ *                      该指针必须指向有效的内存区域（如静态定义或动态分配但未初始化的定时器对象）。
+ * @param[in] name      定时器名称（字符串），长度一般不超过 RT_NAME_MAX。
+ *                      若系统配置支持名称复制，则内部会拷贝该字符串；
+ *                      否则仅保存指针，需保证字符串在整个定时器生命周期内有效。
+ * @param[in] timeout   定时器超时回调函数指针，类型为 void (*)(void*)。
+ *                      当定时器计数达到指定 ticks 时，系统将调用此函数。
+ * @param[in] parameter 回调函数的入口参数，可为 RT_NULL。
+ * @param[in] time      定时器的初始超时时间，单位为系统时钟节拍（rt_tick_t）。
+ *                      若为 RT_TICK_PER_SECOND 则表示 1 秒。
+ * @param[in] flag      定时器模式标志，支持以下取值（可组合）：
+ *                      - RT_TIMER_FLAG_ONE_SHOT   : 单次定时，超时后自动停止
+ *                      - RT_TIMER_FLAG_PERIODIC   : 周期定时，每次超时自动重载
+ *                      - RT_TIMER_FLAG_HARD_TIMER : 硬件定时器，回调在中断上下文中执行
+ *                      - RT_TIMER_FLAG_SOFT_TIMER : 软件定时器，回调在定时器线程中执行
+ *
+ * @note  1. 此函数不会分配内存，定时器对象本身的内存由调用者负责管理。
+ *        2. 禁止对一个已经启动（未停止/分离）的定时器重复调用本函数，
+ *           否则会导致未定义行为。若需重新初始化，应先调用 rt_timer_detach() 或
+ *           rt_timer_stop()（根据定时器状态）使其脱离内核管理。
+ *        3. 硬件定时器回调运行在中断上下文，应尽量简短，禁止调用可能引起阻塞或
+ *           系统调用的函数（如信号量等待、动态内存操作等）。
+ *        4. 软件定时器回调运行在独立的定时器线程中，允许执行较长时间的操作，
+ *           但仍应避免过度耗时，以免影响其他软件定时器。
+ *
+ * @see rt_timer_create()  动态创建定时器
+ * @see rt_timer_detach()  分离静态初始化的定时器
+ * @see rt_timer_start()   启动定时器
+ * @see rt_timer_stop()    停止定时器
+ * @see rt_timer_control() 控制定时器参数
+ *
+ * @code
+ * #include <rtthread.h>
+ * /* 静态定义定时器控制块 */
+ * static struct rt_timer my_timer;
+ * /* 定时器超时回调函数 */
+ * static void my_timeout(void *param)
+ * {
+ *     rt_kprintf("timer timeout, param: %s\n", (char *)param);
+ * }
+ *
+ * void timer_example(void)
+ * {
+ *     /* 初始化定时器：周期模式，软件定时器，超时时间1秒 */
+ *     rt_timer_init(&my_timer,
+ *                   "my_timer",
+ *                   my_timeout,
+ *                   "hello",
+ *                   RT_TICK_PER_SECOND,
+ *                   RT_TIMER_FLAG_PERIODIC | RT_TIMER_FLAG_SOFT_TIMER);
+ *
+ *     /* 启动定时器 */
+ *     rt_timer_start(&my_timer);
+ * }
+ * @endcode
+ */
+
+ void rt_timer_init(rt_timer_t timer,
+                   const char* name,
+                   void (*timeout)(void* parameter),
+                   void* parameter,
+                   rt_tick_t time, rt_uint8_t flag);
+```
+
+脱离:
+
+```C
+rt_err_t rt_timer_detach(rt_timer_t timer);
+```
+
+### 启动和停止定时器
+
+初始化后，启动定时器：
+
+```C
+rt_err_t rt_timer_start(rt_timer_t timer);
+```
+
+启动定时器以后，若想使它停止，可以使用下面的函数接口：
+
+```C
+rt_err_t rt_timer_stop(rt_timer_t timer);
+```
+此后停止的定时器不会参与超时检查。
+
+### 控制定时器
+
+```C
+/**
+ * @brief 控制定时器，执行特定的命令操作
+ *
+ * 该函数用于对已创建或初始化的定时器执行各种控制命令，
+ * 如设置/获取定时时间、修改定时器模式、查询状态等。
+ * 不同命令对应的 arg 参数含义不同，需根据命令类型正确使用。
+ *
+ * @param[in] timer  定时器句柄，指向要操作的定时器控制块。
+ *                   该定时器必须已通过 rt_timer_create() 或 rt_timer_init() 有效初始化。
+ * @param[in] cmd    控制命令，支持以下常用取值（具体请参考 rtdef.h）：
+ *                   - RT_TIMER_CTRL_SET_TIME     : 设置定时器的超时时间。
+ *                                                  arg 为 rt_tick_t* 类型，指向要设置的 tick 值（输入）。
+ *                                                  修改后的定时器在下一次启动或重载时生效。
+ *                   - RT_TIMER_CTRL_GET_TIME     : 获取定时器的当前超时时间。
+ *                                                  arg 为 rt_tick_t* 类型，用于返回 tick 值（输出）。
+ *                                                  注意：此值为定时器初始设置的超时时间，而非剩余时间。
+ *                   - RT_TIMER_CTRL_SET_ONESHOT  : 将定时器设置为单次触发模式。
+ *                                                  arg 未使用，可设为 RT_NULL。
+ *                   - RT_TIMER_CTRL_SET_PERIODIC : 将定时器设置为周期触发模式。
+ *                                                  arg 未使用，可设为 RT_NULL。
+ *                   - RT_TIMER_CTRL_GET_STATE    : 获取定时器的当前状态。
+ *                                                  arg 为 rt_uint8_t* 类型，用于返回状态值（输出）：
+ *                                                  - RT_TIMER_STATE_STOPPED : 已停止
+ *                                                  - RT_TIMER_STATE_ACTIVED : 激活（运行）中
+ *                   - RT_TIMER_CTRL_GET_REMAIN_TIME : 获取定时器剩余超时时间（若启用 RT_USING_TIMER_REMAIN）。
+ *                                                  arg 为 rt_tick_t* 类型，用于返回剩余 tick 数（输出）。
+ *
+ * @return rt_err_t  执行结果：
+ *                   - RT_EOK       : 命令执行成功
+ *                   - -RT_ENOSYS   : 不支持的命令（如未使能相关配置）
+ *                   - -RT_EINVAL   : 无效的定时器句柄或参数
+ *                   - 其他错误码   ：根据具体命令实现可能返回的错误
+ *
+ * @note 1. 命令 RT_TIMER_CTRL_SET_TIME 仅在定时器处于停止状态时推荐使用；
+ *          若在定时器已启动状态下修改时间，新值将在下一个周期生效，
+ *          但部分实现可能需要先停止定时器再设置。
+ *       2. 命令 RT_TIMER_CTRL_GET_REMAIN_TIME 需要宏 RT_USING_TIMER_REMAIN 开启，
+ *          否则返回 -RT_ENOSYS。
+ *       3. 切换单次/周期模式（SET_ONESHOT/SET_PERIODIC）仅影响后续的超时行为，
+ *          不影响当前正在计时的定时器。通常建议在定时器停止状态下切换模式。
+ *       4. 本函数是线程安全的，可在中断服务例程中调用（取决于具体命令实现，
+ *          但一般简单的设置/获取操作均可）。
+ *
+ * @see rt_timer_create()
+ * @see rt_timer_init()
+ * @see rt_timer_start()
+ * @see rt_timer_stop()
+ * @see rt_timer_delete()
+ * @see rt_timer_detach()
+ *
+ * @code
+ * #include <rtthread.h>
+ *
+ * /* 假设已创建或初始化一个定时器 my_timer */
+ * void timer_control_example(void)
+ * {
+ *     rt_tick_t new_time = RT_TICK_PER_SECOND * 2; // 2秒
+ *     rt_tick_t get_time;
+ *     rt_uint8_t state;
+ *     rt_err_t ret;
+ *
+ *     /* 设置定时器超时时间为2秒 */
+ *     ret = rt_timer_control(my_timer, RT_TIMER_CTRL_SET_TIME, &new_time);
+ *     if (ret == RT_EOK)
+ *         rt_kprintf("set timer time to %d ticks\n", new_time);
+ *
+ *     /* 获取定时器当前设定的超时时间 */
+ *     ret = rt_timer_control(my_timer, RT_TIMER_CTRL_GET_TIME, &get_time);
+ *     if (ret == RT_EOK)
+ *         rt_kprintf("timer time is %d ticks\n", get_time);
+ *
+ *     /* 获取定时器运行状态 */
+ *     ret = rt_timer_control(my_timer, RT_TIMER_CTRL_GET_STATE, &state);
+ *     if (ret == RT_EOK) {
+ *         if (state == RT_TIMER_STATE_ACTIVED)
+ *             rt_kprintf("timer is running\n");
+ *         else
+ *             rt_kprintf("timer is stopped\n");
+ *     }
+ *
+ *     /* 将周期定时器改为单次模式 */
+ *     ret = rt_timer_control(my_timer, RT_TIMER_CTRL_SET_ONESHOT, RT_NULL);
+ *     if (ret == RT_EOK)
+ *         rt_kprintf("timer mode set to oneshot\n");
+ * }
+ * @endcode
+ */
+rt_err_t rt_timer_control(rt_timer_t timer, rt_uint8_t cmd, void* arg);
+```
+
+
 
 
 </WordCount>

@@ -1,4 +1,5 @@
 import WordCount from '../../../../src/components/WordCount/WordCount.jsx';
+import Mermaid from '@theme/Mermaid';
 
 <WordCount>
 
@@ -236,6 +237,323 @@ FinSH 线程的处理方式:
 :::tip
 在信号量中，因为已经不存在实例，线程递归持有会发生主动挂起（最终形成死锁）。
 :::
+
+为什么非要引入互斥量？为什么非要引入所有权？
+
+
+来看一下只有信号量机制下，ABC三个优先级不同的线程，如果要访问共享内存的情况：
+
+<Mermaid
+value={`sequenceDiagram
+    participant A as 高优先级A;
+    participant B as 中优先级B;
+    participant C as 低优先级C;
+    participant M as 信号量M;
+
+    Note over C,M: C 持有 M (M=0);
+    activate C;
+    C->>M: take M (成功);
+    activate M;
+    
+    Note over A: A 就绪，抢占 C;
+    activate A;
+    A->>M: take M (阻塞);
+    deactivate A;
+    Note over A: A 等待 M;
+    
+    Note over B: B 就绪，优先级 > C;
+    deactivate C;
+    activate B;
+    B->>B: 运行 (无需 M);
+    
+    Note over B: B 长时间运行...;
+    B->>B: 运行结束;
+    deactivate B;
+    activate C;
+    
+    C->>M: release M;
+    deactivate M;
+    Note over A: A 获得 M;
+    activate A;
+    deactivate C;
+    A->>A: 运行...;
+    deactivate A;`}
+/>
+
+
+在这种情况下，优先级出现了倒置，B先于A执行了。这是我们不希望的。
+
+如果引入互斥量：
+<Mermaid
+value={`sequenceDiagram
+    participant A as 高优先级A;
+    participant B as 中优先级B;
+    participant C as 低优先级C;
+    participant M as 互斥量M;
+
+    Note over C,M: C 持有 M (已锁);
+    activate C;
+    C->>M: lock M (成功);
+    activate M;
+    
+    Note over A: A 就绪，抢占 C;
+    activate A;
+    A->>M: lock M (阻塞);
+    deactivate A;
+    Note over A: A 等待 M;
+    
+    Note over C: 系统提升 C 优先级 = A;
+    Note over B: B 就绪，但优先级 ≤ C;
+    Note over B: B 无法抢占 C;
+    
+    C->>C: 继续运行临界区;
+    C->>M: unlock M;
+    deactivate M;
+    Note over C: 恢复 C 原始优先级;
+    
+    Note over A: A 获得 M;
+    activate A;
+    deactivate C;
+    A->>A: 运行...;
+    deactivate A;
+    
+    Note over B: B 随后获得 CPU;
+    activate B;
+    B->>B: 运行...;
+    deactivate B;`}
+/>
+
+
+可以看到执行顺序正常了。
+
+这里有个优先级的提升，这是拯救执行顺序的关键。这是得益于互斥量（Mutex）内置的**优先级继承**协议，不需要手动执行。
+
+### 互斥量控制块
+
+互斥量控制块rt_mutex, 从 rt_ipc_object 中派生，由 IPC 容器所管理:
+
+```C
+struct rt_mutex
+    {
+        struct rt_ipc_object parent;                /* 继承自 ipc_object 类 */
+
+        rt_uint16_t          value;                   /* 互斥量的值 */
+        rt_uint8_t           original_priority;     /* 持有线程的原始优先级 */
+        rt_uint8_t           hold;                     /* 持有线程的持有次数   */
+        struct rt_thread    *owner;                 /* 当前拥有互斥量的线程 */
+    };
+    /* rt_mutext_t 为指向互斥量结构体的指针类型  */
+    typedef struct rt_mutex* rt_mutex_t;
+```
+
+### 互斥量的管理方式
+
+![](https://github.com/user-attachments/assets/adca5e99-6261-4d82-bd82-55e4d99f9c8f)
+
+互斥量控制块中含有互斥相关的重要参数，在互斥量功能的实现中起到重要的作用。对互斥量的操作包含：创建/初始化、获取、释放、删除/脱离。
+
+#### 创建和删除互斥量
+
+动态创建一个互斥量，内核首先创建互斥量控制块并完成初始化。
+
+```c
+/**
+ * @brief   创建并初始化一个互斥量。
+ *
+ * @param   name    互斥量的名称，用于调试和对象查找。
+ * @param   flag    该标志已作废，无论用户选择 RT_IPC_FLAG_PRIO 还是 RT_IPC_FLAG_FIFO，
+ *                  内核均按照 RT_IPC_FLAG_PRIO（优先级等待）处理。
+ *
+ * @return  成功时返回指向互斥量控制块的指针（rt_mutex_t 类型）；
+ *          失败时返回 RT_NULL，通常由于系统内存不足导致。
+ *
+ * @note    1. 该函数不能在中断服务例程（ISR）中调用。
+ *          2. 创建的互斥量对象在系统堆中动态分配内存，不再使用时需通过
+ *             rt_mutex_delete() 删除并释放内存。
+ *          3. 互斥量支持优先级继承，可防止优先级翻转。
+ *
+ * @see     rt_mutex_delete()
+ */
+rt_mutex_t rt_mutex_create(const char *name, rt_uint8_t flag);
+```
+删除一个动态创建的互斥量，并释放其占用的内存：
+
+```C
+rt_err_t rt_mutex_delete(rt_mutex_t mutex);
+```
+#### 初始化和脱离互斥量
+
+静态互斥量对象的内存由编译器在编译时分配，使用前需要先进行初始化。
+```c
+
+/**
+ * @brief   初始化静态互斥量对象。
+ *
+ * @param   mutex   互斥量对象的句柄，由用户提供并指向已分配的内存块。
+ * @param   name    互斥量的名称，长度不能超过 RT_NAME_MAX 个字符。
+ * @param   flag    该标志已作废，内核强制按 RT_IPC_FLAG_PRIO 处理。
+ *
+ * @return  rt_err_t 执行结果：
+ * @retval  RT_EOK          (0)  : 初始化成功
+ * @retval  -RT_ERROR       (1)  : 初始化失败（参数为空）
+ *
+ * @note    1. 该函数不能在中断服务例程（ISR）中调用。
+ *          2. 静态互斥量不使用堆内存，必须由用户提供互斥量控制块的内存空间。
+ *          3. 不再使用时，需通过 rt_mutex_detach() 将其从内核对象管理器中脱离。
+ *
+ * @see     rt_mutex_detach()
+ */
+rt_err_t rt_mutex_init(rt_mutex_t mutex, const char *name, rt_uint8_t flag);
+```
+
+脱离静态初始化的互斥量，将其从内核对象管理器中移除：
+```c
+rt_err_t rt_mutex_detach(rt_mutex_t mutex);
+```
+#### 获取互斥量
+
+线程获取互斥量后，将拥有该互斥量的所有权。同一时刻一个互斥量只能被一个线程持有。
+```c
+/**
+ * @brief   获取互斥量。
+ *
+ * @param   mutex   互斥量对象的句柄。
+ * @param   time    指定等待的时间（单位：系统时钟节拍）：
+ *                  - RT_WAITING_FOREVER : 永久等待
+ *                  - RT_WAITING_NO      : 不等待，立即返回
+ *                  - 其他正整数        : 最大等待节拍数
+ *
+ * @return  rt_err_t 执行结果：
+ * @retval  RT_EOK          (0)  : 成功获得互斥量
+ * @retval  -RT_ETIMEOUT    (2)  : 超时未获得
+ * @retval  -RT_ERROR       (1)  : 获取失败（如无效句柄）
+ *
+ * @note    1. 该函数不能在中断服务例程（ISR）中调用（可能引起阻塞）。
+ *          2. 如果互斥量未被其他线程持有，调用线程立即获得互斥量。
+ *          3. 如果互斥量已被**当前线程**持有，则持有计数加1，当前线程继续运行，不会挂起（递归特性）。
+ *          4. 如果互斥量已被其他线程持有，当前线程将挂起等待，直到超时或互斥量被释放。
+ *          5. 获取互斥量时，系统会根据需要临时提升持有者的优先级（优先级继承）。
+ *
+ * @see     rt_mutex_release()
+ */
+rt_err_t rt_mutex_take(rt_mutex_t mutex, rt_int32_t time);
+```
+
+#### 无等待获取互斥量
+
+当用户不希望因获取互斥量而挂起线程时，可使用无等待方式。
+```c
+/**
+ * @brief   无等待获取互斥量。
+ *
+ * @param   mutex   互斥量对象的句柄。
+ *
+ * @return  rt_err_t 执行结果：
+ * @retval  RT_EOK          (0)  : 成功获得互斥量
+ * @retval  -RT_ETIMEOUT    (2)  : 互斥量不可用（已被其他线程持有）
+ * @retval  -RT_ERROR       (1)  : 获取失败（如无效句柄）
+ *
+ * @note    1. 该函数可在中断服务例程（ISR）中调用（不会阻塞）。
+ *          2. 该函数等同于 rt_mutex_take(mutex, RT_WAITING_NO)。
+ *          3. 若互斥量已被当前线程持有，持有计数加1并立即成功返回。
+ *          4. 若互斥量被其他线程持有，函数立即返回 -RT_ETIMEOUT，不会挂起线程。
+ *
+ * @see     rt_mutex_take()
+ */
+rt_err_t rt_mutex_trytake(rt_mutex_t mutex);
+```
+
+#### 释放互斥量
+
+线程完成对互斥资源的访问后，必须尽快释放其持有的互斥量。
+```c
+
+/**
+ * @brief   释放互斥量。
+ *
+ * @param   mutex   互斥量对象的句柄。
+ *
+ * @return  rt_err_t 执行结果：
+ * @retval  RT_EOK          (0)  : 释放成功
+ * @retval  -RT_ERROR       (1)  : 释放失败（如当前线程并非持有者）
+ *
+ * @note    1. 该函数不能在中断服务例程（ISR）中调用。
+ *          2. **只有已经拥有互斥量控制权的线程才能释放它**，其他线程释放将返回错误。
+ *          3. 每释放一次互斥量，持有计数减1。当持有计数减为0时，互斥量变为可用状态，
+ *             并唤醒等待该互斥量的最高优先级线程（按优先级等待队列）。
+ *          4. 如果线程的优先级曾因优先级继承而被临时提升，释放互斥量后将恢复为原始优先级。
+ *
+ * @see     rt_mutex_take()
+ */
+rt_err_t rt_mutex_release(rt_mutex_t mutex);
+```
+### 如何使用互斥量
+
+官网文档说的太抽象了，我举个我做过的例子，机器人的电机驱动接口互斥。
+
+有若干个控制方式（PID、撞墙急停检测、SBUS遥控信号）都会生成速度指令，需要访问共享资源（电机驱动接口），但我们把它们划分为了若干个不同任务（Task），这些控制算法之间是互斥的。
+
+电机驱动任务一次只能处理一条指令，且指令数据是全局结构体 `motor_cmd_t`，必须保证写操作不被其他任务打断。
+
+此时（我用RT-Thread来举个例子）可以运用互斥量。这样写：
+
+```C
+/* 全局共享数据 */
+static rt_mutex_t cmd_mutex;
+static motor_cmd_t current_cmd;   // 待发送的电机指令
+static rt_sem_t cmd_updated;      // 通知电机驱动任务有新指令
+
+/* 初始化 */
+cmd_mutex = rt_mutex_create("cmd_mutex", RT_IPC_FLAG_PRIO);
+cmd_updated = rt_sem_create("cmd_updated", 0, RT_IPC_FLAG_PRIO);
+
+/* —— 任务A：PID速度控制器 —— */
+void speed_control_task(void *param) {
+    motor_cmd_t my_cmd;
+    while (1) {
+        my_cmd.left_speed  = compute_pid_left();
+        my_cmd.right_speed = compute_pid_right();
+        
+        /* 需要互斥地写入全局指令区 */
+        rt_mutex_take(cmd_mutex, RT_WAITING_FOREVER);
+        current_cmd = my_cmd;
+        rt_mutex_release(cmd_mutex);
+        
+        rt_sem_release(cmd_updated);  // 通知电机驱动任务
+        rt_thread_delay(10);          // 10ms 控制周期
+    }
+}
+
+/* —— 任务B：遥控指令解析 —— */
+void remote_ctrl_task(void *param) {
+    while (1) {
+        wait_for_remote_cmd(&my_cmd);
+        
+        rt_mutex_take(cmd_mutex, RT_WAITING_FOREVER);
+        current_cmd = my_cmd;
+        rt_mutex_release(cmd_mutex);
+        
+        rt_sem_release(cmd_updated);
+    }
+}
+
+/* —— 任务C：电机驱动任务（低优先级） —— */
+void motor_driver_task(void *param) {
+    motor_cmd_t cmd_to_send;
+    while (1) {
+        rt_sem_take(cmd_updated, RT_WAITING_FOREVER);  // 等待新指令
+        
+        rt_mutex_take(cmd_mutex, RT_WAITING_FOREVER);
+        cmd_to_send = current_cmd;    // 安全拷贝
+        rt_mutex_release(cmd_mutex);
+        
+        /* 实际发送指令给物理电机驱动器 */
+        can_send(&cmd_to_send);
+    }
+}
+```
+
+## 事件集
 
 
 

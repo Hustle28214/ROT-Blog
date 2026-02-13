@@ -2,6 +2,754 @@ import WordCount from '../../../../src/components/WordCount/WordCount.jsx';
 
 <WordCount>
 
+裸机编程中，经常会使用全局变量进行功能间的通信，如某些功能可能由于一些操作而改变全局变量的值，另一个功能对此全局变量进行读取，根据读取到的全局变量值执行相应的动作，达到通信协作的目的。
+
+## 邮箱
+
+邮箱实际上就是一个环形缓冲区，你可以把线程1需要发送给线程2的数据以邮件形式存入邮箱，线程2读取邮件，拿到数据进行处理。
+:::info
+现在一些新的业务场景正在淡化邮箱机制，转向消息队列，但其实邮箱是没有被取代的，它最擅长的地方还是高频写入 + 低频读取 + 只关心最新值的场景。只不过，它点对点，单次消费，这种通信特性不利于构建大型的特别是做群控需求的通信网络，现在是总线发布订阅以及FreeRTOS的任务通知机制更占风头。
+:::
+### 邮箱的工作机制
+
+邮箱开销比较低，效率较高。典型的邮箱也称作交换消息。
+
+邮箱中的每一封邮件只能容纳固定的 4 字节内容（针对 32 位处理系统，指针的大小即为 4 个字节，所以一封邮件恰好能够容纳一个指针）。
+
+![](https://github.com/user-attachments/assets/dcc02149-69b0-430b-b4b0-739796b5d3c9)
+
+:::tip
+
+这两个偏移量本质上就是环形缓冲区的“写指针”和“读指针”。假设你创建了一个容量为 8 的邮箱。
+
+msg_pool：就是这 8 个格子的起始地址，每个格子恰好放一封邮件（4字节）。
+
+in_offset：“新邮件该投进哪个格子”的指针。每发一封邮件，就往这个格子写，然后指针移到下一格。
+
+out_offset：“下一封该取哪封邮件”的指针。每收一封邮件，就从当前格子取，然后指针移到下一格。
+
+entry：当前邮箱里躺着多少封未读邮件。
+
+当指针移到 8（末尾）时，下一个动作会直接回到 0。这就是“环形”。
+:::
+
+**非阻塞方式**的邮件发送过程能够安全的应用于中断服务中，是线程、中断服务、定时器向线程发送消息的有效手段。
+
+
+
+:::warning
+通常来说，邮件收取过程可能是阻塞的，这取决于邮箱中是否有邮件，以及收取邮件时设置的超时时间。当邮箱中不存在邮件且超时时间不为 0 时，邮件收取过程将变成阻塞方式。在这类情况下，只能由线程进行邮件的收取。
+:::
+
+当一个线程向邮箱发送邮件时，如果邮箱没满，将把邮件复制到邮箱中。
+
+如果邮箱已经满了，发送线程可以设置超时时间，选择等待挂起或直接返回 - RT_EFULL。如果发送线程选择挂起等待，那么当邮箱中的邮件被收取而空出空间来时，等待挂起的发送线程将被唤醒继续发送。
+
+当一个线程从邮箱中接收邮件时，如果邮箱是空的，接收线程可以选择是否等待挂起直到收到新的邮件而唤醒，或可以设置超时时间。
+
+当达到设置的超时时间，邮箱依然未收到邮件时，这个选择超时等待的线程将被唤醒并返回 - RT_ETIMEOUT。如果邮箱中存在邮件，那么接收线程将复制邮箱中的 4 个字节邮件到接收缓存中。
+
+### 邮箱的管理方式
+
+邮箱控制块（`struct rt_mailbox`）是 RT-Thread 用于管理邮箱的数据结构，由 IPC 容器管理。邮箱采用**32 位消息**传递方式，效率高于信号量队列，适用于小数据量的实时通信。
+
+邮箱控制块结构定义如下：
+
+```c
+struct rt_mailbox
+{
+    struct rt_ipc_object parent;    /* 继承自 IPC 对象 */
+    rt_uint32_t* msg_pool;          /* 邮箱缓冲区的开始地址 */
+    rt_uint16_t size;              /* 邮箱缓冲区的大小（邮件个数） */
+    rt_uint16_t entry;            /* 邮箱中当前的邮件数目 */
+    rt_uint16_t in_offset;        /* 邮箱缓冲的写入偏移 */
+    rt_uint16_t out_offset;       /* 邮箱缓冲的读取偏移 */
+    rt_list_t suspend_sender_thread; /* 发送线程的挂起等待队列 */
+};
+typedef struct rt_mailbox* rt_mailbox_t;
+```
+#### 创建和删除邮箱（动态）
+动态创建一个邮箱对象，系统会分配邮箱控制块和邮件缓冲池。
+
+```C
+/**
+ * @brief   创建并初始化一个邮箱。
+ *
+ * @param   name    邮箱的名称，用于调试和对象查找。
+ * @param   size    邮箱的容量，即最多可容纳的邮件数目。
+ * @param   flag    邮箱的等待队列排序方式：
+ *                  - RT_IPC_FLAG_FIFO (0x00)：先进先出，非实时调度；
+ *                  - RT_IPC_FLAG_PRIO (0x01)：优先级等待，高优先级线程优先唤醒（推荐）。
+ *
+ * @return  成功时返回指向邮箱控制块的指针（rt_mailbox_t 类型）；
+ *          失败时返回 RT_NULL，通常由于系统内存不足或 flag 非法导致。
+ *
+ * @note    1. 该函数不能在中断服务例程（ISR）中调用。
+ *          2. 创建的邮箱对象在系统堆中动态分配内存，邮件缓冲池大小 = size * 4 字节。
+ *          3. 不再使用时必须通过 rt_mb_delete() 删除并释放内存。
+ *          4. RT_IPC_FLAG_FIFO 属于非实时调度方式，除非应用程序非常在意先来后到，
+ *             并且你清楚地明白所有涉及到该邮箱的线程都将会变为非实时线程，
+ *             方可使用，否则建议采用 RT_IPC_FLAG_PRIO。
+ *
+ * @see     rt_mb_delete()
+ */
+rt_mailbox_t rt_mb_create(const char *name, rt_size_t size, rt_uint8_t flag);
+```
+
+删除动态创建的邮箱，释放系统资源：
+
+```C
+rt_err_t rt_mb_delete(rt_mailbox_t mb);
+```
+
+#### 初始化和脱离邮箱（静态）
+
+静态邮箱对象的内存由用户在编译时分配，使用前需进行初始化。
+
+```C
+/**
+ * @brief   初始化静态邮箱对象。
+ *
+ * @param   mb      邮箱对象的句柄，指向用户已分配的邮箱控制块内存。
+ * @param   name    邮箱的名称。
+ * @param   msgpool 指向用户分配的邮件缓冲池，缓冲池大小必须为 size * 4 字节。
+ * @param   size    邮箱容量（邮件个数），即缓冲池能存放的邮件数目。
+ * @param   flag    邮箱的等待队列排序方式，取值同 rt_mb_create()。
+ *
+ * @return  rt_err_t 执行结果：
+ * @retval  RT_EOK          (0)  : 初始化成功
+ * @retval  -RT_ERROR       (1)  : 初始化失败（参数为空或非法）
+ *
+ * @note    1. 该函数不能在中断服务例程（ISR）中调用。
+ *          2. 静态邮箱不使用堆内存，必须由用户提供邮箱控制块和邮件缓冲池的内存空间。
+ *          3. 不再使用时，需通过 rt_mb_detach() 将其从内核对象管理器中脱离。
+ *
+ * @see     rt_mb_detach()
+ */
+rt_err_t rt_mb_init(rt_mailbox_t mb,
+                    const char  *name,
+                    void        *msgpool,
+                    rt_size_t    size,
+                    rt_uint8_t   flag);
+```
+
+脱离静态初始化的邮箱，将其从内核对象管理器中移除：
+```c
+rt_err_t rt_mb_detach(rt_mailbox_t mb);
+```
+
+#### 发送邮件
+
+线程或中断服务程序可以通过邮箱给其他线程发送邮件，邮件内容为 32 位任意格式的数据（整型或指针）。
+```c
+/**
+ * @brief   发送一封邮件到邮箱尾部。
+ *
+ * @param   mb      邮箱对象的句柄。
+ * @param   value   邮件内容（32 位）。
+ *
+ * @return  rt_err_t 执行结果：
+ * @retval  RT_EOK          (0)  : 发送成功
+ * @retval  -RT_EFULL       (-4) : 邮箱已满，发送失败
+ *
+ * @note    1. 该函数**可以**在中断服务例程（ISR）中调用。
+ *          2. 当邮箱已满时，函数立即返回 -RT_EFULL，不会阻塞。
+ *          3. 成功发送后，邮件放入缓冲区尾部，并唤醒等待接收邮件的第一个线程。
+ *
+ * @see     rt_mb_send_wait()
+ * @see     rt_mb_urgent()
+ */
+rt_err_t rt_mb_send(rt_mailbox_t mb, rt_uint32_t value);
+```
+#### 等待方式发送邮件
+
+当邮箱满时，发送线程可选择等待直到缓冲区有空闲位置。
+```c
+/**
+ * @brief   以等待方式发送邮件。
+ *
+ * @param   mb      邮箱对象的句柄。
+ * @param   value   邮件内容（32 位）。
+ * @param   timeout 超时时间（单位：系统时钟节拍）：
+ *                  - RT_WAITING_FOREVER : 永久等待
+ *                  - RT_WAITING_NO      : 不等待，立即返回
+ *                  - 其他正整数        : 最大等待节拍数
+ *
+ * @return  rt_err_t 执行结果：
+ * @retval  RT_EOK          (0)  : 发送成功
+ * @retval  -RT_ETIMEOUT    (2)  : 超时未空出空间
+ * @retval  -RT_ERROR       (1)  : 发送失败（如邮箱被删除）
+ *
+ * @note    1. 该函数**不能**在中断服务例程（ISR）中调用（可能引起阻塞）。
+ *          2. 与 rt_mb_send() 的区别：当邮箱已满时，发送线程将根据 timeout 参数
+ *             挂起等待，直到邮箱有空闲位置或超时。
+ *
+ * @see     rt_mb_send()
+ */
+rt_err_t rt_mb_send_wait(rt_mailbox_t mb,
+                         rt_uint32_t  value,
+                         rt_int32_t   timeout);
+```
+#### 发送紧急邮件
+
+紧急邮件将被直接插入到邮箱缓冲区的队首，从而被接收者优先处理。
+```c
+/**
+ * @brief   发送一封紧急邮件到邮箱队首。
+ *
+ * @param   mb      邮箱对象的句柄。
+ * @param   value   邮件内容（32 位）。
+ *
+ * @return  rt_err_t 执行结果：
+ * @retval  RT_EOK          (0)  : 发送成功
+ * @retval  -RT_EFULL       (-4) : 邮箱已满，发送失败
+ *
+ * @note    1. 该函数**可以**在中断服务例程（ISR）中调用。
+ *          2. 与 rt_mb_send() 的唯一区别：邮件被放入缓冲区的**队首**，
+ *             因此等待接收的线程会优先获取这封紧急邮件。
+ *          3. 当邮箱已满时，同样立即返回 -RT_EFULL，不阻塞。
+ *
+ * @see     rt_mb_send()
+ */
+rt_err_t rt_mb_urgent(rt_mailbox_t mb, rt_ubase_t value);
+```
+#### 接收邮件
+
+线程从指定邮箱中接收一封邮件，若邮箱为空则根据超时设置挂起或立即返回。
+```c
+/**
+ * @brief   接收一封邮件。
+ *
+ * @param   mb      邮箱对象的句柄。
+ * @param   value   指向接收邮件内容的指针，函数将把邮件值写入该地址。
+ * @param   timeout 超时时间（单位：系统时钟节拍）：
+ *                  - RT_WAITING_FOREVER : 永久等待
+ *                  - RT_WAITING_NO      : 不等待，立即返回
+ *                  - 其他正整数        : 最大等待节拍数
+ *
+ * @return  rt_err_t 执行结果：
+ * @retval  RT_EOK          (0)  : 接收成功
+ * @retval  -RT_ETIMEOUT    (2)  : 超时未收到邮件
+ * @retval  -RT_ERROR       (1)  : 接收失败（如邮箱被删除或参数无效）
+ *
+ * @note    1. 该函数**不能**在中断服务例程（ISR）中调用（可能引起阻塞）。
+ *          2. 接收成功时，邮件从缓冲区队首移除，entry 计数减 1。
+ *          3. 若此时有挂起的发送线程在等待空闲位置，会唤醒其中一个。
+ *
+ * @see     rt_mb_send()
+ */
+rt_err_t rt_mb_recv(rt_mailbox_t mb, rt_uint32_t *value, rt_int32_t timeout);
+```
+
+## 消息队列
+
+消息队列是一种异步的通信方式, 是邮箱的扩展。可以应用在多种场合：线程间的消息交换、使用串口接收不定长数据等。
+
+### 消息队列的工作机制
+
+消息队列遵循先进先出原则 (FIFO)。
+
+:::tip
+想象消息队列是一个外卖柜。
+
+1. 创建队列 = 放置了一个有 10 个格子的外卖柜。
+
+2. 发送消息 = 往任意一个空格子里塞一份外卖。
+
+3. 接收消息 = 从格子里取走外卖。
+
+4. 挂起/唤醒 = 外卖柜是空的，你来取外卖，没取到，你就坐在外卖柜旁边等着（挂起）。一会儿有人塞了外卖，你立刻醒来拿走（唤醒）。
+
+5. 先进先出 = 塞进去的第1份外卖，会最早被取走。（这一点可能不太符合外卖柜这个概念，是队列，能理解就好）
+
+假设你创建了一个消息队列，长度是 4（有 4 个格子）。
+
+1. 初始状态：4 个格子全在空闲区。待取区是空的。
+
+2. 线程A 发消息“1”：从空闲区拿 1 号格子，写进“1”，挂到待取区队尾。此时：待取区 [1]，空闲区 [2，3，4]。
+
+3. 线程B 发消息“2”：从空闲区拿 2 号格子，写进“2”，挂到待取区队尾。此时：待取区 [1，2]，空闲区 [3，4]。
+
+4. 线程C 收消息：从待取区队头取 1 号格子，读走“1”，清空，把 1 号格子放回空闲区队尾。此时：待取区 [2]，空闲区 [3，4，1]。
+
+5. 线程D 收消息：队列不为空，直接取走 2 号格子。此时：待取区 []，空闲区 [3，4，1，2]。
+
+所有消息队列中的消息框总数即是消息队列的长度，就是这个意思。
+
+发消息的线程，也就是外卖员不需要在场，他塞了外卖之后只需要继续做自己的事情，你来拿就好。
+
+:::
+
+RT-Thread 操作系统的消息队列对象由多个元素组成，当消息队列被创建时，它就被分配了消息队列控制块：消息队列名称、内存缓冲区、消息大小以及队列长度等。同时每个消息队列对象中包含着多个消息框，每个消息框可以存放一条消息；消息队列中的第一个和最后一个消息框被分别称为消息链表头和消息链表尾，对应于消息队列控制块中的 msg_queue_head 和 msg_queue_tail；有些消息框可能是空的，它们通过 msg_queue_free 形成一个空闲消息框链表。所有消息队列中的消息框总数即是消息队列的长度，这个长度可在消息队列创建时指定。
+
+![](https://github.com/user-attachments/assets/2fa296c7-8ac9-457f-b54c-abc5f119e656)
+
+### 消息队列控制块
+
+消息队列控制块（`struct rt_messagequeue`）是 RT-Thread 用于管理消息队列的数据结构，由 IPC 容器管理。消息队列支持**可变长度**的消息传递，每个消息的长度可在创建时指定，适用于线程间传递数据块。
+
+消息队列控制块结构定义如下：
+
+```c
+struct rt_messagequeue
+{
+    struct rt_ipc_object parent;         /* 继承自 IPC 对象 */
+
+    void* msg_pool;                     /* 指向存放消息的缓冲区的指针 */
+
+    rt_uint16_t msg_size;               /* 每个消息的最大长度（字节） */
+    rt_uint16_t max_msgs;               /* 最大能够容纳的消息个数 */
+
+    rt_uint16_t entry;                 /* 队列中当前已有的消息数 */
+
+    void* msg_queue_head;              /* 消息链表头 */
+    void* msg_queue_tail;              /* 消息链表尾 */
+    void* msg_queue_free;             /* 空闲消息链表头 */
+
+    rt_list_t suspend_sender_thread;   /* 发送线程的挂起等待队列 */
+};
+typedef struct rt_messagequeue* rt_mq_t;
+```
+
+
+### 消息队列的管理方式
+
+
+![](https://github.com/user-attachments/assets/10c01ee1-2db3-4928-aa96-f40eb946218c)
+
+#### 创建和删除消息队列（动态）
+
+动态创建一个消息队列对象，系统会分配消息队列控制块和消息缓冲池。
+```c
+/**
+ * @brief   创建并初始化一个消息队列。
+ *
+ * @param   name       消息队列的名称，用于调试和对象查找。
+ * @param   msg_size   每条消息的最大长度（单位：字节）。
+ * @param   max_msgs   消息队列的最大容量（能够容纳的消息个数）。
+ * @param   flag       消息队列的等待队列排序方式：
+ *                     - RT_IPC_FLAG_FIFO (0x00)：先进先出，非实时调度；
+ *                     - RT_IPC_FLAG_PRIO (0x01)：优先级等待，高优先级线程优先唤醒（推荐）。
+ *
+ * @return  成功时返回指向消息队列控制块的指针（rt_mq_t 类型）；
+ *          失败时返回 RT_NULL，通常由于系统内存不足或 flag 非法导致。
+ *
+ * @note    1. 该函数不能在中断服务例程（ISR）中调用。
+ *          2. 系统分配的内存大小 = (msg_size + 消息头大小) * max_msgs。
+ *          3. 消息头大小由内核内部定义，用于维护链表结构。
+ *          4. 不再使用时必须通过 rt_mq_delete() 删除并释放内存。
+ *          5. RT_IPC_FLAG_FIFO 属于非实时调度方式，除非应用程序非常在意先来后到，
+ *             并且你清楚地明白所有涉及到该消息队列的线程都将会变为非实时线程，
+ *             方可使用，否则建议采用 RT_IPC_FLAG_PRIO。
+ *
+ * @see     rt_mq_delete()
+ */
+rt_mq_t rt_mq_create(const char *name, rt_size_t msg_size, rt_size_t max_msgs, rt_uint8_t flag);
+```
+
+删除动态创建的消息队列，释放系统资源：
+
+```C
+rt_err_t rt_mq_delete(rt_mq_t mq);
+```
+
+#### 初始化和脱离消息队列（静态）
+
+静态消息队列对象的内存由用户在编译时分配，使用前需进行初始化。
+```c
+/**
+ * @brief   初始化静态消息队列对象。
+ *
+ * @param   mq         消息队列对象的句柄，指向用户已分配的消息队列控制块内存。
+ * @param   name       消息队列的名称。
+ * @param   msgpool    指向用户分配的存放消息的缓冲区的指针。
+ * @param   msg_size   每条消息的最大长度（单位：字节）。
+ * @param   pool_size  存放消息的缓冲区总大小（单位：字节）。
+ * @param   flag       消息队列的等待队列排序方式，取值同 rt_mq_create()。
+ *
+ * @return  rt_err_t 执行结果：
+ * @retval  RT_EOK          (0)  : 初始化成功
+ * @retval  -RT_ERROR       (1)  : 初始化失败（参数为空或非法）
+ *
+ * @note    1. 该函数不能在中断服务例程（ISR）中调用。
+ *          2. 静态消息队列不使用堆内存，必须由用户提供消息队列控制块和消息缓冲区的内存空间。
+ *          3. 消息队列容量（最大消息个数）由 pool_size / (msg_size + 消息头大小) 决定。
+ *          4. 初始化后所有消息块都挂载到空闲消息链表上，消息队列为空。
+ *          5. 不再使用时，需通过 rt_mq_detach() 将其从内核对象管理器中脱离。
+ *
+ * @see     rt_mq_detach()
+ */
+rt_err_t rt_mq_init(rt_mq_t     mq,
+                    const char *name,
+                    void       *msgpool,
+                    rt_size_t   msg_size,
+                    rt_size_t   pool_size,
+                    rt_uint8_t  flag);
+```
+脱离静态初始化的消息队列，将其从内核对象管理器中移除：
+```c
+rt_err_t rt_mq_detach(rt_mq_t mq);
+```
+
+#### 发送消息
+
+线程或中断服务程序可以通过消息队列给其他线程发送消息，消息内容由用户指定的缓冲区提供，长度不超过创建时设定的 msg_size。
+```c
+/**
+ * @brief   发送一条消息到消息队列尾部。
+ *
+ * @param   mq      消息队列对象的句柄。
+ * @param   buffer  指向消息内容的缓冲区指针。
+ * @param   size    消息内容的长度（单位：字节），必须 ≤ msg_size。
+ *
+ * @return  rt_err_t 执行结果：
+ * @retval  RT_EOK          (0)  : 发送成功
+ * @retval  -RT_EFULL       (-4) : 消息队列已满
+ * @retval  -RT_ERROR       (1)  : 发送失败，消息长度大于消息队列规定的最大长度
+ *
+ * @note    1. 该函数**可以**在中断服务例程（ISR）中调用。
+ *          2. 发送消息时，内核从空闲消息链表上取下一个空闲消息块，
+ *             将 buffer 指向的内容复制到消息块中，然后将该消息块挂载到消息队列尾部。
+ *          3. 当空闲消息链表无可用消息块时，队列已满，立即返回 -RT_EFULL，不会阻塞。
+ *
+ * @see     rt_mq_send_wait()
+ * @see     rt_mq_urgent()
+ */
+rt_err_t rt_mq_send(rt_mq_t mq, void *buffer, rt_size_t size);
+```
+#### 等待方式发送消息
+
+当消息队列满时，发送线程可选择等待直到缓冲区有空闲消息块。
+```c
+/**
+ * @brief   以等待方式发送消息。
+ *
+ * @param   mq      消息队列对象的句柄。
+ * @param   buffer  指向消息内容的缓冲区指针。
+ * @param   size    消息内容的长度（单位：字节），必须 ≤ msg_size。
+ * @param   timeout 超时时间（单位：系统时钟节拍）：
+ *                  - RT_WAITING_FOREVER : 永久等待
+ *                  - RT_WAITING_NO      : 不等待，立即返回
+ *                  - 其他正整数        : 最大等待节拍数
+ *
+ * @return  rt_err_t 执行结果：
+ * @retval  RT_EOK          (0)  : 发送成功
+ * @retval  -RT_ETIMEOUT    (2)  : 超时未空出空间
+ * @retval  -RT_EFULL       (-4) : 消息队列已满（当 timeout = RT_WAITING_NO 时）
+ * @retval  -RT_ERROR       (1)  : 发送失败（如消息长度超限或队列被删除）
+ *
+ * @note    1. 该函数**不能**在中断服务例程（ISR）中调用（可能引起阻塞）。
+ *          2. 与 rt_mq_send() 的区别：当消息队列已满时，发送线程将根据 timeout 参数
+ *             挂起等待，直到有空闲消息块或超时。
+ *
+ * @see     rt_mq_send()
+ */
+rt_err_t rt_mq_send_wait(rt_mq_t     mq,
+                         const void *buffer,
+                         rt_size_t   size,
+                         rt_int32_t  timeout);
+```
+#### 发送紧急消息
+
+紧急消息将被直接插入到消息队列的队首，从而被接收者优先处理。
+```c
+/**
+ * @brief   发送一条紧急消息到消息队列队首。
+ *
+ * @param   mq      消息队列对象的句柄。
+ * @param   buffer  指向消息内容的缓冲区指针。
+ * @param   size    消息内容的长度（单位：字节），必须 ≤ msg_size。
+ *
+ * @return  rt_err_t 执行结果：
+ * @retval  RT_EOK          (0)  : 发送成功
+ * @retval  -RT_EFULL       (-4) : 消息队列已满
+ * @retval  -RT_ERROR       (1)  : 发送失败（消息长度超限）
+ *
+ * @note    1. 该函数**可以**在中断服务例程（ISR）中调用。
+ *          2. 与 rt_mq_send() 的唯一区别：消息块被挂载到消息队列的**队首**，
+ *             因此等待接收的线程会优先获取这封紧急消息。
+ *          3. 当空闲消息链表无可用消息块时，立即返回 -RT_EFULL，不阻塞。
+ *
+ * @see     rt_mq_send()
+ */
+rt_err_t rt_mq_urgent(rt_mq_t mq, void *buffer, rt_size_t size);
+```
+#### 接收消息
+
+线程从指定消息队列中接收一条消息，若队列为空则根据超时设置挂起或立即返回。
+```c
+/**
+ * @brief   接收一条消息。
+ *
+ * @param   mq      消息队列对象的句柄。
+ * @param   buffer  指向接收缓冲区的指针，接收到的消息内容将被复制到此缓冲区。
+ * @param   size    接收缓冲区的大小（单位：字节）。若消息实际长度大于 size，
+ *                  则只复制 size 字节，多余部分被丢弃（需由用户保证缓冲区足够）。
+ * @param   timeout 超时时间（单位：系统时钟节拍）：
+ *                  - RT_WAITING_FOREVER : 永久等待
+ *                  - RT_WAITING_NO      : 不等待，立即返回
+ *                  - 其他正整数        : 最大等待节拍数
+ *
+ * @return  rt_ssize_t 执行结果：
+ * @retval  >0             成功收到，返回实际复制的消息长度（单位：字节）
+ * @retval  -RT_ETIMEOUT   (2)  超时未收到消息
+ * @retval  -RT_ERROR      (1)  接收失败（如队列被删除或参数无效）
+ *
+ * @note    1. 该函数**不能**在中断服务例程（ISR）中调用（可能引起阻塞）。
+ *          2. 接收成功时，内核将队首消息内容复制到 buffer 中，
+ *             然后将该消息块从消息队列移除，并挂载到空闲消息链表尾部。
+ *          3. 若此时有挂起的发送线程在等待空闲消息块，会唤醒其中一个。
+ *          4. 用户需保证 buffer 大小 ≥ msg_size，否则可能丢失数据。
+ *
+ * @see     rt_mq_send()
+ */
+rt_ssize_t rt_mq_recv(rt_mq_t mq, void *buffer, rt_size_t size, rt_int32_t timeout);
+```
+
+### 如何应用消息队列
+
+消息队列适用于**线程间传递不定长数据**，以及**中断服务程序向线程发送消息**（中断中不能接收消息）。 
+
+与邮箱（固定4字节）不同，消息队列通过**数据复制**传递消息，无需动态内存分配，也无指针有效期问题。 
+
+当创建的消息队列最大消息长度为4字节时，其行为将蜕化为邮箱。
+
+#### 发送消息
+
+#### 发送消息
+
+消息队列的核心优势是**直接复制消息内容**，而非仅传递指针。  
+这使得发送方可以使用**局部变量**构造消息，接收方同样使用局部变量接收，无需担心内存释放。
+
+**典型用法：传递可变长度数据块**
+
+```c
+/* 消息结构体：描述一个数据块 */
+struct msg
+{
+    rt_uint8_t *data_ptr;    /* 数据块首地址 */
+    rt_uint32_t data_size;   /* 数据块大小   */
+};
+
+/* 发送线程/中断：构造局部消息并发送 */
+void send_op(void *data, rt_size_t length)
+{
+    struct msg msg_ptr;
+
+    msg_ptr.data_ptr = data;   /* 指向数据块 */
+    msg_ptr.data_size = length;
+
+    /* 将整个 msg_ptr 结构体复制进消息队列 */
+    rt_mq_send(mq, (void*)&msg_ptr, sizeof(struct msg));
+}
+
+/* 接收线程：使用局部变量接收消息 */
+void message_handler(void)
+{
+    struct msg msg_ptr;   /* 局部变量，用于存放接收到的消息 */
+
+    /* 从消息队列复制数据到 msg_ptr */
+    if (rt_mq_recv(mq, (void*)&msg_ptr, sizeof(struct msg), RT_WAITING_FOREVER) > 0)
+    {
+        /* 成功接收到消息，data_ptr 和 data_size 已复制 */
+        process_data(msg_ptr.data_ptr, msg_ptr.data_size);
+    }
+}
+```
+
+:::tip
+消息队列内部完成完整的内存拷贝，因此发送方的局部变量在函数返回后失效不会影响接收方。
+
+若所有消息长度均为4字节，消息队列在功能上等价于邮箱，但内部实现仍为消息队列机制。
+:::
+
+#### 同步消息
+
+某些场景下，发送线程不仅需要发出消息，还需要等待接收线程处理完毕并确认。
+
+此时可采用 “消息队列 + 信号量” 或 “消息队列 + 邮箱” 的组合，在消息结构中嵌入同步对象。
+
+```C
+/* 方式1：信号量确认 */
+struct msg_with_sem
+{
+    /* 消息业务数据 */
+    uint32_t cmd;
+    void *data;
+
+    /* 同步对象：信号量 */
+    rt_sem_t ack_sem;
+};
+
+/* 方式2：邮箱确认 */
+struct msg_with_mb
+{
+    /* 消息业务数据 */
+    uint32_t cmd;
+    void *data;
+
+    /* 同步对象：邮箱（可传递32位返回值） */
+    rt_mailbox_t ack_mb;
+};
+```
+
+## 信号
+
+信号（又称为软中断信号），在软件层次上是对中断机制的一种模拟，在原理上，一个线程收到一个信号与处理器收到一个中断请求可以说是类似的。
+
+### 信号的工作机制
+
+信号的本质是软中断。
+
+![](https://github.com/user-attachments/assets/42555c1d-448a-4fb8-b506-61882833049a)
+
+收到信号的线程对各种信号有不同的处理方法，处理方法可以分为三类：
+
+1. 类似中断的处理程序，对于需要处理的信号，线程可以指定处理函数，由该函数来处理。
+
+2. 忽略某个信号，对该信号不做任何处理，就像未发生过一样。
+
+3. 对该信号的处理保留系统的默认值。
+
+假设线程 1 需要对信号进行处理，首先线程 1 安装一个信号并解除阻塞，并在安装的同时设定了对信号的异常处理方式；然后其他线程可以给线程 1 发送信号，触发线程 1 对该信号的处理。
+
+当信号被传递给线程 1 时，如果它正处于挂起状态，那会把状态改为就绪状态去处理对应的信号。如果它正处于运行状态，那么会在它当前的线程栈基础上建立新栈帧空间去处理对应的信号，需要注意的是使用的线程栈大小也会相应增加。
+
+### 信号的管理方式
+
+RT-Thread 的信号（Signal）机制提供了**异步软中断**处理能力，允许线程向其他线程发送通知，使其立即跳转到信号处理函数执行。  
+
+信号与 IPC 不同：IPC 用于同步或数据交换，信号用于**异常处理、事件通知**等场景。
+
+RT-Thread 支持标准 POSIX 信号的部分功能，开放给用户的信号值为 **SIGUSR1** 和 **SIGUSR2**。
+
+#### 安装信号
+
+线程在处理某一信号前，必须先安装该信号，建立**信号值**与**处理动作**的映射关系。
+
+```c
+/**
+ * @brief   安装信号，设置信号的处理函数。
+ *
+ * @param   signo   信号值，用户可使用 SIGUSR1 和 SIGUSR2。
+ * @param   handler 信号处理方式，可取以下三类值：
+ *                  - 用户自定义函数指针：信号发生时调用该函数；
+ *                  - SIG_IGN            ：忽略该信号；
+ *                  - SIG_DFL            ：使用系统默认处理函数 _signal_default_handler()。
+ *
+ * @return  成功时返回**之前**安装的信号处理函数指针；
+ *          失败时返回 SIG_ERR。
+ *
+ * @note    1. 该函数只能在线程上下文中调用，不能在中断服务例程中使用。
+ *          2. 安装信号不会自动解除信号的阻塞状态，若信号被阻塞，需先解除阻塞。
+ *
+ * @see     rt_signal_mask()
+ * @see     rt_signal_unmask()
+ */
+rt_sighandler_t rt_signal_install(int signo, rt_sighandler_t handler);
+```
+
+#### 阻塞信号
+
+阻塞（屏蔽）信号后，该信号将不会递达给线程，也不会触发软中断。
+
+线程若希望暂时不响应某信号，可将其加入阻塞集。
+```c
+
+/**
+ * @brief   阻塞指定的信号。
+ *
+ * @param   signo   需要阻塞的信号值（SIGUSR1 / SIGUSR2）。
+ *
+ * @return  无返回值。
+ *
+ * @note    1. 该函数只能在线程上下文中调用。
+ *          2. 被阻塞的信号仍然可以被发送，但会保持在挂起状态，
+ *             直到线程解除对该信号的阻塞。
+ *
+ * @see     rt_signal_unmask()
+ */
+void rt_signal_mask(int signo);
+```
+#### 解除信号阻塞
+
+解除阻塞后，之前被阻塞的信号会立即递达线程（若该信号在阻塞期间被发送过），并触发相应的处理函数。
+```c
+/**
+ * @brief   解除指定信号的阻塞。
+ *
+ * @param   signo   需要解除阻塞的信号值（SIGUSR1 / SIGUSR2）。
+ *
+ * @return  无返回值。
+ *
+ * @note    1. 该函数只能在线程上下文中调用。
+ *          2. 解除阻塞后，若有该信号的挂起实例，将立即引发软中断。
+ *
+ * @see     rt_signal_mask()
+ */
+void rt_signal_unmask(int signo);
+```
+#### 发送信号
+
+向指定线程发送信号。如果目标线程已安装该信号且未阻塞，则立即触发信号处理函数；
+
+若目标线程阻塞了该信号，信号将进入挂起状态，待解除阻塞后递达。
+```c
+
+/**
+ * @brief   向指定线程发送信号。
+ *
+ * @param   tid     目标线程的句柄。
+ * @param   sig     信号值（SIGUSR1 / SIGUSR2）。
+ *
+ * @return  rt_err_t 执行结果：
+ * @retval  RT_EOK          (0)  : 发送成功
+ * @retval  -RT_EINVAL      (4)  : 参数错误（无效信号值或线程句柄）
+ *
+ * @note    1. 该函数**可以**在中断服务例程（ISR）中调用。
+ *          2. 如果目标线程尚未安装该信号，发送操作仍会成功，
+ *             但信号到达时将因为没有处理函数而被忽略。
+ *
+ * @see     rt_signal_install()
+ */
+int rt_thread_kill(rt_thread_t tid, int sig);
+```
+#### 等待信号
+
+线程调用此函数，同步等待指定的一个或多个信号到来。
+若信号未发生，线程将挂起直到超时或信号到达。
+```c
+
+/**
+ * @brief   同步等待信号。
+ *
+ * @param   set     指向信号集（rt_sigset_t）的指针，指定要等待的信号集合。
+ * @param   si      指向信号信息结构体（rt_siginfo_t）的指针，
+ *                  用于接收到达信号的详细信息（如信号值、发送者等）。
+ * @param   timeout 超时时间（单位：系统时钟节拍）：
+ *                  - RT_WAITING_FOREVER : 永久等待
+ *                  - RT_WAITING_NO      : 不等待，立即返回
+ *                  - 其他正整数        : 最大等待节拍数
+ *
+ * @return  int 执行结果：
+ * @retval  RT_EOK          (0)  : 成功等到信号
+ * @retval  -RT_ETIMEOUT    (2)  : 超时未等到信号
+ * @retval  -RT_EINVAL      (4)  : 参数错误（如 set 为空或无效信号集）
+ *
+ * @note    1. 该函数**不能**在中断服务例程（ISR）中调用（可能引起阻塞）。
+ *          2. 信号集 rt_sigset_t 目前仅包含 SIGUSR1 和 SIGUSR2，
+ *             可使用宏 RT_SIG_USR1、RT_SIG_USR2 构造。
+ *          3. 等待期间该信号的阻塞状态不受影响，若信号被阻塞，
+ *             即使实际已发送，线程也不会被唤醒。
+ *
+ * @see     rt_signal_install()
+ * @see     rt_thread_kill()
+ */
+int rt_signal_wait(const rt_sigset_t *set,
+                   rt_siginfo_t      *si,
+                   rt_int32_t         timeout);
+```
+
 
 
 </WordCount>

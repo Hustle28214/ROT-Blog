@@ -1,0 +1,269 @@
+import WordCount from '../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+## 1. 模型预测控制的概念
+
+MPC是一种**滚动优化**的控制方法，在每个采样时刻，MPC会通过求解一个有限时间内的最优化问题来计算最优控制序列。这一有限时间称为**预测区间**。
+
+在实际控制中，只选取预测区间内最优控制序列中的第一项施加到系统中。
+
+MPC通常针对离散系统，因此预测区间通常指的是预测的离散步数。
+
+一个单输入单状态系统，其离散型状态空间方程为：
+
+$$
+x_{[k+1]} = f(x_{[k]}, u_{[k]}) \tag{5.1.1a}
+$$
+
+性能指标为  
+
+$$
+J = h(x_{[N]}, x_d) + \sum_{k=1}^{N_p-1} g(x_{[k]}, x_d, u_{[k]}) \tag{5.1.1b}
+$$
+
+![](https://github.com/user-attachments/assets/4fae3b49-8902-4bc3-bdc7-5eb85ce7c65e)
+
+滚动优化的概念如图所示。其中预测区间 (prediction horizon) 定义为 $N_p$，控制区间 (control horizon) 定义为 $N_c$。在本例中 $N_p = N_c = 5$。系统从 $k$ 时刻开始，初始状态为 $x_{[k]}$。
+
+滚动优化控制会通过求解预测区间内的最优化问题（令 $N_p = 5$ 时的性能指标 $J$ 最小），计算出最优控制序列 $u_{[k|k]}$、$u_{[k+1|k]}$、$u_{[k+2|k]}$、$u_{[k+3|k]}$、$u_{[k+4|k]}$。同时根据式(5.1.1a)的系统模型预测系统在这样的控制序列下状态值的变化 $x_{[k+1|k]}$、$x_{[k+2|k]}$、$x_{[k+3|k]}$、$x_{[k+4|k]}$、$x_{[k+5|k]}$。在完成控制量的计算和模型预测之后，只对系统施加 $u_{[k|k]}$ 而舍去其余控制序列。
+
+:::danger
+请注意控制序列以及状态变量的标注方法，$u_{[k+i|k]}$ 代表在 $k$ 时刻计算得到的 $k+i$ 时刻的控制策略。$x_{[k+i|k]}$ 代表在 $k$ 时刻预测得到的 $k+i$ 时刻的状态变量的值。以此类推，$x_{[k+i|k+1]}$ 代表了在 $k+1$ 时刻预测得到的 $k+i$ 时刻的状态变量的值。
+:::
+
+在 $k+1$ 时刻，系统将重复 $k$ 时刻的操作，如图 5.1.1(b)所示，此时的系统状态在上一次控制 $u_{[k|k]}$ 的作用下达到了 $x_{[k+1]}$，将作为 $k+1$ 时刻的初始状态。预测区间将向前移动一个离散步长，计算出最优控制序列 $u_{[k+1|k+1]}$、$u_{[k+2|k+1]}$、$u_{[k+3|k+1]}$、$u_{[k+4|k+1]}$，并预测系统在这样的控制序列下状态值的变化 $x_{[k+2|k+1]}$、$x_{[k+3|k+1]}$、$x_{[k+4|k+1]}$、$x_{[k+5|k+1]}$。同样，在 $k+1$ 时刻只对系统施加 $u_{[k+1|k+1]}$ 这一项输入。重复这样的操作，预测控制随着时间的前进不断反复地在线运行，在每一个新的时刻都需要计算与分析预测区间内发生的情况。在每一次优化开始时，系统的状态变量会作为初始条件用于系统的模型预测，也可以理解为系统的反馈项。
+
+在上述案例中，预测区间与控制区间相等 ($N_p = N_c = 5$)。在某些情况下，为了节省计算资源，会选择 $N_c < N_p$。当时间超过控制区间之后，控制量将保持为常数（与前值一致），如图 5.1.2 所示，当控制区间 $N_c = 2$ 时，$k+1$ 时刻之后的控制量将保持与 $u_{[k+1|k]}$ 一致。
+
+![](https://github.com/user-attachments/assets/cefd7a15-c6b4-436c-a1c0-570152c656b2)
+
+## 5.2 二次规划问题
+
+二次规划问题 (quadratic programming, QP) 与线性 MPC 有着密切的关系。在模型预测控制中，我们需要在每个时刻通过预测模型来计算未来一段时间内的最优控制输入，而这个过程就可以转化为一个带有约束的二次规划问题。本节将讨论二次规划问题的求解及其一般形式。
+
+二次规划问题的标准形式可以表达为
+
+$$
+\min J = \frac{1}{2} u^T Hu + u^T f \tag{5.2.1a}
+$$
+
+即寻找令性能指标 $J$ 最小的 $u$ 值，同时满足约束条件
+
+$$
+\begin{aligned}
+Mu &\leq b \\
+M_{eq}u &= b_{eq} \\
+LB &\leq u \leq UB
+\end{aligned}
+\tag{5.2.1b}
+$$
+
+式 (5.2.1) 中，$u$ 是 $n \times 1$ 向量；$H$ 是 $n \times n$ 对称正定矩阵。目标函数由两部分构成，第一部分是二次型 $u^T Hu$，第二部分是线性项 $u^T f$，其中 $f$ 为 $n \times 1$ 向量。约束条件可以包含等式约束和不等式约束，同时也包含了 $u$ 的取值范围，其中 LB 代表下限 (lower bound)，UB 代表上限 (upper bound)，都是 $n \times 1$ 向量。
+
+### 5.2.1 无约束情况的解析解
+
+对于无约束情况的二次规划问题，当 $H$ 可逆时，可以求其解析解，令 $\frac{\partial J}{\partial u} = 0$，根据矩阵求导公式 2.3.1 和矩阵求导公式 2.3.3，可得
+
+$$
+\frac{\partial J}{\partial u} = \frac{\partial \left( \frac{1}{2} u^T Hu + u^T f \right)}{\partial u} = 0
+$$
+
+$$
+\Rightarrow Hu + f = 0
+$$
+
+$$
+\Rightarrow u^* = -H^{-1}f \tag{5.2.2a}
+$$
+
+$u^*$ 是令 $J$ 取极值的点，同时其二次导数
+
+$$
+\frac{\partial^2 J}{\partial u^2} = H \tag{5.2.2b}
+$$
+
+根据定义，$H$ 是正定矩阵，因此极值点是 $J$ 的最小值点。
+
+**例 5.2.1** 求令 $J = \frac{1}{2}(u_1^2 + u_2^2) + u_1 + u_2$ 最小的 $u_1$ 和 $u_2$ 值。
+
+解：性能指标可以写成向量与矩阵的形式，即
+
+$$
+J = \frac{1}{2}u^T Hu + u^T f \tag{5.2.3a}
+$$
+
+其中
+
+$$
+u = \begin{bmatrix} u_1 \\ u_2 \end{bmatrix}, \quad H = \begin{bmatrix} 1 & 0 \\ 0 & 1 \end{bmatrix}, \quad f = \begin{bmatrix} 1 \\ 1 \end{bmatrix} \tag{5.2.3b}
+$$
+
+代入式 (5.2.2a) 可得
+
+$$
+u^* = -H^{-1}f = \begin{bmatrix} -1 \\ -1 \end{bmatrix} \tag{5.2.4}
+$$
+
+代入式 (5.2.3a) 可以得到 $J$ 的最小值为
+
+$$
+J = \frac{1}{2}\begin{bmatrix} -1 & -1 \end{bmatrix}\begin{bmatrix} 1 & 0 \\ 0 & 1 \end{bmatrix}\begin{bmatrix} -1 \\ -1 \end{bmatrix} + \begin{bmatrix} -1 & -1 \end{bmatrix}\begin{bmatrix} 1 \\ 1 \end{bmatrix} = -1 \tag{5.2.5}
+$$
+
+![](https://github.com/user-attachments/assets/46eb56bb-acd7-4a0f-8d82-24843b88bcad)
+
+图 5.2.1(a) 展示了本例中性能指标的三维图像，它是一个“碗状”的抛物面，极小值出现在“碗底”位置。图 5.2.1(b) 是以 $u_1$ 为横轴、$u_2$ 为纵轴的等高线图，每一个圆环的“高度”是一致的（$J$ 相同），最小值位置在图的中心点。
+
+
+### 5.2.2 等式约束——拉格朗日乘数法
+
+如果二次规划问题包含等式约束，则可以使用拉格朗日乘数法 (Lagrange multiplier) 将约束融合进性能指标。二次规划问题的性能指标为
+
+$$
+J = \frac{1}{2} u^T Hu + u^T f \tag{5.2.6a}
+$$
+
+满足约束条件
+
+$$
+M_{eq}u = b_{eq} \tag{5.2.6b}
+$$
+
+其中 $M_{eq}$ 为 $m \times n$ 矩阵，$b_{eq}$ 为 $m \times 1$ 向量。
+
+为了求解这一问题，引入 $m \times 1$ 拉格朗日乘数 $\lambda$，将约束融合进性能指标，得到新的含有约束条件的性能指标，即
+
+$$
+J_L = \frac{1}{2} u^T Hu + u^T f + \lambda^T (M_{eq}u - b_{eq}) \tag{5.2.6c}
+$$
+
+拉格朗日乘数法的具体方法是式 (5.2.6c) 对 $u$ 和 $\lambda$ 分别求偏导数并令其为 0，即
+
+$$
+\frac{\partial J_L}{\partial u} = Hu + f + M_{eq}^T \lambda = 0 \tag{5.2.7a}
+$$
+$$
+\frac{\partial J_L}{\partial \lambda} = M_{eq}u - b_{eq} = 0 \tag{5.2.7b}
+$$
+
+其中式 (5.2.7b) 即式 (5.2.6b)。以上公式推导使用了矩阵求导公式 2.3.1，矩阵求导公式 2.3.2 和矩阵求导公式 2.3.3 进行化简。
+
+将式 (5.2.7) 写成紧凑的矩阵形式，得到
+
+$$
+\begin{bmatrix}
+H & M_{eq}^T \\
+M_{eq} & 0
+\end{bmatrix}
+\begin{bmatrix}
+u \\
+\lambda
+\end{bmatrix}
+=
+\begin{bmatrix}
+-f \\
+b_{eq}
+\end{bmatrix} \tag{5.2.8}
+$$
+
+假设矩阵
+$\begin{bmatrix}
+H & M_{eq}^T \\
+M_{eq} & 0
+\end{bmatrix}$
+可逆，则可求解如下
+
+$$
+\begin{bmatrix}
+u^* \\
+\lambda^*
+\end{bmatrix}
+=
+\begin{bmatrix}
+H_{n \times n} & M_{eq_{n \times m}}^T \\
+M_{eq_{m \times n}} & 0_{m \times m}
+\end{bmatrix}^{-1}
+\begin{bmatrix}
+-f_{n \times 1} \\
+b_{eq_{m \times 1}}
+\end{bmatrix} \tag{5.2.9}
+$$
+
+在例 5.2.1 中增加一个等式约束条件，形成一个新的问题。
+
+**例 5.2.2** 求令 $J = \frac{1}{2} (u_1^2 + u_2^2) + u_1 + u_2$ 最小的 $u_1$ 和 $u_2$ 值，同时满足 $u_1 - u_2 = 1$。
+
+解：性能指标可以写成
+
+$$
+J = \frac{1}{2} u^T Hu + u^T f \tag{5.2.10a}
+$$
+
+其中
+
+$$
+u =
+\begin{bmatrix}
+u_1 \\
+u_2
+\end{bmatrix}, \quad H =
+\begin{bmatrix}
+1 & 0 \\
+0 & 1
+\end{bmatrix}, \quad f =
+\begin{bmatrix}
+1 \\
+1
+\end{bmatrix} \tag{5.2.10b}
+$$
+
+约束条件可以写成
+
+$$
+M_{eq} u = b_{eq} \tag{5.2.11a}
+$$
+
+其中
+
+$$
+M_{eq} = [1 \quad -1], \quad b_{eq} = [1] \tag{5.2.11b}
+$$
+
+代入式 (5.2.9)，可得
+
+$$
+\begin{bmatrix}
+u^* \\
+\lambda^*
+\end{bmatrix}
+=
+\begin{bmatrix}
+H & M_{eq}^T \\
+M_{eq} & 0
+\end{bmatrix}^{-1}
+\begin{bmatrix}
+-f \\
+b_{eq}
+\end{bmatrix}
+=
+\begin{bmatrix}
+-0.5 \\
+-1.5 \\
+-0.5
+\end{bmatrix} \tag{5.2.12}
+$$
+
+将最优的 $u^*$ 代入式 (5.2.10a)，则可求解性能指标的最小值，这里不再赘述。如图 5.2.2(a) 所示，约束 $u_1 - u_2 = 1$ 在空间中是一个平面，它与性能指标相交的部分形成了一条曲线，即约束条件在性能指标上的投影。最小值点则需要在这一条投影曲线上做出选择。图 5.2.2(b) 更好地说明了这一问题。
+
+观察图 5.2.2(b)，可以发现当代价函数取得最小值时，其等高线与约束曲线相切。因此这一点的约束的梯度方向一定与代价函数的梯度方向在一条直线上。式 (5.2.7a) 体现了这一思想，其中 $Hu + f$ 是代价函数的梯度方向，$M_{eq}^T$ 则是约束的梯度方向，其中拉格朗日乘数 $\lambda$ 使得它们在同一条直线上。
+
+![](https://github.com/user-attachments/assets/1c250d9a-1589-4949-a530-e01326f1de4b)
+
+
+## References
+
+\[1\]. 王天威. 控制之美: 最优化控制 MPC 与卡尔曼滤波器 Optimal control, model predictive control and Kalman filter. 卷 2[M]. 清华大学出版社, 2023.
+
+
+</WordCount>

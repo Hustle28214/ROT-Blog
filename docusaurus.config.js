@@ -90,10 +90,19 @@ const config = {
       }),
     ],
   ],
-  stylesheets: [
+  // stylesheets: [
+  //   {
+  //     href: 'http://43.167.163.230/katex/katex.min.css',
+  //     type: 'text/css',
+  //   },
+  // ],
+    stylesheets: [
     {
-      href: 'http://43.167.163.230/katex/katex.min.css',
+      href: 'https://cdn.jsdelivr.net/npm/katex@0.13.24/dist/katex.min.css',
       type: 'text/css',
+      integrity:
+        'sha384-odtC+0UGzzFL/6PNoE8rX/SPcQDXBJ+uRepguP4QkPCm2LBxH3FA3y+fKSiJ+AmM',
+      crossorigin: 'anonymous',
     },
   ],
   themes: [
@@ -135,6 +144,7 @@ const config = {
     //   // see: https://www.npmjs.com/package/medium-zoom#options
       
     // },
+    
     imageZoom: {
       // CSS selector to apply the plugin to, defaults to '.markdown img'
       selector: '.markdown img',
@@ -290,7 +300,7 @@ const config = {
       prism: {
         theme: prismThemes.github,
         darkTheme: prismThemes.dracula,
-        additionalLanguages: ['c','matlab','verilog','java','bash'],
+        additionalLanguages: ['c','matlab','verilog','java','bash','csharp'],
       },
     }),
 };

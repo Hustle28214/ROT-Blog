@@ -1,0 +1,457 @@
+import WordCount from '../../../../src/components/WordCount/WordCount';
+import Mermaid from '@theme/Mermaid';
+
+<WordCount>
+
+本篇文章重点会放在语法的细节上，不对语法基础做过多解释。
+
+## 数值类型
+
+### 整型数值类型
+
+
+
+| 类型     | 描述                     | 大小（字节） | 范围                                                         | 默认值 | CLS 兼容 |
+|----------|--------------------------|---------------|---------------------------------------------------------------|--------|----------|
+| `sbyte`  | 有符号 8 位整数          | 1             | -128 到 127                                                   | 0      | 否       |
+| `byte`   | 无符号 8 位整数          | 1             | 0 到 255                                                      | 0      | 是       |
+| `short`  | 有符号 16 位整数         | 2             | -32,768 到 32,767                                             | 0      | 是       |
+| `ushort` | 无符号 16 位整数         | 2             | 0 到 65,535                                                   | 0      | 否       |
+| `int`    | 有符号 32 位整数         | 4             | -2,147,483,648 到 2,147,483,647                               | 0      | 是       |
+| `uint`   | 无符号 32 位整数         | 4             | 0 到 4,294,967,295                                            | 0      | 否       |
+| `long`   | 有符号 64 位整数         | 8             | -9,223,372,036,854,775,808 到 9,223,372,036,854,775,807      | 0      | 是       |
+| `ulong`  | 无符号 64 位整数         | 8             | 0 到 18,446,744,073,709,551,615                               | 0      | 否       |
+| `nint`   | 有符号平台相关整数       | 4 或 8        | 与指针相同（32 位进程为 32 位，64 位进程为 64 位）            | 0      | 否       |
+| `nuint`  | 无符号平台相关整数       | 4 或 8        | 与指针相同（32 位进程为 32 位，64 位进程为 64 位）            | 0      | 否       |
+
+> **注意**：`char` 类型本质上是无符号 16 位整数（0~65535），但用于表示 Unicode 字符，不应用于算术运算。
+
+平台相关类型 `nint` 和 `nuint`
+- 它们的大小取决于运行进程的位数（32 位或 64 位）。
+- 常用于与指针运算、互操作或需要平台自然整数大小的场景。
+- 在 32 位系统上为 32 位，64 位系统上为 64 位。
+
+整数字面量默认是 `int`，但可以通过后缀指定类型：
+
+| 后缀     | 示例                | 类型     |
+|----------|---------------------|----------|
+| 无       | `123`               | `int`    |
+| `u` 或 `U` | `123U`              | `uint`   |
+| `l` 或 `L` | `123L`              | `long`   |
+| `ul`、`uL`、`Ul`、`UL` | `123UL` | `ulong`  |
+
+还可以使用十六进制（`0x`）和二进制（`0b`）表示法：
+```csharp
+int hex = 0x7F;      // 127
+uint bin = 0b1010;   // 10
+```
+隐式转换：从范围小的类型到范围大的类型（如 int → long）会自动进行，不会丢失数据。
+
+显式转换：从大范围到小范围可能丢失数据，必须使用强制转换。
+```csharp
+
+long big = 300;
+int small = (int)big; // 显式转换，可能溢出
+```
+`checked` 上下文：可检测溢出，默认在非 checked 上下文中溢出会截断，checked 上下文中会抛出 `OverflowException`。
+
+```csharp
+checked
+{
+    int max = int.MaxValue;
+    int result = max + 1; // 抛出 OverflowException
+}
+```
+
+
+### 浮点类型
+
+| 类型      | 描述                         | 大小（字节） | 精度（有效数字）       | 范围（近似）                                     | 后缀    | .NET 类型      |
+|-----------|------------------------------|---------------|------------------------|--------------------------------------------------|---------|----------------|
+| `float`   | 单精度浮点数                 | 4             | ~6-9 位                | ±1.5e-45 到 ±3.4e38                              | `f`/`F` | `System.Single`  |
+| `double`  | 双精度浮点数                 | 8             | ~15-17 位               | ±5.0e-324 到 ±1.7e308                             | `d`/`D` | `System.Double`  |
+| `decimal` | 高精度十进制数（适合财务）   | 16            | 28-29 位有效数字        | ±1.0e-28 到 ±7.9e28                               | `m`/`M` | `System.Decimal` |
+
+
+`decimal`类型范围较小，精度较高：
+```c#
+double a = 1.0;
+double b = 3.0;
+Console.WriteLine(a / b);
+
+decimal c = 1.0M;
+decimal d = 3.0M; // 指示常量应该用decimal类型
+Console.WriteLine(c / d);
+```
+
+不带后缀的浮点数字面量默认为 double。
+
+使用后缀明确指定类型：
+
+- float：f 或 F（例如 3.14f）
+
+- decimal：m 或 M（例如 19.99m）
+
+- double：可省略，也可使用 d/D（如 3.14d）
+
+```csharp
+double d1 = 3.14;      // double
+float f1 = 3.14f;      // float
+decimal m1 = 3.14m;    // decimal
+```
+
+### 内置类型转换
+
+隐式转换：
+
+- float → double（因为 double 范围更大、精度更高）
+
+- float 或 double 不能隐式转换为 decimal（可能丢失精度）
+
+
+| 源类型   | 目标类型                                      |
+|----------|-----------------------------------------------|
+| `sbyte`  | `short`、`int`、`long`、`float`、`double`、`decimal` |
+| `byte`   | `short`、`ushort`、`int`、`uint`、`long`、`ulong`、`float`、`double`、`decimal` |
+| `short`  | `int`、`long`、`float`、`double`、`decimal`        |
+| `ushort` | `int`、`uint`、`long`、`ulong`、`float`、`double`、`decimal` |
+| `int`    | `long`、`float`、`double`、`decimal`                |
+| `uint`   | `long`、`ulong`、`float`、`double`、`decimal`      |
+| `long`   | `float`、`double`、`decimal`                        |
+| `ulong`  | `float`、`double`、`decimal`                        |
+| `char`   | `ushort`、`int`、`uint`、`long`、`ulong`、`float`、`double`、`decimal` |
+
+
+显式转换：其他类型转换为 float/double/decimal 需要使用强制转换，可能引起精度损失或溢出。
+
+```csharp
+double d = 3.14;
+float f = (float)d;        // 显式转换，可能精度损失
+decimal m = (decimal)d;     // 显式转换，double 转 decimal 需要显式
+```
+| 源类型 | 目标类型 |
+|--------|----------|
+| long | int、uint、short、ushort、byte、sbyte、char |
+| ulong | long、int、uint、short、ushort、byte、sbyte、char |
+| float | 任何整型、decimal |
+| double | 任何整型、float、decimal |
+| decimal | 任何整型、float、double |
+
+
+## 类型系统
+
+<Mermaid value={`graph TD
+    A[C# 类型] --> B[值类型]
+    A --> C[引用类型]
+    A --> D[类型参数]
+    B --> E[简单类型<br/>（int, double, bool, char 等）]
+    B --> F[枚举 enum]
+    B --> G[结构体 struct]
+    B --> H[可空值类型 T?]
+    C --> I[类 class]
+    C --> J[接口 interface]
+    C --> K[委托 delegate]
+    C --> L[数组]
+    C --> M[字符串 string]
+    C --> N[动态类型 dynamic]
+    D --> O[泛型类型参数]`}/ >
+
+值类型vs引用类型：
+
+| 特性               | 值类型                                      | 引用类型                                      |
+|--------------------|---------------------------------------------|-----------------------------------------------|
+| **存储位置**       | 栈上（或作为其他对象的一部分内联）          | 堆上，变量持有引用                            |
+| **赋值行为**       | 复制整个值                                  | 复制引用，多个变量可指向同一对象              |
+| **默认值**         | 所有位为零（例如 `0`、`false`）             | `null`                                        |
+| **继承**           | 隐式密封，不能派生，但可实现接口            | 支持继承和多态                                |
+| **内存释放**       | 超出作用域自动释放                          | 由垃圾回收器回收                              |
+| **典型示例**       | 结构体、枚举、基本数值类型                  | 类、接口、委托、数组、字符串                  |
+
+
+1. 类（`class`）
+- 引用类型，支持继承、多态、封装。
+- 可以包含字段、属性、方法、事件等。
+
+```csharp
+public class Person
+{
+    public string Name { get; set; }
+    public int Age { get; set; }
+}
+```
+2. 结构体（struct）
+
+值类型，适合轻量级对象。
+
+不支持继承（但可实现接口）。
+
+常用于表示简单数据，如 Point、Rectangle。
+```csharp
+
+public struct Point
+{
+    public int X;
+    public int Y;
+}
+```
+
+3. 记录（record）
+
+    引用类型（record class）或值类型（record struct）。
+
+    默认提供基于值的相等性、非破坏性修改（with）和简洁语法。
+
+```csharp
+
+public record Person(string Name, int Age);
+public record struct Point(int X, int Y);
+```
+4. 枚举（enum）
+
+    值类型，用于定义一组命名常量。
+
+    默认底层类型为 int，可指定其他整型。
+
+```csharp
+
+public enum Color
+{
+    Red,
+    Green,
+    Blue
+}
+```
+5. 接口（interface）
+
+    定义契约，不包含实现。
+
+    类和结构体可实现多个接口。
+
+```csharp
+
+public interface IMovable
+{
+    void Move(int x, int y);
+}
+```
+6. 委托（delegate）
+
+    引用类型，用于封装方法，类似于函数指针。
+
+    事件基于委托实现。
+
+```csharp
+
+public delegate void Notify(string message);
+```
+### 特殊类型与概念
+1. 可空类型（Nullable Types）
+
+    值类型不能为 null，但可通过 Nullable\<T\> 或 T? 语法使其可为空。
+
+    引用类型默认可为空（C# 8.0 引入可空引用类型上下文）。
+
+```c#
+
+int? nullableInt = null;           // 可空值类型
+string? nullableString = null;     // 可空引用类型（需启用可空上下文）
+```
+2. 泛型（Generics）
+
+    允许定义类型参数，提高代码复用和类型安全。
+
+    可用于类、结构、接口、委托和方法。
+
+```csharp
+
+public class List<T>
+{
+    public void Add(T item) { ... }
+}
+```
+3. 匿名类型
+
+    由编译器自动生成的只读类型，用于临时存储一组属性。
+
+    常用于 LINQ 查询结果。
+
+```csharp
+
+var person = new { Name = "Alice", Age = 30 };
+```
+4. 元组（Tuples）
+    轻量级数据结构，可包含多个不同类型的元素。
+    支持命名元素和解构。
+```csharp
+var tuple = (Name: "Alice", Age: 30);
+Console.WriteLine(tuple.Name);
+```
+5. 指针类型
+
+    在不安全上下文中使用，用于直接操作内存。
+
+    使用 * 和 & 操作符。
+
+```csharp
+unsafe
+{
+    int* ptr = &someVariable;
+}
+```
+
+6. 装箱和拆箱
+
+    装箱：值类型转换为 object 或接口类型，在堆上分配对象。
+
+    拆箱：将装箱的对象转换回值类型。
+
+```csharp
+int i = 123;
+object obj = i;   // 装箱
+int j = (int)obj; // 拆箱
+```
+### 类型系统的高级特性
+
+1. 类型推断（var）
+
+    编译器根据初始化表达式推断变量类型。
+
+    减少冗余，但可能降低可读性（需合理使用）。
+
+```csharp
+
+var name = "Alice";  // 推断为 string
+var numbers = new int[] { 1, 2, 3 };
+```
+2. 模式匹配
+
+    提供更灵活的类型检查和转换语法。
+
+    支持类型模式、属性模式、位置模式等。
+
+```csharp
+
+object obj = "Hello";
+if (obj is string s)
+{
+    Console.WriteLine(s.Length);
+}
+
+// switch 表达式
+string result = obj switch
+{
+    int i => $"整数 {i}",
+    string str => $"字符串 {str}",
+    _ => "其他"
+};
+```
+3. 可空引用类型（C# 8.0+）
+
+    帮助开发者避免空引用异常。
+
+    通过注解 ? 表示可为空，编译器提供静态分析。
+
+```csharp
+#nullable enable
+string? maybeNull = null;   // 可为空
+string notNull = "hello";   // 不可为空
+```
+4. 扩展方法
+
+    允许向现有类型添加新方法，而无需修改类型定义。
+
+    定义在静态类中的静态方法，第一个参数使用 this 关键字。
+
+```csharp
+
+public static class StringExtensions
+{
+    public static bool IsNullOrEmpty(this string s) => string.IsNullOrEmpty(s);
+}
+```
+5. 匿名方法和 Lambda 表达式
+
+    用于创建内联函数，常用于委托和 LINQ。
+
+```csharp
+
+Func<int, int> square = x => x * x;
+```
+类型安全与性能
+
+    静态类型检查：编译时捕获类型错误。
+
+    动态类型（dynamic）：绕过编译时检查，运行时解析，可能带来性能开销和运行时错误。
+
+    泛型：避免装箱和拆箱，提高性能并保持类型安全。
+
+    值类型：减少堆分配和垃圾回收压力。
+
+示例：综合展示类型系统
+```csharp
+
+using System;
+using System.Collections.Generic;
+
+class Program
+{
+    static void Main()
+    {
+        // 值类型
+        int age = 30;
+        Point p1 = new Point(10, 20);
+        Color color = Color.Red;
+
+        // 引用类型
+        Person person = new Person("Alice", 30);
+        object obj = person;
+
+        // 可空类型
+        int? maybeNumber = null;
+
+        // 泛型
+        List<string> names = new List<string> { "Alice", "Bob" };
+
+        // 匿名类型
+        var product = new { Name = "Laptop", Price = 999.99 };
+
+        // 元组
+        var tuple = (X: 10, Y: 20);
+
+        // 模式匹配
+        object data = "Hello";
+        if (data is string s)
+        {
+            Console.WriteLine($"字符串长度: {s.Length}");
+        }
+
+        // 装箱拆箱
+        int i = 42;
+        object boxed = i;       // 装箱
+        int unboxed = (int)boxed; // 拆箱
+
+        // 使用扩展方法
+        string text = "test";
+        Console.WriteLine(text.IsNullOrEmpty());
+    }
+}
+
+// 自定义类型
+public record Person(string Name, int Age);
+public struct Point
+{
+    public int X { get; }
+    public int Y { get; }
+    public Point(int x, int y) => (X, Y) = (x, y);
+}
+public enum Color { Red, Green, Blue }
+
+// 扩展方法
+public static class StringExtensions
+{
+    public static bool IsNullOrEmpty(this string s) => string.IsNullOrEmpty(s);
+}
+```
+
+
+</WordCount>

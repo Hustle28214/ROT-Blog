@@ -228,7 +228,6 @@ public enum Color
     类和结构体可实现多个接口。
 
 ```csharp
-
 public interface IMovable
 {
     void Move(int x, int y);
@@ -241,7 +240,6 @@ public interface IMovable
     事件基于委托实现。
 
 ```csharp
-
 public delegate void Notify(string message);
 ```
 ### 特殊类型与概念
@@ -252,7 +250,6 @@ public delegate void Notify(string message);
     引用类型默认可为空（C# 8.0 引入可空引用类型上下文）。
 
 ```c#
-
 int? nullableInt = null;           // 可空值类型
 string? nullableString = null;     // 可空引用类型（需启用可空上下文）
 ```
@@ -263,7 +260,6 @@ string? nullableString = null;     // 可空引用类型（需启用可空上下
     可用于类、结构、接口、委托和方法。
 
 ```csharp
-
 public class List<T>
 {
     public void Add(T item) { ... }
@@ -276,7 +272,6 @@ public class List<T>
     常用于 LINQ 查询结果。
 
 ```csharp
-
 var person = new { Name = "Alice", Age = 30 };
 ```
 4. 元组（Tuples）
@@ -319,7 +314,6 @@ int j = (int)obj; // 拆箱
     减少冗余，但可能降低可读性（需合理使用）。
 
 ```csharp
-
 var name = "Alice";  // 推断为 string
 var numbers = new int[] { 1, 2, 3 };
 ```
@@ -330,7 +324,6 @@ var numbers = new int[] { 1, 2, 3 };
     支持类型模式、属性模式、位置模式等。
 
 ```csharp
-
 object obj = "Hello";
 if (obj is string s)
 {

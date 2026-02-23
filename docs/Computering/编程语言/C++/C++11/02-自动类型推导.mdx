@@ -29,6 +29,49 @@ auto b = 2; // 自动推导出int
 
 ## 2. decltype关键字
 
+```cpp
+decltype(entity)       // entity 是一个标识符（变量、函数等）
+decltype(expression)   // expression 是任意表达式
+
+int a = 10;
+const int& b = a;
+decltype(a) x;          // int
+decltype(b) y = a;      // const int&（必须初始化）
+
+// 其他类型
+int a = 0;
+int* p = &a;
+
+decltype(a)     d1;    // int
+decltype((a))   d2 = a; // int&，必须初始化
+decltype(*p)    d3 = a; // int&（解引用指针产生左值）
+decltype(++a)   d4 = a; // int&（前置自增返回左值）
+decltype(a++)   d5;     // int（后置自增返回纯右值）
+decltype(42)    d6;     // int（字面量是纯右值）
+decltype(std::move(a)) d7 = 0; // int&&（std::move(a) 是将亡值）
+```
+
+:::info
+`decltype`在C++14中可以实现`decltype(auto)`, 用于让变量或返回类型的推导采用 decltype 的规则，而不是 auto 的规则。通常用于转发函数或完美返回。
+
+```cpp
+decltype(auto) f1() { return x; }      // 返回类型为 x 的声明类型
+decltype(auto) f2() { return (x); }    // 返回类型为 int&（注意括号！）
+```
+:::
+
+然而如果我们要用auto推导函数的返回类型，会这样写：
+
+```cpp
+template<typename X, typename Y, typename Z>
+X AddTwoItems(Y y,Z z){
+    return y+z;
+}
+// 以下注释掉的写法是不合法的：
+//decltype(y+z) AddTwoItems(Y y,Z z);
+
+```
+
 
 
 

@@ -1,11 +1,9 @@
 import React from 'react';
 import Layout from '@theme-original/Layout';
-import Chat from '@site/src/components/Chat/Chat.jsx';
 export default function LayoutWrapper(props) {
   return (
     <>
       <Layout {...props} />
-      
     </>
   );
 }

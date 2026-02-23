@@ -1,0 +1,81 @@
+import WordCount from '../../../../../src/components/WordCount/WordCount';
+import Mermaid from '@theme/Mermaid';
+
+<WordCount>
+
+## 1. 区间迭代
+
+C++11引入了基于范围的for循环，使得写起来会比较简单：
+
+```cpp
+std::vector<int> a(3,50);
+for(std::vector iterator i=a.begin();i<a.end();++i){
+    std::cout<<i<<std::endl;
+}
+// 区间迭代的写法：
+for(auto i:a){
+    std::cout<<i<<std::endl;
+}
+```
+
+## 2. 初始化列表
+
+为了统一C++的初始化方式，让初始化有确定的效果，提出了列表初始化的概念。
+
+这是一种使用花括号 `{}` 来初始化变量或对象的语法，可以用于聚合类型、内置数组、以及接受 `std::initializer_list` 参数的构造函数。
+
+构造函数或者其他函数都可以像参数一样来使用初始化列表。这样一来，类对象或者普通数组（或POD）都有了一个统一的桥梁来初始化。
+
+```cpp
+int a{5};                // 直接列表初始化
+int b = {5};             // 拷贝列表初始化
+std::vector<int> v{1, 2, 3};  // 调用 initializer_list 构造函数
+
+class MyVec {
+    int* data;
+    size_t sz;
+public:
+    MyVec(std::initializer_list<int> list) 
+        : sz(list.size()), data(new int[sz]) {
+        size_t i = 0;
+        for (auto elem : list)   // 遍历 initializer_list
+            data[i++] = elem;
+    }
+    // ... 析构等
+};
+
+MyVec v = {1, 2, 3, 4};  // 调用 initializer_list 构造函数
+```
+
+### 构造函数初始化列表
+
+在构造函数的定义中，用于初始化类成员（包括基类）的一种语法。它位于构造函数参数列表之后、函数体之前，以冒号 : 开头。
+
+```cpp
+class MyClass {
+    const int a;
+    int& b;
+    std::string s;
+public:
+    MyClass(int x, int& y, const std::string& str) 
+        : a(x), b(y), s(str) {   // 初始化列表
+        // 构造函数体
+    }
+};
+```
+
+:::warning
+必须使用初始化列表的情况：
+
+- 初始化 const 成员（只能初始化，不能赋值）。
+
+- 初始化 引用成员（引用必须初始化）。
+
+- 初始化 没有默认构造函数的类类型成员。
+
+- 初始化 基类子对象。
+
+初始化顺序由成员在类中声明的顺序决定，而不是初始化列表中的顺序。优先使用初始化列表而非构造函数体内赋值，通常效率更高（避免先默认构造再赋值）。
+:::
+
+</WordCount>

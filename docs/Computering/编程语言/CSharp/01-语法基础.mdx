@@ -74,7 +74,7 @@ checked
 
 
 `decimal`类型范围较小，精度较高：
-```c#
+```cs
 double a = 1.0;
 double b = 3.0;
 Console.WriteLine(a / b);
@@ -187,7 +187,6 @@ public class Person
 
 常用于表示简单数据，如 Point、Rectangle。
 ```csharp
-
 public struct Point
 {
     public int X;
@@ -202,10 +201,18 @@ public struct Point
     默认提供基于值的相等性、非破坏性修改（with）和简洁语法。
 
 ```csharp
-
 public record Person(string Name, int Age);
 public record struct Point(int X, int Y);
 ```
+
+:::tip
+想象你在填一张快递单：收件人、地址、电话。这些信息一旦填好，就不希望被随意修改（不可变性）。如果你需要修改，通常会重新填一张新单子。另外，判断两张快递单是否相同，是看上面的信息是否一致（值相等），而不是看是不是同一张纸（引用相等）。
+
+你可以把它看作一种数据容器，它自动为你实现了很多“数据类”通常需要手写的功能（比如值相等性比较、复制、解构等）。
+
+C++中没有直接对应的“记录”，但可以用struct（值类型）或不可变类来模拟。例如，定义一个只有`const`成员的类，并重载`operator==`来实现值比较，再实现一个“克隆”方法。C#的记录把这些都自动化了.
+:::
+
 4. 枚举（enum）
 
     值类型，用于定义一组命名常量。
@@ -213,7 +220,6 @@ public record struct Point(int X, int Y);
     默认底层类型为 int，可指定其他整型。
 
 ```csharp
-
 public enum Color
 {
     Red,
@@ -233,6 +239,32 @@ public interface IMovable
     void Move(int x, int y);
 }
 ```
+:::tip
+接口（Interface）可以理解为一纸合同或能力证书。它只规定“能做什么”（比如“这个物体可以飞行”），但不规定“怎么做”（比如“用翅膀飞”还是“喷气飞”）。任何类只要签署了这份合同（即实现接口），就必须提供具体的做法。
+
+对比C++，C++中没有专门的“接口”关键字，但可以通过只包含纯虚函数的抽象基类来模拟接口：
+```cpp
+
+class IFlyable {               // 相当于C#的接口
+public:
+    virtual void Fly() = 0;     // 纯虚函数，无实现
+    virtual ~IFlyable() {}      // 虚析构
+};
+
+class Bird : public IFlyable {
+public:
+    void Fly() override { /* 翅膀飞 */ }
+};
+
+class Airplane : public IFlyable {
+public:
+    void Fly() override { /* 引擎飞 */ }
+};
+```
+:::
+
+
+
 6. 委托（delegate）
 
     引用类型，用于封装方法，类似于函数指针。
@@ -240,31 +272,75 @@ public interface IMovable
     事件基于委托实现。
 
 ```csharp
-public delegate void Notify(string message);
+// 定义一个委托，可以指向任何返回 int、接受两个 int 参数的方法
+public delegate int MyDelegate(int x, int y);
+MyDelegate del1 = new MyDelegate(Add);      // 指向静态方法
+MyDelegate del2 = new MyDelegate(new Program().Multiply); // 指向实例方法
+int result = del1(3, 5); // 输出 8
+// 多播委托
+MyDelegate del = Add;
+del += Multiply;   // 增加一个方法
+del(2, 3);         // 先执行 Add(2,3) -> 5，再执行 Multiply(2,3) -> 6
 ```
+
+:::tip
+想象你去餐厅点餐，你把想吃的菜写在点餐单上，然后交给服务员。服务员根据这张单子去后厨让厨师做菜。这里的“点餐单”就像委托——它记录了你要执行的操作（吃什么菜），而服务员就是调用委托的代码，后厨厨师就是实际干活的方法。
+:::
+
+
+
 ### 特殊类型与概念
+
 1. 可空类型（Nullable Types）
 
     值类型不能为 null，但可通过 Nullable\<T\> 或 T? 语法使其可为空。
 
     引用类型默认可为空（C# 8.0 引入可空引用类型上下文）。
 
-```c#
+```cs
 int? nullableInt = null;           // 可空值类型
 string? nullableString = null;     // 可空引用类型（需启用可空上下文）
 ```
+
+
 2. 泛型（Generics）
 
-    允许定义类型参数，提高代码复用和类型安全。
+允许定义类型参数，提高代码复用和类型安全。
 
-    可用于类、结构、接口、委托和方法。
+可用于类、结构、接口、委托和方法。
 
 ```csharp
 public class List<T>
 {
     public void Add(T item) { ... }
 }
+// 具体一点的使用
+public class Box<T>
+{
+    private T content;
+
+    public void Put(T item) => content = item;
+    public T Get() => content;
+}
+
+// 使用时指定具体类型
+Box<int> intBox = new Box<int>();
+intBox.Put(123);
+int value = intBox.Get();  // 直接得到 int，无需转换
+
+Box<string> stringBox = new Box<string>();
+stringBox.Put("Hello");
+string text = stringBox.Get();
 ```
+
+
+
+
+:::warning
+C# 泛型与C++ 的Template不同，其实例化时机是在运行时，Template实例化是在编译时。
+
+:::
+
 3. 匿名类型
 
     由编译器自动生成的只读类型，用于临时存储一组属性。
@@ -356,7 +432,6 @@ string notNull = "hello";   // 不可为空
     定义在静态类中的静态方法，第一个参数使用 this 关键字。
 
 ```csharp
-
 public static class StringExtensions
 {
     public static bool IsNullOrEmpty(this string s) => string.IsNullOrEmpty(s);
@@ -367,10 +442,10 @@ public static class StringExtensions
     用于创建内联函数，常用于委托和 LINQ。
 
 ```csharp
-
 Func<int, int> square = x => x * x;
 ```
-类型安全与性能
+
+### 类型安全与性能
 
     静态类型检查：编译时捕获类型错误。
 
@@ -381,8 +456,8 @@ Func<int, int> square = x => x * x;
     值类型：减少堆分配和垃圾回收压力。
 
 示例：综合展示类型系统
-```csharp
 
+```csharp
 using System;
 using System.Collections.Generic;
 
@@ -445,6 +520,8 @@ public static class StringExtensions
     public static bool IsNullOrEmpty(this string s) => string.IsNullOrEmpty(s);
 }
 ```
+
+
 
 
 </WordCount>

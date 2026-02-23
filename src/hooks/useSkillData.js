@@ -150,9 +150,6 @@ const generateCompleteDocsData = () => {
                             }
                         }
                     },
-                    skills: {
-                        'WEB技能树': { docPath: 'Computering/WEB开发/WEB技能树', level: 'intermediate', tags: ['web'] }
-                    }
                 },
                 '信息安全': {
                     docPath: 'Computering/信息安全',
@@ -248,13 +245,47 @@ const generateCompleteDocsData = () => {
                         '栈': { docPath: 'Computering/数据结构/栈', level: 'beginner', tags: ['stack'] },
                         '链表与邻接表': { docPath: 'Computering/数据结构/链表与邻接表', level: 'intermediate', tags: ['linked-list'] },
                         '队列': { docPath: 'Computering/数据结构/队列', level: 'beginner', tags: ['queue'] },
-                        '数据结构': { docPath: 'Computering/数据结构/数据结构', level: 'intermediate', tags: ['overview'] },
+                        
                     }
                 },
                 '算法': {
                     docPath: 'Computering/算法',
-                    skills: {
-                        '算法': { docPath: 'Computering/算法/算法', level: 'intermediate', tags: ['algorithm'] }
+                    
+                    topics: {
+                        'LeetCode刷题': {
+                            docPath: 'Computering/算法/LeetCode刷题',
+                            skills: {
+                                '两数之和1': { docPath: 'Computering/算法/LeetCode刷题/两数之和1', level: 'easy', tags: ['leetcode'] },
+                                '两数相加2': { docPath: 'Computering/算法/LeetCode刷题/两数相加2', level: 'medium', tags: ['leetcode'] },
+                                '无重复字符的最长子串3': { docPath: 'Computering/算法/LeetCode刷题/无重复字符的最长子串3', level: 'medium', tags: ['leetcode'] },
+                                '盛最多水的容器11': { docPath: 'Computering/算法/LeetCode刷题/盛最多水的容器11', level: 'medium', tags: ['leetcode'] },
+                                '最长公共前缀14': { docPath: 'Computering/算法/LeetCode刷题/最长公共前缀14', level: 'easy', tags: ['leetcode'] },
+                                '三数之和15': { docPath: 'Computering/算法/LeetCode刷题/三数之和15', level: 'medium', tags: ['leetcode'] },
+                                '最接近的三数之和16': { docPath: 'Computering/算法/LeetCode刷题/最接近的三数之和16', level: 'medium', tags: ['leetcode'] },
+                                '合并两个有序链表21': { docPath: 'Computering/算法/LeetCode刷题/合并两个有序链表21', level: 'easy', tags: ['leetcode'] },
+                                '下一个排列31': { docPath: 'Computering/算法/LeetCode刷题/下一个排列31', level: 'medium', tags: ['leetcode'] },
+                                '接雨水42': { docPath: 'Computering/算法/LeetCode刷题/接雨水42', level: 'hard', tags: ['leetcode'] }
+                            }
+                        },
+                        '动态规划': {
+                            docPath: 'Computering/算法/动态规划',
+                            skills: {
+                                '区间DP': { docPath: 'Computering/算法/动态规划/区间DP', level: 'advanced', tags: ['dp'] },
+                                '树形DP': { docPath: 'Computering/算法/动态规划/树形DP', level: 'advanced', tags: ['dp'] },
+                                '背包DP': { docPath: 'Computering/算法/动态规划/背包DP', level: 'advanced', tags: ['dp'] },
+                                '记忆化搜索': { docPath: 'Computering/算法/动态规划/记忆化搜索', level: 'intermediate', tags: ['dp'] }
+                            }
+                        },
+                        '字符串': {
+                            docPath: 'Computering/算法/字符串',
+                            skills: {
+                                'KMP': { docPath: 'Computering/算法/字符串/KMP', level: 'advanced', tags: ['string'] }
+                            }
+                        },
+                        '数学': {
+                            docPath: 'Computering/算法/数学',
+                            skills: {}
+                        },
                     },
                     topics: {
                         '搜索': {
@@ -354,7 +385,8 @@ const generateCompleteDocsData = () => {
                             skills: {
                                 'C++概述': { docPath: 'Computering/编程语言/C++/C++概述', level: 'beginner', tags: ['cpp'] },
                                 'C++程序的基本组成': { docPath: 'Computering/编程语言/C++/C++程序的基本组成', level: 'beginner', tags: ['cpp'] },
-                                '标识符和数据类型': { docPath: 'Computering/编程语言/C++/标识符和数据类型', level: 'beginner', tags: ['cpp'] }
+                                '标识符和数据类型': { docPath: 'Computering/编程语言/C++/标识符和数据类型', level: 'beginner', tags: ['cpp'] },
+                                'C++八股': { docPath: 'Computering/编程语言/C++/C++八股', level: 'intermediate', tags: ['cpp'] }
                             },
                             topics: {
                                 'C++11': {
@@ -370,6 +402,12 @@ const generateCompleteDocsData = () => {
                                         'vector': { docPath: 'Computering/编程语言/C++/STL/vector', level: 'intermediate', tags: ['stl'] }
                                     }
                                 }
+                            }
+                        },
+                        'CSharp': {
+                            docPath: 'Computering/编程语言/CSharp',
+                            skills: {
+                                '语法基础': { docPath: 'Computering/编程语言/CSharp/语法基础', level: 'intermediate', tags: ['csharp'] }
                             }
                         },
                         'Rust': {
@@ -392,9 +430,7 @@ const generateCompleteDocsData = () => {
                             }
                         }
                     },
-                    skills: {
-                        '编程语言': { docPath: 'Computering/编程语言/编程语言', level: 'beginner', tags: ['programming'] }
-                    }
+                    
                 },
                 '编译原理': {
                     docPath: 'Computering/编译原理',
@@ -435,7 +471,9 @@ const generateCompleteDocsData = () => {
             subcategories: {
                 'MPC模型预测控制': {
                     docPath: 'Control/MPC模型预测控制',
-                    skills: {}
+                    skills: {
+                        '模型预测控制': { docPath: 'Control/MPC模型预测控制/模型预测控制', level: 'advanced', tags: ['mpc'] }
+                    }
                 },
                 '强化学习': {
                     docPath: 'Control/强化学习',
@@ -626,15 +664,69 @@ const generateCompleteDocsData = () => {
                     docPath: 'Electronic/ASIC',
                     skills: {},
                     topics: {
-                        'RiscV': {
-                            docPath: 'Electronic/ASIC/RiscV',
-                            skills: {}
+                        'PA': {
+                            docPath: 'Electronic/ASIC/PA',
+                            skills: {
+                                'PA0': { docPath: 'Electronic/ASIC/PA/PA0', level: 'advanced', tags: ['asic'] }
+                            }
                         }
                     }
                 },
                 '信号完整性分析': {
                     docPath: 'Electronic/信号完整性分析',
-                    skills: {}
+                    skills: {
+                        '电容物理基础': { docPath: 'Electronic/信号完整性分析/电容物理基础', level: 'intermediate', tags: ['si'] },
+                        '传输线物理基础': { docPath: 'Electronic/信号完整性分析/传输线物理基础', level: 'intermediate', tags: ['si'] },
+                        '传输线与反射': { docPath: 'Electronic/信号完整性分析/传输线与反射', level: 'advanced', tags: ['si'] },
+                        '电感物理基础': { docPath: 'Electronic/信号完整性分析/电感物理基础', level: 'intermediate', tags: ['si'] }
+                    }
+                },
+                '元器件设计': {
+                    docPath: 'Electronic/元器件设计',
+                    topics: {
+                        '滤波器设计': {
+                            docPath: 'Electronic/元器件设计/滤波器设计',
+                            skills: {
+                                '滤波器设计概述': { docPath: 'Electronic/元器件设计/滤波器设计/滤波器设计概述', level: 'beginner', tags: ['filter'] },
+                                '滤波器的频率响应与时间响应特性': { docPath: 'Electronic/元器件设计/滤波器设计/滤波器的频率响应与时间响应特性', level: 'intermediate', tags: ['filter'] },
+                                'RC滤波器设计': { docPath: 'Electronic/元器件设计/滤波器设计/RC滤波器设计', level: 'intermediate', tags: ['rc-filter'] },
+                                '有源滤波器设计': { docPath: 'Electronic/元器件设计/滤波器设计/有源滤波器设计', level: 'intermediate', tags: ['active-filter'] }
+                            }
+                        },
+                        '电机设计': {
+                            docPath: 'Electronic/元器件设计/电机设计',
+                            topics: {
+                                'FOC': {
+                                    docPath: 'Electronic/元器件设计/电机设计/FOC',
+                                    skills: {
+                                        '标幺值': { docPath: 'Electronic/元器件设计/电机设计/FOC/标幺值', level: 'intermediate', tags: ['foc'] },
+                                        '克拉克变换与帕克变换': { docPath: 'Electronic/元器件设计/电机设计/FOC/克拉克变换与帕克变换', level: 'advanced', tags: ['transform'] },
+                                        '开环调速': { docPath: 'Electronic/元器件设计/电机设计/FOC/开环调速', level: 'intermediate', tags: ['speed'] },
+                                        '闭环位控': { docPath: 'Electronic/元器件设计/电机设计/FOC/闭环位控', level: 'intermediate', tags: ['position'] },
+                                        '闭环调速': { docPath: 'Electronic/元器件设计/电机设计/FOC/闭环调速', level: 'intermediate', tags: ['speed'] },
+                                        '电流闭环': { docPath: 'Electronic/元器件设计/电机设计/FOC/电流闭环', level: 'intermediate', tags: ['current'] },
+                                        'SPWM与SVPWM': { docPath: 'Electronic/元器件设计/电机设计/FOC/SPWM与SVPWM', level: 'advanced', tags: ['pwm'] },
+                                        'VF模式': { docPath: 'Electronic/元器件设计/电机设计/FOC/VF模式', level: 'advanced', tags: ['motor'] },
+                                        'ABZ编码器': { docPath: 'Electronic/元器件设计/电机设计/FOC/ABZ编码器', level: 'intermediate', tags: ['encoder'] },
+                                        '编码器测速': { docPath: 'Electronic/元器件设计/电机设计/FOC/编码器测速', level: 'intermediate', tags: ['encoder'] },
+                                        '高频注入': { docPath: 'Electronic/元器件设计/电机设计/FOC/高频注入', level: 'advanced', tags: ['sensorless'] }
+                                    }
+                                },
+                                '轴向磁通电机': {
+                                    docPath: 'Electronic/元器件设计/电机设计/轴向磁通电机',
+                                    skills: {
+                                        '轴向磁通电机': { docPath: 'Electronic/元器件设计/电机设计/轴向磁通电机/轴向磁通电机', level: 'advanced', tags: ['motor'] }
+                                    }
+                                }
+                            }
+                        },
+                        '电源设计': {
+                            docPath: 'Electronic/元器件设计/电源设计',
+                            skills: {
+                                '电源系统介绍': { docPath: 'Electronic/元器件设计/电源设计/电源系统介绍', level: 'beginner', tags: ['power'] }
+                            }
+                        }
+                    }
                 },
                 '嵌入式': {
                     docPath: 'Electronic/嵌入式',
@@ -685,6 +777,24 @@ const generateCompleteDocsData = () => {
                         'ESP32': {
                             docPath: 'Electronic/嵌入式/ESP32',
                             skills: {}
+                        },
+                        'RISC-V': {
+                            docPath: 'Electronic/嵌入式/RISC-V',
+                            skills: {
+                                'RISCV简介': { docPath: 'Electronic/嵌入式/RISC-V/RISCV简介', level: 'intermediate', tags: ['riscv'] }
+                            }
+                        },
+                        'RT-Thread': {
+                            docPath: 'Electronic/嵌入式/RT-Thread',
+                            skills: {
+                                'RT-Thread内核': { docPath: 'Electronic/嵌入式/RT-Thread/RT-Thread内核', level: 'intermediate', tags: ['rtos'] },
+                                'RT-Thread线程管理': { docPath: 'Electronic/嵌入式/RT-Thread/RT-Thread线程管理', level: 'intermediate', tags: ['rtos'] },
+                                'RT-Thread时钟管理': { docPath: 'Electronic/嵌入式/RT-Thread/RT-Thread时钟管理', level: 'intermediate', tags: ['rtos'] },
+                                'RT-Thread线程间同步': { docPath: 'Electronic/嵌入式/RT-Thread/RT-Thread线程间同步', level: 'intermediate', tags: ['rtos'] },
+                                'RT-Thread线程间通信': { docPath: 'Electronic/嵌入式/RT-Thread/RT-Thread线程间通信', level: 'intermediate', tags: ['rtos'] },
+                                'RT-Thread内存管理': { docPath: 'Electronic/嵌入式/RT-Thread/RT-Thread内存管理', level: 'intermediate', tags: ['rtos'] },
+                                'RT-Thread中断管理': { docPath: 'Electronic/嵌入式/RT-Thread/RT-Thread中断管理', level: 'intermediate', tags: ['rtos'] }
+                            }
                         }
                     },
                     skills: {
@@ -761,6 +871,55 @@ const generateCompleteDocsData = () => {
                         '电磁理论': { docPath: 'Electronic/微波工程/电磁理论', level: 'advanced', tags: ['microwave'] }
                     }
                 },
+                '微波工程': {
+                    docPath: 'Electronic/微波工程',
+                    skills: {
+                        '电磁理论': { docPath: 'Electronic/微波工程/电磁理论', level: 'advanced', tags: ['microwave'] }
+                    }
+                },
+                '电子技术基础': {
+                    docPath: 'Electronic/电子技术基础',
+                    topics: {
+                        '数字电子技术基础': {
+                            docPath: 'Electronic/电子技术基础/数字电子技术基础',
+                            skills: {
+                                '数字逻辑基础': { docPath: 'Electronic/电子技术基础/数字电子技术基础/数字逻辑基础', level: 'beginner', tags: ['digital'] },
+                                '逻辑代数与硬件描述语言': { docPath: 'Electronic/电子技术基础/数字电子技术基础/逻辑代数与硬件描述语言', level: 'intermediate', tags: ['digital'] },
+                                '逻辑门电路': { docPath: 'Electronic/电子技术基础/数字电子技术基础/逻辑门电路', level: 'intermediate', tags: ['digital'] },
+                                '组合逻辑电路': { docPath: 'Electronic/电子技术基础/数字电子技术基础/组合逻辑电路', level: 'intermediate', tags: ['digital'] },
+                                '锁存器和触发器': { docPath: 'Electronic/电子技术基础/数字电子技术基础/锁存器和触发器', level: 'intermediate', tags: ['digital'] },
+                                '时序逻辑电路': { docPath: 'Electronic/电子技术基础/数字电子技术基础/时序逻辑电路', level: 'intermediate', tags: ['digital'] },
+                                '半导体存储器': { docPath: 'Electronic/电子技术基础/数字电子技术基础/半导体存储器', level: 'intermediate', tags: ['digital'] },
+                                'CPLD和FPGA': { docPath: 'Electronic/电子技术基础/数字电子技术基础/CPLD和FPGA', level: 'advanced', tags: ['digital'] },
+                                '脉冲波形的变换与产生': { docPath: 'Electronic/电子技术基础/数字电子技术基础/脉冲波形的变换与产生', level: 'intermediate', tags: ['digital'] },
+                                '数模与模数转换器': { docPath: 'Electronic/电子技术基础/数字电子技术基础/数模与模数转换器', level: 'intermediate', tags: ['digital'] },
+                                '数字系统设计基础': { docPath: 'Electronic/电子技术基础/数字电子技术基础/数字系统设计基础', level: 'intermediate', tags: ['digital'] }
+                            }
+                        },
+                        '模拟电子技术基础': {
+                            docPath: 'Electronic/电子技术基础/模拟电子技术基础',
+                            skills: {
+                                '绪论': { docPath: 'Electronic/电子技术基础/模拟电子技术基础/绪论', level: 'beginner', tags: ['analog'] },
+                                '运算放大器': { docPath: 'Electronic/电子技术基础/模拟电子技术基础/运算放大器', level: 'intermediate', tags: ['analog'] },
+                                '二极管及其基本放大电路': { docPath: 'Electronic/电子技术基础/模拟电子技术基础/二极管及其基本放大电路', level: 'intermediate', tags: ['analog'] },
+                                '场效应三极管及其放大电路': { docPath: 'Electronic/电子技术基础/模拟电子技术基础/场效应三极管及其放大电路', level: 'intermediate', tags: ['analog'] },
+                                '双极结型三极管及其放大电路': { docPath: 'Electronic/电子技术基础/模拟电子技术基础/双极结型三极管及其放大电路', level: 'intermediate', tags: ['analog'] },
+                                '频率响应': { docPath: 'Electronic/电子技术基础/模拟电子技术基础/频率响应', level: 'advanced', tags: ['analog'] },
+                                '模拟集成电路': { docPath: 'Electronic/电子技术基础/模拟电子技术基础/模拟集成电路', level: 'advanced', tags: ['analog'] },
+                                '反馈放大电路': { docPath: 'Electronic/电子技术基础/模拟电子技术基础/反馈放大电路', level: 'advanced', tags: ['analog'] },
+                                '功率放大电路': { docPath: 'Electronic/电子技术基础/模拟电子技术基础/功率放大电路', level: 'intermediate', tags: ['analog'] },
+                                '信号处理与信号产生电路': { docPath: 'Electronic/电子技术基础/模拟电子技术基础/信号处理与信号产生电路', level: 'intermediate', tags: ['analog'] },
+                                '直流稳压电源': { docPath: 'Electronic/电子技术基础/模拟电子技术基础/直流稳压电源', level: 'intermediate', tags: ['analog'] }
+                            }
+                        },
+                        '电力电子技术': {
+                            docPath: 'Electronic/电子技术基础/电力电子技术',
+                            skills: {
+                                'H桥驱动直流电机': { docPath: 'Electronic/电子技术基础/电力电子技术/H桥驱动直流电机', level: 'intermediate', tags: ['power'] }
+                            }
+                        }
+                    }
+                },
                 '电磁场与电磁波': {
                     docPath: 'Electronic/电磁场与电磁波',
                     skills: {
@@ -821,14 +980,22 @@ const generateCompleteDocsData = () => {
                     docPath: 'Mathematics/微积分',
                     skills: {
                         '微积分': { docPath: 'Mathematics/微积分/微积分', level: 'beginner', tags: ['calculus'] },
+                        '一元函数微分学': { docPath: 'Mathematics/微积分/一元函数微分学', level: 'intermediate', tags: ['differential'] },
+                        '一元函数积分学': { docPath: 'Mathematics/微积分/一元函数积分学', level: 'intermediate', tags: ['integral'] },
                         '不定积分': { docPath: 'Mathematics/微积分/不定积分', level: 'intermediate', tags: ['integral'] },
                         '定积分': { docPath: 'Mathematics/微积分/定积分', level: 'intermediate', tags: ['definite'] },
+                        '二重积分': { docPath: 'Mathematics/微积分/二重积分', level: 'intermediate', tags: ['double-integral'] },
+                        '三重积分和线面积分': { docPath: 'Mathematics/微积分/三重积分和线面积分', level: 'advanced', tags: ['triple-integral'] },
                         '多元函数的极限、连续与微分': { docPath: 'Mathematics/微积分/多元函数的极限、连续与微分', level: 'advanced', tags: ['multivariable'] },
                         '多元函数微积分学综合': { docPath: 'Mathematics/微积分/多元函数微积分学综合', level: 'advanced', tags: ['multivariable'] },
                         '微分中值定理': { docPath: 'Mathematics/微积分/微分中值定理', level: 'advanced', tags: ['mvt'] },
+                        '常微分方程': { docPath: 'Mathematics/微积分/常微分方程', level: 'advanced', tags: ['ode'] },
                         '微分方程': { docPath: 'Mathematics/微积分/微分方程', level: 'advanced', tags: ['ode'] },
+                        '无穷级数': { docPath: 'Mathematics/微积分/无穷级数', level: 'advanced', tags: ['series'] },
                         '级数': { docPath: 'Mathematics/微积分/级数', level: 'advanced', tags: ['series'] },
-                        '线面积分': { docPath: 'Mathematics/微积分/线面积分', level: 'advanced', tags: ['integral'] }
+                        '线面积分': { docPath: 'Mathematics/微积分/线面积分', level: 'advanced', tags: ['integral'] },
+                        '积分等式与积分不等式': { docPath: 'Mathematics/微积分/积分等式与积分不等式', level: 'advanced', tags: ['integral'] },
+                        '零点问题与微分不等式': { docPath: 'Mathematics/微积分/零点问题与微分不等式', level: 'advanced', tags: ['zero-point'] }
                     }
                 },
                 '线性代数': {
@@ -897,22 +1064,13 @@ const generateCompleteDocsData = () => {
                         '云津日记': { docPath: 'Robotics/机器人不同构型实践/云津日记', level: 'intermediate', tags: ['project'] }
                     }
                 },
-                '高等机器人控制': {
-                    docPath: 'Robotics/高等机器人控制',
-                    skills: {
-                        '非线性控制在机器人中的应用': { docPath: 'Robotics/高等机器人控制/非线性控制在机器人中的应用', level: 'advanced', tags: ['nonlinear-control'] }
-                    }
-                },
                 'ROS': {
                     docPath: 'Robotics/ROS',
                     skills: {
                         'ROS基本操作': { docPath: 'Robotics/ROS/ROS基本操作', level: 'beginner', tags: ['ros'] },
                         '话题通信机制': { docPath: 'Robotics/ROS/话题通信机制', level: 'intermediate', tags: ['communication'] },
                         'ROS安装流程': { docPath: 'Robotics/ROS/ROS安装流程', level: 'beginner', tags: ['install'] },
-                        'ROS': { docPath: 'Robotics/ROS/ROS', level: 'beginner', tags: ['ros'] },
-                        'Coppeliasim': { docPath: 'Robotics/ROS/Coppeliasim', level: 'intermediate', tags: ['simulation'] },
-                        'Coppeliasim基本操作': { docPath: 'Robotics/ROS/Coppeliasim基本操作', level: 'intermediate', tags: ['simulation'] },
-                        '总复习': { docPath: 'Robotics/ROS/总复习', level: 'advanced', tags: ['review'] }
+                        'ROS': { docPath: 'Robotics/ROS/ROS', level: 'beginner', tags: ['ros'] }
                     }
                 },
                 '机器人学导论': {
@@ -920,23 +1078,11 @@ const generateCompleteDocsData = () => {
                     skills: {
                         '空间描述与变换': { docPath: 'Robotics/机器人学导论/空间描述与变换', level: 'intermediate', tags: ['kinematics'] },
                         '机器人正运动学': { docPath: 'Robotics/机器人学导论/机器人正运动学', level: 'intermediate', tags: ['forward'] },
-                        '机器人逆运动学': { docPath: 'Robotics/机器人学导论/机器人逆运动学', level: 'advanced', tags: ['inverse'] }
+                        '机器人逆运动学': { docPath: 'Robotics/机器人学导论/机器人逆运动学', level: 'advanced', tags: ['inverse'] },
+                        '速度与静力': { docPath: 'Robotics/机器人学导论/速度与静力', level: 'intermediate', tags: ['velocity'] }
                     }
                 },
-                '机器人运动控制': {
-                    docPath: 'Robotics/机器人运动控制',
-                    skills: {
-                        '概述': { docPath: 'Robotics/机器人运动控制/概述', level: 'beginner', tags: ['overview'] },
-                        '机器人系统构成': { docPath: 'Robotics/机器人运动控制/机器人系统构成', level: 'intermediate', tags: ['system'] },
-                        '数学模型': { docPath: 'Robotics/机器人运动控制/数学模型', level: 'intermediate', tags: ['model'] },
-                        '机器人运动学基础': { docPath: 'Robotics/机器人运动控制/机器人运动学基础', level: 'intermediate', tags: ['kinematics'] },
-                        '机器人系统电学设计': { docPath: 'Robotics/机器人运动控制/机器人系统电学设计', level: 'intermediate', tags: ['electrical'] },
-                        '机器人底层控制': { docPath: 'Robotics/机器人运动控制/机器人底层控制', level: 'advanced', tags: ['low-level'] },
-                        '机器人上层控制': { docPath: 'Robotics/机器人运动控制/机器人上层控制', level: 'advanced', tags: ['high-level'] },
-                        '移动机器人路径规划': { docPath: 'Robotics/机器人运动控制/移动机器人路径规划', level: 'advanced', tags: ['planning'] },
-                        '机器人视觉': { docPath: 'Robotics/机器人运动控制/机器人视觉', level: 'advanced', tags: ['vision'] }
-                    }
-                },
+                
                 '视觉SLAM十四讲': {
                     docPath: 'Robotics/视觉SLAM十四讲',
                     skills: {
@@ -955,6 +1101,9 @@ const generateCompleteDocsData = () => {
         'Machinery': {
             color: '#F59E0B',
             docPath: 'Machinery/机械设计',
+            skills: {
+                '机械设计经典五十问': { docPath: 'Machinery/机械设计经典五十问', level: 'intermediate', tags: ['machinery', 'questions'] }
+            },
             subcategories: {
                 '机械设计': {
                     docPath: 'Machinery/机械设计/机械设计',
@@ -1034,21 +1183,13 @@ const generateCompleteDocsData = () => {
                 }
             }
         },
-        'PLC': {
-            color: '#6366F1',
-            docPath: 'PLC',
-            subcategories: {
-                'Siemens PLC': {
-                    docPath: 'PLC',
-                    skills: {
-                        'Siemens PLC': { docPath: 'PLC/Siemens PLC', level: 'intermediate', tags: ['plc'] }
-                    }
-                }
-            }
-        },
+        
         'Sensor': {
             color: '#84CC16',
             docPath: 'Sensor/仪器科学与技术',
+            skills: {
+                '视触觉传感器': { docPath: 'Sensor/视触觉传感器', level: 'intermediate', tags: ['sensor', 'tactile'] }
+            },
             subcategories: {
                 '传感器与机器人感知技术': {
                     docPath: 'Sensor/传感器与机器人感知技术',
@@ -1066,14 +1207,9 @@ const generateCompleteDocsData = () => {
         'Synbio': {
             color: '#14B8A6',
             docPath: 'Synbio/生物信息学',
-            subcategories: {
-                '生物信息学': {
-                    docPath: 'Synbio',
-                    skills: {
-                        '生物信息学': { docPath: 'Synbio/生物信息学', level: 'intermediate', tags: ['bio'] },
-                        '记替朋友解决的一个化信问题': { docPath: 'Synbio/记替朋友解决的一个化信问题', level: 'intermediate', tags: ['chemistry'] }
-                    }
-                }
+            skills: {
+                '生物信息学': { docPath: 'Synbio/生物信息学', level: 'intermediate', tags: ['bio'] },
+                '记替朋友解决的一个化信问题': { docPath: 'Synbio/记替朋友解决的一个化信问题', level: 'intermediate', tags: ['chemistry'] }
             }
         }
     };

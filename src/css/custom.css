@@ -59,10 +59,6 @@ body {
   font-family: 'DreamHanSansCN', 'Mengyuan', system-ui, -apple-system, 'PingFang SC' !important;
 }
 
-/* 强制应用 DreamHanSansCN 字体到所有元素
-* {
-  font-family: 'DreamHanSansCN', 'Mengyuan', system-ui, -apple-system, 'PingFang SC' !important;
-} */
 
 /* 暗模式下背景色 */
 [data-theme='dark'] body {

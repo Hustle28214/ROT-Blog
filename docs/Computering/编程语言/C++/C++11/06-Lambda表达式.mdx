@@ -1,0 +1,253 @@
+import WordCount from '../../../../../src/components/WordCount/WordCount';
+import Mermaid from '@theme/Mermaid';
+
+<WordCount>
+
+## 1. 何为Lambda表达式
+
+Lambda表达式也称为匿名函数（也称为闭包），可以直接在函数内部定义临时函数对象，极大简化了代码。
+
+可以在代码中内联定义，捕获其作用域内的变量，并在需要时被调用。它本质上是一个语法糖，编译器会将其展开为一个未命名的函数对象类。
+
+```cpp
+// Lambda表达式语法：
+[capture](parameters) -> return_type { body }
+```
+
+- `[capture]`：捕获列表，指定 lambda 表达式内部可以访问的外部变量及其方式。
+
+- `(parameters)`：参数列表，与普通函数的参数列表类似。
+
+- `-> return_type`：返回类型（可选，可自动推导）。
+
+- `{ body }`：函数体。
+
+
+:::info
+编译器如何处理 Lambda？
+
+对于 lambda 表达式，编译器会生成一个未命名的类，该类重载了 `operator()`，并将捕获的变量作为成员变量存储。
+
+例如，对于：
+```cpp
+int x = 1, y = 2;
+auto f = [x, &y](int z) -> int { return x + y + z; };
+```
+编译器大致生成类似下面的代码：
+```cpp
+class __Lambda_123 {
+    int _x;       // 值捕获的 x 副本
+    int& _y;      // 引用捕获的 y
+public:
+    __Lambda_123(int x, int& y) : _x(x), _y(y) {}
+    int operator()(int z) const {  // 默认 const，除非 mutable
+        return _x + _y + z;
+    }
+};
+auto f = __Lambda_123(x, y);
+```
+如果 lambda 用 `mutable`，则 `operator()` 不是 `const`。
+
+调用 `f(z)` 实际上就是调用 `operator()(z)`。
+
+:::
+
+
+### 1.1 捕获列表
+
+
+捕获列表用于控制 lambda 如何访问其所在作用域中的非静态局部变量（包括 this）。捕获方式有两种：值捕获和引用捕获。
+
+| 捕获形式 | 含义 | 示例 |
+|---------|------|------|
+| `[x]` | 以值的方式捕获变量 x | `int x = 1; auto f = [x] { return x; };` |
+| `[&x]` | 以引用的方式捕获变量 x | `[&x] { x++; }` |
+| `[=]` | 以值的方式捕获所有局部变量（隐式值捕获） | `[=] { return a + b; }` |
+| `[&]` | 以引用的方式捕获所有局部变量（隐式引用捕获） | `[&] { a++; b++; }` |
+| `[this]` | 捕获当前对象的 this 指针，用于访问类的成员 | `[this] { return member; }` |
+| `[=, &x]` | 默认以值捕获，但 x 以引用捕获 | `[=, &x] { x = y + z; }`（注意顺序：&x 必须在 = 之后） |
+| `[&, x]` | 默认以引用捕获，但 x 以值捕获 | `[&, x] { y = x + z; }`（x 不能是引用捕获） |
+| `[x, &y]` | 混合显式捕获 | 明确指定每个变量的捕获方式 |
+
+:::warning
+
+- 捕获列表只能捕获非静态局部变量（自动存储期），不能捕获全局变量或静态变量（它们可以直接访问）。
+
+- 捕获的变量在 lambda 表达式创建时被“快照”（值捕获）或绑定引用（引用捕获）。后续修改原始变量（值捕获不影响内部副本，引用捕获会影响）。
+
+- 如果 lambda 表达式在函数返回后使用（例如返回 lambda 或放入线程），必须避免引用捕获的变量失效（悬空引用）。
+
+- C++11 不支持捕获列表中的初始化捕获（如 `[x = std::move(y)]`），那是 C++14 的特性。
+:::
+
+
+### 1.2 参数列表 (parameters)
+
+参数列表与普通函数相同，可以有默认参数（C++14 允许）。如果不需要参数，可以省略括号（仅当没有参数且没有 mutable/异常说明时）。
+```cpp
+auto f = [] { std::cout << "hello"; };  // 无参数，省略括号
+auto f2 = [](int a, int b) { return a + b; };
+```
+
+### 1.3 返回类型 `-> return_type`
+
+返回类型可以自动推导：
+
+如果函数体只包含一个 return 语句，编译器会推导返回类型。
+
+否则，如果未指定返回类型，默认为 void。
+
+```cpp
+auto f1 = [](int a) { return a * 2; };          // 返回 int
+auto f2 = [](int a) -> double { return a; };    // 显式指定返回类型 double
+auto f3 = [] { std::cout << "no return"; };     // 返回 void
+```
+### 1.4 函数体 `{ body }`
+
+可以是复合语句，支持所有语句（循环、条件、异常等），内部可以使用捕获的变量、参数、静态变量、全局变量等。
+
+### 1.5 可选修饰符
+
+
+`mutable`：允许在值捕获的变量副本上修改（默认情况下，值捕获的变量是 const 的，不可修改）。
+```cpp
+int x = 5;
+auto f = [x]() mutable { x++; return x; };
+f(); // 返回 6，但外部 x 仍然是 5
+```
+
+    
+异常说明：可以指定 noexcept。
+
+```cpp
+auto f = []() noexcept { throw std::exception(); }; // 警告：noexcept 函数抛出异常
+```
+属性：如 `[[noreturn]]` 等。
+
+完整语法：
+```cpp
+[capture](params) mutable(可选) exception(可选) -> return(可选) { body }
+```
+
+## 2. Lambda 的类型
+
+每个 lambda 表达式都有一个唯一的、编译器生成的类型，该类型是一个匿名的函数对象（仿函数）类。即使两个 lambda 表达式代码完全相同，它们的类型也不同。
+
+```cpp
+auto f1 = [] { return 42; };
+auto f2 = [] { return 42; };
+// f1 和 f2 是不同的类型
+```
+:::tip
+如果 lambda 没有捕获任何变量，它可以隐式转换为函数指针（指向具有相同签名的函数）。
+```cpp
+void (*func_ptr)() = [] { std::cout << "hello"; };  // 合法
+func_ptr(); // 调用
+```
+如果 lambda 有捕获，则不能转换为函数指针（因为函数指针无法携带状态）。
+:::
+## 3. 捕获的细节与生命周期
+### 3.1 值捕获
+
+值捕获的变量在 lambda 创建时会被复制到 lambda 内部，形成一个独立的副本。
+
+在 C++11 中，这种复制只能通过拷贝构造函数完成；而从 C++14 开始，可以使用初始化捕获（generalized lambda capture）来移动变量（例如 `[x = std::move(y)]`），从而实现移动语义。
+
+此后，lambda 内部操作的是这个副本，对该副本的任何修改都不会影响原始变量。
+
+需要注意的是，默认情况下 lambda 的 `operator()` 是 const 的，因此值捕获的副本在 lambda 内部被视为常量，不可修改；若需要在 lambda 内部修改该副本，则必须将 lambda 声明为 mutable。
+
+:::info
+
+我们这里说的拷贝构造函数是指Lambda执行时内部发生的。
+
+在 C++11 中，当你说“以值的方式捕获变量”时，比如 `[x] { ... }`，编译器实际上会做两件事：
+
+1. 在生成的匿名类中创建一个成员变量，这个成员变量的类型与 x 相同（忽略引用、const 等限定符）。
+
+2. 在构造这个匿名类对象时，用 x 来初始化这个成员变量。
+
+这里的“初始化”就是通过调用拷贝构造函数完成的。拷贝构造函数是一种特殊的构造函数，它接受一个同类型的对象作为参数，并创建一个新的对象作为原对象的副本。也就是说，在 C++11 的 lambda 中，值捕获的过程相当于：
+```cpp
+// 假设 x 的类型是 T，那么生成的类大致是：
+class Lambda {
+    T captured_x;  // 成员变量
+public:
+    Lambda(const T& original_x) : captured_x(original_x) {} // 拷贝构造
+    // ...
+};
+```
+所以，如果你捕获的变量 x 的类型是只能移动而不能拷贝的（例如 `std::unique_ptr<int>`），那么在 C++11 中就无法用值捕获它，因为 std::unique_ptr 没有拷贝构造函数（只有移动构造函数）。编译器会报错，提示你调用了已删除的拷贝构造函数。
+
+C++14 引入了初始化捕获（也叫广义 lambda 捕获），允许你显式地控制如何构造这个内部成员。例如你可以写：
+```cpp
+std::unique_ptr<int> p = std::make_unique<int>(42);
+auto lambda = [p = std::move(p)] { /* ... */ };
+```
+这里 `p = std::move(p)` 表示：在 lambda 内部创建一个名为 p 的成员变量，并用 `std::move(p)`的结果（即右值）来初始化它。这就会调用 `std::unique_ptr` 的移动构造函数，而不是拷贝构造函数。这样，原来只能移动的类型就可以被“捕获”到 lambda 中了。
+:::
+
+### 3.2 引用捕获
+
+引用捕获的变量只是绑定到外部变量，不拷贝。使用时需确保外部变量的生命周期长于 lambda，否则产生悬空引用，导致未定义行为。
+```cpp
+auto bad_lambda() {
+    int x = 10;
+    return [&] { return x; }; // 危险：返回时 x 已销毁，引用悬挂
+}
+```
+### 3.3 捕获 this
+
+在类的成员函数中定义 lambda 时，可以通过 `[this]` 捕获当前对象的指针，从而访问类的成员（包括私有成员）。
+
+:::danger
+但如果 lambda 的生命周期超过对象，也会产生悬空 `this`。
+:::
+```cpp
+class MyClass {
+    int data = 0;
+public:
+    auto get_lambda() {
+        return [this] { return data; }; // 捕获 this 指针
+    }
+};
+// 如果对象先销毁，lambda 再调用会崩溃
+```
+### 3.4 捕获静态变量
+
+静态变量（静态局部变量）和全局变量具有静态存储期，它们的生命周期贯穿整个程序运行期间，并且可以从其声明位置开始到程序结束的任何地方访问（受作用域规则限制）。
+
+因此，lambda 表达式可以直接使用它们，无需在捕获列表中显式捕获。
+
+```cpp
+#include <iostream>
+
+// 全局变量
+int global_var = 100;
+
+void demo() {
+    // 静态局部变量（生命周期同全局，但仅在函数内可见）
+    static int static_var = 200;
+
+    // 定义一个 lambda，直接使用全局变量和静态局部变量
+    auto lambda = []() {
+        // 直接访问，无需捕获
+        std::cout << "global_var = " << global_var << std::endl;
+        std::cout << "static_var = " << static_var << std::endl;
+
+        // 甚至可以修改它们（如果不是 const）
+        global_var += 10;
+        static_var += 10;
+    };
+
+    lambda(); // 第一次调用
+    lambda(); // 第二次调用，可以看到值在持续变化
+}
+
+int main() {
+    demo();
+    return 0;
+}
+```
+
+</WordCount>

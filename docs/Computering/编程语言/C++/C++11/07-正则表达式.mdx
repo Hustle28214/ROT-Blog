@@ -1,0 +1,54 @@
+import WordCount from '../../../../../src/components/WordCount/WordCount';
+import Mermaid from '@theme/Mermaid';
+
+<WordCount>
+
+正则表达式用于字符串的模式匹配、搜索和替换。它基于 ECMAScript 正则表达式语法，并允许选择其他语法（如 basic、extended、awk、grep、egrep）。
+
+要使用正则表达式，你需要引入`<regex>`头文件。
+
+## 1. 核心组件
+
+| 组件 | 说明 |
+|------|------|
+| `std::regex` / `std::wregex` | 表示一个正则表达式对象，分别用于 char 和 wchar_t 字符。 |
+| `std::match_results` | 保存一次匹配操作的结果，其特化版本有 `std::cmatch`（const char*）、`std::smatch`（std::string）、`std::wcmatch`（const wchar_t*）、`std::wsmatch`（std::wstring）。 |
+| `std::regex_match` | 判断整个字符序列是否完全匹配正则表达式。 |
+| `std::regex_search` | 在字符序列中搜索第一个匹配的子串。 |
+| `std::regex_replace` | 将匹配的子串替换为指定的格式字符串。 |
+| `std::regex_iterator` | 迭代遍历所有匹配的子串。 |
+| `std::regex_token_iterator` | 迭代遍历匹配结果中的指定子表达式或未匹配的部分。 |
+| `std::regex_error` | 正则表达式编译或使用过程中抛出的异常类型。 |
+
+
+## 2. 正则表达式语法选项
+
+| 标志 | 说明 |
+|------|------|
+| `std::regex::ECMAScript` | 默认语法，遵循 ECMAScript 正则表达式规范（最常用，功能最全）。 |
+| `std::regex::basic` | 基础 POSIX 正则表达式语法。 |
+| `std::regex::extended` | 扩展 POSIX 正则表达式语法。 |
+| `std::regex::awk` | awk 工具使用的语法。 |
+| `std::regex::grep` | grep 工具使用的语法。 |
+| `std::regex::egrep` | egrep 工具使用的语法（等于 extended）。 |
+| `std::regex::icase` | 匹配时不区分大小写。 |
+| `std::regex::nosubs` | 不存储子表达式匹配结果，提高性能。 |
+| `std::regex::optimize` | 指示编译器构建更快的正则表达式（可能增加编译时间）。 |
+| `std::regex::collate` | 考虑本地化语言环境的字符对照规则。 |
+
+
+:::tip
+- **语法选择**：通常使用默认的 `ECMAScript` 语法即可满足绝大多数需求，它支持现代正则表达式特性（如 `\d`、`\w`、非捕获组 `(?:...)`、前瞻 `(?=...)` 等）。如果需要兼容 POSIX 风格的工具，可以选用对应的标志。
+- **标志组合**：多个标志可以通过按位或（`|`）组合使用，例如 `std::regex::ECMAScript | std::regex::icase` 表示使用 ECMAScript 语法且不区分大小写。
+- **性能优化**：
+  - `std::regex::optimize` 建议在正则表达式会被重复使用多次（例如在循环中）时启用，它会花费更多编译时间生成更快的匹配状态机。
+  - `std::regex::nosubs` 可以禁用捕获组的存储，在不需要提取子表达式时使用可减少内存占用并提高匹配速度。
+- **字符类型匹配**：处理宽字符（如 UTF-16）时，应使用 `std::wregex` 和对应的结果类型（`std::wsmatch`、`std::wcmatch`），避免窄字符与宽字符混用。
+- **异常处理**：正则表达式编译失败时会抛出 `std::regex_error` 异常，建议在构造 `std::regex` 对象时捕获并处理该异常，以便定位语法错误。
+:::
+
+## 3. 基本的几个使用案例
+
+
+
+</WordCount>

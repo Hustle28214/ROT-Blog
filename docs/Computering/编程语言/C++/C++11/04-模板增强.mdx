@@ -3,8 +3,136 @@ import Mermaid from '@theme/Mermaid';
 
 <WordCount>
 
-
+C++11及之后，模板能力得到了非常大的增强：
 
 ## 1. 外部模板
+
+以前C++的模板只有在使用时才会被实例化，现在可以通过`extern template`显式声明模板该在哪个位置实例化。
+
+```cpp
+// header.h
+template<typename T> void f(T) {}
+
+// 告知编译器 f<int> 在其他地方实例化
+extern template void f<int>(int);
+
+// 与此同时，某个.cpp文件
+template void f<int>(int); // 显式实例化定义
+```
+
+## 2. 可变参数模板
+
+允许模板接受任意数量、任意类型的参数，而且不需要固定参数个数，解决了传统模板只能固定数量参数的限制。
+
+核心语法：
+
+模板参数包：typename... Args
+
+函数参数包：Args... args
+
+展开参数包：args... 或通过递归/初始化列表等方式
+
+```cpp
+// 递归终止函数（无参数时调用）
+void print() {}
+
+template<typename T, typename... Args>
+void print(T first, Args... args) {
+    std::cout << first << " ";
+    print(args...);  // 递归调用，每次剥离一个参数
+}
+
+// 使用
+print(1, 3.14, "hello", 'a');
+// 输出：1 3.14 hello a
+```
+
+## 3. 模板别名
+
+使用 `using` 为模板定义别名，比 `typedef` 更清晰，且能用于模板别名(相比之下`typedef`是不能用于模板别名的)。
+
+```cpp
+// 为带有自定义分配器的 vector 定义别名
+template<typename T>
+using MyVector = std::vector<T, MyAllocator<T>>;
+
+MyVector<int> vec;  // 等价于 std::vector<int, MyAllocator<int>>
+```
+
+## 4. 函数模板的默认模板参数
+
+函数模板和类模板一样能够拥有默认参数。
+
+```cpp
+template<typename T = int>
+void func(T val = T()) {
+    // ...
+}
+
+func();      // 使用默认模板参数 int，默认值 0
+func(3.14);  // 模板参数推导为 double，覆盖默认
+```
+
+### 局部和匿名类型作为模板参数
+
+C++98 禁止将局部类型、匿名类型等作为模板参数，C++11 解除此限制。
+
+```cpp
+template<typename T> void foo() {}
+
+struct {} anonymous;  // 匿名类型变量
+foo<decltype(anonymous)>();  // 允许
+
+void bar() {
+    struct Local {} local;   // 局部类型
+    foo<Local>();            // 允许
+}
+```
+
+
+## 5. 尖括号
+
+在 C++98/03 中，如果模板嵌套使用连续的两个右尖括号，如 `vector<vector<int>>`，编译器会将其解析为右移操作符 `>>`，导致编译错误。因此程序员必须手动添加空格：`vector<vector<int> >`。这在代码中既啰嗦又容易遗漏。
+
+C++11 修改了语法规则，允许编译器正确区分模板的结束符 `>` 和右移运算符 `>>`。现在可以直接写：
+```cpp
+std::vector<std::vector<int>> matrix;  // 合法，无需空格
+```
+
+## 6.变参模板的 sizeof...
+
+在编译期获取参数包中的参数个数。
+
+示例：
+```cpp
+
+template<typename... Args>
+void count() {
+    std::cout << "Number of arguments: " << sizeof...(Args) << std::endl;
+}
+
+count<int, double, char>();  // 输出 3
+```
+## 7. 友元声明的增强
+
+允许将模板参数声明为友元，或者将特定模板实例声明为友元。
+
+```cpp
+
+// 将模板参数类型 T 声明为友元
+template<typename T>
+class A {
+    friend T;  // T 类型的所有成员都可以访问 A 的私有成员
+    // ...
+};
+
+// 将特定模板实例声明为友元
+template<typename T>
+class B {
+    template<typename U> friend class C;  // C 的所有实例都是友元
+    friend class C<int>;                   // 只有 C<int> 是友元
+};
+```
+
 
 </WordCount>

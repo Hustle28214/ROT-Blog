@@ -1,0 +1,129 @@
+import WordCount from '../../../../../src/components/WordCount/WordCount';
+import Mermaid from '@theme/Mermaid';
+
+<WordCount>
+
+## 1. 委托构造函数
+
+委托构造函数允许一个构造函数调用同一个类的另一个构造函数，从而避免重复编写相同的初始化代码。被调用的构造函数称为目标构造函数，调用者称为委托构造函数。
+
+语法：在构造函数的初始化列表中使用 : 构造函数名(参数) 来委托。
+
+```cpp
+class Vehicle{
+    public:
+        int oil;
+        int battery;
+        // 目标构造函数
+        Vehicle(){
+            oil = 10;
+        }
+        // 委托构造函数
+        Vehicle_2(int value):Vehicle(){// Vehicle_2()委托给Vehicle()
+            battery = 20;
+        }
+}
+```
+
+:::danger
+1. 构造函数之间不能形成循环调用，否则编译器会报错。
+
+2. 一旦委托给另一个构造函数，就不能再初始化其他成员（除非在被委托的构造函数中初始化）
+
+3. 这意味着成员变量的最终值可能受两个构造函数的影响。例如上例中 `value2` 在 `Base()` 中未初始化，然后在 `Base(int)` 中被赋值为 2，这没问题。但如果 `Base()` 也初始化了 `value2`，则 `Base(int)` 中的赋值会覆盖它。
+
+4. 如果目标构造函数抛出异常，则委托构造函数也不会执行，整个构造过程终止。
+
+5. 委托构造本身与 explicit 无关，explicit 只影响构造函数的隐式转换。委托是在类内部显式调用，不受影响。
+:::
+
+## 2. 继承构造函数
+
+允许派生类直接继承基类的构造函数（包括模板构造函数），无需手动编写转发构造函数。语法：`using Base::Base;`
+
+```cpp
+struct Base {
+    Base(int) {}
+    Base(double, int) {}
+};
+
+struct Derived : Base {
+    using Base::Base;   // 继承 Base 的所有构造函数
+};
+
+Derived d1(10);         // 调用 Base(int)
+Derived d2(3.14, 5);    // 调用 Base(double, int)
+```
+
+## 3. 默认构造函数的控制：=default 与 =delete
+
+### 3.1 =default
+
+显式要求编译器生成默认的特殊成员函数（默认构造函数、析构函数、拷贝构造函数、拷贝赋值运算符、移动构造函数、移动赋值运算符）。
+
+当用户声明了其他构造函数导致编译器不自动生成默认构造函数时，可通过 `=default` 强制生成。
+
+```cpp
+class Point {
+public:
+    Point() = default;           // 强制生成默认构造函数
+    Point(int x, int y) : x_(x), y_(y) {}
+private:
+    int x_, y_;
+};
+```
+### 3.2 =delete
+
+禁用某个函数（包括构造函数、赋值运算符等），使调用该函数导致编译错误。
+
+阻止拷贝、阻止特定类型转换、禁用默认构造等。
+
+```cpp
+class NonCopyable {
+public:
+    NonCopyable() = default;
+    NonCopyable(const NonCopyable&) = delete;            // 禁止拷贝构造
+    NonCopyable& operator=(const NonCopyable&) = delete; // 禁止拷贝赋值
+};
+```
+
+注意：`=delete` 可用于任何函数，不仅限于特殊成员函数。
+
+## 4. explicit 用于转换构造函数和转换运算符
+
+### 4.1 explicit 转换构造函数
+
+阻止构造函数被用于隐式类型转换。
+
+C++98 已有，C++11 未变，但强调其重要性。
+
+```cpp
+class String {
+public:
+    explicit String(const char* p) {}   // 禁止隐式转换
+};
+void foo(String s);
+foo("hello");    // 错误：无法隐式转换
+foo(String("hello")); // 正确：显式构造
+```
+
+### 4.2 explicit 转换运算符（C++11 新增）
+
+使类型转换运算符只能用于显式转换（如 `static_cast`），避免意外的隐式转换。
+
+`explicit operator 类型() const`;
+
+```cpp
+struct BoolLike {
+    explicit operator bool() const { return true; }
+};
+
+BoolLike b;
+if (b) { ... }          // 正确：if 条件支持 explicit bool 转换（语境转换）
+bool flag = b;          // 错误：需要显式转换
+bool flag2 = static_cast<bool>(b); // 正确
+```
+
+某些上下文（如 if、while、&&、|| 等）允许 `explicit` 转换运算符被隐式调用，这是特例。
+
+</WordCount>

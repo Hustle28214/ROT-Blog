@@ -4,23 +4,79 @@ import WordCount from '../../../src/components/WordCount/WordCount';
 
 简单复现了一下，把论文给出的方法总结一下：
 
-## **Step 1：人-机器人关键身体匹配**
+## Step 1：人-机器人关键身体匹配
 - **论文描述**：用户定义人体关键部位与机器人关键部位的映射 $M$，并为每个部位指定位置和方向的跟踪权重。
 - **代码实现**：
   - 初始化时读取配置文件（`IK_CONFIG_DICT`），其中包含 `ik_match_table1` 和 `ik_match_table2`，定义了人体部位与机器人部位的对应关系、权重（位置权重 `pos_weight`、方向权重 `rot_weight`）以及偏移量。
   - 通过 `setup_retarget_configuration` 为每个映射创建 `mink.FrameTask`，并将任务分别存入 `tasks1` 和 `tasks2`（对应两个优化阶段）。
 
+```py
+# __init__ 中加载 IK 配置
+with open(IK_CONFIG_DICT[src_human][tgt_robot]) as f:
+    ik_config = json.load(f)
 
+self.ik_match_table1 = ik_config["ik_match_table1"]
+self.ik_match_table2 = ik_config["ik_match_table2"]
+# ... 其他参数
 
-## **Step 2：人-机器人静止姿态对齐（Rest Pose Alignment）**
+# setup_retarget_configuration 中创建任务
+def setup_retarget_configuration(self):
+    self.configuration = mink.Configuration(self.model)
+    self.tasks1 = []
+    self.tasks2 = []
+    
+    for frame_name, entry in self.ik_match_table1.items():
+        body_name, pos_weight, rot_weight, pos_offset, rot_offset = entry
+        if pos_weight != 0 or rot_weight != 0:
+            task = mink.FrameTask(
+                frame_name=frame_name,
+                frame_type="body",
+                position_cost=pos_weight,
+                orientation_cost=rot_weight,
+                lm_damping=1,
+            )
+            self.human_body_to_task1[body_name] = task
+            self.pos_offsets1[body_name] = np.array(pos_offset) - self.ground
+            self.rot_offsets1[body_name] = R.from_quat(rot_offset, scalar_first=True)
+            self.tasks1.append(task)
+    
+    for frame_name, entry in self.ik_match_table2.items():
+        body_name, pos_weight, rot_weight, pos_offset, rot_offset = entry
+        if pos_weight != 0 or rot_weight != 0:
+            task = mink.FrameTask(...)  # 类似创建任务
+            self.human_body_to_task2[body_name] = task
+            self.pos_offsets2[body_name] = np.array(pos_offset) - self.ground
+            self.rot_offsets2[body_name] = R.from_quat(rot_offset, scalar_first=True)
+            self.tasks2.append(task)
+```
+
+## Step 2：人-机器人静止姿态对齐（Rest Pose Alignment）
 - **论文描述**：通过旋转和平移偏移量，使人体部位的静止姿态与机器人静止姿态对齐。
 - **代码实现**：
   - `offset_human_data` 方法：对每个关键部位，先应用旋转偏移（`rot_offsets`），再根据旋转后的方向将局部位置偏移（`pos_offsets`）转换到全局坐标系并加到位置上。
   - 偏移量同样从配置文件中读取（`pos_offset`, `rot_offset`）。
 
+```py
+def offset_human_data(self, human_data, pos_offsets, rot_offsets):
+    """the pos offsets are applied in the local frame"""
+    offset_human_data = {}
+    for body_name in human_data.keys():
+        pos, quat = human_data[body_name]
+        offset_human_data[body_name] = [pos, quat]
+        # apply rotation offset first
+        updated_quat = (R.from_quat(quat, scalar_first=True) * rot_offsets[body_name]).as_quat(scalar_first=True)
+        offset_human_data[body_name][1] = updated_quat
+        
+        local_offset = pos_offsets[body_name]
+        # compute the global position offset using the updated rotation
+        global_pos_offset = R.from_quat(updated_quat, scalar_first=True).apply(local_offset)
+        
+        offset_human_data[body_name][0] = pos + global_pos_offset
+       
+    return offset_human_data
+```
 
-
-## **Step 3：人体数据非均匀局部缩放（Non-Uniform Local Scaling）**
+## Step 3：人体数据非均匀局部缩放（Non-Uniform Local Scaling）
 - **论文描述**：基于人体骨骼高度计算整体缩放因子，并对每个关键部位使用独立的局部缩放因子，公式为：
   $$
   p_{\text{target}}^b = \frac{h}{h_{\text{ref}}} s_b (p_{\text{source}}^j - p_{\text{source}}^{\text{root}}) + \frac{h}{h_{\text{ref}}} s_{\text{root}} p_{\text{source}}^{\text{root}}
@@ -32,9 +88,32 @@ import WordCount from '../../../src/components/WordCount/WordCount';
     - 对其他部位，计算相对于根节点的局部位置，乘以对应缩放因子，再加回缩放后的根节点位置。
   - 缩放因子来自配置文件 `human_scale_table`，并根据实际人体高度（`actual_human_height`）调整参考高度 $h_{\text{ref}}$。
 
+```py
+def scale_human_data(self, human_data, human_root_name, human_scale_table):
+    human_data_local = {}
+    root_pos, root_quat = human_data[human_root_name]
+    
+    # scale root
+    scaled_root_pos = human_scale_table[human_root_name] * root_pos
+    
+    # scale other body parts in local frame
+    for body_name in human_data.keys():
+        if body_name not in human_scale_table:
+            continue
+        if body_name == human_root_name:
+            continue
+        else:
+            human_data_local[body_name] = (human_data[body_name][0] - root_pos) * human_scale_table[body_name]
+        
+    # transform back to global frame
+    human_data_global = {human_root_name: (scaled_root_pos, root_quat)}
+    for body_name in human_data_local.keys():
+        human_data_global[body_name] = (human_data_local[body_name] + scaled_root_pos, human_data[body_name][1])
 
+    return human_data_global
+```
 
-## **Step 4：第一阶段优化——仅考虑末端执行器位置和所有关键体方向**
+## Step 4：第一阶段优化——仅考虑末端执行器位置和所有关键体方向
 - **论文描述**：优化问题仅包含末端执行器的位置误差和所有关键体的方向误差，目标函数为：
   $$
   \min_q \sum_{(i,j)\in M} (w_1)^R_{i,j} \|R_i^h \ominus R_j(q)\|^2 + \sum_{(i,j)\in M_{\text{ee}}} (w_1)^p_{i,j} \|p_i^{\text{target}} - p_j(q)\|^2
@@ -45,32 +124,104 @@ import WordCount from '../../../src/components/WordCount/WordCount';
   - `retarget` 方法中首先对 `tasks1` 调用 `mink.solve_ik` 并迭代，直到误差变化小于阈值或达到最大迭代次数。
   - 初始猜测为前一帧的解（对于序列）或默认姿态。
 
+```py
+def retarget(self, human_data, offset_to_ground=False):
+    self.update_targets(human_data, offset_to_ground)
+    
+    if self.use_ik_match_table1:
+        curr_error = self.error1()
+        dt = self.configuration.model.opt.timestep
+        vel1 = mink.solve_ik(
+            self.configuration, self.tasks1, dt, self.solver, self.damping, self.ik_limits
+        )
+        self.configuration.integrate_inplace(vel1, dt)
+        next_error = self.error1()
+        num_iter = 0
+        while curr_error - next_error > 0.001 and num_iter < self.max_iter:
+            curr_error = next_error
+            dt = self.configuration.model.opt.timestep
+            vel1 = mink.solve_ik(
+                self.configuration, self.tasks1, dt, self.solver, self.damping, self.ik_limits
+            )
+            self.configuration.integrate_inplace(vel1, dt)
+            next_error = self.error1()
+            num_iter += 1
+    # ... 后续处理
+```
 
-
-## **Step 5：第二阶段优化——加入所有关键体的位置约束**
+## Step 5：第二阶段优化——加入所有关键体的位置约束
 - **论文描述**：以上一阶段结果为初值，重新优化，目标函数包含所有关键体的位置和方向误差，使用不同的权重 $(w_2)^p, (w_2)^R$。
 - **代码实现**：
   - `tasks2` 对应第二阶段的目标，通常包含所有关键体的位置和方向跟踪。
   - 在第一阶段求解后，继续对 `tasks2` 进行相同的 IK 迭代，直到收敛。
 
+```py
+if self.use_ik_match_table2:
+    curr_error = self.error2()
+    dt = self.configuration.model.opt.timestep
+    vel2 = mink.solve_ik(
+        self.configuration, self.tasks2, dt, self.solver, self.damping, self.ik_limits
+    )
+    self.configuration.integrate_inplace(vel2, dt)
+    next_error = self.error2()
+    num_iter = 0
+    while curr_error - next_error > 0.001 and num_iter < self.max_iter:
+        curr_error = next_error
+        dt = self.configuration.model.opt.timestep
+        vel2 = mink.solve_ik(
+            self.configuration, self.tasks2, dt, self.solver, self.damping, self.ik_limits
+        )
+        self.configuration.integrate_inplace(vel2, dt)
+        next_error = self.error2()
+        num_iter += 1
+```
 
-
-## **应用于运动序列（Application to Motion Sequences）**
+## 应用于运动序列（Application to Motion Sequences）
 - **论文描述**：对每一帧顺序应用上述两阶段 IK，并将前一帧的解作为当前帧的初值。全部帧重定向后，通过正向运动学计算所有身体部位的高度，减去最低高度以修正漂浮或地面穿透。
 - **代码实现**：
   - `retarget` 方法每次处理一帧数据，内部更新目标并执行两阶段 IK。
   - 类提供了 `offset_human_data_to_ground` 方法，在需要时（通过 `offset_to_ground` 参数）调整所有部位的高度，使脚部接触地面（减去最低点并添加预设的地面偏移 `ground_offset`）。
   - 同时 `apply_ground_offset` 方法允许统一调整全局高度。
 
+```py
+def offset_human_data_to_ground(self, human_data):
+    """find the lowest point of the human data and offset the human data to the ground"""
+    offset_human_data = {}
+    ground_offset = 0.1
+    lowest_pos = np.inf
 
+    for body_name in human_data.keys():
+        if "Foot" not in body_name and "foot" not in body_name:
+            continue
+        pos, quat = human_data[body_name]
+        if pos[2] < lowest_pos:
+            lowest_pos = pos[2]
+    for body_name in human_data.keys():
+        pos, quat = human_data[body_name]
+        offset_human_data[body_name] = [pos, quat]
+        offset_human_data[body_name][0] = pos - np.array([0, 0, lowest_pos]) + np.array([0, 0, ground_offset])
+    return offset_human_data
+```
 
-## **其他细节**
+## 其他细节
 - **微分 IK 求解器**：代码使用 `mink` 库，与论文引用一致。
 - **关节限位**：通过 `ik_limits` 传入 `mink.ConfigurationLimit`（关节位置限位）和可选的 `VelocityLimit`，对应论文中的约束 $q^- \le q \le q^+$。
 - **迭代终止条件**：误差变化小于 0.001 或达到最大迭代次数 10，与论文设定一致。
 
 
-## **结论**
+```py
+# 关节限位设置
+self.ik_limits = [mink.ConfigurationLimit(self.model)]
+if use_velocity_limit:
+    VELOCITY_LIMITS = {k: 3*np.pi for k in self.robot_motor_names.keys()}
+    self.ik_limits.append(mink.VelocityLimit(self.model, VELOCITY_LIMITS))
+
+# 迭代终止条件（已在 retarget 循环中使用）
+while curr_error - next_error > 0.001 and num_iter < self.max_iter:
+    ...ASAP
+```
+
+## 结论
 `GeneralMotionRetargeting` 类正是论文中提出的 **GMR 算法的完整实现**，涵盖了从映射定义、缩放、偏移到两阶段 IK 求解及后处理的全流程。配置文件的灵活性使其能够适应不同的人体数据源和机器人模型。
 
 </WordCount>

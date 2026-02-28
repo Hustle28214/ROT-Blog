@@ -5,9 +5,40 @@ import Mermaid from '@theme/Mermaid';
 
 左值（lvalue）：可以取地址、有名字的表达式，如变量名、返回左值引用的函数调用。通常位于赋值运算符左侧。
 
+```cpp
+int x = 10;       // x 是左值
+int* p = &x;      // 可以对 x 取地址
+```
+
 右值（rvalue）：临时对象、字面常量（除字符串外）、返回右值的表达式，如 x+y、42。它们没有持久的内存地址。
 
+```cpp
+int y = 20;       // 20 是字面常量，是右值
+int z = x + y;    // x + y 的结果是临时值，是右值
+```
+
+:::info
+C++11 将右值进一步细分为纯右值（prvalue）和将亡值（xvalue）
+:::
+
 ## 1. 右值引用
+
+### 1.1 左值引用
+
+左值引用：使用 & 声明，只能绑定到左值。
+
+```cpp
+int a = 5;
+int& ref = a;     // OK：ref 绑定到左值 a
+// int& ref2 = 10; // 错误：不能绑定到右值
+```
+
+常量左值引用可以绑定到右值（延长临时对象的生命周期），但不能修改。
+```cpp
+const int& cref = 10; // OK：const 左值引用可以绑定右值
+```
+
+### 1.2 右值引用
 
 右值引用是一种引用类型，用 `&&` 声明，只能绑定到右值。它允许我们“窃取”右值对象的资源（如动态内存），因为右值即将销毁，无需深拷贝。
 
@@ -16,6 +47,157 @@ int&& rref = 42;                // 绑定到字面量
 std::string&& sref = getTemp(); // 绑定到临时 string
 ```
 
+右值引用的主要用途是实现**移动语义**——将临时对象的资源“偷”过来，避免深拷贝。
 
+## 2. 移动语义
+
+考虑一个管理动态数组的类 `MyVector`：
+
+```cpp
+class MyVector {
+public:
+    int* data;
+    size_t size;
+
+    MyVector(size_t n) : size(n), data(new int[n]) {}
+
+    // 拷贝构造函数（深拷贝）
+    MyVector(const MyVector& other) : size(other.size), data(new int[other.size]) {
+        std::copy(other.data, other.data + size, data);
+    }
+
+    ~MyVector() { delete[] data; }
+};
+```
+
+当函数返回临时 `MyVector` 对象时，会调用拷贝构造函数，分配新内存并复制数据。但临时对象很快就会被销毁，造成不必要的内存分配和拷贝开销。
+
+C++11 允许我们定义移动构造函数和移动赋值运算符，它们接受右值引用参数，将源对象的资源“转移”给目标对象，而不是复制。
+
+```cpp
+class MyVector {
+public:
+    // 移动构造函数
+    MyVector(MyVector&& other) noexcept
+        : size(other.size), data(other.data) {
+        other.size = 0;
+        other.data = nullptr;  // 将源对象置为空，防止析构时释放资源
+    }
+
+    // 移动赋值运算符
+    MyVector& operator=(MyVector&& other) noexcept {
+        if (this != &other) {
+            delete[] data;                // 释放当前资源
+            data = other.data;
+            size = other.size;
+            other.data = nullptr;
+            other.size = 0;
+        }
+        return *this;
+    }
+};
+```
+当用一个右值（如临时对象）构造或赋值时，编译器会选择移动版本，高效地转移所有权。
+
+```cpp
+MyVector createVector() {
+    MyVector v(1000);
+    return v;  // 编译器可能优化，但若未优化，会调用移动构造函数
+}
+
+MyVector v1(100);
+MyVector v2(std::move(v1)); // 将 v1 转换为右值，调用移动构造函数
+// 此时 v1 处于有效但未定义状态（size=0, data=nullptr）
+```
+
+`std::move` 只是将左值转换为右值引用，它本身并不移动任何东西，真正的移动发生在移动构造函数或移动赋值运算符中。
+
+### std::move 的作用
+
+`std::move` 定义在 `<utility>`中，本质上是一个强制类型转换：
+```cpp
+
+template<typename T>
+typename std::remove_reference<T>::type&& move(T&& t) noexcept {
+    return static_cast<typename std::remove_reference<T>::type&&>(t);
+}
+```
+它把任何类型 T 转换为对应的右值引用类型，从而告诉编译器“这个对象可以被移动”。
+```cpp
+std::string str = "hello";
+std::vector<std::string> vec;
+vec.push_back(std::move(str));  // 移动 str 到 vector 中，str 变为空
+```
+使用 ``std::move`` 后，被移动的对象通常处于“有效但未指定”的状态，后续可以重新赋值或销毁，但不应再依赖其原有内容。
+
+
+## 3. 完美转发
+
+完美转发指的是在函数模板中，将参数原样（保持其左值/右值属性）转发给另一个函数。C++11 通过引用折叠规则和 std::forward 实现。
+
+### 3.1 引用折叠规则
+
+当模板参数推导出 T 后，`T&&` 称为万能引用（Universal Reference，或转发引用），它可以绑定到左值或右值，具体取决于实参：
+
+如果实参是左值，T 被推导为左值引用类型，`T&&` 折叠为 `T&`（左值引用）。
+
+如果实参是右值，T 被推导为非引用类型，`T&&` 就是右值引用。
+
+规则：
+
+1. T& & → T&
+
+2. T& && → T&
+
+3. T&& & → T&
+
+4. T&& &&→ T&&
+
+### 3.2 使用 std::forward
+
+`std::forward` 根据模板参数的类型，返回相应的引用，保持值类别。
+```cpp
+
+template<typename F, typename T>
+void wrapper(F f, T&& arg) {
+    f(std::forward<T>(arg));  // 完美转发 arg，保持其左/右值属性
+}
+
+void process(int& x) { std::cout << "lvalue\n"; }
+void process(int&& x) { std::cout << "rvalue\n"; }
+
+int main() {
+    int a = 10;
+    wrapper(process, a);       // 输出 lvalue
+    wrapper(process, 20);      // 输出 rvalue
+}
+```
+`std::forward<T>(arg)` 等价于 `static_cast<T&&>(arg)`，结合引用折叠，实现了完美转发。
+
+:::danger
+1. 不要返回局部变量的右值引用
+```cpp
+int&& bad() {
+    int x = 0;
+    return std::move(x);  // 危险！x 在函数结束时销毁
+}
+```
+
+返回右值引用与返回左值引用一样，会导致悬垂引用。
+
+PS: 悬垂引用是指一个引用（reference）仍然指向某个对象，但该对象已经被销毁或释放，不再有效。通过这种引用访问对象会导致未定义行为（Undefined Behavior），可能造成程序崩溃、数据损坏或其他难以调试的问题。
+
+2. 移动后的对象应处于可析构状态
+
+移动操作应将源对象置于有效状态（通常为空），以便后续安全析构或重新赋值。
+
+3. 移动构造函数/赋值运算符通常应标记为 `noexcept`
+
+这样可以优化标准容器的行为（如 `std::vector` 重新分配内存时会优先选择移动而不是拷贝）。
+
+4. 区分万能引用与右值引用
+
+在模板上下文中，`T&&`可能是万能引用；在非模板中，`int&&`就是普通的右值引用。
+:::
 
 </WordCount>

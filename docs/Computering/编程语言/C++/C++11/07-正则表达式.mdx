@@ -49,6 +49,86 @@ import Mermaid from '@theme/Mermaid';
 
 ## 3. 基本的几个使用案例
 
+### 验证邮箱格式
 
+```cpp
+#include <regex>
+#include <iostream>
+
+bool isValidEmail(const std::string& email) {
+    std::regex pattern(R"(^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$)");
+    return std::regex_match(email, pattern);
+}
+```
+
+### 提取字符串中的所有数字
+
+```cpp
+#include <regex>
+#include <string>
+#include <vector>
+
+std::vector<int> extractNumbers(const std::string& text) {
+    std::regex pattern(R"(\d+)");
+    std::sregex_iterator begin(text.begin(), text.end(), pattern);
+    std::sregex_iterator end;
+    std::vector<int> result;
+    for (auto it = begin; it != end; ++it) {
+        result.push_back(std::stoi(it->str()));
+    }
+    return result;
+}
+```
+
+
+### 替换敏感词
+
+```cpp
+#include <regex>
+#include <iostream>
+
+std::string censor(const std::string& text) {
+    std::regex pattern("笨蛋");
+    return std::regex_replace(text, pattern, "***");
+}
+```
+
+### 检查密码强度
+
+```cpp
+bool isStrongPassword(const std::string& pwd) {
+    std::regex pattern(R"(^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$)");
+    return std::regex_match(pwd, pattern);
+}
+```
+
+### 分割字符串
+
+```cpp
+#include <regex>
+#include <vector>
+
+std::vector<std::string> split(const std::string& str) {
+    std::regex pattern(R"([ ,]+)");
+    std::sregex_token_iterator begin(str.begin(), str.end(), pattern, -1);
+    std::sregex_token_iterator end;
+    return {begin, end};
+}
+```
+
+### 匹配 URL
+
+```cpp
+std::vector<std::string> findURLs(const std::string& text) {
+    std::regex pattern(R"(https?://[^\s]+)");
+    std::sregex_iterator begin(text.begin(), text.end(), pattern);
+    std::sregex_iterator end;
+    std::vector<std::string> urls;
+    for (auto it = begin; it != end; ++it) {
+        urls.push_back(it->str());
+    }
+    return urls;
+}
+```
 
 </WordCount>

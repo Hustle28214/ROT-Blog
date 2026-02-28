@@ -840,6 +840,14 @@ const projectData = {
             color: "#B8DF6A",
             details: "作为项目的主要开发者，主导APP的设计、开发及维护。利用uni - app框架的跨平台特性，实现了多端运行，覆盖了iOS、Android、HarmonyOS。并且使用原生JS 优化了小程序、快应用平台的表现。通过Vue.js进行组件化开发，形成了一套可复用的Vue.js组件。实现商品分类、搜索、购物车、订单管理等核心商城功能。实现从试剂盒购买、扫码绑定试剂盒、检测结果反馈、报告查看的流程。使用懒加载技术和图片优化策略，减少APP加载时间，增强用户体验。通过数据缓存和本地存储，优化网络请求，提高页面响应速度。"
           },
+          {
+            name: "Arxiv-Float: 桌面文献速递",
+            description: "基于Ollama+PyQt6的Arxiv桌面文献速递助手",
+            icon: "🏬",
+            link:"https://github.com/Hustle28214/arxiv-float",
+            color: "#B8DF6A",
+            details: "Arxiv Float 是一款面向机器人/人工智能领域研究者的桌面应用，能够实时获取 arXiv 最新论文，利用大语言模型生成中文摘要，并提供 PDF 聊天、代码仓库查询、全局技术路线图等深度功能，帮助您快速把握领域动态。"
+          },
         ]
       }
     ]

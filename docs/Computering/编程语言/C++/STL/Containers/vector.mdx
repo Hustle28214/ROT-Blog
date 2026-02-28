@@ -1,0 +1,274 @@
+import WordCount from '../../../../../../src/components/WordCount/WordCount';
+import Mermaid from '@theme/Mermaid';
+
+<WordCount>
+
+## vector基础概念
+
+vector其实不是容器，STL中的容器指的是Container，是一种数据结构的类型，不只是vector，queue/stack等都是容器的一种。
+
+C++提供的vector是一种序列容器，它允许运行时动态地增加和删除元素。
+
+vector实际上是基于数组的数据结构，可以自动地管理内存，不需要手动分配、释放内存。
+
+与C++数组相比，vector具有更大的灵活性。
+
+vector的大小可以自动增长和缩小。
+
+## vector对象创建
+
+```cpp
+#include <vector>
+// 首先引入vector标准模板库
+using namespace std;
+int main()
+{
+    vector<int> vec; //创建一个vector对象vec，类型为int
+    return 0;
+}
+```
+
+## vector赋值操作
+
+```cpp
+ans = v.[i] //访问容器中任意位置的元素的值，而不用声明其大小
+v.[i] = 1
+```
+
+## vector数据插入
+
+### 1. push_back()
+
+最常用的方法是``push_back()``方法。
+
+```cpp
+vec.front() //返回第一个元素
+vec.back() //返回最后一个元素
+v.push_back(x) //在尾部插入元素x
+v.size() //返回容器中元素的个数
+
+for(int i=0;i<v.size();++i)
+{
+    vec.push_back(i*10);
+}
+
+```
+### 2. insert()
+
+```cpp
+std::vector<int> vec = {1, 2, 3};
+auto it = vec.begin() + 1;  // 指向第二个元素
+vec.insert(it, 4);  // 在第二个位置插入 4，vec 变为 {1, 4, 2, 3}
+```
+
+
+## vector数据删除
+
+vector使用pop_back()和erase()函数来删除元素。
+
+```cpp
+v.pop_back() //删除最后一个元素
+v.erase(v.begin()+i) //删除第i个元素
+v.erase(v.begin(),v.begin()+i) //删除第i个元素到末尾的元素
+v.erase(v.begin(),v.end()) //删除所有元素
+```
+
+需要注意vector虽然不需要预先指定大小，但正是因为这样的特性，滥用可能会对系统的性能造成影响，所以规范上来说，最好还是预先知道vector大小。
+
+### 1. 使用迭代器删除
+
+当你使用迭代器从 ``std::vector`` 中删除一个元素时，使用成员函数 ``erase`` 可以指定要删除的元素位置。例如：
+
+```cpp
+auto it = v.find(some_value); // 假设 v 是一个 std::vector
+if (it != v.end()) {
+    v.erase(it);
+}
+```
+
+### 2. 删除多个连续的元素
+
+删除多个连续的元素，可以通过指定一个范围来使用 ``erase`` 函数，这样可以避免单独删除每个元素时多次移动后续的元素。
+
+```cpp
+v.erase(v.begin() + start_index, v.begin() + end_index);
+```
+
+### 3. 使用移除-擦除惯用法
+
+对于容器中的一部分或所有满足某个条件的元素的删除，可以先使用 ``std::remove`` 或 ```std::remove_if``` 算法将这些元素移至容器的末尾，然后删除这些元素。这种方法可以将所有需要的移动操作合并成一次执行，减少了元素的重新安排次数。
+
+```cpp
+v.erase(std::remove_if(v.begin(), v.end(), some_pred), v.end());
+```
+
+``some_pred`` 是一个谓词函数，用于确定哪些元素需要被删除。
+
+## vector扩容机制
+
+vector 底层使用动态分配的连续数组存储元素。当向 vector 中添加元素（如 `push_back`）且当前容量（capacity）不足以容纳新元素时，会触发扩容。
+
+扩容过程：
+
+1. 分配一块更大的新内存（通常是当前容量的 1.5 倍或 2 倍，不同实现可能不同，GCC 采用 2 倍增长，MSVC 也曾采用 1.5 倍）。
+
+2. 将原有元素从旧内存移动或拷贝到新内存（C++11 及以后，如果元素类型支持不抛出异常的移动构造函数，则会使用移动语义提高效率，否则回退到拷贝）。
+
+3. 销毁旧内存中的元素并释放旧内存。
+
+4. 更新内部指针（指向新内存的起始、结束和容量尾）。
+
+扩容是相对昂贵的操作（涉及内存分配和数据复制），因此频繁扩容会影响性能。开发者可通过 `reserve()` 预分配足够容量来避免多次扩容。扩容后，所有指向元素的迭代器、指针和引用都会失效（因为内存地址改变）。
+
+```cpp
+std::vector<int> v;
+std::cout << v.capacity(); // 0
+v.push_back(1);             // 容量可能变为 1（或更大）
+v.push_back(2);             // 可能再次扩容
+// 预留空间
+v.reserve(100);             // 确保容量至少为 100，避免后续插入频繁扩容
+```
+
+## vector随机访问
+
+vector 的元素在内存中是连续存储的，因此支持常数时间 O(1) 的随机访问。
+
+通过 `operator[]` 或 `at()` 直接计算偏移量访问元素：``*(v.data() + index)``。
+
+deque 也支持随机访问，但通常速度稍慢（因为可能跨多个连续块），而 vector 是纯连续内存，CPU 缓存友好，访问速度最快。
+
+`operator[]` 不检查越界（效率高但危险），`at()` 会检查并抛出 `std::out_of_range` 异常。
+
+示例：
+```cpp
+std::vector<int> v = {10, 20, 30};
+int x = v[1];      // x = 20
+int y = v.at(2);   // y = 30
+// v[10];          // 未定义行为，可能崩溃
+```
+## vector内存交换
+
+vector 提供了 swap 成员函数，用于高效地交换两个 vector 的内容。
+
+swap 仅交换内部指针（指向堆内存的指针、大小和容量），不涉及元素拷贝，因此是常数时间 O(1) 操作，且不会引发异常。
+
+快速交换两个容器的数据。可用于“清除并释放内存”的技巧：`std::vector<int>().swap(v)`; 或 C++11 的 `v.clear()`; `v.shrink_to_fit();`。
+
+:::warning
+交换后迭代器会指向原来对方的容器元素（迭代器本身不失效，但指向的对象变了）。
+:::
+示例：
+```cpp
+std::vector<int> a = {1,2,3}, b = {4,5,6,7};
+a.swap(b);  // 交换后 a = {4,5,6,7}, b = {1,2,3}
+```
+## vector空间预留
+
+vector 提供了两个关键函数来管理内存空间：reserve() 和 resize()。
+### reserve(n)
+
+请求将容器的容量至少扩大至 n（如果 n 大于当前容量，则重新分配内存；否则无影响）。
+
+不改变 size()，只增加 capacity()。
+
+使用`reserve()`可以预先分配足够内存，避免后续插入操作多次扩容，提高性能。
+
+示例：
+```cpp
+std::vector<int> v;
+v.reserve(1000);        // 一次性分配容纳1000个int的内存
+for (int i = 0; i < 1000; ++i)
+    v.push_back(i);     // 整个过程不会发生扩容
+```
+### resize(n)
+
+改变容器中元素的数量为 n。
+
+如果 n 小于当前 size()，则移除多余元素（析构）。如果 n 大于当前 size()，则添加新元素（值初始化或指定值），可能引发扩容。
+
+既改变 size() 也影响 capacity()（可能增加容量）。
+
+示例：
+```cpp
+std::vector<int> v = {1,2,3};
+v.resize(5);            // 现在 v = {1,2,3,0,0} (新元素值初始化)
+v.resize(2);            // 现在 v = {1,2}
+```
+### shrink_to_fit() (C++11)
+
+请求移除多余容量，使 capacity() 减小到至少与 size() 相等。这是一个非强制性请求，实现可以忽略。
+
+示例：
+```cpp
+std::vector<int> v(1000);
+v.clear();              // size=0, capacity=1000
+v.shrink_to_fit();      // 尝试释放多余内存
+```
+## vector高效删除
+
+从 vector 中删除元素的方法有多种，效率取决于删除的位置和方式。
+
+### pop_back()
+
+删除最后一个元素，常数时间 O(1)，且不会引起内存重新分配。
+
+被删除元素的析构函数被调用，但 capacity() 不变。
+
+### erase(pos) / erase(first, last)
+
+删除单个元素或一段区间，复杂度为 O(n)（因为需要将后续元素向前移动）。
+
+返回指向被删除元素之后第一个元素的迭代器。
+
+:::danger
+删除元素后，指向删除点之后的元素的迭代器、指针和引用都会失效（因为元素被移动了）。
+:::
+### 删除特定值（如移除所有等于x的元素）
+
+使用 “erase-remove” 惯用法：
+```cpp
+v.erase(std::remove(v.begin(), v.end(), value), v.end());
+```
+`std::remove` 将不等于 value 的元素移到前面，返回新逻辑结尾的迭代器。
+
+`erase` 删除从该迭代器到末尾的元素。
+
+时间复杂度 O(n)，但只移动一次元素，比逐个 erase 更高效。
+
+### 删除符合条件的元素
+
+结合 `std::remove_if` 和 `erase`：
+```cpp
+v.erase(std::remove_if(v.begin(), v.end(), [](int x){ return x % 2 == 0; }), v.end());
+```
+### 删除并释放内存
+
+若想清空并释放所有内存，可用 `clear()` 然后 `shrink_to_fit()`，或使用临时空 vector 交换：
+```cpp
+std::vector<int>().swap(v);  // v 变为空且容量为0
+```
+## vector数据排序
+
+vector 支持通过标准算法 `std::sort` 进行排序，因为其随机访问迭代器满足排序算法的要求。
+
+`std::sort`：通常实现为内省排序（IntroSort），在数据量大时使用快速排序，递归深度过大时切换到堆排序，小范围使用插入排序，平均复杂度 O(n log n)。
+
+使用方式：
+```cpp
+std::vector<int> v = {5, 2, 8, 1, 9};
+std::sort(v.begin(), v.end());                // 升序
+std::sort(v.begin(), v.end(), std::greater<>()); // 降序
+```
+自定义排序：
+```cpp
+struct Person { std::string name; int age; };
+std::vector<Person> people = {...};
+std::sort(people.begin(), people.end(),
+            [](const Person& a, const Person& b) { return a.age < b.age; });
+```
+如果需要保持相等元素的相对顺序，使用 `std::stable_sort`，但通常性能稍差。
+
+注意：对 vector 排序会使所有迭代器、指针和引用失效（因为元素位置移动）。
+
+
+</WordCount>

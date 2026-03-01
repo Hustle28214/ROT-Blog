@@ -110,6 +110,17 @@ std::forward_list<int> fl6(std::move(fl4)); // 移动构造（fl4 变为空）
 
 :::tip
 为了追求性能，确实没有size()方法。
+
+std::forward_list 的设计目标是“与手写 C 风格单向链表的开销完全相同”。如果维护一个 size 成员变量，那么每个 forward_list 对象需要额外增加一个字段（通常 8 字节，64 位系统），每次插入、删除操作都要额外更新这个计数器。虽然维护 size 可以让 size() 操作变成 O(1)，但这会拖慢所有修改操作（insert_after, erase_after, splice_after 等），即使大多数用户可能根本不需要获取大小。
+
+splice 操作的复杂性：某些形式的 splice 操作（链表拼接）如果要求维护准确的 size，会从 `O(1)` 变成 `O(n)`，考虑到复杂度成本上升，加上size()并不是好选择。
+
+如果要获取大小需要使用`std::distance`手写。
+
+```cpp
+// 使用 std::distance 计算大小（O(n) 时间复杂度）
+int size = std::distance(fl.begin(), fl.end());  // size = 5
+```
 :::
 
 模板参数：
@@ -158,7 +169,26 @@ Allocator：内存分配器类型，默认为 `std::allocator<T>`。
 
 ## 4. std::tuple
 
+`std::tuple` 是 C++11 引入的固定大小的异质容器，定义在头文件 `<tuple>` 中。它能够存储不同类型的元素，类似于一个广义的 `std::pair`，但可以容纳任意数量的元素。
 
+```cpp
+#include <tuple>
+std::tuple<T1, T2, ..., TN> t;  // 可包含 0 个或多个类型
+```
+
+元素类型可以完全不同（例如 `int`、`double`、`std::string` 等）。元素个数在编译时确定，不能动态增减。
+
+可以通过 `std::get<index>(t)` 或 `std::get<T>(t)`（当类型唯一时）访问元素。
+
+:::info
+C++17 起可直接解包为多个变量。
+:::
+
+可以与 `std::pair` 互转，包含两个元素的 tuple 可与 pair 相互转换（需要类型兼容）。
+
+支持 `==`、`!=`、`<`、`<=`、`>`、`>=`，按字典序比较（需元素支持对应操作）。
+
+可作为函数返回值：方便返回多个值。
 
 
 </WordCount>

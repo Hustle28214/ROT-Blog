@@ -169,11 +169,38 @@ Allocator：内存分配器类型，默认为 `std::allocator<T>`。
 
 ## 4. std::tuple
 
-`std::tuple` 是 C++11 引入的固定大小的异质容器，定义在头文件 `<tuple>` 中。它能够存储不同类型的元素，类似于一个广义的 `std::pair`，但可以容纳任意数量的元素。
+`std::tuple` 是 C++11 引入的固定大小的异质容器，定义在头文件 `<tuple>` 中。它能够存储不同类型的元素(数组和函数不能，但可以是引用)，类似于一个广义的 `std::pair`，但可以容纳任意数量的元素。经常用于泛型编程。
 
 ```cpp
 #include <tuple>
 std::tuple<T1, T2, ..., TN> t;  // 可包含 0 个或多个类型
+
+
+#include <string>
+
+// 默认构造函数（元素被值初始化）
+std::tuple<int, double, std::string> t1;  // int=0, double=0.0, string=""
+
+// 带初始值的构造函数
+std::tuple<int, double, std::string> t2(42, 3.14, "world");
+
+// 使用 make_tuple（C++11）
+auto t3 = std::make_tuple(42, 3.14, "world");  // 自动推导类型
+
+// 列表初始化（C++11）
+std::tuple<int, double, std::string> t4{42, 3.14, "world"};
+
+// 拷贝/移动构造
+std::tuple<int, double, std::string> t5 = t2;
+std::tuple<int, double, std::string> t6 = std::move(t2);
+
+// 从 pair 构造（针对二元 tuple）
+std::pair<int, std::string> p(1, "hello");
+std::tuple<int, std::string> t7(p);          // 隐式转换
+std::tuple<int, std::string> t8 = p;         // 也可
+
+// 空 tuple
+std::tuple<> t9;  // 空元组，特殊用途
 ```
 
 元素类型可以完全不同（例如 `int`、`double`、`std::string` 等）。元素个数在编译时确定，不能动态增减。
@@ -188,7 +215,20 @@ C++17 起可直接解包为多个变量。
 
 支持 `==`、`!=`、`<`、`<=`、`>`、`>=`，按字典序比较（需元素支持对应操作）。
 
-可作为函数返回值：方便返回多个值。
+可作为函数返回值。
 
+模板参数：
+```cpp
+template<class... Types>
+class tuple;
+```
+
+### 创建 tuple
+
+```cpp
+#include <tuple>
+int arr[5]={1,2,3,4,5};
+std::tuple<int,string,std::ref(arr)> 
+```
 
 </WordCount>

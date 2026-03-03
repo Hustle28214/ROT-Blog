@@ -1,0 +1,50 @@
+
+import WordCount from '../../../../src/components/WordCount/WordCount';
+import Mermaid from '@theme/Mermaid';
+
+<WordCount>
+
+
+泛型编程主要通过模板（template）实现。
+
+模板允许在编译期根据实际使用的类型生成具体的代码，从而实现静态多态（编译时多态）。
+
+函数模板示例:
+
+```cpp
+template <typename T>
+T max(T a, T b) {
+    return (a > b) ? a : b;
+}
+```
+使用时，编译器会根据传入的参数类型自动推导出 T：
+```cpp
+int i = max(3, 5);        // T 推导为 int
+double d = max(3.14, 2.5); // T 推导为 double
+```
+也可以显式指定类型：
+```cpp
+int i = max<int>(3.5, 2);  // 强制 T 为 int，实参 3.5 转为 int
+```
+
+类模板示例:
+
+```cpp
+template <typename T>
+class Stack {
+private:
+    std::vector<T> data;
+public:
+    void push(const T& value) { data.push_back(value); }
+    T pop() { T top = data.back(); data.pop_back(); return top; }
+};
+```
+使用时需指定具体类型：
+```cpp
+Stack<int> intStack;
+intStack.push(10);
+Stack<std::string> stringStack;
+stringStack.push("hello");
+```
+
+</WordCount>

@@ -1,0 +1,252 @@
+import WordCount from '../../../../src/components/WordCount/WordCount';
+import Mermaid from '@theme/Mermaid';
+
+<WordCount>
+
+## 1. 重载(Overload)
+
+重载是 C++ 中一种强大的编译时多态机制，允许在同一作用域内定义多个同名但参数列表不同的函数。编译器根据函数调用时提供的实参类型、个数和顺序，在编译期决定调用哪一个版本。重载不仅适用于普通函数，也适用于成员函数、构造函数和运算符。
+
+
+### 1.1 重载的条件
+
+要构成函数重载，必须满足以下条件：
+
+1. 同一作用域（例如同一个类、同一个命名空间或全局作用域）。
+
+2. 函数名相同。
+
+3. 参数列表不同，包括参数的类型、个数、顺序。注意：返回值类型不能用于区分重载。
+
+示例：
+```cpp
+void print(int i);           // (1)
+void print(double d);        // (2) 参数类型不同
+void print(const char* s);   // (3) 参数类型不同
+void print(int i, double d); // (4) 参数个数不同
+void print(double d, int i); // (5) 参数顺序不同
+```
+### 1.2 不构成重载的情况
+
+仅返回值不同：
+```cpp
+int func();
+double func();   // 错误：无法重载，仅返回值不同
+```
+参数列表相同但使用了不同的 `typedef`（因为 `typedef` 只是别名，不产生新类型）：
+```cpp
+typedef int INT;
+void f(int);
+void f(INT);     // 重复定义，INT 就是 int
+```
+顶层 `const`（即 `const` 修饰参数本身）不影响参数类型，但底层 `const`（指针或引用指向的内容是 const）可以区分：
+```cpp
+void f(int);          // (1)
+void f(const int);    // 重复定义，顶层 const 被忽略
+
+void g(int*);         // (2)
+void g(const int*);   // 底层 const，构成重载
+```
+### 1.3 成员函数的 const 重载
+
+在类中，成员函数的 const 限定符可以作为重载依据：
+```cpp
+class MyClass {
+public:
+    void func();          // 非 const 版本
+    void func() const;    // const 版本，构成重载
+};
+```
+const 对象只能调用 const 成员函数，非 const 对象可以调用任一版本（优先调用非 const 版本，若不存在则调用 const 版本）。
+
+const 限定符改变了隐含的 this 指针类型，因此构成真正的函数重载。
+
+
+### 1.4 重载与默认参数
+
+默认参数可能导致调用二义性，应谨慎使用：
+```cpp
+void f(int a, int b = 0);
+void f(int a);            // 调用 f(5) 时，两个版本都匹配，导致二义性
+```
+
+### 1.5 重载解析（Overload Resolution）
+
+当调用重载函数时，编译器通过以下步骤确定最佳匹配：
+
+候选函数：查找所有同名函数（考虑作用域）。
+
+可行函数：根据实参个数筛选，并能通过隐式转换匹配的函数。
+
+寻找最佳匹配：按以下优先级选择：
+
+- 精确匹配：类型完全相同（忽略顶层 const 或数组到指针、函数到指针的转换）。
+
+- 通过提升匹配：如 char 到 int，float 到 double。
+
+- 通过标准转换匹配：如 int 到 double，派生类指针到基类指针。
+
+- 通过用户定义转换匹配：如通过构造函数或类型转换运算符。
+
+- 通过省略号匹配（...）优先级最低。
+
+如果有多个可行函数匹配级别相同且无法区分，则产生二义性，编译器报错。
+
+示例：
+```cpp
+void f(int);
+void f(double);
+f(5);      // 精确匹配 int -> int
+f(5.0f);   // float 提升到 double 优于 float 转 int? 实际上 float 转 double 是提升，float 转 int 是标准转换，所以选择 double 版本
+```
+
+### 1.6 运算符重载
+
+C++ 允许重载大部分运算符，使自定义类型支持类似内置类型的操作。
+### 基本规则
+
+1. 可以重载的运算符：`+ - * / % ^ & | ~ ! = < > += -= *= /= %= ^= &= |= << >> >>= <<= == != <= >= && || ++ -- , ->* -> () [] new new[] delete delete[]` 等。
+
+2. 不能重载的运算符：`:: .* . ?: sizeof typeid alignof noexcept`。
+
+3. 重载的运算符必须至少有一个操作数是自定义类型（防止改变内置类型的行为）。
+
+4. 不能改变运算符的优先级、结合性、操作数个数。
+
+5. 不能创建新的运算符符号。
+
+### 两种重载形式
+
+成员函数形式：隐含一个 this 指针，左操作数为调用对象。
+```cpp
+class Complex {
+public:
+    Complex operator+(const Complex& rhs) const;  // 二元运算符
+    Complex& operator++();                         // 前置 ++
+    Complex operator++(int);                        // 后置 ++（哑元 int）
+};
+```
+非成员函数形式（通常是友元）：
+```cpp
+class Complex { /* ... */ };
+Complex operator+(const Complex& lhs, const Complex& rhs);  // 支持左操作数非对象
+```
+### 常用运算符重载示例
+
+输入输出运算符：通常重载为友元。（因为左操作数不是我们的类，但又需要访问类的私有成员。）
+```cpp
+friend ostream& operator<<(ostream& os, const Complex& c);
+friend istream& operator>>(istream& is, Complex& c);
+```
+赋值运算符：必须重载为成员函数。
+```cpp
+Complex& operator=(const Complex& rhs);  // 处理自我赋值
+```
+下标运算符：返回引用。
+```cpp
+int& operator[](size_t index);
+const int& operator[](size_t index) const;
+```
+函数调用运算符：使对象可调用（仿函数）。
+```cpp
+struct Add {
+    int operator()(int a, int b) const { return a + b; }
+};
+```
+#### 注意事项
+
+重载的运算符应模拟内置类型的行为，避免引起误解（如 `+` 应表示加法）。
+
+通常返回引用以支持链式操作（如 `<<` 返回 `ostream&`）。
+
+返回对象可能涉及拷贝，可返回引用或使用移动语义。
+
+### 1.7 构造函数重载
+
+构造函数也可以重载，以提供多种初始化方式：
+```cpp
+class Date {
+public:
+    Date();                      // 默认构造
+    Date(int year, int month);   // 带参数构造
+    Date(const char* str);       // 从字符串构造
+};
+```
+重载的构造函数之间可以通过委托构造（C++11）复用代码。
+
+:::tip
+要实现委托构造，在构造函数的初始化列表中，调用另一个构造函数即可：
+```cpp
+class MyClass {
+public:
+    MyClass() : MyClass(0, 0) {          // 委托给两个参数的构造函数
+        // 其他代码（可选）
+    }
+    
+    MyClass(int x) : MyClass(x, 0) {     // 委托给两个参数的构造函数
+    }
+    
+    MyClass(int x, int y) : x_(x), y_(y) {
+        // 真正的初始化工作
+    }
+private:
+    int x_, y_;
+};
+```
+被委托的构造函数（目标构造函数）的初始化列表负责初始化成员。
+
+委托构造函数的函数体可以在目标构造函数执行完后继续执行（但通常不这样做，以保持逻辑清晰）。
+:::
+
+
+### 1.8 重载与模板
+
+函数模板也可以与普通函数构成重载。模板实例化后与普通函数形成重载集合，遵循相同的重载解析规则，但模板有特殊处理：
+
+如果模板和非模板函数都匹配，优先选择非模板函数（更特化）。
+
+如果有多个模板匹配，选择最特化的版本（偏序规则）。
+
+示例：
+```cpp
+template<typename T> void f(T);            // (1)
+template<typename T> void f(T*);           // (2) 更特化
+void f(int);                                // (3)
+f(5);        // 调用 (3) 非模板
+f(new int);  // 调用 (2) T* 版本
+```
+### 1.9 重载与作用域
+
+重载只发生在同一作用域内。派生类中定义的函数会隐藏基类的同名函数，而不是重载。
+
+如果需要使基类的重载版本在派生类中可见，可以使用 using 声明：
+```cpp
+class Base {
+public:
+    void func(int);
+    void func(double);
+};
+class Derived : public Base {
+public:
+    using Base::func;   // 将基类所有 func 引入派生类作用域
+    void func(const char*);  // 新增重载
+};
+```
+
+## 2. 重写(override)
+
+重写（Override，也称覆盖）是 C++ 面向对象编程中实现运行时多态的核心机制。它允许派生类重新定义基类中已存在的虚函数，从而使得通过基类指针或引用调用该函数时，能够根据对象的实际类型执行派生类的版本。
+
+
+
+| 特性 | 重载 (Overload) | 重写 (Override) | 隐藏 (Hide) |
+|------|-----------------|-----------------|-------------|
+| **作用域** | 同一作用域（如同一个类或全局） | 基类与派生类（不同作用域） | 基类与派生类（不同作用域） |
+| **函数要求** | 函数名相同，参数列表（个数/类型/顺序）必须不同 | 必须是虚函数，且签名（函数名、参数列表、返回类型）完全相同（协变返回类型除外） | 函数名相同即可，参数列表可以相同也可以不同 |
+| **关键字** | 无特殊关键字 | 基类使用 `virtual`，派生类可选 `override`（C++11 起推荐） | 无特殊关键字 |
+| **绑定时机** | 编译期确定（静态多态） | 运行期根据对象实际类型动态绑定（动态多态） | 编译期根据静态类型决定（名字查找） |
+| **目的** | 为同一操作提供多种参数形式的接口 | 实现接口规范，让派生类提供特定实现 | 重新定义继承来的函数，隐藏基类版本 |
+
+
+
+</WordCount>

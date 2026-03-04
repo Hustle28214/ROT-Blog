@@ -1,0 +1,80 @@
+
+
+import WordCount from '../../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+地址：https://leetcode.cn/problems/remove-duplicates-from-sorted-list-ii/description/?envType=problem-list-v2&envId=linked-list
+
+
+## 题干
+
+给定一个已排序的链表的头 head ， 删除原始链表中所有重复数字的节点，只留下不同的数字 。返回 已排序的链表 。
+
+ 
+
+示例 1：
+```
+输入：head = [1,2,3,3,4,4,5]
+输出：[1,2,5]
+```
+示例 2：
+```
+输入：head = [1,1,1,2,3]
+输出：[2,3]
+```
+ 
+
+提示：
+```
+链表中节点数目在范围 [0, 300] 内
+-100 <= Node.val <= 100
+题目数据保证链表已经按升序 排列
+```
+
+
+## 思路
+
+仍然是原地删除。这次要多考虑一步，创造多一个while循环把重复元素跳过。
+
+## 题解
+
+```cpp
+/**
+ * Definition for singly-linked list.
+ * struct ListNode {
+ *     int val;
+ *     ListNode *next;
+ *     ListNode() : val(0), next(nullptr) {}
+ *     ListNode(int x) : val(x), next(nullptr) {}
+ *     ListNode(int x, ListNode *next) : val(x), next(next) {}
+ * };
+ */
+class Solution {
+public:
+    ListNode* deleteDuplicates(ListNode* head) {
+        if(!head) return nullptr;
+        ListNode* temp = new ListNode(0,head);
+        ListNode* cur = temp;
+        // ListNode* prev = temp;
+        while(cur->next&&cur->next->next){
+            
+            if(cur->next->val==cur->next->next->val){
+                int dupVal = cur->next->val;
+                while(cur->next&&cur->next->val==dupVal){
+                    cur->next = cur->next->next;
+                }
+                // prev->next = cur;
+            }else{
+                // prev = cur;
+                cur = cur->next;
+            }
+
+            // 思路：仍然是原地删除
+        }
+        return temp->next;
+    }
+};
+```
+
+</WordCount>

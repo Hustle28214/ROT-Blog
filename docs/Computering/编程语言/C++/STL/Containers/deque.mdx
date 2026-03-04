@@ -7,6 +7,66 @@ import Mermaid from '@theme/Mermaid';
 
 Deque也就是双端队列，可以让用户从队列的头部和尾部进行插入和删除操作。
 
-当你需要一个既支持高效随机访问，又需要在序列两端频繁进行插入和删除操作的容器时，deque 是首选。
+```cpp
+#include <deque>
+std::deque<T> dq;  // T 为元素类型
+```
+
+deque支持 `operator[]` 和 `at()`。当你需要一个既支持高效**随机访问**，又需要在序列两端频繁进行插入和删除操作的容器时，`deque` 是首选。
+
+如果你需要在序列中间频繁插入或删除元素，`list` 或 `forward_list` 会更合适。
+
+如果你需要所有元素都存储在一块连续的内存中（例如，为了与C风格API交互），那么必须使用 `vector`。
+
+本质上，deque是一个动态数组。
+
+```cpp
+#include <deque>
+std::deque<int> temp;// 初始化一个空的deque
+
+std::deque<int> tempA(2);// 初始化2个0的deque
+
+std::deque<int> tempB(6,10); // 初始化6个10的deque
+
+std::deque<int> d4 = {1, 2, 3, 4, 5}; // 初始化5个元素，1 2 3 4 5的deque
+std::deque<int> d5{1, 2, 3, 4, 5}; // 语义与上面相同
+
+std::vector<int> d6 = {1,2,3};
+std::deque<int> d7(d6.begin(),d6.end());// 通过迭代器范围构造
+
+std::deque<int> d7(d4);
+std::deque<int> d8(std::move(d4)); // 拷贝/移动构造
+```
+
+## 常用成员函数
+
+| 函数 | 说明 |
+|------|------|
+| **元素访问** | |
+| `operator[](size_t pos)` | 返回指定位置的引用，不进行边界检查 |
+| `at(size_t pos)` | 返回指定位置的引用，带边界检查（越界抛出 `std::out_of_range`） |
+| `front()` | 返回首元素的引用 |
+| `back()` | 返回尾元素的引用 |
+| **迭代器** | |
+| `begin()` / `end()` | 返回起始和尾后迭代器 |
+| `rbegin()` / `rend()` | 返回反向迭代器 |
+| **容量** | |
+| `empty()` | 判断是否为空 |
+| `size()` | 返回元素个数 |
+| `max_size()` | 返回最大可能元素个数 |
+| `shrink_to_fit()` | （C++11）请求释放未使用的内存（非强制） |
+| **修改器** | |
+| `clear()` | 清空所有元素 |
+| `insert(pos, value)` | 在指定位置插入元素（可插入多个） |
+| `emplace(pos, args...)` | 在指定位置就地构造元素 |
+| `erase(pos)` / `erase(first, last)` | 删除指定位置或范围的元素 |
+| `push_front(value)` | 在头部插入元素 |
+| `emplace_front(args...)` | 在头部就地构造元素 |
+| `pop_front()` | 删除头部元素 |
+| `push_back(value)` | 在尾部插入元素 |
+| `emplace_back(args...)` | 在尾部就地构造元素 |
+| `pop_back()` | 删除尾部元素 |
+| `resize(count)` / `resize(count, value)` | 改变大小（多删少补） |
+| `swap(other)` | 交换两个 deque 的内容 |
 
 </WordCount>

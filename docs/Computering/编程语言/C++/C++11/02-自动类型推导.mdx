@@ -25,7 +25,84 @@ auto b = 2; // 自动推导出int
 3. 不能用于数组
 4. (但可以用于指针)
 5. 无法推导出模板参数
-6. 
+6. 不能用于非静态成员变量的直接类型推导（C++17 前）
+7. 当用 auto 定义数组变量时，数组名会退化为指针
+
+```cpp
+int arr[5];
+auto a = arr;         // a 的类型是 int*（退化为指针）
+auto& b = arr;        // b 的类型是 int(&)[5]（保留数组信息）
+
+auto s = "hello";     // s 的类型是 const char*，而非 const char[6]
+```
+
+8. 不能用于位域（bit-field）
+
+```cpp
+struct S {
+    auto b : 1;       // 错误：位域不能使用 auto
+};
+```
+
+9. 当使用花括号 `{}` 初始化时，auto 会推导为 std::initializer_list，而不是数组或其他容器。
+```cpp
+auto x = {1, 2, 3};   // x 的类型是 std::initializer_list<int>
+auto y{1};            // C++17 后：y 为 int；C++11/14 中也是 std::initializer_list<int>
+auto z = {1};         // 始终是 std::initializer_list<int>
+```
+
+
+10. 默认情况下，auto 会忽略顶层 const 和引用，需要显式添加才能保留。
+
+```cpp
+const int ci = 10;
+auto a = ci;            // a 是 int（顶层 const 被忽略）
+auto& b = ci;           // b 是 const int&（底层 const 保留）
+auto c = &ci;           // c 是 const int*（指针指向 const）
+const auto d = ci;      // d 是 const int5 
+
+// 若需保留表达式的完整类型（包括引用），应使用 decltype(auto)。
+
+int x = 0;
+int& ref = x;
+const int& cref = x;
+
+auto v1 = ref;                // v1: int
+decltype(auto) v2 = ref;      // v2: int& (ref 是左值引用，所以 v2 也是 int&)
+
+auto v3 = cref;               // v3: int (顶层 const 和引用被剥离)
+decltype(auto) v4 = cref;     // v4: const int&
+
+// 函数返回类型中使用
+int& getRef(int& a) { return a; }
+auto ret1 = getRef(x);        // ret1: int (引用被剥离)
+decltype(auto) ret2 = getRef(x); // ret2: int& (保留引用)
+```
+
+11. 不能用于函数参数中的数组大小。在函数参数中，不能使用 auto 指定数组大小，如 `void f(int arr[auto])` 非法（但可通过模板实现）。
+
+:::info
+C++14 允许函数使用 auto 作为返回类型（后置或前置），但要求：
+
+1. 所有 return 语句推导出的类型必须一致。
+
+2. 不能用于虚函数（虚函数需要固定签名）。
+
+3. 递归函数中，在递归调用前至少有一个 return 语句以确定类型。
+
+4. 返回类型为 auto 的函数在使用前必须可见（不能仅靠前向声明）。
+
+5. 不能返回数组或函数类型（但可返回指针或引用）。
+```cpp
+auto func() { return 42; }        // 正确，返回 int
+auto fib(int n) {                  // 递归需谨慎
+    if (n <= 1) return n;          // 必须有此句才能推导
+    return fib(n-1) + fib(n-2);    // 推导为 int
+}
+```
+:::
+
+
 
 ## 2. decltype关键字
 

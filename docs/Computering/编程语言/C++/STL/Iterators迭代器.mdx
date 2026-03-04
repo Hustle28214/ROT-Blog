@@ -1,0 +1,289 @@
+import WordCount from '../../../../../src/components/WordCount/WordCount';
+import Mermaid from '@theme/Mermaid';
+
+<WordCount>
+
+迭代器（Iterator）是 C++ 标准模板库（STL）的核心组件之一，它提供了一种统一的方式来访问容器中的元素，而不需要暴露容器的底层实现。
+
+通过重载一系列运算符（如 *、->、++ 等），迭代器可以像原生指针一样使用，但内部操作因容器而异。
+
+可以将迭代器视为广义的指针：它指向容器中的某个元素，并支持类似指针的操作（如自增、解引用）。通过迭代器，算法可以独立于具体容器，实现泛型编程。
+```cpp
+#include <iterator> // 注意没有s
+
+for(ContainerType::iterator it=container.begin();it!=container.end();++it){
+    // 具体实现
+    // 访问元素 *it
+}
+```
+
+:::warning
+通常容器同时提供 iterator 和 const_iterator，后者通过模板或不同类实现。
+
+对于频繁操作，尽量使迭代器轻量（例如只包含一个指针）。通常迭代器操作不抛出异常。
+:::
+
+算法（如 `std::sort`、`std::find`）通过迭代器操作元素，无需知道容器是 vector 还是 list。
+
+所有容器都提供 `begin()` 和 `end()` 成员函数，返回指向首元素和尾后元素的迭代器，使得遍历方式一致。
+
+除了正向遍历，还有反向迭代器、常量迭代器等。
+
+指针本身是一种迭代器（对于连续内存的容器，如 `vector` 的迭代器通常就是原生指针的 `typedef`）。迭代器通常重载了 `operator*`、`operator->`、`operator++` 等，行为类似指针，但可能包含更多信息（如用于 list 的迭代器内部需维护节点指针）。
+
+C++ 标准将迭代器分为五类，根据它们支持的操作能力递增：
+
+| 类别 | 支持的操作 | 典型容器/场景 |
+|------|------------|---------------|
+| 输入迭代器 (Input Iterator) | 单向读取：++、*（读）、==、!= | 从输入流读取（如 istream_iterator） |
+| 输出迭代器 (Output Iterator) | 单向写入：++、*（写） | 向输出流写入（如 ostream_iterator） |
+| 前向迭代器 (Forward Iterator) | 结合输入+输出，且可多次遍历同一序列 | forward_list、unordered_set 等 |
+| 双向迭代器 (Bidirectional Iterator) | 在前向基础上支持 --（递减） | list、set、map |
+| 随机访问迭代器 (Random Access Iterator) | 在双向基础上支持 +n、-n、[]、< 等 | vector、deque、array、原生指针 |
+
+迭代器的基本操作: 
+
+| 操作 | 说明 | 支持的最低迭代器类别 |
+|------|------|---------------------|
+| `*it` | 解引用，访问当前元素 | 所有迭代器 |
+| `it->member` | 通过指针访问成员（等价于 `(*it).member`） | 所有迭代器 |
+| `++it`、`it++` | 前进到下一个元素 | 所有迭代器 |
+| `--it`、`it--` | 后退到前一个元素 | 双向迭代器 |
+| `it + n`、`it - n` | 跳跃 n 个位置 | 随机访问迭代器 |
+| `it += n`、`it -= n` | 跳跃赋值 | 随机访问迭代器 |
+| `it[n]` | 下标访问（等价于 `*(it + n)`） | 随机访问迭代器 |
+| `it1 == it2`、`it1 != it2` | 比较是否指向同一位置 | 所有迭代器 |
+| `it1 < it2`、`it1 <= it2` 等 | 比较前后位置 | 随机访问迭代器 |
+
+:::warning
+只是基本操作，不是成员函数。
+:::
+
+
+
+## 1. 容器的迭代器类型
+
+| 容器 | 迭代器类型 | 备注 |
+|------|------------|------|
+| vector | 随机访问迭代器 | 通常为原生指针的别名 |
+| deque | 随机访问迭代器 | 虽然分段连续，但封装后支持随机访问 |
+| array | 随机访问迭代器 | 固定大小，本质是原生指针 |
+| string | 随机访问迭代器 | 类似 `vector<char>` |
+| list | 双向迭代器 | 双向链表 |
+| forward_list | 前向迭代器 | 单向链表 |
+| set / map | 双向迭代器 | 红黑树实现，中序遍历 |
+| unordered_set / unordered_map | 前向迭代器 | 哈希表，迭代器是单向的 |
+
+
+
+## 2. 迭代器适配器成员函数
+
+某些标准库迭代器适配器提供了额外的成员函数，主要用于获取底层迭代器或进行特定操作。
+
+### 2.1 `reverse_iterator`（反向迭代器）
+**`base()`**：返回对应的正向迭代器。  
+
+反向迭代器的逻辑位置与正向迭代器相差一个元素（`&*rit == &*(rit.base() - 1)`）。
+
+```cpp
+std::vector<int> v = {1,2,3};
+auto rit = v.rbegin();      // 指向 3
+auto it = rit.base();       // 指向 3 的下一个位置（即 end()）
+```
+### 2.2 `move_iterator`（移动迭代器）（C++11）
+
+**`base()`**：返回被封装的底层迭代器。
+
+```cpp
+std::list<std::string> lst = {"a", "b"};
+auto mit = std::make_move_iterator(lst.begin());
+auto it = mit.base();       // 返回 lst.begin()
+```
+### 2.3 插入迭代器（Insert Iterators）
+
+插入迭代器（如 `back_insert_iterator`、`front_insert_iterator`、`insert_iterator`）主要用于赋值操作，它们重载了 `operator=`，但通常没有额外的成员函数。不过，它们有：
+
+构造函数接受容器引用（或容器+位置）。
+
+`operator=`：将值插入容器，返回迭代器自身（以便连续赋值）。
+
+```cpp
+std::vector<int> v;
+auto it = std::back_inserter(v);
+it = 10;   // 等价于 v.push_back(10)
+```
+
+### 2.4 流迭代器（Stream Iterators）
+
+`istream_iterator` 和 `ostream_iterator` 提供了一些构造函数和默认构造（表示结束），但没有特别多的成员函数。主要操作是：
+
+1. `operator*`：读取当前值（输入迭代器）。
+
+2. `operator=`：写入值（输出迭代器）。
+
+默认构造：用于构造 end-of-stream 迭代器。
+
+## 3. 迭代器特性（std::iterator_traits）
+
+### 3.1 迭代器标签（iterator tags）
+
+为了在编译期区分迭代器类型，STL 定义了五个空结构体作为标签：
+```cpp
+namespace std {
+    struct input_iterator_tag {};
+    struct output_iterator_tag {};
+    struct forward_iterator_tag : public input_iterator_tag {};
+    struct bidirectional_iterator_tag : public forward_iterator_tag {};
+    struct random_access_iterator_tag : public bidirectional_iterator_tag {};
+}
+```
+每个迭代器类内部会定义一个 iterator_category 类型别名，指示其类别。例如：
+```cpp
+template <typename T>
+struct list_iterator {
+    using iterator_category = std::bidirectional_iterator_tag;
+    // ...
+};
+```
+
+### 3.2 `std::iterator_traits`
+
+`iterator_traits` 是一个模板，用于统一获取迭代器的相关类型（值类型、指针类型、引用类型、差值类型、迭代器类别）。对于指针类型，提供了偏特化版本，使指针也能作为迭代器使用。
+```cpp
+
+template <typename Iter>
+struct iterator_traits {
+    using value_type        = typename Iter::value_type;
+    using difference_type   = typename Iter::difference_type;
+    using pointer           = typename Iter::pointer;
+    using reference         = typename Iter::reference;
+    using iterator_category = typename Iter::iterator_category;
+};
+
+// 针对 T* 的偏特化
+template <typename T>
+struct iterator_traits<T*> {
+    using value_type        = T;
+    using difference_type   = ptrdiff_t;
+    using pointer           = T*;
+    using reference         = T&;
+    using iterator_category = random_access_iterator_tag;
+};
+```
+算法通过 `iterator_traits` 获取信息，并可以根据 `iterator_category` 进行标签派发（tag dispatching），选择最优实现。
+
+## 4. 全局迭代器辅助函数
+
+除了迭代器本身的运算符和少数成员函数外，STL 还提供了一些全局函数来操作迭代器，它们通常接受迭代器参数并返回迭代器或相关信息：
+
+1. `std::advance(it, n)`：将迭代器 it 前进 n 步（利用迭代器类别优化）。
+
+2. `std::next(it, n)`：返回 it 之后 n 步的新迭代器（C++11）。
+
+3. `std::prev(it, n)`：返回 it 之前 n 步的新迭代器（C++11）。
+
+4. `std::distance(first, last)`：返回两个迭代器之间的距离。
+
+5. `std::begin(c)` / `std::end(c)`：返回容器或数组的首/尾迭代器（C++11）。
+
+6. `std::rbegin(c)` / `std::rend(c)`：返回反向迭代器（C++14）。
+
+这些函数不是迭代器的成员，但经常与迭代器一起使用。
+
+## 5. 迭代器失效（Iterator Invalidation）
+
+迭代器失效是使用 STL 时最容易出错的地方。当容器结构发生变化（如插入、删除、重新分配）时，某些迭代器可能变得无效，继续使用会导致未定义行为。
+
+
+### 5.1 常见容器的失效规则
+
+| 容器 | 插入操作 | 删除操作 | 重新分配 |
+|------|----------|----------|----------|
+| vector | 若插入导致容量不足而重新分配，则所有迭代器失效；否则插入点之后的迭代器失效 | 被删除元素之后的迭代器失效（包括 `end()`） | 重新分配时所有迭代器失效 |
+| deque | 插入在首尾时，仅当前块可能受影响，但标准未保证；插入中间则所有迭代器失效 | 删除在首尾时，仅被删元素迭代器失效；删除中间则所有失效 | 不适用（无重新分配概念，但块满时可能分配新块，影响迭代器） |
+| list/forward_list | 插入不使任何迭代器失效（除 `end()` 可能变） | 仅被删除元素的迭代器失效，其他有效 | 不适用 |
+| set/map/unordered_set等 | 插入不使已有迭代器失效 | 仅被删除元素的迭代器失效，其他有效 | 哈希表 rehash 会使所有迭代器失效（但元素指针有效） |
+
+每次操作后，若需要继续使用迭代器，最好重新获取（例如调用 `begin()`）。
+
+在循环中删除元素时，需注意迭代器更新：
+
+```cpp
+// 正确删除 vector 中的偶数
+std::vector<int> v = {1,2,3,4};
+for (auto it = v.begin(); it != v.end(); ) {
+    if (*it % 2 == 0)
+        it = v.erase(it);  // erase 返回下一个有效迭代器
+    else
+        ++it;
+}
+```
+
+### 5.2 迭代器失效与底层实现的关系
+
+迭代器失效的本质是迭代器内部封装的指针或信息不再有效，通常与容器的内存重分配、元素移动或删除有关。
+
+1. vector：重新分配时所有迭代器失效（指向旧内存）；插入/删除点之后的迭代器失效（元素移动导致地址变化）。
+
+2. deque：插入/删除中间元素会导致所有迭代器失效（因为缓冲区可能重排）；两端操作可能仅影响相关缓冲区，但标准未严格保证，具体取决于实现。
+
+3. list：除被删除元素的迭代器外，其他迭代器始终有效（节点独立，删除只释放该节点内存）。
+
+4. 关联容器：插入不影响已有迭代器；删除仅使被删元素的迭代器失效。
+
+
+## 6. 运算符重载的实现示例
+
+以自定义的 `list` 迭代器为例，展示核心运算符的实现：
+```cpp
+template <typename T>
+class list_iterator {
+private:
+    __list_node<T>* node;   // 节点指针
+public:
+    using iterator_category = std::bidirectional_iterator_tag;
+    using value_type = T;
+    using difference_type = ptrdiff_t;
+    using pointer = T*;
+    using reference = T&;
+
+    list_iterator(__list_node<T>* n = nullptr) : node(n) {}
+
+    reference operator*() const { return node->data; }
+    pointer operator->() const { return &(node->data); }
+
+    // 前置 ++
+    list_iterator& operator++() {
+        node = node->next;
+        return *this;
+    }
+    // 后置 ++
+    list_iterator operator++(int) {
+        list_iterator tmp = *this;
+        node = node->next;
+        return tmp;
+    }
+    // 前置 --
+    list_iterator& operator--() {
+        node = node->prev;
+        return *this;
+    }
+    // 后置 --
+    list_iterator operator--(int) {
+        list_iterator tmp = *this;
+        node = node->prev;
+        return tmp;
+    }
+
+    friend bool operator==(const list_iterator& a, const list_iterator& b) {
+        return a.node == b.node;
+    }
+    friend bool operator!=(const list_iterator& a, const list_iterator& b) {
+        return a.node != b.node;
+    }
+};
+```
+
+
+
+</WordCount>

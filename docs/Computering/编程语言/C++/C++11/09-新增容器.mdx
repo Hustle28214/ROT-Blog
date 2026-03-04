@@ -1,0 +1,234 @@
+import WordCount from '../../../../../src/components/WordCount/WordCount';
+import Mermaid from '@theme/Mermaid';
+
+<WordCount>
+
+## 1. 无序容器
+
+新增的无序容器:`std::unordered_set`/`std::unordered_multiset`和`std::unordered_map`/`std::unordered_multimap`
+
+## 2. std::array
+
+`std::array` 是 C++11 引入的容器，定义在头文件 `<array>` 中。它是一个封装了固定大小数组的容器，将 C 风格数组的底层连续存储与 STL 容器的接口相结合，提供了更安全、更便捷的数组操作方式。
+```cpp
+#include <array>
+std::array<T, N> arr;  // T 为元素类型，N 为编译期常量大小
+
+// 默认初始化（对于基本类型，值未定义；对于类类型，调用默认构造函数）
+std::array<int, 5> arr1;               // 元素值不确定
+
+// 值初始化（所有元素被零初始化）
+std::array<int, 5> arr2{};              // 所有元素为 0
+
+// 列表初始化（聚合初始化）
+std::array<int, 5> arr3 = {1, 2, 3};    // 前三个为 1,2,3，后面补 0
+std::array<int, 5> arr4{1, 2, 3, 4, 5}; // C++11 起支持
+
+// 拷贝/移动构造
+std::array<int, 5> arr5 = arr3;         // 深拷贝
+std::array<int, 5> arr6 = std::move(arr3); // 移动（实际仍是拷贝，因元素在内部）
+```
+array保存在栈内存中，区别于vector（保存在堆内存），栈内存分配会比堆快很多。但是array也是编译时固定大小，vector则是运行时可变大小。
+
+array受限于栈大小，vector则受限于系统内存。
+
+模板参数:
+```cpp
+template<class T, std::size_t N>
+struct array {
+    T _M_elems[N];  // 实现细节，实际命名可能不同
+    // ... 成员函数
+};
+```
+大小：`sizeof(std::array<T, N>) == N * sizeof(T)`，整个数组的对齐方式与 `T[N]` 相同。
+
+`arr[i]` 直接访问内部数组成员，无边界检查（除非使用 `at()`）。
+
+:::info
+以下是详细的总结对比：
+
+| 特性                | `std::array`                          | `std::vector`                          |
+|---------------------|---------------------------------------|----------------------------------------|
+| **大小**            | 编译时固定                            | 运行时可变                             |
+| **元素存储位置**    | 对象内部（栈或静态区）                | 堆（对象本身可能在栈）                 |
+| **分配/释放速度**   | 极快（栈分配）                        | 较慢（堆分配，可能涉及系统调用）       |
+| **内存限制**        | 受限于栈大小                          | 受限于系统内存                         |
+| **扩容能力**        | 无                                    | 可动态扩容，但可能重新分配和拷贝       |
+| **内存开销**        | 仅元素本身                            | vector 对象开销 + 堆内存管理开销       |
+| **复制/移动**       | 复制是逐元素拷贝；移动也是逐元素       | 复制深拷贝；移动交换指针（高效）       |
+| **适用场景**        | 大小固定、对性能敏感、避免堆分配       | 大小变化、大数据量、灵活内存管理       |
+:::
+
+### 常用成员函数
+
+| 函数              | 说明                                                                 |
+|-------------------|----------------------------------------------------------------------|
+| `at(size_t pos)`  | 返回指定位置的引用，带边界检查（越界抛出 `std::out_of_range`）        |
+| `operator[]`      | 返回指定位置的引用，**不**进行边界检查                               |
+| `front()`         | 返回首元素的引用                                                    |
+| `back()`          | 返回尾元素的引用                                                    |
+| `data()`          | 返回指向底层数组的指针（`T*`），可用于与 C API 交互                 |
+| `begin()/end()`   | 返回迭代器，支持范围 for                                             |
+| `rbegin()/rend()` | 反向迭代器                                                          |
+| `size()`          | 返回元素个数（`N`）                                                  |
+| `max_size()`      | 返回 `N`                                                             |
+| `empty()`         | 返回 `false`（除非 `N==0`）                                          |
+| `fill(const T& value)` | 用指定值填充整个数组                                            |
+| `swap(array& other)` | 交换两个数组的内容（要求大小相同），通常逐元素交换，效率与大小成正比 |
+
+
+### 与C风格数组对比
+
+| 特性               | C 风格数组 (`T arr[N]`)          | `std::array<T, N>`                |
+|--------------------|----------------------------------|-----------------------------------|
+| 类型安全           | 隐式转换为指针，丢失大小信息      | 类型包含大小，不会隐式退化         |
+| 接口               | 无成员函数，需手动计算大小        | 提供完整 STL 容器接口              |
+| 赋值               | 不支持直接赋值（`arr1 = arr2` 非法） | 支持拷贝赋值（深拷贝）              |
+| 作为函数参数       | 退化为指针，需额外传递大小        | 按值传递保留大小（但拷贝代价大）    |
+| 边界检查           | 无                                | `at()` 提供可选边界检查             |
+| 与算法库交互       | 需通过指针或 `std::begin/end`     | 直接使用迭代器                     |
+| 性能               | 相同                              | 相同（无额外开销）                 |
+
+## 3. std::forward_list
+
+原理参考数据结构的链表/单向链表。
+
+`std::forward_list` 是 C++11 引入的单向链表容器，定义在头文件 `<forward_list>` 中。它实现了单链表数据结构，每个节点只包含指向下一个节点的指针，因此比 `std::list`（双向链表）更节省内存，但只能单向遍历（从前向后）。
+
+```cpp
+#include <forward_list>
+
+std::forward_list<int> fl1;                // 空链表
+std::forward_list<int> fl2(5);              // 5 个元素，值初始化（int 为 0）
+std::forward_list<int> fl3(5, 10);          // 5 个元素，每个都是 10
+std::forward_list<int> fl4 = {1, 2, 3, 4};  // 列表初始化
+std::forward_list<int> fl5(fl4);            // 拷贝构造
+std::forward_list<int> fl6(std::move(fl4)); // 移动构造（fl4 变为空）
+```
+
+它提供了常数时间的插入和删除操作（在已知位置之后），但不支持随机访问，且没有 size() 成员。
+
+:::tip
+为了追求性能，确实没有size()方法。
+
+std::forward_list 的设计目标是“与手写 C 风格单向链表的开销完全相同”。如果维护一个 size 成员变量，那么每个 forward_list 对象需要额外增加一个字段（通常 8 字节，64 位系统），每次插入、删除操作都要额外更新这个计数器。虽然维护 size 可以让 size() 操作变成 O(1)，但这会拖慢所有修改操作（insert_after, erase_after, splice_after 等），即使大多数用户可能根本不需要获取大小。
+
+splice 操作的复杂性：某些形式的 splice 操作（链表拼接）如果要求维护准确的 size，会从 `O(1)` 变成 `O(n)`，考虑到复杂度成本上升，加上size()并不是好选择。
+
+如果要获取大小需要使用`std::distance`手写。
+
+```cpp
+// 使用 std::distance 计算大小（O(n) 时间复杂度）
+int size = std::distance(fl.begin(), fl.end());  // size = 5
+```
+:::
+
+模板参数：
+
+```cpp
+template<class T, class Allocator = std::allocator<T>>
+class forward_list;
+```
+T：元素类型。
+
+Allocator：内存分配器类型，默认为 `std::allocator<T>`。
+
+### 常用成员函数
+
+| 函数 | 说明 |
+|------|------|
+| **迭代器** |  |
+| `before_begin()` | 返回指向首元素之前位置的迭代器，不能解引用，用于 `insert_after`、`erase_after` 等操作 |
+| `begin()` / `end()` | 返回指向第一个元素和尾后位置的迭代器 |
+| `cbefore_begin()` / `cbegin()` / `cend()` | const 版本 |
+| **容量** |  |
+| `empty()` | 判断链表是否为空 |
+| `max_size()` | 返回最大可能元素个数（受内存限制） |
+| **元素访问** |  |
+| `front()` | 返回第一个元素的引用（链表不能为空） |
+| **修改器** |  |
+| `assign()` | 赋值（替换全部内容） |
+| `emplace_front()` | 在头部就地构造元素 |
+| `push_front()` | 在头部插入元素 |
+| `pop_front()` | 删除头部元素 |
+| `emplace_after(pos, args...)` | 在指定位置之后就地构造元素 |
+| `insert_after(pos, value)` | 在指定位置之后插入元素（可插入多个） |
+| `erase_after(pos)` | 删除指定位置之后的元素（可删除一个范围） |
+| `clear()` | 清空所有元素 |
+| **操作** |  |
+| `splice_after(pos, other)` | 将另一个链表中的元素移动到当前链表的指定位置之后 |
+| `remove(val)` | 删除所有等于 `val` 的元素 |
+| `remove_if(pred)` | 删除所有满足谓词的元素 |
+| `unique()` | 删除连续重复元素（可自定义二元谓词） |
+| `merge(other)` | 合并两个已排序链表 |
+| `sort()` | 排序（稳定排序） |
+| `reverse()` | 反转链表 |
+| `swap(other)` | 交换两个链表内容 |
+
+`insert_after` 和 `erase_after` 都是在指定位置之后操作，这是为了配合单链表的特性。如果需要操作指定位置本身，需要知道其前驱。
+
+## 4. std::tuple
+
+`std::tuple` 是 C++11 引入的固定大小的异质容器，定义在头文件 `<tuple>` 中。它能够存储不同类型的元素(数组和函数不能，但可以是引用)，类似于一个广义的 `std::pair`，但可以容纳任意数量的元素。经常用于泛型编程。
+
+```cpp
+#include <tuple>
+std::tuple<T1, T2, ..., TN> t;  // 可包含 0 个或多个类型
+
+
+#include <string>
+
+// 默认构造函数（元素被值初始化）
+std::tuple<int, double, std::string> t1;  // int=0, double=0.0, string=""
+
+// 带初始值的构造函数
+std::tuple<int, double, std::string> t2(42, 3.14, "world");
+
+// 使用 make_tuple（C++11）
+auto t3 = std::make_tuple(42, 3.14, "world");  // 自动推导类型
+
+// 列表初始化（C++11）
+std::tuple<int, double, std::string> t4{42, 3.14, "world"};
+
+// 拷贝/移动构造
+std::tuple<int, double, std::string> t5 = t2;
+std::tuple<int, double, std::string> t6 = std::move(t2);
+
+// 从 pair 构造（针对二元 tuple）
+std::pair<int, std::string> p(1, "hello");
+std::tuple<int, std::string> t7(p);          // 隐式转换
+std::tuple<int, std::string> t8 = p;         // 也可
+
+// 空 tuple
+std::tuple<> t9;  // 空元组，特殊用途
+```
+
+元素类型可以完全不同（例如 `int`、`double`、`std::string` 等）。元素个数在编译时确定，不能动态增减。
+
+可以通过 `std::get<index>(t)` 或 `std::get<T>(t)`（当类型唯一时）访问元素。
+
+:::info
+C++17 起可直接解包为多个变量。
+:::
+
+可以与 `std::pair` 互转，包含两个元素的 tuple 可与 pair 相互转换（需要类型兼容）。
+
+支持 `==`、`!=`、`<`、`<=`、`>`、`>=`，按字典序比较（需元素支持对应操作）。
+
+可作为函数返回值。
+
+模板参数：
+```cpp
+template<class... Types>
+class tuple;
+```
+
+### 创建 tuple
+
+```cpp
+#include <tuple>
+int arr[5]={1,2,3,4,5};
+std::tuple<int,string,std::ref(arr)> 
+```
+
+</WordCount>

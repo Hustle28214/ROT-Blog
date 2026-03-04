@@ -1,0 +1,70 @@
+
+
+import WordCount from '../../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+地址：https://leetcode.cn/problems/sqrtx/?envType=problem-list-v2&envId=binary-search
+
+## 题干
+
+给你一个非负整数 x ，计算并返回 x 的 算术平方根 。
+
+由于返回类型是整数，结果只保留 整数部分 ，小数部分将被 舍去 。
+
+注意：不允许使用任何内置指数函数和算符，例如 pow(x, 0.5) 或者 x ** 0.5 。
+
+
+示例 1：
+```
+输入：x = 4
+输出：2
+```
+示例 2：
+```
+输入：x = 8
+输出：2
+解释：8 的算术平方根是 2.82842..., 由于返回类型是整数，小数部分将被舍去。
+```
+ 
+
+提示：
+```text
+0 <= x <= 231 - 1
+```
+## 思路
+
+类似35题的二分查找，用左右双指针查找，只需要看`mid*mid`是否还是太小或者太大，然后更新边界。注意最后返回的应该是右指针，而不是左，因为循环结束时 rptr 是最后一个平方 ≤ x 的数。如果直接返回 lptr，则会得到第一个不可行数，错误。
+
+:::tip
+平方函数在非负区间单调递增。
+:::
+
+
+## 题解
+
+```cpp
+class Solution {
+public:
+    int mySqrt(int x) {
+        long long lptr = 0;
+        long long rptr = x;
+        
+        while(lptr<=rptr){
+            long long mid = lptr + (rptr - lptr)/2;
+            if(mid*mid==x){
+                return mid;
+            }
+            else if(mid*mid<x){
+                lptr = mid+1;
+            }else{
+                rptr = mid -1;
+            }
+        }
+        return rptr;
+    }
+};
+```
+
+
+</WordCount>

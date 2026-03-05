@@ -50,6 +50,15 @@ import WordCount from '../../../../src/components/WordCount/WordCount';
 
 滑动窗口的核心思想是，**不断的调节子序列的起始位置和终止位置**。我们应该将滑动窗口遍历起点定在窗口的左边界还是右边界？左边界，其实就是暴力解，右边界就不同了，右指针不断向右移动，扩大窗口，把新元素加入 sum.
 
+:::info
+右指针不断向右移动，扩大窗口，把新元素加入 sum。
+
+当 sum >= target 时，说明当前窗口满足条件，我们尝试收缩左边界，即把左指针向右移动，同时从 sum 中减去移出的元素，看看能否得到一个更短的满足条件的窗口。
+
+在收缩过程中，记录下每次满足条件时的窗口长度，并更新最小长度。
+
+重复直到右指针遍历完整个数组。
+:::
 
 ## 题解
 ```cpp
@@ -66,13 +75,40 @@ public:
             while(sum>=target){
                 // 监控窗口内的数组，只要总和大于等于target
                 winLen = rptr-lptr+1;// 为什么要＋1？因为这两个指针涵盖的值都要包括
-                minVal = (minVal<winLen)?minVal:winLen;//更新最大值
+                minVal = (minVal<winLen)?minVal:winLen;//更新窗口长度最小值
                 sum -= nums[lptr++];
             }
         }
         return minVal==INT32_MAX?0:minVal;
     }
 };
+```
+
+
+## 滑动窗口模板
+```cpp
+int slidingWindow(vector<int>& nums, int target) {
+    int left = 0, right = 0;
+    int sum = 0; // 或其它需要维护的状态
+    int ans = ...; // 根据题目要求初始化
+    
+    while (right < nums.size()) {
+        // 扩大窗口：将 nums[right] 加入窗口
+        sum += nums[right]; // 或其他操作
+        right++;
+        
+        // 当窗口需要收缩时（视题目条件而定）
+        while (/* 窗口需要收缩的条件 */) {
+            // 更新答案（如果需要）
+            ans = ...;
+            // 缩小窗口：移出 nums[left]
+            sum -= nums[left];
+            left++;
+        }
+        // 可能也需要在这里更新答案（取决于题目）
+    }
+    return ans;
+}
 ```
 
 </WordCount>

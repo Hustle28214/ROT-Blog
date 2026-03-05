@@ -1,0 +1,68 @@
+
+import WordCount from '../../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+地址：https://leetcode.cn/problems/climbing-stairs/
+
+## 题干
+
+假设你正在爬楼梯。需要 n 阶你才能到达楼顶。
+
+每次你可以爬 1 或 2 个台阶。你有多少种不同的方法可以爬到楼顶呢？
+
+ 
+
+示例 1：
+```
+输入：n = 2
+输出：2
+解释：有两种方法可以爬到楼顶。
+1. 1 阶 + 1 阶
+2. 2 阶
+```
+示例 2：
+```
+输入：n = 3
+输出：3
+解释：有三种方法可以爬到楼顶。
+1. 1 阶 + 1 阶 + 1 阶
+2. 1 阶 + 2 阶
+3. 2 阶 + 1 阶
+```
+ 
+
+提示：
+```
+1 <= n <= 45
+```
+
+## 思路
+
+典型的动态规划题目，核心的是状态转移方程：`dp[i] = dp[i-1] + dp[i-2];`。
+
+`dp[0]`没有意义。为什么？因为不会有零级台阶这一说，就算有那就是不动。这不能算一个动作。
+
+对于这类题目已经在[状态转移方程](/docs/Computering/算法/动态规划/状态转移方程.mdx)里面写的很清晰。可跳转阅读。
+
+## 题解
+
+```cpp
+class Solution {
+public:
+    int climbStairs(int n) {
+        if (n == 1) return 1;
+        if (n == 2) return 2;
+        // 创建大小为 n+1 的数组，下标从 0 到 n
+        vector<int> dp(n + 1, 0);
+        dp[1] = 1;   // 爬 1 阶：1 种方法
+        dp[2] = 2;   // 爬 2 阶：2 种方法
+        for (int i = 3; i <= n; i++) {
+            dp[i] = dp[i-1] + dp[i-2];
+        }
+        return dp[n];
+    }
+};
+```
+
+</WordCount>

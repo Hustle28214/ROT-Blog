@@ -1,0 +1,64 @@
+
+import WordCount from '../../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+地址：https://leetcode.cn/problems/pascals-triangle/description/
+
+## 题干
+
+给定一个非负整数 numRows，生成「杨辉三角」的前 numRows 行。
+
+在「杨辉三角」中，每个数是它左上方和右上方的数的和。
+
+ 
+
+示例 1:
+```
+输入: numRows = 5
+输出: [[1],[1,1],[1,2,1],[1,3,3,1],[1,4,6,4,1]]
+```
+示例 2:
+```
+输入: numRows = 1
+输出: [[1]]
+```
+ 
+
+提示:
+```
+1 <= numRows <= 30
+```
+
+## 思路
+
+DP。仔细想想。用i表示当前行数，用j表示当前行的第j个元素。核心方程：`dp[i][j]=dp[i-1]dp[j-1]+dp[i-1]dp[j];`
+
+## 题解
+
+```cpp
+class Solution {
+public:
+    vector<vector<int>> generate(int numRows) {
+        
+        if(numRows==1) return {{1}};;
+        if(numRows==2) return {{1},{1,1}};;
+        vector<vector<int>> result(numRows);
+        result[0].resize(1); 
+        result[0] = {1};
+        result[1].resize(2); 
+        result[1] = {1, 1};     
+        for(int i=2;i<numRows;++i){
+            result[i].resize(i + 1);
+            result[i][0]=1;// 首元素
+            result[i][i]=1;// 末尾元素
+            for(int j=1;j<i;++j){
+                result[i][j]=result[i-1][j]+result[i-1][j-1];
+            }
+        }
+        return result;
+    }
+};
+```
+
+</WordCount>

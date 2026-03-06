@@ -39,9 +39,32 @@ s 由英文字母、数字、符号和空格组成
 
 ## 思路
 
-依然是滑动窗口
+依然是滑动窗口，用一个set来存储窗口的字符。
 
 ## 题解
 
+```cpp
+class Solution {
+public:
+    int lengthOfLongestSubstring(string s) {
+        if(s.size()==0) return 0;
+        int lptr=0;
+        int rptr=0;
+        unordered_set<char> slided_window;// 存储当前窗口内的字符
+        int maxLen = 0;
+        for(rptr;rptr<s.size();++rptr){
+            // 如果当前字符已经在窗口中，移动左指针直到可以加入
+            while(slided_window.find(s[rptr])!=slided_window.end()){// 这就是找到了的意思
+                slided_window.erase(s[lptr]);// 删掉这个重复的元素
+                lptr++;// 左指针继续往前探索
+            }
+            slided_window.insert(s[rptr]);// 没有重复的了，可以加新的，新的元素在右指针这里
+            maxLen = max(rptr-lptr+1,maxLen);
+
+        }
+        return maxLen;
+    }
+};
+```
 
 </WordCount>

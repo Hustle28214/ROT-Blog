@@ -1,0 +1,39 @@
+import WordCount from '../../../../src/components/WordCount/WordCount';
+import Mermaid from '@theme/Mermaid';
+
+<WordCount>
+
+## memcpy
+
+实现目标：从源指针src复制n个字节到缓冲区中，应指定目标缓冲区的起始地址（大小至少为 n 字节）。
+
+
+具体实现：
+```cpp
+void *my_memcpy(void *dest,const void *src,int n){
+    // src 源数据是只读的
+    // 要复制字节，所以我们先把dest转换为字符指针
+    char *dest_char = (char *)dest;
+    const char *src_char = (char *)src;
+    while(n--){
+        *dest_char++ = *src_char++;
+    }
+    return dest;
+}
+```
+
+## strcpy
+
+实现目标：将源字符串（包括结尾的 '\0'）复制到目标缓冲区。
+
+具体实现：
+```cpp
+char *my_strcpy(char *dest,const char *src){
+    char *dest_char = dest;
+    while((*dest_char++=*src++)!='\0');// '\0' 也会被复制过去，因此可以作为结束条件
+    return dest_char;
+}
+```
+
+
+</WordCount>

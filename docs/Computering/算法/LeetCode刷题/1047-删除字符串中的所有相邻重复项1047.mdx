@@ -1,0 +1,68 @@
+
+import WordCount from '../../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+地址：https://leetcode.cn/problems/remove-all-adjacent-duplicates-in-string/description/
+
+## 题干
+
+给出由小写字母组成的字符串 `s`，重复项删除操作会选择两个相邻且相同的字母，并删除它们。
+
+在 `s` 上反复执行重复项删除操作，直到无法继续删除。
+
+在完成所有重复项删除操作后返回最终的字符串。答案保证唯一。
+
+ 
+
+示例：
+```
+输入："abbaca"
+输出："ca"
+解释：
+例如，在 "abbaca" 中，我们可以删除 "bb" 由于两字母相邻且相同，这是此时唯一可以执行删除操作的重复项。之后我们得到字符串 "aaca"，其中又只有 "aa" 可以执行重复项删除操作，所以最后的字符串为 "ca"。
+```
+ 
+
+提示：
+```
+1 <= s.length <= 105
+s 仅由小写英文字母组成。
+```
+
+## 思路
+
+有点像消消乐，但是消消乐是3个以上的元素才能消除，这个是2个重复且相邻就可以了。
+
+遍历字符串，维护一个栈，栈中存放每个字符元素，栈顶元素是当前字符串中最新的元素。当遍历到的元素与栈顶元素相同，栈顶元素出栈。
+
+要注意栈为空的情况，进行或处理。
+
+## 题解
+
+```cpp
+class Solution {
+public:
+    string removeDuplicates(string s) {
+        if(s.length()==1) return s;
+        stack<int> stk;
+        for(int i=0;i<s.length();++i){
+            if(stk.empty() || s[i]!=stk.top()){
+                // 如果栈顶不是相同元素，那么入栈
+                stk.push(s[i]);
+            }else{
+                stk.pop();
+            }
+        }
+        string res="";
+        while(!stk.empty()){
+            res +=stk.top();
+            stk.pop();
+        }
+        reverse(res.begin(),res.end());//记得反转字符串，并且反转的方法是reverse()
+        return res;
+    }
+};
+```
+
+</WordCount>

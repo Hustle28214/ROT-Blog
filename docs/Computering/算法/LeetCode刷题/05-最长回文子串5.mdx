@@ -31,13 +31,61 @@ s 仅由数字和英文字母组成
 
 ## 思路
 
+这道题在我看来是一道比较难的题目。首先要准确的判断我们需要慢慢拆解。而且存在很多隐藏的需要考虑的细节。
 
+:::tip
+外层循环 `len`：从 2 到 n，依次处理所有长度大于等于 2 的子串。
+为什么要从 2 开始？因为长度为 1 已经初始化好了。
+
+内层循环 i：对于固定长度 `len`，起始索引 i 的取值范围是 0 到 `n - len`，确保 `j = i + len - 1` 不越界。
+
+计算右边界 j：`j = i + len - 1`。
+
+判断条件：
+
+1. 先检查首尾字符 `s[i] == s[j]`。如果不等，该子串不可能是回文，直接跳过。
+
+2. 如果相等，再根据长度判断：
+
+- 如果 `len <= 2`（即长度 2 或 3？注意长度 2 时 `len=2`，长度 3 时 `len=3`，条件均成立），则无需看内部，直接标记为回文。
+- 否则（`len >= 4`），必须确保内部子串 `s[i+1..j-1]` 也是回文，即 `dp[i+1][j-1]` 为 true。
+
+3. 若满足，则 `dp[i][j] = true`，并更新最长记录。
+:::
 
 ## 题解
 
 
 ```cpp
-
+class Solution {
+public:
+    string longestPalindrome(string s) {
+        if(s.empty()) return "";
+        if(s.size()==1) return s;
+        vector<vector<bool>> dp(s.size(), vector<bool>(s.size(), false));
+        int start = 0;
+        int maxLen = 1;
+        for(int i=0;i<s.size();++i){
+            dp[i][i] = true;
+        }
+        for(int i=2;i<=s.size();++i){
+            for(int j=0;j<=s.size()-i;++j){
+                int right = i+j-1;
+                if(s[j]==s[right]){
+                // 长度小于等于2时直接为回文，否则看内部子串，用或条件来判断
+                    if(i<=2||dp[j+1][right-1]){
+                        dp[j][right] = true;//
+                        if(i>maxLen){
+                            maxLen = i;
+                            start = j;
+                        }
+                    }                 
+                }
+            }
+        }
+        return s.substr(start, maxLen);
+    }
+};
 ```
 
 </WordCount>

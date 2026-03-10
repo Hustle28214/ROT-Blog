@@ -54,8 +54,39 @@ strs[i] 仅包含小写字母
 
 ## 题解
 
-```cpp
+注意：本题用的`pairs.second`是对于对象/引用的方法，使用点操作符`.`来访问其成员。
 
+不要和second指针混淆。`xxx->second` — 用于指针或迭代器。
+
+若要改用迭代器：
+```cpp
+for (auto it = umap.begin(); it != umap.end(); ++it) {
+    result.push_back(it->second);  // it 是迭代器，用 ->second
+}
+```
+
+以下是完整题解：
+
+```cpp
+class Solution {
+public:
+    vector<vector<string>> groupAnagrams(vector<string>& strs) {
+        unordered_map<string, vector<string>> umap;
+        
+        for (const string& s : strs) {  
+            string key = s;
+            sort(key.begin(), key.end());
+            umap[key].push_back(s);
+        }
+        
+        vector<vector<string>> result;
+        for (auto& pairs : umap) {
+            result.push_back(pairs.second); 
+        }
+        
+        return result;
+    }
+};
 ```
 
 

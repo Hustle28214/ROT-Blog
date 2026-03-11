@@ -53,7 +53,29 @@ import WordCount from '../../../../src/components/WordCount/WordCount';
 ## 题解
 
 ```cpp
+class Solution {
+public:
+    int longestConsecutive(vector<int>& nums) {
+        unordered_set<int> uset(nums.begin(),nums.end());
+        int maxLen = 0;
+        for(int i:uset){
+            if(uset.find(i-1)==uset.end()){
+                // uset.find(i-1) == uset.end() 为真时，就表示 i-1 不在集合中。
+                int currentN = i;
+                int currentL = 1;
 
+                while(uset.find(currentN+1)!=uset.end()){
+                    // 只要能找到下一个连续的元素
+                    currentN++;
+                    currentL++;
+                }
+                maxLen = max(maxLen,currentL);
+            }
+        }
+        return maxLen;
+    }
+};
 ```
+
 
 </WordCount>

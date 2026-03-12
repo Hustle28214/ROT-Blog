@@ -2,7 +2,7 @@ import WordCount from '../../../src/components/WordCount/WordCount';
 
 <WordCount>
 
-## 并查集(（Disjoint Set Union）)
+## 并查集(Disjoint Set Union)
 
 并查集是树型的数据结构，以森林表示，它支持两种操作：
 
@@ -62,6 +62,19 @@ int find(int x) {
 }
 ```
 
-### 
+### 合并
+
+合并，即合并两棵树的根节点。
+
+```cpp
+void unite(size_t x,size_t y) {
+    x = find(x);
+    y = find(y);
+    if (x != y) {
+        parent[y] = x;
+    }
+}
+```
+
 
 </WordCount>

@@ -1,0 +1,67 @@
+import WordCount from '../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+## 并查集(（Disjoint Set Union）)
+
+并查集是树型的数据结构，以森林表示，它支持两种操作：
+
+1. 查找（Find）：确定某个元素属于哪个集合，通常返回该集合的“代表元素”（根节点）。
+
+2. 合并（Union）：将两个集合合并为一个。
+
+并查集在解决动态连通性、图的连通分量、最小生成树（Kruskal算法）等问题中非常高效。
+
+### 初始化
+
+用一个数组 parent 记录每个元素的父节点。开始时，每个元素单独构成一个集合，即 `parent[i] = i`。
+
+```cpp
+#include <vector>
+using namespace std;
+class Union(){
+    private:
+        vector<int> parent;
+    public:
+        Union(int n){
+            parent.resize(n);
+            for(int i=0;i<n;++i){
+                parent[i] = i;
+            }
+        }
+}
+```
+
+### 查找
+
+查找元素 x 的根节点：若 `parent[x] == x`，则 x 是根；否则递归向上找。
+
+首先我们来实现一个朴素的递归查找算法：
+
+```cpp
+int find(int x) {
+    // 递归写法
+    // return parent[x] == x ? x : find(parent[x]);
+    if (parent[x] != x)
+        return find(parent[x]);
+    return parent[x];
+}
+```
+
+:::tip
+我们认真看一下朴素递归的原理，如果当前元素就是它的父节点（也就是根节点），直接返回X.
+
+如果不是，返回其父节点。就这样一直向上查找。
+:::
+
+我们可以通过路径压缩技术来加快查询：
+
+```cpp
+int find(int x) {
+    return parent[x] == x ? x : (parent[x] = find(parent[x]));
+}
+```
+
+### 
+
+</WordCount>

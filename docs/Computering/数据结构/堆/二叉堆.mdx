@@ -60,7 +60,9 @@ import Mermaid from '@theme/Mermaid';
 ² 二项堆插入的摊销时间复杂度为 O(1)，但最坏情况为 O(log n)，表中取常见的最坏情况。  
 ³ 操作本身使用的辅助空间为 O(1)，堆整体存储空间为 O(n)。
 
-## 二叉堆
+## 二叉堆(Binary Heap)
+
+二叉堆属于可并堆（Mergeable Heap）,支持通常为`O(log n)`时间复杂度(或更快)的合并操作.
 
 ### 插入(Insert)
 
@@ -136,7 +138,283 @@ public:
 
 ### 删除
 
+删除操作**通常是指删除堆顶**，也就是根节点。时间复杂度`O(log n)`。
 
+直接删除会把堆一分为二，这显然不是我们想要的，然而如果我们直接把它移动到末尾再删掉，一方面这个操作不好做，另一方面如果你要变换末尾节点和根节点再删除原根节点，新的根节点很可能是不符合性质的。
+
+所以我们选择向下调整。
+
+在根节点的子节点中找最大的子节点与根节点交换位置，一直这样操作，直到叶子节点。
+
+这样操作之后的节点都满足堆的性质。
+
+当然也可以删除任意节点：
+
+```cpp
+#include <vector>
+using namespace std;
+
+class MaxHeap {
+private:
+    vector<int> heap;
+
+    // 下沉调整：将下标为 index 的元素向下移动
+    // 将该节点的值通过“减小键”（最大堆）或“增大键”（最小堆）调整为负无穷（或正无穷），使其上浮到堆顶。
+    // 然后执行删除堆顶操作。
+    // 由于二叉堆不支持快速查找，必须先知道节点的位置才能删除。若需按值删除，通常需要额外的数据结构（如哈希表）辅助定位。
+    void heapifyDown(int index) {
+        int n = heap.size();
+        while (true) {
+            int left = 2 * index + 1;
+            int right = 2 * index + 2;
+            int largest = index;  // 假设当前节点最大
+
+            if (left < n && heap[left] > heap[largest])
+                largest = left;
+            if (right < n && heap[right] > heap[largest])
+                largest = right;
+
+            if (largest == index) break;  // 无需交换
+
+            swap(heap[index], heap[largest]);
+            index = largest;  // 继续向下
+        }
+    }
+
+public:
+    void insert(int value) { /* 同前 */ }
+
+    // 删除堆顶并返回其值
+    int extractMax() {
+        if (heap.empty()) throw runtime_error("Heap is empty");
+        int maxVal = heap[0];
+        // 将堆顶与最后一个元素交换
+        heap[0] = heap.back();
+        heap.pop_back();  // 删除原堆顶
+        if (!heap.empty())
+            heapifyDown(0);
+        return maxVal;
+    }
+};
+```
+
+### 增大/减小键
+
+将堆中某个节点的键值增大/减小。时间复杂度都是`O(log n)`。
+
+:::tip
+增大键常用于最大堆（如调度器中提高优先级），增大后可能破坏堆序性，需进行上浮调整（最大堆）或下沉调整（最小堆）。
+
+减小键常用于最小堆（如 Dijkstra 算法中更新距离），减小键后可能破坏堆序性，需进行上浮调整。
+:::
+
+```cpp
+// 上浮调整
+void heapifyUp(int index) {
+        while (index > 0) {
+            int parent = (index - 1) / 2;
+            if (heap[parent] >= heap[index])
+                break;
+            swap(heap[parent], heap[index]);
+            index = parent;
+        }
+    }
+// 下沉调整（用于删除堆顶或减小键）
+void heapifyDown(int index) {
+        int n = heap.size();
+        while (true) {
+            int left = 2 * index + 1;
+            int right = 2 * index + 2;
+            int largest = index;
+
+            if (left < n && heap[left] > heap[largest])
+                largest = left;
+            if (right < n && heap[right] > heap[largest])
+                largest = right;
+
+            if (largest == index)
+                break;
+            swap(heap[index], heap[largest]);
+            index = largest;
+        }
+    }
+```
+
+
+### 建堆(Build Heap)
+
+将任意无序数组调整为满足堆序性的数组。
+
+```cpp
+#include <vector>
+using namespace std;
+
+// 下沉调整，用于维护最大堆性质
+void heapifyDown(vector<int>& arr, int n, int i) {
+    int largest = i;
+    int left = 2 * i + 1;
+    int right = 2 * i + 2;
+    if (left < n && arr[left] > arr[largest])
+        largest = left;
+    if (right < n && arr[right] > arr[largest])
+        largest = right;
+    if (largest != i) {
+        swap(arr[i], arr[largest]);
+        heapifyDown(arr, n, largest);
+    }
+}
+
+// 建堆函数：将任意数组调整为最大堆
+void buildMaxHeap(vector<int>& arr) {
+    int n = arr.size();
+    // 从最后一个非叶子节点开始向前堆化
+    for (int i = n / 2 - 1; i >= 0; --i) {
+        heapifyDown(arr, n, i);
+    }
+}
+```
+### 合并(Merge)
+
+合并有两种方法。
+
+连接后建堆，时间复杂度`O(m + n)`:
+```cpp
+#include <vector>
+#include <algorithm>
+using namespace std;
+
+class MaxHeap {
+private:
+    vector<int> heap;
+
+    // 下沉调整（用于建堆）
+    void heapifyDown(vector<int>& arr, int n, int i) {
+        int largest = i;
+        int left = 2 * i + 1;
+        int right = 2 * i + 2;
+        if (left < n && arr[left] > arr[largest])
+            largest = left;
+        if (right < n && arr[right] > arr[largest])
+            largest = right;
+        if (largest != i) {
+            swap(arr[i], arr[largest]);
+            heapifyDown(arr, n, largest);
+        }
+    }
+
+public:
+    MaxHeap() {}
+    MaxHeap(const vector<int>& arr) : heap(arr) {
+        // 建堆
+        for (int i = heap.size() / 2 - 1; i >= 0; --i)
+            heapifyDown(heap, heap.size(), i);
+    }
+
+    // 合并另一个堆（传入堆对象）
+    void merge(const MaxHeap& other) {
+        // 将 other 的底层数组插入到当前数组末尾
+        heap.insert(heap.end(), other.heap.begin(), other.heap.end());
+        // 重新建堆
+        for (int i = heap.size() / 2 - 1; i >= 0; --i)
+            heapifyDown(heap, heap.size(), i);
+    }
+
+    // 获取堆内元素（测试用）
+    const vector<int>& getHeap() const { return heap; }
+};
+```
+
+逐个插入,时间复杂度`O(m log(m+n))`：
+```cpp
+class MaxHeap {
+private:
+    vector<int> heap;
+    void heapifyUp(int index) { /* 上浮代码（同前）*/ }
+    void heapifyDown(int index) { /* 下沉代码（同前）*/ }
+
+public:
+    // 插入单个元素
+    void insert(int val) {
+        heap.push_back(val);
+        heapifyUp(heap.size() - 1);
+    }
+
+    // 逐个插入合并
+    void mergeByInsert(const MaxHeap& other) {
+        for (int val : other.heap) {
+            insert(val);
+        }
+    }
+};
+```
+
+
+## 对顶堆(Max Heap)
+
+对顶堆（也称双堆技巧）是一种利用两个堆来动态维护数据流中位数或其他分位数的数据结构。它通常由**一个大顶堆和一个小顶堆**组成，二者配合可以高效地获取当前所有元素的中位数，并支持动态插入。
+
+- 大顶堆的大小要么等于小顶堆的大小，要么多一个（或反过来，具体取决于中位数的定义）。
+
+- 大顶堆的所有元素 ≤ 小顶堆的所有元素，即大顶堆的堆顶 ≤ 小顶堆的堆顶。
+
+这样，当前数据流的中位数就可以通过两个堆的堆顶快速计算得出。
+
+1. 插入元素
+
+插入新元素时，需要维持两个堆的大小平衡和大小关系。常见做法（以“大顶堆大小 ≥ 小顶堆大小”为例）：
+
+如果大顶堆为空或新元素 ≤ 大顶堆堆顶，则插入大顶堆；否则插入小顶堆。
+
+然后调整两个堆的大小，确保平衡：
+
+    如果大顶堆的大小比小顶堆大超过1，则将大顶堆堆顶弹出并插入小顶堆。
+
+    如果小顶堆的大小大于大顶堆，则将小顶堆堆顶弹出并插入大顶堆。
+
+2. 获取中位数
+
+    如果总元素个数为奇数，中位数就是大顶堆的堆顶（因为大顶堆多一个元素）。
+
+    如果为偶数，中位数可以是两个堆顶的平均值（或其他定义，如取较小者）。
+
+```cpp
+#include <queue>
+#include <vector>
+using namespace std;
+
+class MedianFinder {
+private:
+    priority_queue<int> maxHeap;  // 大顶堆，存较小一半
+    priority_queue<int, vector<int>, greater<int>> minHeap; // 小顶堆，存较大一半
+
+public:
+    void addNum(int num) {
+        // 先决定插入哪个堆
+        if (maxHeap.empty() || num <= maxHeap.top())
+            maxHeap.push(num);
+        else
+            minHeap.push(num);
+
+        // 平衡两个堆的大小
+        if (maxHeap.size() > minHeap.size() + 1) {
+            minHeap.push(maxHeap.top());
+            maxHeap.pop();
+        } else if (minHeap.size() > maxHeap.size()) {
+            maxHeap.push(minHeap.top());
+            minHeap.pop();
+        }
+    }
+
+    double findMedian() {
+        if (maxHeap.size() > minHeap.size())
+            return maxHeap.top();
+        else
+            return (maxHeap.top() + minHeap.top()) / 2.0;
+    }
+};
+// 维护第 k 小的元素：让大顶堆的大小固定为 k，则大顶堆堆顶即为第 k 小的元素。
+// 维护第 k 大的元素：让小顶堆的大小固定为 k，则小顶堆堆顶即为第 k 大的元素。
+```
 
 
 </WordCount>

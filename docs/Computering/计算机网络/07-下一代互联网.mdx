@@ -35,7 +35,7 @@ IPv4存在以下著名的问题：
 
 目标地址（128位）：接收节点的地址。
 
-![在这里插入图片描述](https://i-blog.csdnimg.cn/blog_migrate/26ed97552aadae0cbfac3519827c82c8.png#pic_center)
+<img width="1093" height="583" alt="Image" src="https://github.com/user-attachments/assets/416a907b-4bbf-407b-b03a-7f70983c34b8" />
 
 
 
@@ -104,7 +104,8 @@ IPv6组播地址的格式前缀为1111 1111，即FF00开头。
 ### 特殊地址对比 IPv4 vs IPv6
 
 
-![在这里插入图片描述](https://i-blog.csdnimg.cn/blog_migrate/15da98ce200fa4fd897c6b3f3bb9e062.png#pic_center)
+<img width="842" height="343" alt="Image" src="https://github.com/user-attachments/assets/4086af3e-0efc-4de7-85e0-23334ca01b03" />
+
 ### IPv6路由协议
 
 共有3种路由协议：RIPng，OSPFv3，BGP4+。
@@ -119,7 +120,7 @@ IPv6组播地址的格式前缀为1111 1111，即FF00开头。
 
 新增加的邻居发现功能代替了ARP协议的功能。
 
-![在这里插入图片描述](https://i-blog.csdnimg.cn/blog_migrate/d9423af5d536f27e8368805455f654aa.png)
+<img width="1606" height="724" alt="Image" src="https://github.com/user-attachments/assets/6cc8b9b3-ecda-47d4-99fc-e49232225a31" />
 
 ### IPv6地址基础
 
@@ -145,18 +146,19 @@ IPv6组播地址的格式前缀为1111 1111，即FF00开头。
 
 ### 过渡技术-隧道
 
-![在这里插入图片描述](https://i-blog.csdnimg.cn/blog_migrate/f681d5a621f0d1dbd53b4e9e4f5d4b4c.png)
+<img width="778" height="203" alt="Image" src="https://github.com/user-attachments/assets/e27e0f6a-09fa-40e9-a4fc-0cd194058dc9" />
+
 两节点之间不能使用NAT技术，因为IPv4地址必须全局可路由。
 
 小型网络可以人工配置隧道。对于IPv4/IPv6双栈主机，地址必须已知，可以配置一条默认的隧道，以便把不能连接到任何IPv6路由器的分组发送出去。
 
 大型网络配置人工隧道比较困难，主要可以通过隧道中介（Tunnel Broker）技术解决。隧道服务器是一种即插即用的IPv6技术，通过IPv4网络可以进行IPv6分组的传送。
 
-![在这里插入图片描述](https://i-blog.csdnimg.cn/blog_migrate/a60341b9561b9780e8736742af11bf9b.png)
+<img width="757" height="605" alt="Image" src="https://github.com/user-attachments/assets/40b77f7f-d4b8-417c-a52f-83053b10bac2" />
 
 自动隧道（ISATAP）：两个双栈主机可以通过自动隧道在IPv4网络中进行通信。可以穿透NAT设备，与私网之外的主机建立IPv6连接。
 
-![在这里插入图片描述](https://i-blog.csdnimg.cn/blog_migrate/9125e5326e68b7b542b079cdbbe06499.png)
+<img width="597" height="255" alt="Image" src="https://github.com/user-attachments/assets/20e41acb-7030-4c20-8df0-87528a56a541" />
 
 
 ### 过渡技术-地址翻译
@@ -170,7 +172,7 @@ IPv6组播地址的格式前缀为1111 1111，即FF00开头。
 - 动态NAT-PT M:N
 - 基于端口NAPT-PT M:1
 
-![在这里插入图片描述](https://i-blog.csdnimg.cn/blog_migrate/049f50f181e00b19116e0865ab41dfa4.png)
+<img width="686" height="329" alt="Image" src="https://github.com/user-attachments/assets/b3cf6d32-ba2e-403b-8c97-8c9b7b562358" />
 
 示例：
 

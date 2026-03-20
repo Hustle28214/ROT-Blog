@@ -1,0 +1,97 @@
+
+
+import WordCount from '../src/components/WordCount/WordCount';
+
+<WordCount>
+
+地址：https://leetcode.cn/problems/binary-tree-preorder-traversal
+
+## 题干
+
+给你一棵二叉树的根节点 root ，返回其节点值的 后序遍历 。
+
+ 
+
+示例 1：
+```
+输入：root = [1,null,2,3]
+
+输出：[3,2,1]
+
+```
+示例 2：
+```
+输入：root = [1,2,3,4,5,null,8,null,null,6,7,9]
+
+输出：[4,6,7,5,2,9,8,3,1]
+
+```
+示例 3：
+```
+输入：root = []
+
+输出：[]
+```
+示例 4：
+```
+输入：root = [1]
+
+输出：[1]
+```
+ 
+
+提示：
+```
+树中节点的数目在范围 [0, 100] 内
+-100 <= Node.val <= 100
+```
+ 
+
+进阶：递归算法很简单，你可以通过迭代算法完成吗？
+
+## 思路
+
+和前序中序类似。
+
+:::tip
+当被调用函数执行完毕（遇到 return; 或函数末尾的`}`），系统会：
+
+1. 弹出栈帧，从调用栈中移除当前函数的栈帧。
+
+2. 恢复调用者的栈帧（包括之前的局部变量和返回地址）。
+
+3. 将程序计数器设置为之前保存的返回地址，即调用者中调用该函数的那条指令的下一行。
+:::
+
+## 题解
+
+
+```cpp
+/**
+ * Definition for a binary tree node.
+ * struct TreeNode {
+ *     int val;
+ *     TreeNode *left;
+ *     TreeNode *right;
+ *     TreeNode() : val(0), left(nullptr), right(nullptr) {}
+ *     TreeNode(int x) : val(x), left(nullptr), right(nullptr) {}
+ *     TreeNode(int x, TreeNode *left, TreeNode *right) : val(x), left(left), right(right) {}
+ * };
+ */
+class Solution {
+public:
+    void Back(TreeNode* root,vector<int>& vec){     
+        if(root==nullptr) return;
+        Back(root->left,vec);// 比如说从根节点开始，只要执行这个就会一直访问到最左边的节点
+        Back(root->right,vec);// 发现最左边的节点没有右子树，返回上一层节点，访问右子树
+        vec.push_back(root->val);
+    }
+    vector<int> postorderTraversal(TreeNode* root) {
+        vector<int> result;
+        Back(root,result);
+        return result;
+    }
+};
+```
+
+</WordCount>

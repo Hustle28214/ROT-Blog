@@ -1,0 +1,97 @@
+
+
+import WordCount from '../src/components/WordCount/WordCount';
+
+<WordCount>
+
+地址：https://leetcode.cn/problems/valid-parentheses/description/?envType=study-plan-v2&envId=top-100-liked
+
+## 题干
+
+
+给定一个只包括` '('，')'，'{'，'}'，'['，']'` 的字符串 s ，判断字符串是否有效。
+
+有效字符串需满足：
+
+    左括号必须用相同类型的右括号闭合。
+    左括号必须以正确的顺序闭合。
+    每个右括号都有一个对应的相同类型的左括号。
+
+ 
+
+示例 1：
+```
+输入：s = "()"
+
+输出：true
+```
+示例 2：
+```
+输入：s = "()[]{}"
+
+输出：true
+```
+示例 3：
+```
+输入：s = "(]"
+
+输出：false
+```
+示例 4：
+```
+输入：s = "([])"
+
+输出：true
+```
+示例 5：
+```
+输入：s = "([)]"
+
+输出：false
+```
+ 
+
+提示：
+```
+    1 <= s.length <= 104
+    s 仅由括号 '()[]{}' 组成
+```
+
+## 思路
+
+首先考虑括号不匹配的情况有多少种。
+
+1. 左括号/右括号多余了
+2. 括号没有多余，但是类型不一致
+
+这样把每种情况单独列出来就是统共3种情况。
+
+我们维护一个栈来做这道题目，只要读到字符串里的左括号，我们就push一个对应类型的右括号进栈，只要读到右括号，我们就检查目前栈顶的元素是不是对应类型的右括号，如果是，弹出元素，如果不是直接返回false。
+
+如果字符串大小是奇数直接返回false。
+
+## 题解
+
+```cpp
+class Solution {
+public:
+    bool isValid(string s) {
+        if(s.size()%2!=0) return false;
+        stack<char> stk;
+        for(int i=0;i<s.size();++i){
+            if(s[i]=='{') stk.push('}');
+            else if(s[i]=='[') stk.push(']');
+            else if(s[i]=='(') stk.push(')');
+
+            else{
+                if(stk.empty())return false;
+                if(stk.top()!=s[i])return false;
+                stk.pop();
+            }
+        }
+        return stk.empty();
+    }
+};
+```
+
+</WordCount>

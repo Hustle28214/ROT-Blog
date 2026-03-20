@@ -125,6 +125,16 @@ const config = {
   plugins: [
     './src/plugins/plugin-content-docs-stats',
     'plugin-image-zoom',
+      [
+      '@docusaurus/plugin-content-docs',
+      {
+        id: 'leetcode-answer',                     // 必须唯一
+        path: 'leetcode-answer',                    // 文章存放的文件夹
+        routeBasePath: '/leetcode-answer',           // 访问路径，例如 /articles
+        sidebarPath: require.resolve('./sidebarsLeetCodeAnswer.js'),
+        // 其他可选配置：editUrl、showLastUpdateAuthor 等
+      },
+    ],
   ],
   
   // scripts: [
@@ -194,6 +204,13 @@ const config = {
             position: 'right',
             label: '📘技术栈',
             
+          },
+          {
+            type: 'docSidebar',
+            sidebarId: 'leetcodeAnswerSidebar',
+            position: 'right',
+            label: '✔️力扣题解',
+            docsPluginId: 'leetcode-answer',
           },
           {to: '/blog', label: '📝随笔', position: 'right'},
           {  

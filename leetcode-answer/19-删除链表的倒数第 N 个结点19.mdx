@@ -1,0 +1,125 @@
+
+
+import WordCount from '../src/components/WordCount/WordCount';
+
+<WordCount>
+
+地址：https://leetcode.cn/problems/remove-nth-node-from-end-of-list/description/?envType=problem-list-v2&envId=linked-list
+
+## 题干
+
+给你一个链表，删除链表的倒数第 n 个结点，并且返回链表的头结点。
+
+示例 1：
+```
+输入：head = [1,2,3,4,5], n = 2
+输出：[1,2,3,5]
+```
+示例 2：
+```
+输入：head = [1], n = 1
+输出：[]
+```
+示例 3：
+```
+输入：head = [1,2], n = 1
+输出：[1]
+```
+
+提示：
+
+链表中结点的数目为 sz
+```
+1 <= sz <= 30
+0 <= Node.val <= 100
+1 <= n <= sz
+```
+ 
+
+进阶：你能尝试使用一趟扫描实现吗？
+
+## 思路
+
+先遍历一遍长度，然后再遍历一遍，看准删。
+
+更优的做法有点像滑动窗口，也就是快慢指针。快指针先走N步，然后快慢指针同时移动，当快指针指向Nullptr的时候，慢指针此时的位置就是N步，自然就可以删除。
+
+## 题解
+
+
+常规的长度遍历：
+
+```cpp
+/**
+ * Definition for singly-linked list.
+ * struct ListNode {
+ *     int val;
+ *     ListNode *next;
+ *     ListNode() : val(0), next(nullptr) {}
+ *     ListNode(int x) : val(x), next(nullptr) {}
+ *     ListNode(int x, ListNode *next) : val(x), next(next) {}
+ * };
+ */
+class Solution {
+public:
+    ListNode* removeNthFromEnd(ListNode* head, int n) {
+        ListNode* temp = new ListNode(0,head);
+        ListNode* cur = head;
+        int len = 0;
+        while(cur){
+            cur = cur->next;
+            len++;
+        }
+        cur = temp;
+        for(int i=1;i<len-n+1;++i){
+            cur = cur->next;
+        }
+        ListNode* toDelete = cur->next;
+        cur->next = toDelete->next;
+        delete toDelete;
+
+        ListNode* result = temp->next;
+        delete temp;
+        return result;
+    }
+};
+```
+
+快慢指针：
+
+```cpp
+/**
+ * Definition for singly-linked list.
+ * struct ListNode {
+ *     int val;
+ *     ListNode *next;
+ *     ListNode() : val(0), next(nullptr) {}
+ *     ListNode(int x) : val(x), next(nullptr) {}
+ *     ListNode(int x, ListNode *next) : val(x), next(next) {}
+ * };
+ */
+class Solution {
+public:
+    ListNode* removeNthFromEnd(ListNode* head, int n) {
+        
+        ListNode* temp = new ListNode(0,head);
+        ListNode* curF  = temp;
+        ListNode* curL = temp;
+        for(int i=0;i<n;++i){
+            curF = curF->next;
+        }// 快指针先走一轮
+
+        while(curF->next){
+            curF=curF->next;
+            curL=curL->next;
+        }
+        ListNode* toDelete = curL->next;
+        curL->next = toDelete->next;
+        ListNode* result = temp->next;
+        return  result;
+
+    }
+};
+```
+
+</WordCount>

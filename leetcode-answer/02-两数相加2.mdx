@@ -1,0 +1,96 @@
+import WordCount from '../src/components/WordCount/WordCount';
+
+<WordCount>
+
+地址：https://leetcode.cn/problems/add-two-numbers/?envType=problem-list-v2&envId=linked-list
+
+## 题干
+
+给你两个 非空 的链表，表示两个非负的整数。它们每位数字都是按照 逆序 的方式存储的，并且每个节点只能存储 一位 数字。
+
+请你将两个数相加，并以相同形式返回一个表示和的链表。
+
+你可以假设除了数字 0 之外，这两个数都不会以 0 开头。
+
+示例 1：
+```
+输入：l1 = [2,4,3], l2 = [5,6,4]
+输出：[7,0,8]
+解释：342 + 465 = 807.
+```
+示例 2：
+```
+输入：l1 = [0], l2 = [0]
+输出：[0]
+```
+示例 3：
+```
+输入：l1 = [9,9,9,9,9,9,9], l2 = [9,9,9,9]
+输出：[8,9,9,9,0,0,0,1]
+```
+
+
+
+## 思路
+
+首先两个链表按逆序存储，所以比如2,4,3倒过来就是3,4,2。
+
+我的做法不用反向遍历链表，直接按头节点开始相加，处理进位。
+
+结果自然也是按照逆序构建的。所以不用多一步遍历操作。
+
+:::tip
+这里稍有难度的应该是进位的处理.
+
+只要有进位，下一位就+1.
+
+
+还有空值的处理：
+```
+int val1 = (l1 != nullptr) ? l1->val : 0;
+int val2 = (l2 != nullptr) ? l2->val : 0;
+```
+:::
+
+## 题解
+
+```cpp
+/**
+ * Definition for singly-linked list.
+ * struct ListNode {
+ *     int val;
+ *     ListNode *next;
+ *     ListNode() : val(0), next(nullptr) {}
+ *     ListNode(int x) : val(x), next(nullptr) {}
+ *     ListNode(int x, ListNode *next) : val(x), next(next) {}
+ * };
+ */
+class Solution {
+public:
+    ListNode* addTwoNumbers(ListNode* l1, ListNode* l2) {
+        ListNode* temp  = new ListNode(0);
+        ListNode* cur = temp;
+        int yu = 0;
+        while(l1 != nullptr || l2 != nullptr || yu != 0){
+            // 相加，处理进位
+            int val1 = (l1!=nullptr) ? l1->val:0;
+            int val2 = (l2!=nullptr) ? l2->val:0;
+            int sum = val1+val2+yu;
+            yu = sum/10;
+            int digit = sum%10;
+            cur->next = new ListNode(digit);
+            cur = cur->next;
+
+            if(l1!=nullptr)l1 = l1->next;
+            if(l2!=nullptr)l2 = l2->next;
+
+        }
+        ListNode* result = temp->next;
+        delete temp;
+        return result;
+    }
+};
+```
+ 
+
+</WordCount>

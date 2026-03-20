@@ -132,6 +132,8 @@ const config = {
         path: 'leetcode-answer',                    // 文章存放的文件夹
         routeBasePath: '/leetcode-answer',           // 访问路径，例如 /articles
         sidebarPath: require.resolve('./sidebarsLeetCodeAnswer.js'),
+        remarkPlugins: [remarkMath],
+        rehypePlugins: [rehypeKatex],
         // 其他可选配置：editUrl、showLastUpdateAuthor 等
       },
     ],

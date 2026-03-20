@@ -3,14 +3,13 @@ import WordCount from '../src/components/WordCount/WordCount';
 
 <WordCount>
 
-地址：https://leetcode.cn/problems/unique-binary-search-trees/description/?envType=problem-list-v2&envId=binary-tree
+地址：https://leetcode.cn/problems/unique-binary-search-trees/
 
 ## 题干
 
-给你一个整数 n ，求恰由 n 个节点组成且节点值从 1 到 n 互不相同的 二叉搜索树 有多少种？返回满足题意的二叉搜索树的种数。
+给你一个整数 `n` ，求恰由 `n` 个节点组成且节点值从 1 到 `n` 互不相同的 二叉搜索树 有多少种？返回满足题意的二叉搜索树的种数。
 
  
-
 示例 1：
 ```
 输入：n = 3
@@ -33,8 +32,9 @@ import WordCount from '../src/components/WordCount/WordCount';
 本题可以用DP做，捷径为卡特兰数。
 
 卡特兰数公式：
-$$
-C_n = \frac{1}{n+1} \binom{2n}{n}
+
+$$ 
+C_n = \frac{1}{n+1} \binom{2n}{n} 
 $$
 
 DP: 定义`dp[i]`表示i个节点能组成的二叉搜索树的个数。对于`dp[i]`，我们可以枚举根节点j（1到i），那么左子树有`j-1`个节点，右子树有`i-j`个节点，左子树的种数为`dp[j-1]`，右子树的种数为`dp[i-j]`，所以以j为根的种数为`dp[j-1] * dp[i-j]`。对所有j求和得到`dp[i]`。
@@ -80,5 +80,6 @@ int numTrees(int n) {
     
 };
 ```
+
 
 </WordCount>

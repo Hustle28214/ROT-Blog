@@ -1,0 +1,113 @@
+
+
+import WordCount from '../src/components/WordCount/WordCount';
+
+<WordCount>
+
+写力扣题目多了我打算做一个题解归档，参考自己的历史思路，同时也可以存放多语言的解。
+
+由于力扣的题目非常多，而且我还想放一些ACM平台的题解比如洛谷cf，我计划后续采取分类的方式来存放实现，一道题可以使用很多知识点，我目前没想好这个分类该怎么办（当然最好是魔改一下docs，用多个label），目前处于积累阶段（说白了我就是有点懒得做这个工作），就先不分类，直接搜索获取。
+
+
+## ACM输入-输出模板
+
+### 1. 基础读写
+
+```c
+#include <bits/stdc++.h>
+using namespace std;
+
+int main() {
+    int n, m;
+    scanf("%d%d", &n, &m);          // 读取两个整数
+    printf("%d %d\n", n, m);        // 输出
+
+    double d;
+    scanf("%lf", &d);
+    printf("%.2f\n", d);            // 保留两位小数
+
+    char s[100];
+    scanf("%s", s);                 // 读取不含空格的字符串
+    printf("%s\n", s);
+
+    // 读取一整行（包括空格）
+    char line[200];
+    getchar();                      // 吸收前面的换行符
+    fgets(line, sizeof(line), stdin);
+    // 或使用 cin.getline(line, 200);
+
+    return 0;
+}
+```
+
+### 2. 使用cin/couts
+
+```c
+#include <bits/stdc++.h>
+using namespace std;
+
+int main() {
+    ios::sync_with_stdio(false);
+    cin.tie(nullptr);
+
+    int n;
+    cin >> n;
+    cout << n << '\n';
+
+    string s;
+    cin >> s;                       // 读取不含空格字符串
+    getline(cin, s);                // 读取一整行（需先处理前面的换行符）
+
+    return 0;
+}
+```
+
+### 3. 处理多组输入
+多组测试数据，每组以 n 开始，n 为 0 结束.
+```c
+int n;
+while (scanf("%d", &n) && n != 0) {
+    // 处理 n
+    for (int i = 0; i < n; ++i) {
+        int x;
+        scanf("%d", &x);
+        // ...
+    }
+}
+```
+
+### 4. 处理未知行数输入
+
+未知行数，每行两个整数，直到 EOF
+```c
+int a, b;
+while (scanf("%d%d", &a, &b) != EOF) {
+    // 处理 a, b
+}
+```
+
+### 5. 读取二维矩阵
+
+n 行 m 列的矩阵
+```c
+int n, m;
+scanf("%d%d", &n, &m);
+vector<vector<int>> mat(n, vector<int>(m));
+for (int i = 0; i < n; ++i)
+    for (int j = 0; j < m; ++j)
+        scanf("%d", &mat[i][j]);
+```
+
+### 6. 读取带空格的字符串行
+
+```c
+char line[1000];
+while (fgets(line, sizeof(line), stdin)) {
+    // 去掉末尾换行符（可选）
+    line[strcspn(line, "\n")] = '\0';
+    // 处理 line
+}
+```
+
+
+</WordCount>

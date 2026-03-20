@@ -16,7 +16,7 @@ const SkillGraph = ({
     const [centerOnCategory, setCenterOnCategory] = useState(null);
 
     console.log('SkillGraph data:', { nodes: allNodes.length, links: allLinks.length });
-
+    
     // 获取所有分类
     const categories = useMemo(() => {
         const cats = [...new Set(allNodes.map(node => node.category))].filter(Boolean);

@@ -1,0 +1,141 @@
+
+import WordCount from '../src/components/WordCount/WordCount';
+
+<WordCount>
+
+地址：https://leetcode.cn/problems/combinations/description/
+
+## 题干
+
+给定两个整数 n 和 k，返回范围 [1, n] 中所有可能的 k 个数的组合。
+
+你可以按 任何顺序 返回答案。
+
+ 
+
+示例 1：
+```
+输入：n = 4, k = 2
+输出：
+[
+  [2,4],
+  [3,4],
+  [2,3],
+  [1,2],
+  [1,3],
+  [1,4],
+]
+```
+示例 2：
+```
+输入：n = 1, k = 1
+输出：[[1]]
+```
+ 
+
+提示：
+```
+1 <= n <= 20
+1 <= k <= n
+```
+ 
+
+
+## 思路
+
+回溯法解决的问题范围：
+
+1. 组合问题：N个数里面按一定规则找出k个数的集合
+2. 切割问题：一个字符串按一定规则有几种切割方式
+3. 子集问题：一个N个数的集合里有多少符合条件的子集
+4. 排列问题：N个数按一定规则全排列，有几种排列方式
+5. 棋盘问题：N皇后，解数独等等
+
+回溯法需要先把问题简化为树形结构，分层，然后进行剪枝操作。
+
+回溯法的基本框架：
+
+```cpp
+void backtrack(参数) {
+    if (终止条件) {
+        存放结果;
+        return;
+    }
+    for (选择 : 本层集合中的元素) {
+        处理节点;
+        backtrack(路径, 选择列表); // 递归
+        回溯，撤销处理结果;
+    }
+}
+```
+
+以第一组输入为例，n = 4, k = 2 ，我们可以画出递归树：
+
+1. 第一层（选取第一个数）：可以从 1、2、3、4 中选择。
+2. 第二层（选取第二个数）：在第一个数的基础上，从比它大的数中选择，以避免重复（如选了 1 之后，只能选 2、3、4；选了 2 之后只能选 3、4……）。
+
+树形结构如下：
+```text
+
+        开始
+      /   |   \   \
+     1    2    3   4
+    /|\   /\   |
+   2 3 4  3 4  4
+```
+每条从根到叶子长度为 2 的路径就是一个组合。
+
+所以我们可以进行总结：
+
+1. 递归函数的参数和返回值
+
+需要全局变量 `result` 保存所有组合，`path` 保存当前正在构建的组合。
+
+递归函数 `Backtrack(n, k, startIndex)`：
+
+- `n`：范围上限。
+- `k`：需要选取的元素个数。
+- `startIndex`：本层搜索的起始位置（用于避免重复，保证组合递增）。
+
+2. 终止条件
+
+当 `path.size() == k` 时，说明已经找到了一个长度为 k 的组合，将其加入 result，并返回。
+3. 单层搜索的逻辑
+
+从 `startIndex` 开始遍历到 n，对于每个 i：
+
+-  将 `i` 加入 `path`。
+
+- 递归调用 `Backtrack(n, k, i+1)`，下一层从 i+1 开始，确保不重复。
+
+- 递归返回后，将 `i` 从 `path` 中弹出（回溯），以便尝试下一个 i。
+
+## 题解
+
+```cpp
+class Solution {
+private:
+    vector<vector<int>> result;
+    vector<int> path;
+    void Backtrack(int n,int k,int startIndex){
+        if(path.size()==k){
+            result.push_back(path);
+            return;
+        }
+        for(int i=startIndex;i<=n-(k-path.size())+1;++i){
+            path.push_back(i);
+            Backtrack(n,k,i+1);
+            path.pop_back();
+        }
+        
+    }
+public:
+    vector<vector<int>> combine(int n, int k) {
+        Backtrack(n,k,1);
+        return result;
+    
+    }
+};
+```
+
+</WordCount>

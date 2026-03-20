@@ -1,76 +1,84 @@
 {
-  "scripts": {
-    "docusaurus": "docusaurus",
-    "start": "docusaurus start",
-    "swizzle": "docusaurus swizzle",
-    "deploy": "docusaurus deploy",
-    "clear": "docusaurus clear",
-    "serve": "docusaurus serve",
-    "write-translations": "docusaurus write-translations",
-    "write-heading-ids": "docusaurus write-heading-ids",
-    "generate:docs-stats": "node scripts/generateStats.js",
-    "build": "npm run generate:docs-stats && docusaurus build"
-  },
-  "dependencies": {
-    "@docusaurus/core": "^3.9.2",
-    "@docusaurus/plugin-content-docs": "^3.9.2",
-    "@docusaurus/preset-classic": "^3.9.2",
-    "@docusaurus/theme-live-codeblock": "^3.9.2",
-    "@docusaurus/theme-mermaid": "^3.9.2",
-    "@easyops-cn/docusaurus-search-local": "^0.52.2",
-    "@giscus/react": "^3.0.0",
-    "@iconify-json/ri": "^1.2.5",
-    "@jdion/tilt-react": "^1.0.0",
-    "@mdx-js/react": "^3.0.0",
-    "@node-rs/jieba": "^1.10.3",
-    "clsx": "^2.0.0",
-    "d3-force": "^3.0.0",
-    "d3-selection": "^3.0.0",
-    "d3-zoom": "^3.0.0",
-    "docusaurus-lunr-search": "^3.6.0",
-    "docusaurus-plugin-image-zoom": "^3.0.1",
-    "docusaurus-plugin-zooming": "^1.0.0",
-    "framer-motion": "^12.23.24",
-    "katex": "^0.16.28",
-    "motion": "^12.4.3",
-    "plugin-image-zoom": "git+https://github.com/flexanalytics/plugin-image-zoom.git",
-    "postcss": "^8.5.3",
-    "postcss-apply": "^0.12.0",
-    "prism-react-renderer": "^2.3.0",
-    "react": "^18.0.0",
-    "react-circular-progressbar": "^2.1.0",
-    "react-dom": "^18.0.0",
-    "react-native-particles": "^0.0.8",
-    "react-router-dom": "^6.26.1",
-    "rehype-katex": "^7.0.1",
-    "rehype-mermaid": "^2.1.0",
-    "rehype-starry-night": "^2.1.0",
-    "remark-html": "^16.0.1",
-    "remark-math": "^6.0.0",
-    "remark-parse": "^11.0.0",
-    "tailwind-merge": "^3.0.1",
-    "unist-util-visit": "^2.0.0",
-    "vercel": "^50.4.7"
-  },
-  "devDependencies": {
-    "@docusaurus/module-type-aliases": "^3.9.2",
-    "@docusaurus/types": "^3.9.2",
-    "@iconify/react": "^5.2.0",
-    "tailwindcss": "^3.4.17"
-  },
-  "browserslist": {
-    "production": [
-      ">0.5%",
-      "not dead",
-      "not op_mini all"
-    ],
-    "development": [
-      "last 3 chrome version",
-      "last 3 firefox version",
-      "last 5 safari version"
-    ]
-  },
-  "engines": {
-    "node": ">=18.0"
-  }
+    "scripts": {
+        "docusaurus": "docusaurus",
+        "generate:skill-data": "node scripts/generate-skill-data.js",
+        "prestart": "npm run generate:skill-data",
+        "start": "docusaurus start",
+        "swizzle": "docusaurus swizzle",
+        "deploy": "docusaurus deploy",
+        "clear": "docusaurus clear",
+        "serve": "docusaurus serve",
+        "write-translations": "docusaurus write-translations",
+        "write-heading-ids": "docusaurus write-heading-ids",
+        "generate:docs-stats": "node scripts/generateStats.js",
+        "prebuild": "npm run generate:skill-data && npm run generate:docs-stats",
+        "build": "docusaurus build"
+    },
+    "dependencies": {
+        "@docusaurus/core": "^3.9.2",
+        "@docusaurus/plugin-content-docs": "^3.9.2",
+        "@docusaurus/preset-classic": "^3.9.2",
+        "@docusaurus/theme-live-codeblock": "^3.9.2",
+        "@docusaurus/theme-mermaid": "^3.9.2",
+        "@easyops-cn/docusaurus-search-local": "^0.52.2",
+        "@giscus/react": "^3.0.0",
+        "@iconify-json/ri": "^1.2.5",
+        "@jdion/tilt-react": "^1.0.0",
+        "@mdx-js/react": "^3.0.0",
+        "@node-rs/jieba": "^1.10.3",
+        "cheerio": "^1.2.0",
+        "clsx": "^2.0.0",
+        "d3-force": "^3.0.0",
+        "d3-selection": "^3.0.0",
+        "d3-zoom": "^3.0.0",
+        "docusaurus-lunr-search": "^3.6.0",
+        "docusaurus-plugin-image-zoom": "^3.0.1",
+        "docusaurus-plugin-zooming": "^1.0.0",
+        "feed": "^5.2.0",
+        "framer-motion": "^12.23.24",
+        "front-matter": "^4.0.2",
+        "fs-extra": "^11.3.4",
+        "glob": "^13.0.6",
+        "katex": "^0.16.28",
+        "motion": "^12.4.3",
+        "plugin-image-zoom": "git+https://github.com/flexanalytics/plugin-image-zoom.git",
+        "postcss": "^8.5.3",
+        "postcss-apply": "^0.12.0",
+        "prism-react-renderer": "^2.3.0",
+        "react": "^18.0.0",
+        "react-circular-progressbar": "^2.1.0",
+        "react-dom": "^18.0.0",
+        "react-native-particles": "^0.0.8",
+        "react-router-dom": "^6.26.1",
+        "rehype-katex": "^7.0.1",
+        "rehype-mermaid": "^2.1.0",
+        "rehype-starry-night": "^2.1.0",
+        "remark-html": "^16.0.1",
+        "remark-math": "^6.0.0",
+        "remark-parse": "^11.0.0",
+        "tailwind-merge": "^3.0.1",
+        "unist-util-visit": "^2.0.0",
+        "vercel": "^50.4.7"
+    },
+    "devDependencies": {
+        "@docusaurus/module-type-aliases": "^3.9.2",
+        "@docusaurus/types": "^3.9.2",
+        "@iconify/react": "^5.2.0",
+        "tailwindcss": "^3.4.17"
+    },
+    "browserslist": {
+        "production": [
+            ">0.5%",
+            "not dead",
+            "not op_mini all"
+        ],
+        "development": [
+            "last 3 chrome version",
+            "last 3 firefox version",
+            "last 5 safari version"
+        ]
+    },
+    "engines": {
+        "node": ">=18.0"
+    }
 }

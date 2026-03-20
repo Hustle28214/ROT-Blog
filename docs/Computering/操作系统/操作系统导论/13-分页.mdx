@@ -2,6 +2,106 @@ import WordCount from '../../../../src/components/WordCount/WordCount';
 
 <WordCount>
 
+分页需要把内存地址空间切分成大量的固定大小的单元页，记录这些单元的地址映射信息（一般存储在物理内存中）。
+
+在转换虚拟地址时，分页逻辑上需要一次额外的内存访问。
+
+如何加速地址转换？我们要增加地址转换旁路缓冲存储器（translation-lookaside buffer，TLB），即虚拟到物理地址转换的硬件缓存（cache），对每次内存访问，硬件先检查TLB，如果其中有期望的转换映射，就完成，这样不用访问页表。
+
+
+## 1. TLB的基本算法
+
+```c
+// TLB控制流算法
+VPN = (VirtualAddress & VPN_MASK) >> SHIFT
+(Success, TlbEntry) = TLB_Lookup(VPN)
+if (Success == True)
+// TLB Hit
+    if (CanAccess(TlbEntry.ProtectBits) == True)
+        Offset = VirtualAddress & OFFSET_MASK
+        PhysAddr = (TlbEntry.PFN << SHIFT) | Offset
+        AccessMemory(PhysAddr)
+    else
+        RaiseException(PROTECTION_FAULT)
+else
+// TLB Miss
+    PTEAddr = PTBR + (VPN * sizeof(PTE))
+    PTE = AccessMemory(PTEAddr)
+
+    if (PTE.Valid == False)
+        RaiseException(SEGMENTATION_FAULT)
+    else if (CanAccess(PTE.ProtectBits) == False)
+        RaiseException(PROTECTION_FAULT)
+    else
+        TLB_Insert(VPN, PTE.PFN, PTE.ProtectBits)
+        RetryInstruction()
+```
+
+
+硬件处理虚拟地址转换时，先提取页号（VPN）并检查TLB。若TLB命中，直接获取页帧号（PFN）与偏移量组合成物理地址访问内存；若未命中，则硬件访问页表查找映射并更新TLB（需额外内存引用），然后重新执行指令。TLB命中速度快，未命中则开销大，应尽量减少未命中以提高性能。
+
+## 2. 访问数组
+
+假设初始TLB为空。循环访问a\[0\]到a\[9\]：
+
+步骤1：访问a\[0\] (VPN=6)
+
+- TLB查找VPN=6 → 未命中
+
+- 硬件访问页表，获取物理帧号（假设PFN为某值，如PFN=10），加载到TLB
+
+- 然后访问内存（通过物理地址）
+
+步骤2：访问a\[1\] (VPN=6)
+
+- TLB查找VPN=6 → 命中（映射已在TLB中）
+
+- 直接得到PFN，组合偏移，访问内存
+
+步骤3：访问a\[2\] (VPN=6)
+
+- 同样命中
+
+步骤4：访问a\[3\] (VPN=7)
+
+- TLB查找VPN=7 → 未命中
+
+- 访问页表，加载映射（PFN=11），更新TLB
+- 访问内存
+
+步骤5\~7：访问a\[4\]、a\[5\]、a\[6\] (VPN=7)
+
+- 每次TLB命中
+
+步骤8：访问a\[7\] (VPN=8)
+
+- TLB查找VPN=8 → 未命中
+
+- 访问页表，加载映射（PFN=12），更新TLB
+
+- 访问内存
+
+步骤9\~10：访问a\[8\]、a\[9\] (VPN=8)
+
+- 每次TLB命中
+
+TLB命中/未命中示意图（用✔表示命中，✘表示未命中）：
+| 访问顺序 | 元素 | VPN | TLB结果 |
+|----------|------|-----|---------|
+| 1        | a\[0\] | 6   | ✘ 未命中 |
+| 2        | a\[1\] | 6   | ✔ 命中 |
+| 3        | a\[2\] | 6   | ✔ 命中 |
+| 4        | a\[3\] | 7   | ✘ 未命中 |
+| 5        | a\[4\] | 7   | ✔ 命中 |
+| 6        | a\[5\] | 7   | ✔ 命中 |
+| 7        | a\[6\] | 7   | ✔ 命中 |
+| 8        | a\[7\] | 8   | ✘ 未命中 |
+| 9        | a\[8\] | 8   | ✔ 命中 |
+| 10       | a\[9\] | 8   | ✔ 命中 |
+
+## 3. 谁来处理 TLB 未命中
+
+
 
 
 

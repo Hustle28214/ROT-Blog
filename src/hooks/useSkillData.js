@@ -1,19 +1,18 @@
 
 import { useMemo } from 'react';
+import { useEffect, useState } from 'react';
+import skillData from '@site/src/data/skill-data.json';  // Docusaurus 别名用法
 
 export const useSkillData = () => {
-    return useMemo(() => {
-        try {
-            const data = generateCompleteDocsData();
-            validateData(data);
-            return data;
-        } catch (error) {
-            console.error('获取技能数据失败:', error);
-            return { nodes: [], links: [] };
-        }
-    }, []);
-};
+  const [data, setData] = useState({ nodes: [], links: [] });
 
+  useEffect(() => {
+    // 可以直接使用导入的 skillData，也可以做额外处理
+    setData(skillData);
+  }, []);
+
+  return data;
+};
 const validateData = (data) => {
     const { nodes, links } = data;
     nodes.forEach(node => {

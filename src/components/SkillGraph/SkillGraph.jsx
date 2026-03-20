@@ -16,13 +16,7 @@ const SkillGraph = ({
     const [centerOnCategory, setCenterOnCategory] = useState(null);
 
     console.log('SkillGraph data:', { nodes: allNodes.length, links: allLinks.length });
-      if (!allNodes || allNodes.length === 0) {
-    return (
-      <div className="skill-graph-empty">
-        <p>暂无技能数据，请检查文档目录或生成脚本。</p>
-      </div>
-    );
-  }
+    
     // 获取所有分类
     const categories = useMemo(() => {
         const cats = [...new Set(allNodes.map(node => node.category))].filter(Boolean);

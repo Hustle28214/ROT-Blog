@@ -245,7 +245,7 @@ const config = {
           },  
 
           {
-            href: '/blog/rss.xml',
+            href: 'https://rot-blog.vercel.app/blog/rss.xml',
             label: 'RSS',
             position: 'right',
           },

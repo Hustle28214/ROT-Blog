@@ -204,78 +204,91 @@ value={`flowchart TD
 ## 连接方式
 
 <Mermaid
-    value={`graph TB
-    subgraph MCU[STM32H750 主控]
-        SPI1[SPI1]
-        SPI2[SPI2]
-        SPI3[SPI3]
-        SPI4[SPI4]
-        TIM_PWM[TIM2 PWM]
-        DAC1[DAC1]
-        GPIO[GPIO]
+    value={`flowchart TD
+    STM32[STM32H750VBT6<br/>主控]:::mcu
+
+    %% 发射链路
+    subgraph TX [发射链路]
+        AD9106[AD9106 DAC]:::tx
+        Transformer[T1-1T-KK81+<br/>1:1 变压器]:::tx
+        ADA4870[ADA4870 PA x4]:::tx
+        MD0100_T[MD0100 收发开关<br/>（发射侧 A 端）]:::tx
+        Probe_T[超声波探头<br/>（四通道）]:::probe
     end
 
-    subgraph TX[发射链路]
-        AD9106[AD9106 DAC]
-        ADA4870[ADA4870 功放 x4]
-        MD0100_T[MD0100 发射侧]
+    %% 接收链路
+    subgraph RX [接收链路]
+        Probe_R[超声波探头<br/>（四通道）]:::probe
+        MD0100_R[MD0100 收发开关<br/>（接收侧 B 端）]:::rx
+        Clamp[BAT54S 钳位二极管]:::rx
+        AD8334[AD8334 VGA]:::rx
+        RC_Filter[抗混叠滤波<br/>100Ω+820pF]:::rx
+        LTC2325[LTC2325-16 ADC]:::rx
     end
 
-    subgraph RX[接收链路]
-        MD0100_R[MD0100 接收侧]
-        CLAMP[BAT54S 钳位]
-        AD8334[AD8334 VGA]
-        LTC2325[LTC2325 ADC]
+    %% 电源系统
+    subgraph Power [电源系统]
+        HV_P[LT3463 +40V]:::hv
+        HV_N[LT3463 -40V]:::hv
+        MT3608[MT3608 升压<br/>5V → 6V]:::ps
+        AV_5V[LT3045 +5V_A]:::av
+        AV_3V3[LT3045 +3.3V_A]:::av
+        DV_3V3[AMS1117 +3.3V_D]:::dv
     end
 
-    subgraph POWER[电源模块]
-        HV[±40V]
-        AV_5V[+5V_A]
-        AV_3V3[+3.3V_A]
-        DV_3V3[+3.3V_D]
-    end
+    %% 控制与数据流
+    STM32 -- "SPI, GPIO, TRIGGER" --> AD9106
+    AD9106 -- "差分电流 (IOUTP/IOUTN)" --> Transformer
+    Transformer -- "单端电压 (~1V)" --> ADA4870
+    ADA4870 -- "高压脉冲 (±38V)" --> MD0100_T --> Probe_T
 
-    subgraph PROBE[探头接口]
-        PROBE1[四通道探头]
-    end
-
-    %% 控制信号连接
-    SPI1 -- "CS,SCK,MOSI" --> AD9106
-    GPIO -- "RESET, TRIGGER" --> AD9106
-    TIM_PWM -- "50MHz 时钟" --> AD9106
-    
-    GPIO -- "HILO, MODE" --> AD8334
-    DAC1 -- "GAIN 控制电压" --> AD8334
-    
-    SPI2 -- "SCK" --> LTC2325
-    SPI2 -- "MISO" --> LTC2325
-    SPI3 -- "MISO" --> LTC2325
-    SPI4 -- "MISO" --> LTC2325
-    GPIO -- "CNV, BUSY" --> LTC2325
-
-    %% 发射信号流
-    AD9106 -- "差分电流 (IOUTP/IOUTN)" --> ADA4870
-    ADA4870 -- "高压脉冲 (40Vpp)" --> MD0100_T
-    MD0100_T -- "发射脉冲" --> PROBE1
-
-    %% 接收信号流
-    PROBE1 -- "回波信号" --> MD0100_R
-    MD0100_R -- "微弱回波" --> CLAMP
-    CLAMP -- "钳位后信号" --> AD8334
-    AD8334 -- "差分输出 (VOH/VOL)" --> LTC2325
-    LTC2325 -- "16位并行数据" --> SPI2/SPI3/SPI4
+    Probe_R --> MD0100_R --> Clamp --> AD8334
+    STM32 -- "DAC/PWM (GAIN12/34)" --> AD8334
+    STM32 -- "GPIO (HILO, MODE)" --> AD8334
+    AD8334 -- "差分输出 (VOHx/VOLx)" --> RC_Filter --> LTC2325
+    LTC2325 -- "4×SPI (MISO), CNV, SCK" --> STM32
 
     %% 电源分配
-    HV --> ADA4870
+    HV_P --> ADA4870
+    HV_N --> ADA4870
+    MT3608 -- "6V" --> AV_5V
     AV_5V --> AD9106
     AV_5V --> AD8334
     AV_5V --> LTC2325
     AV_3V3 --> AD9106
     AV_3V3 --> LTC2325
-    DV_3V3 --> MCU
+    DV_3V3 --> STM32
 
-    %% 共用器件示意
-    MD0100_T -.-> MD0100_R`}
+    %% 共用器件示意（虚线）
+    Probe_T -.-> Probe_R
+    MD0100_T -.-> MD0100_R
+
+    %% 样式定义
+    classDef mcu fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+    classDef tx fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    classDef rx fill:#e8f5e9,stroke:#1b5e20,stroke-width:2px
+    classDef probe fill:#f3e5f5,stroke:#4a148c,stroke-width:1px
+    classDef hv fill:#ffebee,stroke:#b71c1c,stroke-width:2px
+    classDef av fill:#e0f2fe,stroke:#0c4e6e,stroke-width:2px
+    classDef dv fill:#e0f2e9,stroke:#1e5f3e,stroke-width:2px
+    classDef ps fill:#fff9c4,stroke:#b26a00,stroke-width:2px`}
 />
+
+## 设计中用到的关键芯片列表
+
+| 芯片型号 | 功能 | 关键参数 | 数量 |
+| :--- | :--- | :--- | :--- |
+| **STM32H750VBT6** | 主控MCU | ARM Cortex-M7, 480MHz, 128KB Flash, 5×SPI | 1 |
+| **AD9106BCPZ** | 四通道波形发生器 (DAC) | 12位, 180MSPS, 内置DDS和SRAM, 4mA输出 | 1 |
+| **ADA4870ARRZ** | 高速高压功放 | ±40V供电, 1A输出, 2500V/µs压摆率 | 4 |
+| **MD0100** | 双通道收发开关 | 无源器件, 自动切换, 耐压±100V | 2 |
+| **AD8334ACPZ** | 四通道VGA | 5V供电, 100MHz带宽, 48dB增益范围, 超低噪声 | 1 |
+| **LTC2325CUKG-16#PBF** | 四通道16位ADC | 5Msps同步采样, 8Vpp差分输入, SPI/CMOS接口 | 1 |
+| **LT3463AEDD#PBF** | 双通道DC-DC高压电源 | 输入2.4V-15V, 输出±40V, 集成肖特基二极管 | 2 |
+| **MT3608** | 升压DC-DC | 输入5V, 输出6V, 1.2MHz开关频率 | 1 |
+| **LT3045EDD#PBF** | 超低噪声LDO | 500mA, 0.8µV RMS噪声, 可调输出 | 2 |
+| **T1-1T-KK81+** | 1:1宽带变压器 | 80kHz-200MHz, 用于差分转单端 | 4 |
+| **BAT54S** | 肖特基二极管 | 30V, 200mA, 用于MD0100 B端钳位 | 4 |
+| **BAS21** | 高压肖特基二极管 | 200V, 200mA, 用于LT3463负压部分 | 2 |
 
 </WordCount>

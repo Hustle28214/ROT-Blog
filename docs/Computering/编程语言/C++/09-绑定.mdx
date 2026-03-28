@@ -1,0 +1,152 @@
+
+import WordCount from '../../../../src/components/WordCount/WordCount';
+import Mermaid from '@theme/Mermaid';
+
+<WordCount>
+
+C++ 中的绑定指的是函数调用与函数体代码之间的关联过程。根据确定时机的不同，分为静态绑定和动态绑定。
+
+## 0. 静态类型和动态类型
+
+关于静态绑定和静态类型/动态绑定和动态类型有一些误区，可能会混淆。
+
+静态类型和动态类型是关于变量/表达式的类型分类，而静态绑定和动态绑定是关于函数调用如何关联到实际代码的机制。它们密切相关，但属于不同层面。
+
+静态类型（Static Type）指的是变量或表达式在**编译时已知的类型**。它由声明决定，不会改变。它决定了编译器能看到哪些成员、能进行哪些类型检查。
+
+动态类型（Dynamic Type）指的是变量或表达式在**运行时实际指向的对象的类型**。只有通过指针或引用访问多态对象时，它才有意义。对于非多态类型，动态类型等于静态类型。
+
+```cpp
+Base* ptr = new Derived();   // 静态类型：Base*；动态类型：Derived*
+// 定义了一个指针变量 ptr，它的静态类型是 Base*，因为它被声明为指向 Base 类型的指针。
+// 而 ptr 在运行时实际指向的是一个 Derived 类型的对象，因此 *ptr 的动态类型是 Derived（或者说 ptr 指向的对象的动态类型是 Derived）。
+```
+
+
+## 1. 静态绑定
+
+静态绑定是指**函数调用的目标在编译阶段就已经确定**，编译器根据**调用者（对象、指针或引用）的静态类型**（即声明时的类型）直接生成调用代码，不需要等到运行时再决定。
+
+对于非虚函数（普通成员函数）、全局函数、静态函数、重载函数，C++ 一律采用静态绑定。编译器看到 `obj.func()` 或 `ptr->func()`，就根据 obj 或 ptr 的声明类型去查找 func 的定义，找到后直接生成调用指令（如 `call Base::func`）。
+
+举个例子：
+
+```cpp
+class Base {
+public:
+    void show() { cout << "Base\n"; }   // 非虚
+    virtual void vshow() { cout << "Base virtual\n"; }
+};
+
+class Derived : public Base {
+public:
+    void show() { cout << "Derived\n"; }      // 隐藏基类的 show
+    void vshow() override { cout << "Derived virtual\n"; }
+};
+
+void test() {
+    Base* p = new Derived();   // 静态类型 Base*，动态类型 Derived*
+    p->show();                 // 静态绑定 → 调用 Base::show
+    p->vshow();                // 动态绑定 → 调用 Derived::vshow
+}
+```
+`p->show()`：因为 show 不是虚函数，编译器只看 p 的静态类型（Base*），直接生成调用 Base::show 的代码。即使 p 实际指向 Derived 对象，也永远不会执行 Derived::show。
+
+`p->vshow()`：vshow 是虚函数，所以采用动态绑定，运行时根据 p 实际指向的对象类型调用 Derived::vshow。
+
+静态绑定有哪些优势？
+
+一是效率高：直接函数调用，没有虚表查找开销。
+
+二是可内联：编译器在编译时能看到函数体，可以将其内联展开。
+
+## 2. 动态绑定
+
+动态绑定指在**程序运行时才确定应该调用哪个函数**，而不是在编译时决定。它依赖于对象的动态类型（即实际创建的对象类型），而不是指针或引用的静态类型（声明时的类型）。
+
+动态绑定的技术核心实际上是虚函数表(vTable)。
+
+当通过基类指针或引用操作对象时，我们可能希望调用实际派生类中覆盖的函数版本，而不是基类的版本。这就需要在运行时根据对象的具体类型来选择正确的函数，从而实现多态。
+
+```cpp
+void playSound(Animal* animal) {
+    animal->speak();   // 希望根据实际动物类型发出不同声音
+}
+```
+如果 `speak` 是虚函数，`playSound` 可以传入任何派生类对象（如 Dog、Cat），并且会自动调用正确的版本。
+
+### 2.1 如何实现动态绑定
+
+首先我们可以想想为什么动态绑定能被实现？
+
+当我们通过基类指针或引用调用虚函数时，必须能够根据对象的实际类型来决定调用哪个函数。如果编译器在编译时就把调用地址固定下来，就无法实现多态。
+
+因此，需要一个在运行时可以查询的“函数映射表”——这就是虚表。
+
+虚函数表（vtable）是一个函数指针数组，存放该类所有虚函数的地址。每个含有虚函数的类（包括派生类）都有自己的一张虚表。
+
+伴随每个对象的是一个指向其虚表的指针（vptr）。
+
+虚指针（vptr）是每个对象内部隐藏的一个指针，指向该对象所属类的虚表。对象创建时（构造函数中），编译器自动设置 vptr。
+
+为了更好的理解，我们举个例子：
+
+```cpp
+class Animal{
+    public:
+        virtual void speak_sound1(){
+            cout << "Animal speak_sound1\n";
+        }
+        virtual void speak_sound2(){
+            cout << "Animal speak_sound2\n";
+        }
+        virtual void speak_sound3(){
+            cout << "Animal speak_sound3\n";
+        }
+        
+        virtual ~Animal() = default;
+}
+
+class Dog : public Animal{
+    public:
+        void speak_sound1() override{
+            cout << "Dog speak_sound1\n";
+        }
+        
+        virtual void speak_sound4(){
+            cout << "Dog speak_sound4\n";
+        }
+    
+}
+```
+分析Animal类的虚表，有三个槽位，分别是对应`&Animal::speak_sound1`、`&Animal::speak_sound2`、`&Animal::speak_sound3`。
+
+Dog的虚表继承了Animal的虚表，在三个槽位的基础上多了一个槽位，对应`&Dog::speak_sound4`。同时，`&Dog::speak_sound1`被新的`&Dog::speak_sound1`槽位覆盖了。
+
+接着，看对象内存布局。
+
+Animal对象只包含一个虚指针`vptr`，指向Animal的虚表。
+
+Dog对象只包含一个虚指针`vptr`，指向Dog的虚表。因为单继承下，派生类对象在基类子对象的基础上增加成员，`vptr` 通常位于对象起始位置。
+
+接着看一下调用过程：
+
+```cpp
+Animal* animal = new Dog();
+animal -> speak_sound1();
+```
+对于`animal -> speak_sound1()`，它知道 `speak_sound1` 在虚表中的索引（假设为 0）。
+
+运行时，它先从`animal`指向的对象中取出`vptr`，即`vptr = *(void**)animal`。
+
+调用虚函数时，编译器生成的代码大致为：
+```cpp
+// 伪代码
+(*obj->vptr[index])(obj, args);
+```
+让我们一步步分析这个过程：
+
+
+
+
+</WordCount>

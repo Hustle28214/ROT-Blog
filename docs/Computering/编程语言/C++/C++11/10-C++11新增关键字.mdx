@@ -1,0 +1,34 @@
+import WordCount from '../../../../../src/components/WordCount/WordCount';
+import Mermaid from '@theme/Mermaid';
+
+<WordCount>
+
+## constexpr关键字
+
+使指定的函数或类在编译时获得常量表达式的结果。
+
+和`const`关键字的区别在于，`const`仍可能修饰一个动态变量，但`constexpr`修饰的一定是常量，有多常量，整个运行时都不能被改变。
+
+`constexpr`可以修饰函数，
+
+## final关键字
+
+这部分基础可以看[final关键字](../07-重载、重写、隐藏.mdx)，在此作出补充：
+
+### 底层实现原理
+
+首先，final关键字存在编译期约束，在编译期由编译器直接检查，免去了运行时开销。
+
+### 后续标准演进
+
+final关键字的后续演进影响比较小，主要是它设计的目的本身只有两个，为了防止继承，以及防止虚函数被重写。
+
+C++14中，编译器对 final 的优化支持逐渐成熟，尤其是对于 final 类，编译器可以更激进地去虚化（devirtualization）。
+
+C++20 新增了 `[[likely]]` / `[[unlikely]]` 属性，可与 final 结合使用以指导优化，但这不是 final 本身的演进。
+
+## override关键字
+
+这部分可以看[override关键字](../07-重载、重写、隐藏.mdx)
+
+</WordCount>

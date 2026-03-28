@@ -73,11 +73,62 @@ import WordCount from '../src/components/WordCount/WordCount';
 ## 题解
 ```cpp
 class Solution {
+private:
+    int n;
+    vector<int> segment;
+    void build(int p,int l,int r){
+        if(l==r){
+            segment[p]=1;
+            return;
+        }
+        int mid =(l+r)/2;
+        build(p*2,l,mid);
+        build(p*2+1,mid+1,r);
+        segment[p] = segment[p*2]+segment[p*2+1];
+    }
+    // 查询第 k 个空位的位置（k 从 1 开始）
+    // 每个内部节点存储其子节点区间内空位的总数
+    int query(int p,int l,int r,int k){
+        if(l==r)return l;
+        int mid=(l+r)/2;
+        if(segment[p*2]>=k){
+            return query(p*2,l,mid,k);
+        }else{
+            return query(p*2+1,mid+1,r,k-segment[p*2]);
+        }
+    }
+    void update(int p,int l,int r,int pos){
+        if(l==r){
+            segment[p] = 0;
+            return ;
+        }
+        int mid = (l+r)/2;
+        if(pos<=mid){
+            update(p*2,l,mid,pos);// 找左子树
+        }else{
+            update(p*2+1,mid+1,r,pos);// 找右子树
+        }
+        segment[p] = segment[p*2]+segment[p*2+1];
+    }
 public:
     vector<vector<int>> reconstructQueue(vector<vector<int>>& people) {
-        vector<vector<int>> res;
-        // 排序
-        sort()
+        n = people.size();
+        vector<vector<int>> result(n);
+        sort(people.begin(), people.end(), [](const vector<int>& a, const vector<int>& b) {
+          // lambda表达式做比较器，捕获列表为空，不捕获外部变量
+            if (a[0] != b[0]) return a[0] > b[0];   // 身高降序
+            return a[1] < b[1];                     // 同身高 k 升序
+        });
+        segment.resize(4*n);
+        build(1, 0, n - 1);
+        for(int i=0;i<n;++i){
+            int h=people[i][0];
+            int k=people[i][1];
+            int pos = query(1, 0, n-1, k+1);
+            result[pos] = {h, k};
+            update(1, 0, n-1, pos);
+        }
+        return result;
     }
 };
 ```

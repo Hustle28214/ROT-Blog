@@ -2,4 +2,51 @@ import WordCount from '../../../src/components/WordCount/WordCount';
 
 <WordCount>
 
+## 工厂模式
+
+工厂模式是指父类中提供一个创建对象的方法，子类来自行决定实例化对象的类型。
+
+这样说的比较抽象，举个例子：
+
+你正在写一家跨国电商的后台系统。
+
+假设你有一个抽象父类叫 Logistics（物流），里面定义了一个发货的流程。这个流程是固定的：先包装、再创建物流单、最后发货。
+
+```cpp
+#include <iostream>
+#include <memory>  // for std::unique_ptr
+
+// 抽象产品：运输工具
+class Transport {
+public:
+    virtual ~Transport() = default;  // 虚析构，确保子类正确释放
+    virtual void ship() const = 0;   // 纯虚函数，具体运输方式由子类实现
+};
+
+// 抽象创建者：物流
+class Logistics {
+public:
+    virtual ~Logistics() = default;
+
+    // 工厂方法：父类提供这个“创建对象的方法”，但具体实现交给子类
+    // 返回智能指针，自动管理生命周期
+    virtual std::unique_ptr<Transport> createTransport() const = 0;
+
+    // 模板方法：定义了发货的固定流程
+    void deliver(const std::string& packageId) const {
+        std::cout << "包装货物：" << packageId << std::endl;
+
+        // 调用工厂方法获取具体运输工具（多态）
+        auto transport = createTransport();
+
+        // 运输
+        transport->ship();
+
+        std::cout << "货物已签收" << std::endl;
+    }
+};
+```
+
+
+
 </WordCount>

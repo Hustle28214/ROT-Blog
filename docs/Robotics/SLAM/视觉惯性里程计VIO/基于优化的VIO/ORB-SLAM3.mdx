@@ -1,0 +1,32 @@
+import WordCount from '../../../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+## ORB-SLAM3简介
+
+
+## ORB-SLAM3架构
+
+### 支持传感器列表
+
+ORB-SLAM3支持的相机（视觉传感器）包括：
+
+- 单目相机(Monoocular Camera)
+- 双目相机(Stereo Camera)
+- RGB-D相机(RGB-D Camera)
+
+而支持的输入包括：
+
+- 单目相机图像（单目SLAM）+ 时间戳
+- 双目相机图像（双目SLAM）+ 时间戳
+- RGB-D相机图像（多目SLAM）+ 时间戳
+- 单目相机图像+ 惯性传感器数据（IMU）+ 时间戳 （VIO）
+- 双目相机图像+ 惯性传感器数据（IMU）+ 时间戳 （VIO）
+- RGB-D相机图像+ 惯性传感器数据（IMU）+ 时间戳 （VIO）
+
+具体配置可见于examples文件夹下。
+
+
+
+
+</WordCount>

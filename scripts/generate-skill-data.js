@@ -29,6 +29,14 @@ function generateId(relPath) {
   return relPath.replace(/[\\/.]/g, '-').replace(/^-/, '');
 }
 
+function normalizeDocPathForRoute(itemRelPath) {
+  const withoutExt = itemRelPath.replace(/\.mdx?$/, '');
+  const segments = withoutExt.split('/');
+  const lastIndex = segments.length - 1;
+  segments[lastIndex] = segments[lastIndex].replace(/^\d+-/, '');
+  return segments.join('/');
+}
+
 function scanDir(dirPath, relPath, parentId, parentType, category) {
   const items = fs.readdirSync(dirPath);
   for (const item of items) {
@@ -65,7 +73,7 @@ function scanDir(dirPath, relPath, parentId, parentType, category) {
         type: 'skill',
         level: 'intermediate',
         color: CATEGORY_COLORS[category] || '#CCCCCC',
-        docPath: itemRelPath.replace(/\.mdx?$/, ''),
+        docPath: normalizeDocPathForRoute(itemRelPath),
         progress: Math.floor(Math.random() * 100),
         tags: [],
       });

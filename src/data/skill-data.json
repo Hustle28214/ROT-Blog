@@ -36,7 +36,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/WEB开发/Docusaurus/Plugins",
-      "progress": 89,
+      "progress": 20,
       "tags": []
     },
     {
@@ -47,7 +47,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/WEB开发/Docusaurus/Swizzle",
-      "progress": 30,
+      "progress": 32,
       "tags": []
     },
     {
@@ -58,7 +58,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/WEB开发/Docusaurus/Vercel联合部署",
-      "progress": 63,
+      "progress": 3,
       "tags": []
     },
     {
@@ -87,7 +87,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/信息安全/密码学/密码基础",
-      "progress": 16,
+      "progress": 6,
       "tags": []
     },
     {
@@ -107,7 +107,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/信息安全/密码学/密码学数论/素数和模运算",
-      "progress": 99,
+      "progress": 32,
       "tags": []
     },
     {
@@ -118,7 +118,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/信息安全/密码学/密码学数论/最大公约数、扩展欧几里得算法和最小公倍数",
-      "progress": 5,
+      "progress": 45,
       "tags": []
     },
     {
@@ -129,7 +129,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/信息安全/密码学/密码学数论/算术基本定理证明、等价关系、同余和乘法逆元",
-      "progress": 42,
+      "progress": 33,
       "tags": []
     },
     {
@@ -149,7 +149,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/实用工作流/8分钟入门Markdown",
-      "progress": 0,
+      "progress": 94,
       "tags": []
     },
     {
@@ -160,7 +160,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/实用工作流/Git",
-      "progress": 18,
+      "progress": 49,
       "tags": []
     },
     {
@@ -189,7 +189,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/并行计算与分布式系统/Fine-tunning/P-tuning和Adapter",
-      "progress": 47,
+      "progress": 48,
       "tags": []
     },
     {
@@ -200,7 +200,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/并行计算与分布式系统/Fine-tunning/全量微调",
-      "progress": 38,
+      "progress": 88,
       "tags": []
     },
     {
@@ -211,7 +211,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/并行计算与分布式系统/Fine-tunning/显存计算",
-      "progress": 1,
+      "progress": 53,
       "tags": []
     },
     {
@@ -222,7 +222,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/并行计算与分布式系统/Fine-tunning/模型评估",
-      "progress": 19,
+      "progress": 50,
       "tags": []
     },
     {
@@ -242,7 +242,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/并行计算与分布式系统/GPU编程/CUDA基础",
-      "progress": 40,
+      "progress": 32,
       "tags": []
     },
     {
@@ -262,7 +262,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/并行计算与分布式系统/RLHF技术/DPO和PPO算法",
-      "progress": 47,
+      "progress": 81,
       "tags": []
     },
     {
@@ -273,7 +273,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/并行计算与分布式系统/RLHF技术/Reward Model",
-      "progress": 89,
+      "progress": 15,
       "tags": []
     },
     {
@@ -284,7 +284,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/并行计算与分布式系统/RLHF技术/RLHF",
-      "progress": 12,
+      "progress": 94,
       "tags": []
     },
     {
@@ -304,7 +304,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/并行计算与分布式系统/协同进化计算与多智能体系统/绪论",
-      "progress": 42,
+      "progress": 89,
       "tags": []
     },
     {
@@ -324,7 +324,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/并行计算与分布式系统/模型分布式训练和并行计算/MOE并行与Deepspeed",
-      "progress": 7,
+      "progress": 80,
       "tags": []
     },
     {
@@ -335,7 +335,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/并行计算与分布式系统/模型分布式训练和并行计算/多维混合并行与自动并行",
-      "progress": 92,
+      "progress": 68,
       "tags": []
     },
     {
@@ -346,7 +346,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/并行计算与分布式系统/模型分布式训练和并行计算/数据并行和模型并行",
-      "progress": 7,
+      "progress": 42,
       "tags": []
     },
     {
@@ -357,7 +357,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/并行计算与分布式系统/模型分布式训练和并行计算/流水线并行与张量并行",
-      "progress": 26,
+      "progress": 53,
       "tags": []
     },
     {
@@ -377,7 +377,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/并行计算与分布式系统/调度算法/调度算法简介",
-      "progress": 86,
+      "progress": 10,
       "tags": []
     },
     {
@@ -397,7 +397,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/并行计算与分布式系统/高性能计算HPC/HIP异构编程模型",
-      "progress": 57,
+      "progress": 55,
       "tags": []
     },
     {
@@ -408,7 +408,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/并行计算与分布式系统/高性能计算HPC/优化程序性能方法概览",
-      "progress": 22,
+      "progress": 47,
       "tags": []
     },
     {
@@ -437,7 +437,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/操作系统/Linux/Shell",
-      "progress": 28,
+      "progress": 3,
       "tags": []
     },
     {
@@ -448,7 +448,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/操作系统/Linux/Shell工具与脚本",
-      "progress": 59,
+      "progress": 30,
       "tags": []
     },
     {
@@ -459,7 +459,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/操作系统/Linux/Linux系统简介",
-      "progress": 80,
+      "progress": 76,
       "tags": []
     },
     {
@@ -470,7 +470,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/操作系统/Linux/Linux文件系统",
-      "progress": 79,
+      "progress": 40,
       "tags": []
     },
     {
@@ -481,7 +481,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/操作系统/Linux/Shell压缩命令",
-      "progress": 5,
+      "progress": 76,
       "tags": []
     },
     {
@@ -501,7 +501,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/操作系统/Linux/Linux驱动开发/字符设备驱动框架",
-      "progress": 43,
+      "progress": 81,
       "tags": []
     },
     {
@@ -521,7 +521,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/操作系统/QEMU/Hypervisor（虚拟机监控器）",
-      "progress": 69,
+      "progress": 98,
       "tags": []
     },
     {
@@ -532,7 +532,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/操作系统/QEMU/面向对象建模",
-      "progress": 22,
+      "progress": 84,
       "tags": []
     },
     {
@@ -552,7 +552,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/操作系统/操作系统导论/进程",
-      "progress": 36,
+      "progress": 75,
       "tags": []
     },
     {
@@ -563,7 +563,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/操作系统/操作系统导论/进程API",
-      "progress": 11,
+      "progress": 6,
       "tags": []
     },
     {
@@ -574,7 +574,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/操作系统/操作系统导论/受限直接执行",
-      "progress": 12,
+      "progress": 14,
       "tags": []
     },
     {
@@ -585,7 +585,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/操作系统/操作系统导论/进程调度",
-      "progress": 15,
+      "progress": 64,
       "tags": []
     },
     {
@@ -596,7 +596,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/操作系统/操作系统导论/多级反馈队列",
-      "progress": 11,
+      "progress": 80,
       "tags": []
     },
     {
@@ -607,7 +607,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/操作系统/操作系统导论/比例份额",
-      "progress": 56,
+      "progress": 26,
       "tags": []
     },
     {
@@ -618,7 +618,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/操作系统/操作系统导论/多处理器调度",
-      "progress": 62,
+      "progress": 72,
       "tags": []
     },
     {
@@ -629,7 +629,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/操作系统/操作系统导论/地址空间",
-      "progress": 44,
+      "progress": 52,
       "tags": []
     },
     {
@@ -640,7 +640,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/操作系统/操作系统导论/内存操作API",
-      "progress": 11,
+      "progress": 8,
       "tags": []
     },
     {
@@ -651,7 +651,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/操作系统/操作系统导论/地址转换",
-      "progress": 67,
+      "progress": 60,
       "tags": []
     },
     {
@@ -662,7 +662,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/操作系统/操作系统导论/分段",
-      "progress": 32,
+      "progress": 41,
       "tags": []
     },
     {
@@ -673,7 +673,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/操作系统/操作系统导论/空闲空间管理",
-      "progress": 38,
+      "progress": 82,
       "tags": []
     },
     {
@@ -684,7 +684,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/操作系统/操作系统导论/分页",
-      "progress": 82,
+      "progress": 94,
       "tags": []
     },
     {
@@ -695,7 +695,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/操作系统/操作系统导论/快速地址转换",
-      "progress": 54,
+      "progress": 2,
       "tags": []
     },
     {
@@ -706,7 +706,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/操作系统/操作系统导论/分页进阶",
-      "progress": 86,
+      "progress": 82,
       "tags": []
     },
     {
@@ -717,7 +717,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/操作系统/操作系统导论/交换空间",
-      "progress": 41,
+      "progress": 89,
       "tags": []
     },
     {
@@ -728,7 +728,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/操作系统/操作系统导论/缓存管理",
-      "progress": 57,
+      "progress": 88,
       "tags": []
     },
     {
@@ -739,7 +739,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/操作系统/操作系统导论/VMS虚拟内存系统",
-      "progress": 43,
+      "progress": 89,
       "tags": []
     },
     {
@@ -750,7 +750,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/操作系统/操作系统导论/并发",
-      "progress": 56,
+      "progress": 64,
       "tags": []
     },
     {
@@ -761,7 +761,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/操作系统/操作系统导论/线程API",
-      "progress": 30,
+      "progress": 20,
       "tags": []
     },
     {
@@ -772,7 +772,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/操作系统/操作系统导论/锁",
-      "progress": 26,
+      "progress": 32,
       "tags": []
     },
     {
@@ -783,7 +783,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/操作系统/操作系统导论/基于锁的并发数据结构",
-      "progress": 24,
+      "progress": 27,
       "tags": []
     },
     {
@@ -794,7 +794,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/操作系统/操作系统导论/条件变量",
-      "progress": 92,
+      "progress": 30,
       "tags": []
     },
     {
@@ -805,7 +805,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/操作系统/操作系统导论/信号量",
-      "progress": 47,
+      "progress": 62,
       "tags": []
     },
     {
@@ -816,7 +816,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/操作系统/操作系统导论/常见并发问题",
-      "progress": 58,
+      "progress": 7,
       "tags": []
     },
     {
@@ -827,7 +827,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/操作系统/操作系统导论/基于事件的并发",
-      "progress": 92,
+      "progress": 9,
       "tags": []
     },
     {
@@ -847,7 +847,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/数字图像处理/数字图像基础",
-      "progress": 18,
+      "progress": 6,
       "tags": []
     },
     {
@@ -858,7 +858,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/数字图像处理/数字图像特征",
-      "progress": 71,
+      "progress": 33,
       "tags": []
     },
     {
@@ -869,7 +869,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/数字图像处理/离散二维处理",
-      "progress": 67,
+      "progress": 68,
       "tags": []
     },
     {
@@ -880,7 +880,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/数字图像处理/图像改进",
-      "progress": 32,
+      "progress": 61,
       "tags": []
     },
     {
@@ -891,7 +891,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/数字图像处理/图像分析",
-      "progress": 22,
+      "progress": 8,
       "tags": []
     },
     {
@@ -902,7 +902,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/数字图像处理/图像处理软件",
-      "progress": 14,
+      "progress": 76,
       "tags": []
     },
     {
@@ -913,7 +913,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/数字图像处理/速通yoloV10",
-      "progress": 4,
+      "progress": 66,
       "tags": []
     },
     {
@@ -933,7 +933,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/数据结构/HashTable哈希表",
-      "progress": 48,
+      "progress": 22,
       "tags": []
     },
     {
@@ -944,7 +944,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/数据结构/Trie字典树",
-      "progress": 93,
+      "progress": 48,
       "tags": []
     },
     {
@@ -955,7 +955,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/数据结构/单调栈",
-      "progress": 41,
+      "progress": 97,
       "tags": []
     },
     {
@@ -966,7 +966,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/数据结构/单调队列",
-      "progress": 95,
+      "progress": 36,
       "tags": []
     },
     {
@@ -977,7 +977,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/数据结构/哈夫曼树",
-      "progress": 69,
+      "progress": 15,
       "tags": []
     },
     {
@@ -997,7 +997,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/数据结构/堆/d-叉堆",
-      "progress": 49,
+      "progress": 55,
       "tags": []
     },
     {
@@ -1008,7 +1008,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/数据结构/堆/二叉堆",
-      "progress": 97,
+      "progress": 77,
       "tags": []
     },
     {
@@ -1019,7 +1019,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/数据结构/堆/左偏树",
-      "progress": 26,
+      "progress": 73,
       "tags": []
     },
     {
@@ -1030,7 +1030,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/数据结构/堆/配对堆",
-      "progress": 67,
+      "progress": 21,
       "tags": []
     },
     {
@@ -1041,7 +1041,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/数据结构/并查集",
-      "progress": 86,
+      "progress": 64,
       "tags": []
     },
     {
@@ -1052,7 +1052,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/数据结构/栈",
-      "progress": 63,
+      "progress": 23,
       "tags": []
     },
     {
@@ -1063,7 +1063,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/数据结构/树状数组",
-      "progress": 84,
+      "progress": 64,
       "tags": []
     },
     {
@@ -1083,7 +1083,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/数据结构/线段树/ZKW 线段树",
-      "progress": 8,
+      "progress": 37,
       "tags": []
     },
     {
@@ -1094,7 +1094,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/数据结构/线段树/主席树",
-      "progress": 95,
+      "progress": 25,
       "tags": []
     },
     {
@@ -1105,7 +1105,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/数据结构/线段树/扫描线线段树",
-      "progress": 87,
+      "progress": 47,
       "tags": []
     },
     {
@@ -1116,7 +1116,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/数据结构/线段树/权值线段树",
-      "progress": 64,
+      "progress": 58,
       "tags": []
     },
     {
@@ -1127,7 +1127,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/数据结构/线段树/李超线段树",
-      "progress": 38,
+      "progress": 80,
       "tags": []
     },
     {
@@ -1138,7 +1138,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/数据结构/线段树/树套树",
-      "progress": 70,
+      "progress": 81,
       "tags": []
     },
     {
@@ -1149,7 +1149,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/数据结构/线段树/线段树",
-      "progress": 24,
+      "progress": 6,
       "tags": []
     },
     {
@@ -1160,7 +1160,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/数据结构/链表与邻接表",
-      "progress": 23,
+      "progress": 46,
       "tags": []
     },
     {
@@ -1171,7 +1171,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/数据结构/队列",
-      "progress": 27,
+      "progress": 23,
       "tags": []
     },
     {
@@ -1200,7 +1200,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/机器学习/AAAMLP/SupervisedLearning监督学习",
-      "progress": 80,
+      "progress": 37,
       "tags": []
     },
     {
@@ -1211,7 +1211,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/机器学习/AAAMLP/CrossValidation交叉验证",
-      "progress": 75,
+      "progress": 36,
       "tags": []
     },
     {
@@ -1222,7 +1222,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/机器学习/AAAMLP/EvaluationMetrics评估指标",
-      "progress": 85,
+      "progress": 45,
       "tags": []
     },
     {
@@ -1233,7 +1233,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/机器学习/AAAMLP/ArrangingMLProjects组织机器学习",
-      "progress": 31,
+      "progress": 15,
       "tags": []
     },
     {
@@ -1244,7 +1244,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/机器学习/AAAMLP/ApproachingCategoricalVar处理分类变量",
-      "progress": 72,
+      "progress": 94,
       "tags": []
     },
     {
@@ -1255,7 +1255,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/机器学习/AAAMLP/FeatureEngineering特征工程",
-      "progress": 8,
+      "progress": 18,
       "tags": []
     },
     {
@@ -1266,7 +1266,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/机器学习/AAAMLP/FeatureSelection特征选择",
-      "progress": 50,
+      "progress": 98,
       "tags": []
     },
     {
@@ -1277,7 +1277,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/机器学习/AAAMLP/HyperparameterOptimization超参数优化",
-      "progress": 76,
+      "progress": 44,
       "tags": []
     },
     {
@@ -1288,7 +1288,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/机器学习/AAAMLP/ApproachingImageClassification&Segmentation图像分类和分割",
-      "progress": 83,
+      "progress": 32,
       "tags": []
     },
     {
@@ -1299,7 +1299,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/机器学习/AAAMLP/ApproachingTextClassification&Regression文本分类或回归",
-      "progress": 89,
+      "progress": 76,
       "tags": []
     },
     {
@@ -1310,7 +1310,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/机器学习/AAAMLP/ApproachingEnsembling&Stacking组合和堆叠",
-      "progress": 33,
+      "progress": 96,
       "tags": []
     },
     {
@@ -1321,7 +1321,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/机器学习/AAAMLP/ApproachingReproducibleCode&ModelServing可重复代码和模型",
-      "progress": 83,
+      "progress": 32,
       "tags": []
     },
     {
@@ -1332,7 +1332,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/机器学习/AAAMLP/阅读本系列的提示",
-      "progress": 34,
+      "progress": 61,
       "tags": []
     },
     {
@@ -1352,7 +1352,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/机器学习/推荐系统/概述",
-      "progress": 89,
+      "progress": 1,
       "tags": []
     },
     {
@@ -1363,7 +1363,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/机器学习/推荐系统/协同过滤",
-      "progress": 40,
+      "progress": 19,
       "tags": []
     },
     {
@@ -1383,7 +1383,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/机器学习/智能体系统/智能体简介",
-      "progress": 92,
+      "progress": 57,
       "tags": []
     },
     {
@@ -1394,7 +1394,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/机器学习/智能体系统/LLM基础",
-      "progress": 15,
+      "progress": 31,
       "tags": []
     },
     {
@@ -1405,7 +1405,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/机器学习/智能体系统/智能体经典范式构建",
-      "progress": 52,
+      "progress": 0,
       "tags": []
     },
     {
@@ -1416,7 +1416,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/机器学习/智能体系统/基于低代码平台的智能体搭建",
-      "progress": 17,
+      "progress": 44,
       "tags": []
     },
     {
@@ -1427,7 +1427,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/机器学习/智能体系统/框架开发实践",
-      "progress": 40,
+      "progress": 15,
       "tags": []
     },
     {
@@ -1449,7 +1449,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/机器学习/智能体系统/记忆与检索",
-      "progress": 95,
+      "progress": 88,
       "tags": []
     },
     {
@@ -1460,7 +1460,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/机器学习/智能体系统/上下文工程",
-      "progress": 99,
+      "progress": 29,
       "tags": []
     },
     {
@@ -1471,7 +1471,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/机器学习/智能体系统/智能体通信协议",
-      "progress": 59,
+      "progress": 53,
       "tags": []
     },
     {
@@ -1482,7 +1482,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/机器学习/智能体系统/AgenticRL",
-      "progress": 63,
+      "progress": 20,
       "tags": []
     },
     {
@@ -1493,7 +1493,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/机器学习/智能体系统/智能体性能评估",
-      "progress": 45,
+      "progress": 95,
       "tags": []
     },
     {
@@ -1513,7 +1513,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/机器学习/深度学习/深度学习概览",
-      "progress": 18,
+      "progress": 93,
       "tags": []
     },
     {
@@ -1524,7 +1524,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/机器学习/深度学习/BP神经网络",
-      "progress": 72,
+      "progress": 37,
       "tags": []
     },
     {
@@ -1535,7 +1535,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/机器学习/深度学习/LSTM",
-      "progress": 81,
+      "progress": 42,
       "tags": []
     },
     {
@@ -1546,7 +1546,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/机器学习/深度学习/浅谈数据增强",
-      "progress": 96,
+      "progress": 10,
       "tags": []
     },
     {
@@ -1566,7 +1566,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/机器学习/迁移学习/迁移学习的基本概念",
-      "progress": 42,
+      "progress": 95,
       "tags": []
     },
     {
@@ -1595,7 +1595,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/算法/动态规划/区间DP",
-      "progress": 86,
+      "progress": 17,
       "tags": []
     },
     {
@@ -1606,7 +1606,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/算法/动态规划/树形DP",
-      "progress": 97,
+      "progress": 5,
       "tags": []
     },
     {
@@ -1617,7 +1617,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/算法/动态规划/状态转移方程",
-      "progress": 19,
+      "progress": 90,
       "tags": []
     },
     {
@@ -1628,7 +1628,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/算法/动态规划/背包DP",
-      "progress": 93,
+      "progress": 75,
       "tags": []
     },
     {
@@ -1639,7 +1639,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/算法/动态规划/记忆化搜索",
-      "progress": 57,
+      "progress": 17,
       "tags": []
     },
     {
@@ -1659,7 +1659,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/算法/字符串/KMP",
-      "progress": 92,
+      "progress": 98,
       "tags": []
     },
     {
@@ -1679,7 +1679,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/算法/搜索/A星",
-      "progress": 33,
+      "progress": 96,
       "tags": []
     },
     {
@@ -1690,7 +1690,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/算法/搜索/BFS",
-      "progress": 70,
+      "progress": 72,
       "tags": []
     },
     {
@@ -1701,7 +1701,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/算法/搜索/DFS",
-      "progress": 39,
+      "progress": 89,
       "tags": []
     },
     {
@@ -1712,7 +1712,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/算法/搜索/IDA星",
-      "progress": 26,
+      "progress": 21,
       "tags": []
     },
     {
@@ -1723,7 +1723,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/算法/搜索/双向搜索",
-      "progress": 73,
+      "progress": 76,
       "tags": []
     },
     {
@@ -1734,7 +1734,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/算法/搜索/启发式搜索",
-      "progress": 13,
+      "progress": 61,
       "tags": []
     },
     {
@@ -1745,7 +1745,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/算法/搜索/回溯法",
-      "progress": 54,
+      "progress": 52,
       "tags": []
     },
     {
@@ -1756,7 +1756,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/算法/搜索/迭代加深搜索",
-      "progress": 76,
+      "progress": 88,
       "tags": []
     },
     {
@@ -1776,7 +1776,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/算法/算法基础/二分",
-      "progress": 11,
+      "progress": 7,
       "tags": []
     },
     {
@@ -1787,7 +1787,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/算法/算法基础/前缀和 & 差分",
-      "progress": 13,
+      "progress": 60,
       "tags": []
     },
     {
@@ -1798,7 +1798,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/算法/算法基础/排序",
-      "progress": 82,
+      "progress": 78,
       "tags": []
     },
     {
@@ -1809,7 +1809,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/算法/算法基础/简单DP",
-      "progress": 4,
+      "progress": 43,
       "tags": []
     },
     {
@@ -1820,7 +1820,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/算法/算法基础/贪心",
-      "progress": 27,
+      "progress": 25,
       "tags": []
     },
     {
@@ -1849,7 +1849,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/编程语言/C/独立实现基本操作函数",
-      "progress": 43,
+      "progress": 42,
       "tags": []
     },
     {
@@ -1869,7 +1869,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/编程语言/C++/C++概述",
-      "progress": 99,
+      "progress": 25,
       "tags": []
     },
     {
@@ -1880,7 +1880,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/编程语言/C++/C++程序的基本组成",
-      "progress": 48,
+      "progress": 27,
       "tags": []
     },
     {
@@ -1891,7 +1891,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/编程语言/C++/标识符和数据类型",
-      "progress": 61,
+      "progress": 0,
       "tags": []
     },
     {
@@ -1902,7 +1902,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/编程语言/C++/C++八股",
-      "progress": 39,
+      "progress": 47,
       "tags": []
     },
     {
@@ -1913,7 +1913,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/编程语言/C++/深拷贝",
-      "progress": 38,
+      "progress": 49,
       "tags": []
     },
     {
@@ -1924,7 +1924,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/编程语言/C++/内存对齐",
-      "progress": 69,
+      "progress": 1,
       "tags": []
     },
     {
@@ -1935,7 +1935,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/编程语言/C++/重载、重写、隐藏",
-      "progress": 52,
+      "progress": 29,
       "tags": []
     },
     {
@@ -1946,7 +1946,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/编程语言/C++/泛型编程",
-      "progress": 99,
+      "progress": 23,
       "tags": []
     },
     {
@@ -1966,7 +1966,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/编程语言/C++/C++11/并发支持",
-      "progress": 8,
+      "progress": 91,
       "tags": []
     },
     {
@@ -1977,7 +1977,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/编程语言/C++/C++11/自动类型推导",
-      "progress": 55,
+      "progress": 69,
       "tags": []
     },
     {
@@ -1988,7 +1988,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/编程语言/C++/C++11/区间迭代&初始化列表",
-      "progress": 94,
+      "progress": 5,
       "tags": []
     },
     {
@@ -1999,7 +1999,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/编程语言/C++/C++11/模板增强",
-      "progress": 23,
+      "progress": 97,
       "tags": []
     },
     {
@@ -2010,7 +2010,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/编程语言/C++/C++11/构造函数",
-      "progress": 54,
+      "progress": 51,
       "tags": []
     },
     {
@@ -2021,7 +2021,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/编程语言/C++/C++11/Lambda表达式",
-      "progress": 90,
+      "progress": 36,
       "tags": []
     },
     {
@@ -2032,7 +2032,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/编程语言/C++/C++11/正则表达式",
-      "progress": 11,
+      "progress": 27,
       "tags": []
     },
     {
@@ -2043,7 +2043,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/编程语言/C++/C++11/右值引用&移动语义",
-      "progress": 50,
+      "progress": 92,
       "tags": []
     },
     {
@@ -2054,7 +2054,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/编程语言/C++/C++11/新增容器",
-      "progress": 74,
+      "progress": 96,
       "tags": []
     },
     {
@@ -2074,7 +2074,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/编程语言/C++/C++14/C++14标准库新工具",
-      "progress": 39,
+      "progress": 44,
       "tags": []
     },
     {
@@ -2085,7 +2085,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/编程语言/C++/C++14/函数返回值类型推导",
-      "progress": 88,
+      "progress": 26,
       "tags": []
     },
     {
@@ -2096,7 +2096,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/编程语言/C++/C++14/变量模板与内联变量",
-      "progress": 21,
+      "progress": 25,
       "tags": []
     },
     {
@@ -2107,7 +2107,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/编程语言/C++/C++14/字面量增强",
-      "progress": 72,
+      "progress": 24,
       "tags": []
     },
     {
@@ -2118,7 +2118,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/编程语言/C++/C++14/泛型 Lambda 与初始化捕获",
-      "progress": 43,
+      "progress": 74,
       "tags": []
     },
     {
@@ -2138,7 +2138,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/编程语言/C++/C++17/结构化绑定",
-      "progress": 21,
+      "progress": 27,
       "tags": []
     },
     {
@@ -2149,7 +2149,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/编程语言/C++/C++17/ifswitch初始化语句",
-      "progress": 55,
+      "progress": 30,
       "tags": []
     },
     {
@@ -2160,7 +2160,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/编程语言/C++/C++17/类模板参数推导",
-      "progress": 33,
+      "progress": 99,
       "tags": []
     },
     {
@@ -2171,7 +2171,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/编程语言/C++/C++17/编译期if",
-      "progress": 42,
+      "progress": 67,
       "tags": []
     },
     {
@@ -2182,7 +2182,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/编程语言/C++/C++17/内联变量与静态成员初始化",
-      "progress": 52,
+      "progress": 71,
       "tags": []
     },
     {
@@ -2193,7 +2193,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/编程语言/C++/C++17/Lambda表达式再增强",
-      "progress": 97,
+      "progress": 74,
       "tags": []
     },
     {
@@ -2204,7 +2204,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/编程语言/C++/C++17/属性系统扩展",
-      "progress": 16,
+      "progress": 70,
       "tags": []
     },
     {
@@ -2215,7 +2215,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/编程语言/C++/C++17/C++17标准库新工具",
-      "progress": 41,
+      "progress": 14,
       "tags": []
     },
     {
@@ -2235,7 +2235,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/编程语言/C++/C++20/协程Coroutines",
-      "progress": 77,
+      "progress": 13,
       "tags": []
     },
     {
@@ -2246,7 +2246,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/编程语言/C++/C++20/概念Concepts",
-      "progress": 13,
+      "progress": 17,
       "tags": []
     },
     {
@@ -2257,7 +2257,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/编程语言/C++/C++20/范围Ranges",
-      "progress": 61,
+      "progress": 92,
       "tags": []
     },
     {
@@ -2268,7 +2268,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/编程语言/C++/C++20/三路比较运算符",
-      "progress": 31,
+      "progress": 15,
       "tags": []
     },
     {
@@ -2279,7 +2279,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/编程语言/C++/C++20/模块Modules",
-      "progress": 26,
+      "progress": 15,
       "tags": []
     },
     {
@@ -2290,7 +2290,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/编程语言/C++/C++20/constexpr扩展",
-      "progress": 66,
+      "progress": 33,
       "tags": []
     },
     {
@@ -2301,7 +2301,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/编程语言/C++/C++20/立即函数",
-      "progress": 36,
+      "progress": 2,
       "tags": []
     },
     {
@@ -2312,7 +2312,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/编程语言/C++/C++20/指定初始化与聚合增强",
-      "progress": 69,
+      "progress": 51,
       "tags": []
     },
     {
@@ -2323,7 +2323,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/编程语言/C++/C++20/C++20标准库新工具",
-      "progress": 52,
+      "progress": 47,
       "tags": []
     },
     {
@@ -2334,7 +2334,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/编程语言/C++/C++20/C++新属性与语言细节",
-      "progress": 44,
+      "progress": 42,
       "tags": []
     },
     {
@@ -2354,7 +2354,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/编程语言/C++/STL/Adapter适配器",
-      "progress": 71,
+      "progress": 68,
       "tags": []
     },
     {
@@ -2374,7 +2374,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/编程语言/C++/STL/Algorithms/搜索算法",
-      "progress": 44,
+      "progress": 58,
       "tags": []
     },
     {
@@ -2385,7 +2385,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/编程语言/C++/STL/Algorithms/操作算法",
-      "progress": 72,
+      "progress": 57,
       "tags": []
     },
     {
@@ -2396,7 +2396,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/编程语言/C++/STL/Algorithms/筛选排序算法",
-      "progress": 10,
+      "progress": 53,
       "tags": []
     },
     {
@@ -2407,7 +2407,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/编程语言/C++/STL/Algorithms/计数对比算法",
-      "progress": 21,
+      "progress": 72,
       "tags": []
     },
     {
@@ -2427,7 +2427,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/编程语言/C++/STL/Containers/array",
-      "progress": 79,
+      "progress": 8,
       "tags": []
     },
     {
@@ -2438,7 +2438,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/编程语言/C++/STL/Containers/deque",
-      "progress": 62,
+      "progress": 7,
       "tags": []
     },
     {
@@ -2449,7 +2449,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/编程语言/C++/STL/Containers/forwardLIst",
-      "progress": 55,
+      "progress": 37,
       "tags": []
     },
     {
@@ -2460,7 +2460,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/编程语言/C++/STL/Containers/list",
-      "progress": 12,
+      "progress": 18,
       "tags": []
     },
     {
@@ -2471,7 +2471,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/编程语言/C++/STL/Containers/vector",
-      "progress": 57,
+      "progress": 66,
       "tags": []
     },
     {
@@ -2482,7 +2482,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/编程语言/C++/STL/Iterators迭代器",
-      "progress": 84,
+      "progress": 78,
       "tags": []
     },
     {
@@ -2502,7 +2502,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/编程语言/CSharp/语法基础",
-      "progress": 90,
+      "progress": 5,
       "tags": []
     },
     {
@@ -2522,7 +2522,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/编程语言/Rust/Rust基础语法",
-      "progress": 10,
+      "progress": 57,
       "tags": []
     },
     {
@@ -2533,7 +2533,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/编程语言/Rust/自定义类型",
-      "progress": 73,
+      "progress": 13,
       "tags": []
     },
     {
@@ -2553,7 +2553,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/编程语言/鸿蒙/ArkTS",
-      "progress": 65,
+      "progress": 6,
       "tags": []
     },
     {
@@ -2573,7 +2573,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/编译原理/TinyC",
-      "progress": 28,
+      "progress": 67,
       "tags": []
     },
     {
@@ -2584,7 +2584,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/编译原理/引论",
-      "progress": 15,
+      "progress": 56,
       "tags": []
     },
     {
@@ -2595,7 +2595,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/编译原理/简单语法制导翻译器",
-      "progress": 37,
+      "progress": 64,
       "tags": []
     },
     {
@@ -2606,7 +2606,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/编译原理/词法分析",
-      "progress": 31,
+      "progress": 19,
       "tags": []
     },
     {
@@ -2617,7 +2617,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/编译原理/语法分析",
-      "progress": 93,
+      "progress": 67,
       "tags": []
     },
     {
@@ -2628,7 +2628,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/编译原理/语法制导的翻译",
-      "progress": 48,
+      "progress": 38,
       "tags": []
     },
     {
@@ -2639,7 +2639,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/编译原理/中间代码生成",
-      "progress": 16,
+      "progress": 70,
       "tags": []
     },
     {
@@ -2650,7 +2650,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/编译原理/运行时环境",
-      "progress": 69,
+      "progress": 53,
       "tags": []
     },
     {
@@ -2661,7 +2661,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/编译原理/代码生成",
-      "progress": 10,
+      "progress": 47,
       "tags": []
     },
     {
@@ -2672,7 +2672,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/编译原理/机器无关优化",
-      "progress": 90,
+      "progress": 15,
       "tags": []
     },
     {
@@ -2683,7 +2683,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/编译原理/指令级并行性",
-      "progress": 26,
+      "progress": 55,
       "tags": []
     },
     {
@@ -2694,7 +2694,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/编译原理/并行性和局部性优化",
-      "progress": 0,
+      "progress": 7,
       "tags": []
     },
     {
@@ -2705,7 +2705,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/编译原理/过程间分析",
-      "progress": 5,
+      "progress": 85,
       "tags": []
     },
     {
@@ -2725,7 +2725,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/虚拟化容器/kubernetes扫盲",
-      "progress": 94,
+      "progress": 1,
       "tags": []
     },
     {
@@ -2754,7 +2754,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/计算机图形学/光线追踪/光线追踪基本原理",
-      "progress": 24,
+      "progress": 68,
       "tags": []
     },
     {
@@ -2765,7 +2765,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/计算机图形学/光线追踪/加速结构：BVH与k-d树",
-      "progress": 53,
+      "progress": 44,
       "tags": []
     },
     {
@@ -2776,7 +2776,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/计算机图形学/光线追踪/实时光线追踪与RTX",
-      "progress": 89,
+      "progress": 23,
       "tags": []
     },
     {
@@ -2787,7 +2787,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/计算机图形学/光线追踪/材质与间接光照",
-      "progress": 5,
+      "progress": 49,
       "tags": []
     },
     {
@@ -2807,7 +2807,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/计算机图形学/几何处理/参数曲线与曲面",
-      "progress": 24,
+      "progress": 12,
       "tags": []
     },
     {
@@ -2818,7 +2818,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/计算机图形学/几何处理/多边形网格表示与数据结构",
-      "progress": 39,
+      "progress": 74,
       "tags": []
     },
     {
@@ -2829,7 +2829,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/计算机图形学/几何处理/曲面细分与几何细分",
-      "progress": 77,
+      "progress": 95,
       "tags": []
     },
     {
@@ -2840,7 +2840,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/计算机图形学/几何处理/隐式建模与体素",
-      "progress": 22,
+      "progress": 37,
       "tags": []
     },
     {
@@ -2860,7 +2860,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/计算机图形学/动画与模拟/关键帧动画与插值",
-      "progress": 52,
+      "progress": 99,
       "tags": []
     },
     {
@@ -2871,7 +2871,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/计算机图形学/动画与模拟/流体与布料模拟",
-      "progress": 71,
+      "progress": 34,
       "tags": []
     },
     {
@@ -2882,7 +2882,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/计算机图形学/动画与模拟/物理模拟入门",
-      "progress": 26,
+      "progress": 76,
       "tags": []
     },
     {
@@ -2893,7 +2893,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/计算机图形学/动画与模拟/粒子系统基础",
-      "progress": 4,
+      "progress": 14,
       "tags": []
     },
     {
@@ -2904,7 +2904,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/计算机图形学/动画与模拟/骨骼动画与蒙皮",
-      "progress": 90,
+      "progress": 85,
       "tags": []
     },
     {
@@ -2924,7 +2924,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/计算机图形学/后期处理与视觉特效/抗锯齿技术",
-      "progress": 15,
+      "progress": 13,
       "tags": []
     },
     {
@@ -2935,7 +2935,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/计算机图形学/后期处理与视觉特效/景深、运动模糊与雾效",
-      "progress": 77,
+      "progress": 50,
       "tags": []
     },
     {
@@ -2946,7 +2946,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/计算机图形学/后期处理与视觉特效/高动态范围与色调映射",
-      "progress": 28,
+      "progress": 62,
       "tags": []
     },
     {
@@ -2966,7 +2966,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/计算机图形学/图形学数学基础/几何基础：点、线、面与隐式曲面",
-      "progress": 33,
+      "progress": 79,
       "tags": []
     },
     {
@@ -2977,7 +2977,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/计算机图形学/图形学数学基础/向量与矩阵：图形学的数学基石",
-      "progress": 30,
+      "progress": 66,
       "tags": []
     },
     {
@@ -2988,7 +2988,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/计算机图形学/图形学数学基础/坐标空间变换：从模型到屏幕",
-      "progress": 75,
+      "progress": 28,
       "tags": []
     },
     {
@@ -2999,7 +2999,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/计算机图形学/图形学数学基础/颜色与视觉：色彩空间与人眼感知",
-      "progress": 0,
+      "progress": 7,
       "tags": []
     },
     {
@@ -3019,7 +3019,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/计算机图形学/图形渲染管线/光栅化：三角形如何变成像素",
-      "progress": 11,
+      "progress": 80,
       "tags": []
     },
     {
@@ -3030,7 +3030,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/计算机图形学/图形渲染管线/渲染管线概览：从顶点到像素的旅程",
-      "progress": 66,
+      "progress": 25,
       "tags": []
     },
     {
@@ -3041,7 +3041,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/计算机图形学/图形渲染管线/片段处理与输出合并",
-      "progress": 48,
+      "progress": 38,
       "tags": []
     },
     {
@@ -3052,7 +3052,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/计算机图形学/图形渲染管线/顶点处理与图元装配",
-      "progress": 67,
+      "progress": 95,
       "tags": []
     },
     {
@@ -3072,7 +3072,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/计算机图形学/着色器/BRDF与材质系统",
-      "progress": 55,
+      "progress": 50,
       "tags": []
     },
     {
@@ -3083,7 +3083,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/计算机图形学/着色器/基础光照模型",
-      "progress": 15,
+      "progress": 4,
       "tags": []
     },
     {
@@ -3094,7 +3094,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/计算机图形学/着色器/纹理映射基础",
-      "progress": 86,
+      "progress": 7,
       "tags": []
     },
     {
@@ -3105,7 +3105,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/计算机图形学/着色器/高级纹理技术",
-      "progress": 63,
+      "progress": 20,
       "tags": []
     },
     {
@@ -3125,7 +3125,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/计算机图形学/阴影与遮挡/阴影体及其他阴影技术",
-      "progress": 16,
+      "progress": 53,
       "tags": []
     },
     {
@@ -3136,7 +3136,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/计算机图形学/阴影与遮挡/阴影映射原理与实现",
-      "progress": 77,
+      "progress": 53,
       "tags": []
     },
     {
@@ -3156,7 +3156,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/计算机网络/数据通信",
-      "progress": 7,
+      "progress": 85,
       "tags": []
     },
     {
@@ -3167,7 +3167,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/计算机网络/广域通信网",
-      "progress": 59,
+      "progress": 26,
       "tags": []
     },
     {
@@ -3178,7 +3178,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/计算机网络/局域网和城域网",
-      "progress": 12,
+      "progress": 54,
       "tags": []
     },
     {
@@ -3189,7 +3189,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/计算机网络/无线通信网",
-      "progress": 64,
+      "progress": 49,
       "tags": []
     },
     {
@@ -3200,7 +3200,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/计算机网络/网络互联",
-      "progress": 28,
+      "progress": 44,
       "tags": []
     },
     {
@@ -3211,7 +3211,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/计算机网络/下一代互联网",
-      "progress": 98,
+      "progress": 92,
       "tags": []
     },
     {
@@ -3222,7 +3222,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/计算机网络/网络安全",
-      "progress": 14,
+      "progress": 79,
       "tags": []
     },
     {
@@ -3233,7 +3233,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/计算机网络/网络操作系统与服务器",
-      "progress": 4,
+      "progress": 53,
       "tags": []
     },
     {
@@ -3244,7 +3244,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/计算机网络/组网技术",
-      "progress": 83,
+      "progress": 39,
       "tags": []
     },
     {
@@ -3266,7 +3266,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/计算机网络/软件工程",
-      "progress": 29,
+      "progress": 82,
       "tags": []
     },
     {
@@ -3277,7 +3277,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/计算机网络/知识产权和标准化",
-      "progress": 45,
+      "progress": 99,
       "tags": []
     },
     {
@@ -3288,7 +3288,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/计算机网络/漫谈DNS使用问题",
-      "progress": 69,
+      "progress": 17,
       "tags": []
     },
     {
@@ -3299,7 +3299,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/计算机网络/浅说代理Proxy",
-      "progress": 86,
+      "progress": 21,
       "tags": []
     },
     {
@@ -3310,7 +3310,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/计算机网络/如何用传统的方式发邮件",
-      "progress": 35,
+      "progress": 16,
       "tags": []
     },
     {
@@ -3330,7 +3330,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/设计模式/工厂模式",
-      "progress": 80,
+      "progress": 72,
       "tags": []
     },
     {
@@ -3341,7 +3341,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/设计模式/抽象工厂模式",
-      "progress": 79,
+      "progress": 9,
       "tags": []
     },
     {
@@ -3352,7 +3352,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/设计模式/生成器模式",
-      "progress": 73,
+      "progress": 89,
       "tags": []
     },
     {
@@ -3363,7 +3363,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/设计模式/原型模式",
-      "progress": 20,
+      "progress": 71,
       "tags": []
     },
     {
@@ -3374,7 +3374,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/设计模式/单例模式",
-      "progress": 63,
+      "progress": 47,
       "tags": []
     },
     {
@@ -3385,7 +3385,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/设计模式/桥接模式",
-      "progress": 0,
+      "progress": 63,
       "tags": []
     },
     {
@@ -3396,7 +3396,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/设计模式/适配器模式",
-      "progress": 55,
+      "progress": 57,
       "tags": []
     },
     {
@@ -3407,7 +3407,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/设计模式/组合模式",
-      "progress": 79,
+      "progress": 48,
       "tags": []
     },
     {
@@ -3418,7 +3418,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/设计模式/装饰模式",
-      "progress": 22,
+      "progress": 28,
       "tags": []
     },
     {
@@ -3429,7 +3429,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/设计模式/外观模式",
-      "progress": 29,
+      "progress": 36,
       "tags": []
     },
     {
@@ -3440,7 +3440,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/设计模式/享元模式",
-      "progress": 45,
+      "progress": 88,
       "tags": []
     },
     {
@@ -3451,7 +3451,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/设计模式/代理模式",
-      "progress": 41,
+      "progress": 4,
       "tags": []
     },
     {
@@ -3462,7 +3462,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/设计模式/责任链模式",
-      "progress": 72,
+      "progress": 79,
       "tags": []
     },
     {
@@ -3473,7 +3473,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/设计模式/命令模式",
-      "progress": 66,
+      "progress": 84,
       "tags": []
     },
     {
@@ -3484,7 +3484,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/设计模式/迭代器模式",
-      "progress": 80,
+      "progress": 28,
       "tags": []
     },
     {
@@ -3495,7 +3495,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/设计模式/中介者模式",
-      "progress": 41,
+      "progress": 5,
       "tags": []
     },
     {
@@ -3506,7 +3506,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/设计模式/备忘录模式",
-      "progress": 26,
+      "progress": 17,
       "tags": []
     },
     {
@@ -3517,7 +3517,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/设计模式/观察者模式",
-      "progress": 82,
+      "progress": 64,
       "tags": []
     },
     {
@@ -3528,7 +3528,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/设计模式/状态模式",
-      "progress": 60,
+      "progress": 76,
       "tags": []
     },
     {
@@ -3539,7 +3539,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/设计模式/策略模式",
-      "progress": 29,
+      "progress": 47,
       "tags": []
     },
     {
@@ -3550,7 +3550,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/设计模式/模板方式",
-      "progress": 48,
+      "progress": 35,
       "tags": []
     },
     {
@@ -3561,7 +3561,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/设计模式/访问者模式",
-      "progress": 41,
+      "progress": 19,
       "tags": []
     },
     {
@@ -3572,7 +3572,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/设计模式/过滤器模式",
-      "progress": 54,
+      "progress": 21,
       "tags": []
     },
     {
@@ -3583,7 +3583,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/设计模式/空对象模式",
-      "progress": 7,
+      "progress": 14,
       "tags": []
     },
     {
@@ -3594,7 +3594,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/设计模式/MVC模式",
-      "progress": 66,
+      "progress": 30,
       "tags": []
     },
     {
@@ -3605,7 +3605,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/设计模式/业务代表模式",
-      "progress": 12,
+      "progress": 64,
       "tags": []
     },
     {
@@ -3635,7 +3635,7 @@
       "level": "intermediate",
       "color": "#10B981",
       "docPath": "Control/MPC模型预测控制/模型预测控制",
-      "progress": 48,
+      "progress": 40,
       "tags": []
     },
     {
@@ -3655,7 +3655,7 @@
       "level": "intermediate",
       "color": "#10B981",
       "docPath": "Control/Simulink/Simulink入门",
-      "progress": 6,
+      "progress": 59,
       "tags": []
     },
     {
@@ -3675,7 +3675,7 @@
       "level": "intermediate",
       "color": "#10B981",
       "docPath": "Control/强化学习/马尔可夫决策过程",
-      "progress": 88,
+      "progress": 49,
       "tags": []
     },
     {
@@ -3686,7 +3686,7 @@
       "level": "intermediate",
       "color": "#10B981",
       "docPath": "Control/强化学习/动态规划算法",
-      "progress": 92,
+      "progress": 84,
       "tags": []
     },
     {
@@ -3697,7 +3697,7 @@
       "level": "intermediate",
       "color": "#10B981",
       "docPath": "Control/强化学习/时序差分算法",
-      "progress": 76,
+      "progress": 85,
       "tags": []
     },
     {
@@ -3708,7 +3708,7 @@
       "level": "intermediate",
       "color": "#10B981",
       "docPath": "Control/强化学习/Dyna-Q算法",
-      "progress": 81,
+      "progress": 32,
       "tags": []
     },
     {
@@ -3719,7 +3719,7 @@
       "level": "intermediate",
       "color": "#10B981",
       "docPath": "Control/强化学习/DQN算法",
-      "progress": 82,
+      "progress": 63,
       "tags": []
     },
     {
@@ -3730,7 +3730,7 @@
       "level": "intermediate",
       "color": "#10B981",
       "docPath": "Control/强化学习/DQN改进算法",
-      "progress": 19,
+      "progress": 87,
       "tags": []
     },
     {
@@ -3741,7 +3741,7 @@
       "level": "intermediate",
       "color": "#10B981",
       "docPath": "Control/强化学习/策略梯度算法",
-      "progress": 63,
+      "progress": 45,
       "tags": []
     },
     {
@@ -3752,7 +3752,7 @@
       "level": "intermediate",
       "color": "#10B981",
       "docPath": "Control/强化学习/Actor-Critic算法",
-      "progress": 63,
+      "progress": 61,
       "tags": []
     },
     {
@@ -3763,7 +3763,7 @@
       "level": "intermediate",
       "color": "#10B981",
       "docPath": "Control/强化学习/TRPO算法",
-      "progress": 35,
+      "progress": 12,
       "tags": []
     },
     {
@@ -3774,7 +3774,7 @@
       "level": "intermediate",
       "color": "#10B981",
       "docPath": "Control/强化学习/PPO算法",
-      "progress": 74,
+      "progress": 43,
       "tags": []
     },
     {
@@ -3785,7 +3785,7 @@
       "level": "intermediate",
       "color": "#10B981",
       "docPath": "Control/强化学习/DDPG算法",
-      "progress": 67,
+      "progress": 97,
       "tags": []
     },
     {
@@ -3796,7 +3796,7 @@
       "level": "intermediate",
       "color": "#10B981",
       "docPath": "Control/强化学习/SAC算法",
-      "progress": 86,
+      "progress": 54,
       "tags": []
     },
     {
@@ -3807,7 +3807,7 @@
       "level": "intermediate",
       "color": "#10B981",
       "docPath": "Control/强化学习/基于模型的策略优化",
-      "progress": 58,
+      "progress": 31,
       "tags": []
     },
     {
@@ -3827,7 +3827,7 @@
       "level": "intermediate",
       "color": "#10B981",
       "docPath": "Control/微机原理/计算机组成概览",
-      "progress": 43,
+      "progress": 33,
       "tags": []
     },
     {
@@ -3847,7 +3847,7 @@
       "level": "intermediate",
       "color": "#10B981",
       "docPath": "Control/机电传动控制/概述",
-      "progress": 95,
+      "progress": 12,
       "tags": []
     },
     {
@@ -3858,7 +3858,7 @@
       "level": "intermediate",
       "color": "#10B981",
       "docPath": "Control/机电传动控制/机电传动系统的动力学基础",
-      "progress": 75,
+      "progress": 1,
       "tags": []
     },
     {
@@ -3869,7 +3869,7 @@
       "level": "intermediate",
       "color": "#10B981",
       "docPath": "Control/机电传动控制/直流电机的工作原理及特性",
-      "progress": 59,
+      "progress": 99,
       "tags": []
     },
     {
@@ -3880,7 +3880,7 @@
       "level": "intermediate",
       "color": "#10B981",
       "docPath": "Control/机电传动控制/交流电机的工作原理及其特性",
-      "progress": 2,
+      "progress": 23,
       "tags": []
     },
     {
@@ -3891,7 +3891,7 @@
       "level": "intermediate",
       "color": "#10B981",
       "docPath": "Control/机电传动控制/控制电机",
-      "progress": 94,
+      "progress": 79,
       "tags": []
     },
     {
@@ -3911,7 +3911,7 @@
       "level": "intermediate",
       "color": "#10B981",
       "docPath": "Control/模仿学习/规定长度的马尔可夫决策过程",
-      "progress": 7,
+      "progress": 63,
       "tags": []
     },
     {
@@ -3922,7 +3922,7 @@
       "level": "intermediate",
       "color": "#10B981",
       "docPath": "Control/模仿学习/行为克隆",
-      "progress": 80,
+      "progress": 86,
       "tags": []
     },
     {
@@ -3933,7 +3933,7 @@
       "level": "intermediate",
       "color": "#10B981",
       "docPath": "Control/模仿学习/对抗式模仿学习",
-      "progress": 75,
+      "progress": 51,
       "tags": []
     },
     {
@@ -3944,7 +3944,7 @@
       "level": "intermediate",
       "color": "#10B981",
       "docPath": "Control/模仿学习/环境模仿",
-      "progress": 10,
+      "progress": 48,
       "tags": []
     },
     {
@@ -3955,7 +3955,7 @@
       "level": "intermediate",
       "color": "#10B981",
       "docPath": "Control/模仿学习/逆强化学习",
-      "progress": 87,
+      "progress": 76,
       "tags": []
     },
     {
@@ -3975,7 +3975,7 @@
       "level": "intermediate",
       "color": "#10B981",
       "docPath": "Control/现代控制理论/绪论",
-      "progress": 28,
+      "progress": 76,
       "tags": []
     },
     {
@@ -3986,7 +3986,7 @@
       "level": "intermediate",
       "color": "#10B981",
       "docPath": "Control/现代控制理论/控制系统的状态空间表达式",
-      "progress": 91,
+      "progress": 17,
       "tags": []
     },
     {
@@ -3997,7 +3997,7 @@
       "level": "intermediate",
       "color": "#10B981",
       "docPath": "Control/现代控制理论/控制系统状态空间表达式的解",
-      "progress": 68,
+      "progress": 76,
       "tags": []
     },
     {
@@ -4008,7 +4008,7 @@
       "level": "intermediate",
       "color": "#10B981",
       "docPath": "Control/现代控制理论/线性控制系统的能控性和能观性",
-      "progress": 73,
+      "progress": 78,
       "tags": []
     },
     {
@@ -4019,7 +4019,7 @@
       "level": "intermediate",
       "color": "#10B981",
       "docPath": "Control/现代控制理论/稳定性与李雅普诺夫方法",
-      "progress": 95,
+      "progress": 11,
       "tags": []
     },
     {
@@ -4030,7 +4030,7 @@
       "level": "intermediate",
       "color": "#10B981",
       "docPath": "Control/现代控制理论/线性定常系统的综合",
-      "progress": 0,
+      "progress": 79,
       "tags": []
     },
     {
@@ -4041,7 +4041,7 @@
       "level": "intermediate",
       "color": "#10B981",
       "docPath": "Control/现代控制理论/最优控制",
-      "progress": 67,
+      "progress": 19,
       "tags": []
     },
     {
@@ -4070,7 +4070,7 @@
       "level": "intermediate",
       "color": "#10B981",
       "docPath": "Control/自动控制原理/01-自动控制概念/自动控制的一般概念",
-      "progress": 37,
+      "progress": 99,
       "tags": []
     },
     {
@@ -4101,7 +4101,7 @@
       "level": "intermediate",
       "color": "#10B981",
       "docPath": "Control/自动控制原理/02-数学模型/传递函数",
-      "progress": 61,
+      "progress": 23,
       "tags": []
     },
     {
@@ -4112,7 +4112,7 @@
       "level": "intermediate",
       "color": "#10B981",
       "docPath": "Control/自动控制原理/02-数学模型/信号流图、系统传递函数",
-      "progress": 81,
+      "progress": 26,
       "tags": []
     },
     {
@@ -4134,7 +4134,7 @@
       "level": "intermediate",
       "color": "#10B981",
       "docPath": "Control/自动控制原理/02-数学模型/结构图及等效变换",
-      "progress": 24,
+      "progress": 90,
       "tags": []
     },
     {
@@ -4154,7 +4154,7 @@
       "level": "intermediate",
       "color": "#10B981",
       "docPath": "Control/自动控制原理/03-线性系统时域分析与校正/一阶、过阻尼二阶系统动态性能",
-      "progress": 63,
+      "progress": 1,
       "tags": []
     },
     {
@@ -4165,7 +4165,7 @@
       "level": "intermediate",
       "color": "#10B981",
       "docPath": "Control/自动控制原理/03-线性系统时域分析与校正/欠阻尼二阶系统动态性能指标",
-      "progress": 34,
+      "progress": 38,
       "tags": []
     },
     {
@@ -4176,7 +4176,7 @@
       "level": "intermediate",
       "color": "#10B981",
       "docPath": "Control/自动控制原理/03-线性系统时域分析与校正/线性系统的动态误差和时域校正",
-      "progress": 21,
+      "progress": 70,
       "tags": []
     },
     {
@@ -4187,7 +4187,7 @@
       "level": "intermediate",
       "color": "#10B981",
       "docPath": "Control/自动控制原理/03-线性系统时域分析与校正/线性系统的稳态误差（静态）",
-      "progress": 25,
+      "progress": 34,
       "tags": []
     },
     {
@@ -4198,7 +4198,7 @@
       "level": "intermediate",
       "color": "#10B981",
       "docPath": "Control/自动控制原理/03-线性系统时域分析与校正/高阶系统动态性能",
-      "progress": 27,
+      "progress": 99,
       "tags": []
     },
     {
@@ -4218,7 +4218,7 @@
       "level": "intermediate",
       "color": "#10B981",
       "docPath": "Control/自动控制原理/04-根轨迹法/利用根轨迹分析系统性能",
-      "progress": 54,
+      "progress": 90,
       "tags": []
     },
     {
@@ -4229,7 +4229,7 @@
       "level": "intermediate",
       "color": "#10B981",
       "docPath": "Control/自动控制原理/04-根轨迹法/基本概念、绘制法则",
-      "progress": 42,
+      "progress": 19,
       "tags": []
     },
     {
@@ -4240,7 +4240,7 @@
       "level": "intermediate",
       "color": "#10B981",
       "docPath": "Control/自动控制原理/04-根轨迹法/广义根轨迹",
-      "progress": 5,
+      "progress": 65,
       "tags": []
     },
     {
@@ -4260,7 +4260,7 @@
       "level": "intermediate",
       "color": "#10B981",
       "docPath": "Control/自动控制原理/05-线性系统频域分析与校正/Bode图",
-      "progress": 14,
+      "progress": 67,
       "tags": []
     },
     {
@@ -4271,7 +4271,7 @@
       "level": "intermediate",
       "color": "#10B981",
       "docPath": "Control/自动控制原理/05-线性系统频域分析与校正/Nyquist图",
-      "progress": 95,
+      "progress": 11,
       "tags": []
     },
     {
@@ -4282,7 +4282,7 @@
       "level": "intermediate",
       "color": "#10B981",
       "docPath": "Control/自动控制原理/05-线性系统频域分析与校正/开环对数幅频特性分析系统性能",
-      "progress": 44,
+      "progress": 16,
       "tags": []
     },
     {
@@ -4293,7 +4293,7 @@
       "level": "intermediate",
       "color": "#10B981",
       "docPath": "Control/自动控制原理/05-线性系统频域分析与校正/滞后超前校正、PID校正",
-      "progress": 76,
+      "progress": 86,
       "tags": []
     },
     {
@@ -4304,7 +4304,7 @@
       "level": "intermediate",
       "color": "#10B981",
       "docPath": "Control/自动控制原理/05-线性系统频域分析与校正/相角滞后校正",
-      "progress": 29,
+      "progress": 11,
       "tags": []
     },
     {
@@ -4315,7 +4315,7 @@
       "level": "intermediate",
       "color": "#10B981",
       "docPath": "Control/自动控制原理/05-线性系统频域分析与校正/相角超前校正",
-      "progress": 43,
+      "progress": 3,
       "tags": []
     },
     {
@@ -4326,7 +4326,7 @@
       "level": "intermediate",
       "color": "#10B981",
       "docPath": "Control/自动控制原理/05-线性系统频域分析与校正/稳定裕度",
-      "progress": 83,
+      "progress": 88,
       "tags": []
     },
     {
@@ -4337,7 +4337,7 @@
       "level": "intermediate",
       "color": "#10B981",
       "docPath": "Control/自动控制原理/05-线性系统频域分析与校正/闭环频率特性分析系统性能",
-      "progress": 28,
+      "progress": 66,
       "tags": []
     },
     {
@@ -4348,7 +4348,7 @@
       "level": "intermediate",
       "color": "#10B981",
       "docPath": "Control/自动控制原理/05-线性系统频域分析与校正/频域稳定判据",
-      "progress": 59,
+      "progress": 16,
       "tags": []
     },
     {
@@ -4368,7 +4368,7 @@
       "level": "intermediate",
       "color": "#10B981",
       "docPath": "Control/自动控制原理/06-线性离散系统分析与校正/z变换",
-      "progress": 78,
+      "progress": 66,
       "tags": []
     },
     {
@@ -4379,7 +4379,7 @@
       "level": "intermediate",
       "color": "#10B981",
       "docPath": "Control/自动控制原理/06-线性离散系统分析与校正/模拟化校正、数字校正",
-      "progress": 50,
+      "progress": 90,
       "tags": []
     },
     {
@@ -4390,7 +4390,7 @@
       "level": "intermediate",
       "color": "#10B981",
       "docPath": "Control/自动控制原理/06-线性离散系统分析与校正/离散系统、信号采样与保持",
-      "progress": 40,
+      "progress": 42,
       "tags": []
     },
     {
@@ -4401,7 +4401,7 @@
       "level": "intermediate",
       "color": "#10B981",
       "docPath": "Control/自动控制原理/06-线性离散系统分析与校正/离散系统数学模型",
-      "progress": 45,
+      "progress": 94,
       "tags": []
     },
     {
@@ -4412,7 +4412,7 @@
       "level": "intermediate",
       "color": "#10B981",
       "docPath": "Control/自动控制原理/06-线性离散系统分析与校正/稳定性分析",
-      "progress": 95,
+      "progress": 53,
       "tags": []
     },
     {
@@ -4423,7 +4423,7 @@
       "level": "intermediate",
       "color": "#10B981",
       "docPath": "Control/自动控制原理/06-线性离散系统分析与校正/稳态误差、动态性能分析",
-      "progress": 43,
+      "progress": 65,
       "tags": []
     },
     {
@@ -4443,7 +4443,7 @@
       "level": "intermediate",
       "color": "#10B981",
       "docPath": "Control/自动控制原理/07-非线性控制系统分析/描述函数法",
-      "progress": 93,
+      "progress": 50,
       "tags": []
     },
     {
@@ -4454,7 +4454,7 @@
       "level": "intermediate",
       "color": "#10B981",
       "docPath": "Control/自动控制原理/07-非线性控制系统分析/改善非线性系统性能措施",
-      "progress": 52,
+      "progress": 88,
       "tags": []
     },
     {
@@ -4465,7 +4465,7 @@
       "level": "intermediate",
       "color": "#10B981",
       "docPath": "Control/自动控制原理/07-非线性控制系统分析/相平面法",
-      "progress": 33,
+      "progress": 20,
       "tags": []
     },
     {
@@ -4476,7 +4476,7 @@
       "level": "intermediate",
       "color": "#10B981",
       "docPath": "Control/自动控制原理/PID",
-      "progress": 49,
+      "progress": 64,
       "tags": []
     },
     {
@@ -4496,7 +4496,7 @@
       "level": "intermediate",
       "color": "#10B981",
       "docPath": "Control/高阶控制理论/连续系统离散化",
-      "progress": 37,
+      "progress": 1,
       "tags": []
     },
     {
@@ -4507,7 +4507,7 @@
       "level": "intermediate",
       "color": "#10B981",
       "docPath": "Control/高阶控制理论/动态系统分析",
-      "progress": 77,
+      "progress": 6,
       "tags": []
     },
     {
@@ -4518,7 +4518,7 @@
       "level": "intermediate",
       "color": "#10B981",
       "docPath": "Control/高阶控制理论/系统的可控性",
-      "progress": 79,
+      "progress": 83,
       "tags": []
     },
     {
@@ -4557,7 +4557,7 @@
       "level": "intermediate",
       "color": "#EF4444",
       "docPath": "Electronic/ASIC/PA/PA0",
-      "progress": 97,
+      "progress": 33,
       "tags": []
     },
     {
@@ -4577,7 +4577,7 @@
       "level": "intermediate",
       "color": "#EF4444",
       "docPath": "Electronic/EDA/AIEDA的Demo实现",
-      "progress": 15,
+      "progress": 70,
       "tags": []
     },
     {
@@ -4597,7 +4597,7 @@
       "level": "intermediate",
       "color": "#EF4444",
       "docPath": "Electronic/FPGA/FPGA简介",
-      "progress": 8,
+      "progress": 40,
       "tags": []
     },
     {
@@ -4617,7 +4617,7 @@
       "level": "intermediate",
       "color": "#EF4444",
       "docPath": "Electronic/FPGA/Verilog/Verilog简介",
-      "progress": 19,
+      "progress": 92,
       "tags": []
     },
     {
@@ -4628,7 +4628,7 @@
       "level": "intermediate",
       "color": "#EF4444",
       "docPath": "Electronic/FPGA/Verilog/Verilog语法基础",
-      "progress": 4,
+      "progress": 30,
       "tags": []
     },
     {
@@ -4648,7 +4648,7 @@
       "level": "intermediate",
       "color": "#EF4444",
       "docPath": "Electronic/信号与系统/信号与系统",
-      "progress": 31,
+      "progress": 54,
       "tags": []
     },
     {
@@ -4659,7 +4659,7 @@
       "level": "intermediate",
       "color": "#EF4444",
       "docPath": "Electronic/信号与系统/线性时不变系统",
-      "progress": 79,
+      "progress": 34,
       "tags": []
     },
     {
@@ -4670,7 +4670,7 @@
       "level": "intermediate",
       "color": "#EF4444",
       "docPath": "Electronic/信号与系统/周期信号的傅里叶级数表示",
-      "progress": 15,
+      "progress": 59,
       "tags": []
     },
     {
@@ -4681,7 +4681,7 @@
       "level": "intermediate",
       "color": "#EF4444",
       "docPath": "Electronic/信号与系统/连续时间傅里叶变换",
-      "progress": 34,
+      "progress": 55,
       "tags": []
     },
     {
@@ -4692,7 +4692,7 @@
       "level": "intermediate",
       "color": "#EF4444",
       "docPath": "Electronic/信号与系统/离散时间傅里叶变换",
-      "progress": 60,
+      "progress": 14,
       "tags": []
     },
     {
@@ -4703,7 +4703,7 @@
       "level": "intermediate",
       "color": "#EF4444",
       "docPath": "Electronic/信号与系统/信号与系统的时域和频域特性",
-      "progress": 32,
+      "progress": 0,
       "tags": []
     },
     {
@@ -4714,7 +4714,7 @@
       "level": "intermediate",
       "color": "#EF4444",
       "docPath": "Electronic/信号与系统/采样",
-      "progress": 63,
+      "progress": 94,
       "tags": []
     },
     {
@@ -4725,7 +4725,7 @@
       "level": "intermediate",
       "color": "#EF4444",
       "docPath": "Electronic/信号与系统/通信系统",
-      "progress": 56,
+      "progress": 66,
       "tags": []
     },
     {
@@ -4736,7 +4736,7 @@
       "level": "intermediate",
       "color": "#EF4444",
       "docPath": "Electronic/信号与系统/拉普拉斯变换",
-      "progress": 9,
+      "progress": 94,
       "tags": []
     },
     {
@@ -4747,7 +4747,7 @@
       "level": "intermediate",
       "color": "#EF4444",
       "docPath": "Electronic/信号与系统/卡尔曼滤波器MATLAB实现",
-      "progress": 66,
+      "progress": 12,
       "tags": []
     },
     {
@@ -4767,7 +4767,7 @@
       "level": "intermediate",
       "color": "#EF4444",
       "docPath": "Electronic/信号与系统/信号完整性分析/电容物理基础",
-      "progress": 70,
+      "progress": 21,
       "tags": []
     },
     {
@@ -4778,7 +4778,7 @@
       "level": "intermediate",
       "color": "#EF4444",
       "docPath": "Electronic/信号与系统/信号完整性分析/传输线物理基础",
-      "progress": 76,
+      "progress": 72,
       "tags": []
     },
     {
@@ -4789,7 +4789,7 @@
       "level": "intermediate",
       "color": "#EF4444",
       "docPath": "Electronic/信号与系统/信号完整性分析/传输线与反射",
-      "progress": 18,
+      "progress": 82,
       "tags": []
     },
     {
@@ -4800,7 +4800,7 @@
       "level": "intermediate",
       "color": "#EF4444",
       "docPath": "Electronic/信号与系统/信号完整性分析/电感物理基础",
-      "progress": 64,
+      "progress": 96,
       "tags": []
     },
     {
@@ -4829,7 +4829,7 @@
       "level": "intermediate",
       "color": "#EF4444",
       "docPath": "Electronic/元器件设计/滤波器设计/滤波器设计概述",
-      "progress": 72,
+      "progress": 32,
       "tags": []
     },
     {
@@ -4840,7 +4840,7 @@
       "level": "intermediate",
       "color": "#EF4444",
       "docPath": "Electronic/元器件设计/滤波器设计/滤波器的频率响应与时间响应特性",
-      "progress": 6,
+      "progress": 14,
       "tags": []
     },
     {
@@ -4851,7 +4851,7 @@
       "level": "intermediate",
       "color": "#EF4444",
       "docPath": "Electronic/元器件设计/滤波器设计/RC滤波器设计",
-      "progress": 4,
+      "progress": 85,
       "tags": []
     },
     {
@@ -4862,7 +4862,7 @@
       "level": "intermediate",
       "color": "#EF4444",
       "docPath": "Electronic/元器件设计/滤波器设计/有源滤波器设计",
-      "progress": 37,
+      "progress": 81,
       "tags": []
     },
     {
@@ -4891,7 +4891,7 @@
       "level": "intermediate",
       "color": "#EF4444",
       "docPath": "Electronic/元器件设计/电机设计/FOC/标幺值",
-      "progress": 24,
+      "progress": 60,
       "tags": []
     },
     {
@@ -4902,7 +4902,7 @@
       "level": "intermediate",
       "color": "#EF4444",
       "docPath": "Electronic/元器件设计/电机设计/FOC/克拉克变换与帕克变换",
-      "progress": 16,
+      "progress": 60,
       "tags": []
     },
     {
@@ -4913,7 +4913,7 @@
       "level": "intermediate",
       "color": "#EF4444",
       "docPath": "Electronic/元器件设计/电机设计/FOC/开环调速",
-      "progress": 63,
+      "progress": 98,
       "tags": []
     },
     {
@@ -4924,7 +4924,7 @@
       "level": "intermediate",
       "color": "#EF4444",
       "docPath": "Electronic/元器件设计/电机设计/FOC/闭环位控",
-      "progress": 97,
+      "progress": 78,
       "tags": []
     },
     {
@@ -4935,7 +4935,7 @@
       "level": "intermediate",
       "color": "#EF4444",
       "docPath": "Electronic/元器件设计/电机设计/FOC/闭环调速",
-      "progress": 71,
+      "progress": 40,
       "tags": []
     },
     {
@@ -4946,7 +4946,7 @@
       "level": "intermediate",
       "color": "#EF4444",
       "docPath": "Electronic/元器件设计/电机设计/FOC/电流闭环",
-      "progress": 84,
+      "progress": 59,
       "tags": []
     },
     {
@@ -4957,7 +4957,7 @@
       "level": "intermediate",
       "color": "#EF4444",
       "docPath": "Electronic/元器件设计/电机设计/FOC/SPWM与SVPWM",
-      "progress": 3,
+      "progress": 81,
       "tags": []
     },
     {
@@ -4968,7 +4968,7 @@
       "level": "intermediate",
       "color": "#EF4444",
       "docPath": "Electronic/元器件设计/电机设计/FOC/VF模式",
-      "progress": 65,
+      "progress": 48,
       "tags": []
     },
     {
@@ -4979,7 +4979,7 @@
       "level": "intermediate",
       "color": "#EF4444",
       "docPath": "Electronic/元器件设计/电机设计/FOC/ABZ编码器",
-      "progress": 85,
+      "progress": 87,
       "tags": []
     },
     {
@@ -4990,7 +4990,7 @@
       "level": "intermediate",
       "color": "#EF4444",
       "docPath": "Electronic/元器件设计/电机设计/FOC/编码器测速",
-      "progress": 47,
+      "progress": 53,
       "tags": []
     },
     {
@@ -5001,7 +5001,7 @@
       "level": "intermediate",
       "color": "#EF4444",
       "docPath": "Electronic/元器件设计/电机设计/FOC/高频注入",
-      "progress": 91,
+      "progress": 33,
       "tags": []
     },
     {
@@ -5012,7 +5012,7 @@
       "level": "intermediate",
       "color": "#EF4444",
       "docPath": "Electronic/元器件设计/电机设计/FOC/SMO滑膜观测器",
-      "progress": 3,
+      "progress": 52,
       "tags": []
     },
     {
@@ -5023,7 +5023,7 @@
       "level": "intermediate",
       "color": "#EF4444",
       "docPath": "Electronic/元器件设计/电机设计/FOC/17.凸极电机和非凸极电机",
-      "progress": 69,
+      "progress": 47,
       "tags": []
     },
     {
@@ -5043,7 +5043,7 @@
       "level": "intermediate",
       "color": "#EF4444",
       "docPath": "Electronic/元器件设计/电机设计/轴向磁通电机/轴向磁通电机",
-      "progress": 96,
+      "progress": 0,
       "tags": []
     },
     {
@@ -5063,7 +5063,7 @@
       "level": "intermediate",
       "color": "#EF4444",
       "docPath": "Electronic/元器件设计/电源设计/电源系统介绍",
-      "progress": 72,
+      "progress": 80,
       "tags": []
     },
     {
@@ -5092,7 +5092,7 @@
       "level": "intermediate",
       "color": "#EF4444",
       "docPath": "Electronic/嵌入式/ARM/AArch64异常模型",
-      "progress": 88,
+      "progress": 24,
       "tags": []
     },
     {
@@ -5112,7 +5112,27 @@
       "level": "intermediate",
       "color": "#EF4444",
       "docPath": "Electronic/嵌入式/ARM/AArch64指令集架构/指令集",
-      "progress": 24,
+      "progress": 64,
+      "tags": []
+    },
+    {
+      "id": "Electronic-嵌入式-ARM-CortexM4",
+      "title": "CortexM4",
+      "category": "Electronic",
+      "type": "topic",
+      "color": "#EF4444",
+      "docPath": "Electronic/嵌入式/ARM/CortexM4",
+      "progress": 60
+    },
+    {
+      "id": "Electronic-嵌入式-ARM-CortexM4-CortexM4寄存器",
+      "title": "CortexM4寄存器",
+      "category": "Electronic",
+      "type": "skill",
+      "level": "intermediate",
+      "color": "#EF4444",
+      "docPath": "Electronic/嵌入式/ARM/CortexM4/CortexM4寄存器",
+      "progress": 12,
       "tags": []
     },
     {
@@ -5132,7 +5152,7 @@
       "level": "intermediate",
       "color": "#EF4444",
       "docPath": "Electronic/嵌入式/BEKEN/Armino实战使用指南",
-      "progress": 30,
+      "progress": 46,
       "tags": []
     },
     {
@@ -5143,7 +5163,18 @@
       "level": "intermediate",
       "color": "#EF4444",
       "docPath": "Electronic/嵌入式/BEKEN/BK7258",
-      "progress": 61,
+      "progress": 66,
+      "tags": []
+    },
+    {
+      "id": "Electronic-嵌入式-CAN自定义协议",
+      "title": "CAN自定义协议",
+      "category": "Electronic",
+      "type": "skill",
+      "level": "intermediate",
+      "color": "#EF4444",
+      "docPath": "Electronic/嵌入式/CAN自定义协议",
+      "progress": 21,
       "tags": []
     },
     {
@@ -5163,7 +5194,7 @@
       "level": "intermediate",
       "color": "#EF4444",
       "docPath": "Electronic/嵌入式/FreeRTOS/阻塞",
-      "progress": 20,
+      "progress": 63,
       "tags": []
     },
     {
@@ -5174,7 +5205,7 @@
       "level": "intermediate",
       "color": "#EF4444",
       "docPath": "Electronic/嵌入式/FreeRTOS/FreeRTOS初步",
-      "progress": 31,
+      "progress": 19,
       "tags": []
     },
     {
@@ -5194,7 +5225,7 @@
       "level": "intermediate",
       "color": "#EF4444",
       "docPath": "Electronic/嵌入式/RISC-V/RISCV简介",
-      "progress": 65,
+      "progress": 99,
       "tags": []
     },
     {
@@ -5214,7 +5245,7 @@
       "level": "intermediate",
       "color": "#EF4444",
       "docPath": "Electronic/嵌入式/RT-Thread/RT-Thread内核",
-      "progress": 93,
+      "progress": 81,
       "tags": []
     },
     {
@@ -5225,7 +5256,7 @@
       "level": "intermediate",
       "color": "#EF4444",
       "docPath": "Electronic/嵌入式/RT-Thread/RT-Thread线程管理",
-      "progress": 90,
+      "progress": 19,
       "tags": []
     },
     {
@@ -5236,7 +5267,7 @@
       "level": "intermediate",
       "color": "#EF4444",
       "docPath": "Electronic/嵌入式/RT-Thread/RT-Thread时钟管理",
-      "progress": 94,
+      "progress": 17,
       "tags": []
     },
     {
@@ -5247,7 +5278,7 @@
       "level": "intermediate",
       "color": "#EF4444",
       "docPath": "Electronic/嵌入式/RT-Thread/RT-Thread线程间同步",
-      "progress": 44,
+      "progress": 75,
       "tags": []
     },
     {
@@ -5258,7 +5289,7 @@
       "level": "intermediate",
       "color": "#EF4444",
       "docPath": "Electronic/嵌入式/RT-Thread/RT-Thread线程间通信",
-      "progress": 42,
+      "progress": 34,
       "tags": []
     },
     {
@@ -5269,7 +5300,7 @@
       "level": "intermediate",
       "color": "#EF4444",
       "docPath": "Electronic/嵌入式/RT-Thread/RT-Thread内存管理",
-      "progress": 85,
+      "progress": 80,
       "tags": []
     },
     {
@@ -5280,7 +5311,7 @@
       "level": "intermediate",
       "color": "#EF4444",
       "docPath": "Electronic/嵌入式/RT-Thread/RT-Thread中断管理",
-      "progress": 93,
+      "progress": 92,
       "tags": []
     },
     {
@@ -5300,7 +5331,7 @@
       "level": "intermediate",
       "color": "#EF4444",
       "docPath": "Electronic/嵌入式/STM32/GPIO",
-      "progress": 85,
+      "progress": 53,
       "tags": []
     },
     {
@@ -5311,7 +5342,7 @@
       "level": "intermediate",
       "color": "#EF4444",
       "docPath": "Electronic/嵌入式/STM32/EXTI外部中断",
-      "progress": 51,
+      "progress": 9,
       "tags": []
     },
     {
@@ -5322,7 +5353,7 @@
       "level": "intermediate",
       "color": "#EF4444",
       "docPath": "Electronic/嵌入式/STM32/PWM驱动",
-      "progress": 42,
+      "progress": 66,
       "tags": []
     },
     {
@@ -5333,7 +5364,7 @@
       "level": "intermediate",
       "color": "#EF4444",
       "docPath": "Electronic/嵌入式/STM32/TIM输出比较",
-      "progress": 59,
+      "progress": 55,
       "tags": []
     },
     {
@@ -5344,7 +5375,7 @@
       "level": "intermediate",
       "color": "#EF4444",
       "docPath": "Electronic/嵌入式/STM32/TIM输入捕获",
-      "progress": 68,
+      "progress": 44,
       "tags": []
     },
     {
@@ -5355,7 +5386,7 @@
       "level": "intermediate",
       "color": "#EF4444",
       "docPath": "Electronic/嵌入式/STM32/TIM编码器接口",
-      "progress": 41,
+      "progress": 10,
       "tags": []
     },
     {
@@ -5366,7 +5397,7 @@
       "level": "intermediate",
       "color": "#EF4444",
       "docPath": "Electronic/嵌入式/STM32/ADC模数转换器",
-      "progress": 15,
+      "progress": 11,
       "tags": []
     },
     {
@@ -5377,7 +5408,7 @@
       "level": "intermediate",
       "color": "#EF4444",
       "docPath": "Electronic/嵌入式/STM32/DMA直接存储器存取",
-      "progress": 10,
+      "progress": 67,
       "tags": []
     },
     {
@@ -5388,7 +5419,7 @@
       "level": "intermediate",
       "color": "#EF4444",
       "docPath": "Electronic/嵌入式/STM32/USART串口协议",
-      "progress": 31,
+      "progress": 8,
       "tags": []
     },
     {
@@ -5399,7 +5430,7 @@
       "level": "intermediate",
       "color": "#EF4444",
       "docPath": "Electronic/嵌入式/STM32/USART外设",
-      "progress": 26,
+      "progress": 47,
       "tags": []
     },
     {
@@ -5410,7 +5441,7 @@
       "level": "intermediate",
       "color": "#EF4444",
       "docPath": "Electronic/嵌入式/STM32/I2C通信协议",
-      "progress": 87,
+      "progress": 50,
       "tags": []
     },
     {
@@ -5421,7 +5452,7 @@
       "level": "intermediate",
       "color": "#EF4444",
       "docPath": "Electronic/嵌入式/STM32/SPI通信协议",
-      "progress": 83,
+      "progress": 6,
       "tags": []
     },
     {
@@ -5432,7 +5463,7 @@
       "level": "intermediate",
       "color": "#EF4444",
       "docPath": "Electronic/嵌入式/STM32/MPU6050",
-      "progress": 25,
+      "progress": 72,
       "tags": []
     },
     {
@@ -5443,7 +5474,7 @@
       "level": "intermediate",
       "color": "#EF4444",
       "docPath": "Electronic/嵌入式/STM32/OLED调试",
-      "progress": 30,
+      "progress": 42,
       "tags": []
     },
     {
@@ -5454,7 +5485,7 @@
       "level": "intermediate",
       "color": "#EF4444",
       "docPath": "Electronic/嵌入式/STM32/TIM定时中断",
-      "progress": 44,
+      "progress": 19,
       "tags": []
     },
     {
@@ -5465,7 +5496,7 @@
       "level": "intermediate",
       "color": "#EF4444",
       "docPath": "Electronic/嵌入式/STM32/W25Q64",
-      "progress": 71,
+      "progress": 53,
       "tags": []
     },
     {
@@ -5476,7 +5507,7 @@
       "level": "intermediate",
       "color": "#EF4444",
       "docPath": "Electronic/嵌入式/STM32/RTC实时时钟",
-      "progress": 28,
+      "progress": 12,
       "tags": []
     },
     {
@@ -5487,7 +5518,7 @@
       "level": "intermediate",
       "color": "#EF4444",
       "docPath": "Electronic/嵌入式/STM32/PWR电源控制",
-      "progress": 39,
+      "progress": 7,
       "tags": []
     },
     {
@@ -5498,7 +5529,7 @@
       "level": "intermediate",
       "color": "#EF4444",
       "docPath": "Electronic/嵌入式/STM32/WDG看门狗",
-      "progress": 24,
+      "progress": 33,
       "tags": []
     },
     {
@@ -5509,7 +5540,7 @@
       "level": "intermediate",
       "color": "#EF4444",
       "docPath": "Electronic/嵌入式/STM32/FLASH闪存",
-      "progress": 4,
+      "progress": 93,
       "tags": []
     },
     {
@@ -5520,7 +5551,7 @@
       "level": "intermediate",
       "color": "#EF4444",
       "docPath": "Electronic/嵌入式/STM32/CAN通信协议",
-      "progress": 9,
+      "progress": 44,
       "tags": []
     },
     {
@@ -5531,7 +5562,18 @@
       "level": "intermediate",
       "color": "#EF4444",
       "docPath": "Electronic/嵌入式/STM32/EtherCAT",
-      "progress": 37,
+      "progress": 69,
+      "tags": []
+    },
+    {
+      "id": "Electronic-嵌入式-STM32-23-Bootloader",
+      "title": "Bootloader",
+      "category": "Electronic",
+      "type": "skill",
+      "level": "intermediate",
+      "color": "#EF4444",
+      "docPath": "Electronic/嵌入式/STM32/Bootloader",
+      "progress": 74,
       "tags": []
     },
     {
@@ -5542,7 +5584,7 @@
       "level": "intermediate",
       "color": "#EF4444",
       "docPath": "Electronic/嵌入式/毕业设计",
-      "progress": 78,
+      "progress": 67,
       "tags": []
     },
     {
@@ -5553,7 +5595,7 @@
       "level": "intermediate",
       "color": "#EF4444",
       "docPath": "Electronic/嵌入式/速通蓝桥杯嵌入式",
-      "progress": 31,
+      "progress": 53,
       "tags": []
     },
     {
@@ -5573,7 +5615,7 @@
       "level": "intermediate",
       "color": "#EF4444",
       "docPath": "Electronic/微波工程/电磁理论",
-      "progress": 90,
+      "progress": 52,
       "tags": []
     },
     {
@@ -5602,7 +5644,7 @@
       "level": "intermediate",
       "color": "#EF4444",
       "docPath": "Electronic/电子技术基础/数字电子技术基础/数字逻辑基础",
-      "progress": 13,
+      "progress": 17,
       "tags": []
     },
     {
@@ -5613,7 +5655,7 @@
       "level": "intermediate",
       "color": "#EF4444",
       "docPath": "Electronic/电子技术基础/数字电子技术基础/逻辑代数与硬件描述语言",
-      "progress": 79,
+      "progress": 68,
       "tags": []
     },
     {
@@ -5624,7 +5666,7 @@
       "level": "intermediate",
       "color": "#EF4444",
       "docPath": "Electronic/电子技术基础/数字电子技术基础/逻辑门电路",
-      "progress": 93,
+      "progress": 91,
       "tags": []
     },
     {
@@ -5635,7 +5677,7 @@
       "level": "intermediate",
       "color": "#EF4444",
       "docPath": "Electronic/电子技术基础/数字电子技术基础/组合逻辑电路",
-      "progress": 4,
+      "progress": 85,
       "tags": []
     },
     {
@@ -5646,7 +5688,7 @@
       "level": "intermediate",
       "color": "#EF4444",
       "docPath": "Electronic/电子技术基础/数字电子技术基础/锁存器和触发器",
-      "progress": 54,
+      "progress": 6,
       "tags": []
     },
     {
@@ -5657,7 +5699,7 @@
       "level": "intermediate",
       "color": "#EF4444",
       "docPath": "Electronic/电子技术基础/数字电子技术基础/时序逻辑电路",
-      "progress": 4,
+      "progress": 70,
       "tags": []
     },
     {
@@ -5668,7 +5710,7 @@
       "level": "intermediate",
       "color": "#EF4444",
       "docPath": "Electronic/电子技术基础/数字电子技术基础/半导体存储器",
-      "progress": 76,
+      "progress": 41,
       "tags": []
     },
     {
@@ -5679,7 +5721,7 @@
       "level": "intermediate",
       "color": "#EF4444",
       "docPath": "Electronic/电子技术基础/数字电子技术基础/CPLD和FPGA",
-      "progress": 26,
+      "progress": 73,
       "tags": []
     },
     {
@@ -5690,7 +5732,7 @@
       "level": "intermediate",
       "color": "#EF4444",
       "docPath": "Electronic/电子技术基础/数字电子技术基础/脉冲波形的变换与产生",
-      "progress": 38,
+      "progress": 37,
       "tags": []
     },
     {
@@ -5701,7 +5743,7 @@
       "level": "intermediate",
       "color": "#EF4444",
       "docPath": "Electronic/电子技术基础/数字电子技术基础/数模与模数转换器",
-      "progress": 95,
+      "progress": 56,
       "tags": []
     },
     {
@@ -5712,7 +5754,7 @@
       "level": "intermediate",
       "color": "#EF4444",
       "docPath": "Electronic/电子技术基础/数字电子技术基础/数字系统设计基础",
-      "progress": 72,
+      "progress": 97,
       "tags": []
     },
     {
@@ -5732,7 +5774,7 @@
       "level": "intermediate",
       "color": "#EF4444",
       "docPath": "Electronic/电子技术基础/模拟电子技术基础/绪论",
-      "progress": 4,
+      "progress": 21,
       "tags": []
     },
     {
@@ -5743,7 +5785,7 @@
       "level": "intermediate",
       "color": "#EF4444",
       "docPath": "Electronic/电子技术基础/模拟电子技术基础/运算放大器",
-      "progress": 84,
+      "progress": 83,
       "tags": []
     },
     {
@@ -5754,7 +5796,7 @@
       "level": "intermediate",
       "color": "#EF4444",
       "docPath": "Electronic/电子技术基础/模拟电子技术基础/二极管及其基本放大电路",
-      "progress": 44,
+      "progress": 30,
       "tags": []
     },
     {
@@ -5765,7 +5807,7 @@
       "level": "intermediate",
       "color": "#EF4444",
       "docPath": "Electronic/电子技术基础/模拟电子技术基础/场效应三极管及其放大电路",
-      "progress": 64,
+      "progress": 98,
       "tags": []
     },
     {
@@ -5776,7 +5818,7 @@
       "level": "intermediate",
       "color": "#EF4444",
       "docPath": "Electronic/电子技术基础/模拟电子技术基础/双极结型三极管及其放大电路",
-      "progress": 52,
+      "progress": 72,
       "tags": []
     },
     {
@@ -5798,7 +5840,7 @@
       "level": "intermediate",
       "color": "#EF4444",
       "docPath": "Electronic/电子技术基础/模拟电子技术基础/模拟集成电路",
-      "progress": 67,
+      "progress": 56,
       "tags": []
     },
     {
@@ -5809,7 +5851,7 @@
       "level": "intermediate",
       "color": "#EF4444",
       "docPath": "Electronic/电子技术基础/模拟电子技术基础/反馈放大电路",
-      "progress": 68,
+      "progress": 6,
       "tags": []
     },
     {
@@ -5820,7 +5862,7 @@
       "level": "intermediate",
       "color": "#EF4444",
       "docPath": "Electronic/电子技术基础/模拟电子技术基础/功率放大电路",
-      "progress": 42,
+      "progress": 82,
       "tags": []
     },
     {
@@ -5831,7 +5873,7 @@
       "level": "intermediate",
       "color": "#EF4444",
       "docPath": "Electronic/电子技术基础/模拟电子技术基础/信号处理与信号产生电路",
-      "progress": 62,
+      "progress": 39,
       "tags": []
     },
     {
@@ -5842,7 +5884,7 @@
       "level": "intermediate",
       "color": "#EF4444",
       "docPath": "Electronic/电子技术基础/模拟电子技术基础/直流稳压电源",
-      "progress": 92,
+      "progress": 4,
       "tags": []
     },
     {
@@ -5862,7 +5904,7 @@
       "level": "intermediate",
       "color": "#EF4444",
       "docPath": "Electronic/电子技术基础/电力电子技术/H桥驱动直流电机",
-      "progress": 86,
+      "progress": 76,
       "tags": []
     },
     {
@@ -5882,7 +5924,7 @@
       "level": "intermediate",
       "color": "#EF4444",
       "docPath": "Electronic/电磁场与电磁波/静电场",
-      "progress": 45,
+      "progress": 86,
       "tags": []
     },
     {
@@ -5912,7 +5954,7 @@
       "level": "intermediate",
       "color": "#F59E0B",
       "docPath": "Machinery/Pyslvs/Pyslvs使用教程",
-      "progress": 22,
+      "progress": 14,
       "tags": []
     },
     {
@@ -5932,7 +5974,7 @@
       "level": "intermediate",
       "color": "#F59E0B",
       "docPath": "Machinery/机械设计/平面机构的自由度和速度分析",
-      "progress": 94,
+      "progress": 88,
       "tags": []
     },
     {
@@ -5943,7 +5985,7 @@
       "level": "intermediate",
       "color": "#F59E0B",
       "docPath": "Machinery/机械设计/平面连杆机构",
-      "progress": 85,
+      "progress": 55,
       "tags": []
     },
     {
@@ -5954,7 +5996,7 @@
       "level": "intermediate",
       "color": "#F59E0B",
       "docPath": "Machinery/机械设计/凸轮机构",
-      "progress": 73,
+      "progress": 3,
       "tags": []
     },
     {
@@ -5965,7 +6007,7 @@
       "level": "intermediate",
       "color": "#F59E0B",
       "docPath": "Machinery/机械设计/齿轮机构",
-      "progress": 80,
+      "progress": 84,
       "tags": []
     },
     {
@@ -5976,7 +6018,7 @@
       "level": "intermediate",
       "color": "#F59E0B",
       "docPath": "Machinery/机械设计/轮系",
-      "progress": 7,
+      "progress": 52,
       "tags": []
     },
     {
@@ -5987,7 +6029,7 @@
       "level": "intermediate",
       "color": "#F59E0B",
       "docPath": "Machinery/机械设计/连接",
-      "progress": 33,
+      "progress": 48,
       "tags": []
     },
     {
@@ -5998,7 +6040,7 @@
       "level": "intermediate",
       "color": "#F59E0B",
       "docPath": "Machinery/机械设计/齿轮传动",
-      "progress": 24,
+      "progress": 77,
       "tags": []
     },
     {
@@ -6009,7 +6051,7 @@
       "level": "intermediate",
       "color": "#F59E0B",
       "docPath": "Machinery/机械设计/蜗杆传动",
-      "progress": 89,
+      "progress": 28,
       "tags": []
     },
     {
@@ -6020,7 +6062,7 @@
       "level": "intermediate",
       "color": "#F59E0B",
       "docPath": "Machinery/机械设计/带传动",
-      "progress": 18,
+      "progress": 21,
       "tags": []
     },
     {
@@ -6031,7 +6073,7 @@
       "level": "intermediate",
       "color": "#F59E0B",
       "docPath": "Machinery/机械设计/轴",
-      "progress": 22,
+      "progress": 92,
       "tags": []
     },
     {
@@ -6042,7 +6084,7 @@
       "level": "intermediate",
       "color": "#F59E0B",
       "docPath": "Machinery/机械设计/滚动轴承",
-      "progress": 35,
+      "progress": 22,
       "tags": []
     },
     {
@@ -6053,7 +6095,7 @@
       "level": "intermediate",
       "color": "#F59E0B",
       "docPath": "Machinery/机械设计经典五十问",
-      "progress": 40,
+      "progress": 66,
       "tags": []
     },
     {
@@ -6083,7 +6125,7 @@
       "level": "intermediate",
       "color": "#EC4899",
       "docPath": "Materials/半导体器件/固体晶格结构",
-      "progress": 15,
+      "progress": 59,
       "tags": []
     },
     {
@@ -6094,7 +6136,7 @@
       "level": "intermediate",
       "color": "#EC4899",
       "docPath": "Materials/半导体器件/量子力学初步",
-      "progress": 85,
+      "progress": 24,
       "tags": []
     },
     {
@@ -6105,7 +6147,7 @@
       "level": "intermediate",
       "color": "#EC4899",
       "docPath": "Materials/半导体器件/固体量子理论初步",
-      "progress": 45,
+      "progress": 26,
       "tags": []
     },
     {
@@ -6116,7 +6158,7 @@
       "level": "intermediate",
       "color": "#EC4899",
       "docPath": "Materials/半导体器件/平衡半导体",
-      "progress": 83,
+      "progress": 98,
       "tags": []
     },
     {
@@ -6127,7 +6169,7 @@
       "level": "intermediate",
       "color": "#EC4899",
       "docPath": "Materials/半导体器件/载流子输运现象",
-      "progress": 93,
+      "progress": 56,
       "tags": []
     },
     {
@@ -6138,7 +6180,7 @@
       "level": "intermediate",
       "color": "#EC4899",
       "docPath": "Materials/半导体器件/半导体中的非平衡过剩载流子",
-      "progress": 42,
+      "progress": 74,
       "tags": []
     },
     {
@@ -6149,7 +6191,7 @@
       "level": "intermediate",
       "color": "#EC4899",
       "docPath": "Materials/半导体器件/pn结",
-      "progress": 54,
+      "progress": 8,
       "tags": []
     },
     {
@@ -6160,7 +6202,7 @@
       "level": "intermediate",
       "color": "#EC4899",
       "docPath": "Materials/半导体器件/pn结二极管",
-      "progress": 93,
+      "progress": 27,
       "tags": []
     },
     {
@@ -6171,7 +6213,7 @@
       "level": "intermediate",
       "color": "#EC4899",
       "docPath": "Materials/半导体器件/金属半导体和半导体异质结",
-      "progress": 8,
+      "progress": 24,
       "tags": []
     },
     {
@@ -6182,7 +6224,7 @@
       "level": "intermediate",
       "color": "#EC4899",
       "docPath": "Materials/半导体器件/双极晶体管",
-      "progress": 0,
+      "progress": 56,
       "tags": []
     },
     {
@@ -6193,7 +6235,7 @@
       "level": "intermediate",
       "color": "#EC4899",
       "docPath": "Materials/半导体器件/MOSFET基础",
-      "progress": 8,
+      "progress": 53,
       "tags": []
     },
     {
@@ -6204,7 +6246,7 @@
       "level": "intermediate",
       "color": "#EC4899",
       "docPath": "Materials/半导体器件/MOSFET概念深入",
-      "progress": 75,
+      "progress": 70,
       "tags": []
     },
     {
@@ -6215,7 +6257,7 @@
       "level": "intermediate",
       "color": "#EC4899",
       "docPath": "Materials/半导体器件/结型场效应晶体管",
-      "progress": 74,
+      "progress": 85,
       "tags": []
     },
     {
@@ -6226,7 +6268,7 @@
       "level": "intermediate",
       "color": "#EC4899",
       "docPath": "Materials/半导体器件/光器件",
-      "progress": 47,
+      "progress": 51,
       "tags": []
     },
     {
@@ -6237,7 +6279,7 @@
       "level": "intermediate",
       "color": "#EC4899",
       "docPath": "Materials/半导体器件/半导体功率器件",
-      "progress": 50,
+      "progress": 64,
       "tags": []
     },
     {
@@ -6257,7 +6299,7 @@
       "level": "intermediate",
       "color": "#EC4899",
       "docPath": "Materials/半导体物理学/半导体中的电子状态",
-      "progress": 52,
+      "progress": 43,
       "tags": []
     },
     {
@@ -6268,7 +6310,7 @@
       "level": "intermediate",
       "color": "#EC4899",
       "docPath": "Materials/半导体物理学/半导体中杂质和缺陷能级",
-      "progress": 25,
+      "progress": 4,
       "tags": []
     },
     {
@@ -6279,7 +6321,7 @@
       "level": "intermediate",
       "color": "#EC4899",
       "docPath": "Materials/半导体物理学/半导体中载流子的统计分布",
-      "progress": 28,
+      "progress": 12,
       "tags": []
     },
     {
@@ -6290,7 +6332,7 @@
       "level": "intermediate",
       "color": "#EC4899",
       "docPath": "Materials/半导体物理学/半导体的导电性",
-      "progress": 71,
+      "progress": 95,
       "tags": []
     },
     {
@@ -6301,7 +6343,7 @@
       "level": "intermediate",
       "color": "#EC4899",
       "docPath": "Materials/半导体物理学/非平衡载流子",
-      "progress": 66,
+      "progress": 32,
       "tags": []
     },
     {
@@ -6312,7 +6354,7 @@
       "level": "intermediate",
       "color": "#EC4899",
       "docPath": "Materials/半导体物理学/pn结",
-      "progress": 74,
+      "progress": 28,
       "tags": []
     },
     {
@@ -6323,7 +6365,7 @@
       "level": "intermediate",
       "color": "#EC4899",
       "docPath": "Materials/半导体物理学/金属和半导体的接触",
-      "progress": 65,
+      "progress": 60,
       "tags": []
     },
     {
@@ -6334,7 +6376,7 @@
       "level": "intermediate",
       "color": "#EC4899",
       "docPath": "Materials/半导体物理学/半导体表面与MIS结构",
-      "progress": 20,
+      "progress": 50,
       "tags": []
     },
     {
@@ -6345,7 +6387,7 @@
       "level": "intermediate",
       "color": "#EC4899",
       "docPath": "Materials/半导体物理学/半导体异质结构",
-      "progress": 6,
+      "progress": 74,
       "tags": []
     },
     {
@@ -6356,7 +6398,7 @@
       "level": "intermediate",
       "color": "#EC4899",
       "docPath": "Materials/半导体物理学/半导体的光学性质和光电与发光现象",
-      "progress": 22,
+      "progress": 45,
       "tags": []
     },
     {
@@ -6367,7 +6409,7 @@
       "level": "intermediate",
       "color": "#EC4899",
       "docPath": "Materials/半导体物理学/半导体的热电性质",
-      "progress": 25,
+      "progress": 88,
       "tags": []
     },
     {
@@ -6378,7 +6420,7 @@
       "level": "intermediate",
       "color": "#EC4899",
       "docPath": "Materials/半导体物理学/半导体磁和压阻效应",
-      "progress": 78,
+      "progress": 63,
       "tags": []
     },
     {
@@ -6389,7 +6431,7 @@
       "level": "intermediate",
       "color": "#EC4899",
       "docPath": "Materials/半导体物理学/非晶态半导体",
-      "progress": 43,
+      "progress": 39,
       "tags": []
     },
     {
@@ -6419,7 +6461,7 @@
       "level": "intermediate",
       "color": "#8B5CF6",
       "docPath": "Mathematics/微积分/一元函数微分学",
-      "progress": 11,
+      "progress": 88,
       "tags": []
     },
     {
@@ -6430,7 +6472,7 @@
       "level": "intermediate",
       "color": "#8B5CF6",
       "docPath": "Mathematics/微积分/一元函数积分学",
-      "progress": 66,
+      "progress": 42,
       "tags": []
     },
     {
@@ -6441,7 +6483,7 @@
       "level": "intermediate",
       "color": "#8B5CF6",
       "docPath": "Mathematics/微积分/三重积分和线面积分",
-      "progress": 46,
+      "progress": 99,
       "tags": []
     },
     {
@@ -6452,7 +6494,7 @@
       "level": "intermediate",
       "color": "#8B5CF6",
       "docPath": "Mathematics/微积分/不定积分",
-      "progress": 59,
+      "progress": 83,
       "tags": []
     },
     {
@@ -6463,7 +6505,7 @@
       "level": "intermediate",
       "color": "#8B5CF6",
       "docPath": "Mathematics/微积分/二重积分",
-      "progress": 31,
+      "progress": 79,
       "tags": []
     },
     {
@@ -6474,7 +6516,7 @@
       "level": "intermediate",
       "color": "#8B5CF6",
       "docPath": "Mathematics/微积分/多元函数微积分学综合",
-      "progress": 52,
+      "progress": 74,
       "tags": []
     },
     {
@@ -6485,7 +6527,7 @@
       "level": "intermediate",
       "color": "#8B5CF6",
       "docPath": "Mathematics/微积分/多元函数的极限、连续与微分",
-      "progress": 29,
+      "progress": 62,
       "tags": []
     },
     {
@@ -6496,7 +6538,7 @@
       "level": "intermediate",
       "color": "#8B5CF6",
       "docPath": "Mathematics/微积分/定积分",
-      "progress": 80,
+      "progress": 21,
       "tags": []
     },
     {
@@ -6507,7 +6549,7 @@
       "level": "intermediate",
       "color": "#8B5CF6",
       "docPath": "Mathematics/微积分/常微分方程",
-      "progress": 22,
+      "progress": 55,
       "tags": []
     },
     {
@@ -6518,7 +6560,7 @@
       "level": "intermediate",
       "color": "#8B5CF6",
       "docPath": "Mathematics/微积分/微分中值定理",
-      "progress": 34,
+      "progress": 88,
       "tags": []
     },
     {
@@ -6529,7 +6571,7 @@
       "level": "intermediate",
       "color": "#8B5CF6",
       "docPath": "Mathematics/微积分/微分方程",
-      "progress": 44,
+      "progress": 37,
       "tags": []
     },
     {
@@ -6540,7 +6582,7 @@
       "level": "intermediate",
       "color": "#8B5CF6",
       "docPath": "Mathematics/微积分/微积分",
-      "progress": 50,
+      "progress": 90,
       "tags": []
     },
     {
@@ -6551,7 +6593,7 @@
       "level": "intermediate",
       "color": "#8B5CF6",
       "docPath": "Mathematics/微积分/无穷级数",
-      "progress": 92,
+      "progress": 94,
       "tags": []
     },
     {
@@ -6562,7 +6604,7 @@
       "level": "intermediate",
       "color": "#8B5CF6",
       "docPath": "Mathematics/微积分/积分等式与积分不等式",
-      "progress": 74,
+      "progress": 38,
       "tags": []
     },
     {
@@ -6573,7 +6615,7 @@
       "level": "intermediate",
       "color": "#8B5CF6",
       "docPath": "Mathematics/微积分/零点问题与微分不等式",
-      "progress": 77,
+      "progress": 46,
       "tags": []
     },
     {
@@ -6602,7 +6644,7 @@
       "level": "intermediate",
       "color": "#8B5CF6",
       "docPath": "Mathematics/旋量代数与李群李代数/互易性与旋量系",
-      "progress": 31,
+      "progress": 95,
       "tags": []
     },
     {
@@ -6613,7 +6655,7 @@
       "level": "intermediate",
       "color": "#8B5CF6",
       "docPath": "Mathematics/旋量代数与李群李代数/位移算子、指数映射与李群",
-      "progress": 38,
+      "progress": 79,
       "tags": []
     },
     {
@@ -6624,7 +6666,7 @@
       "level": "intermediate",
       "color": "#8B5CF6",
       "docPath": "Mathematics/旋量代数与李群李代数/旋量代数与李代数及李运算",
-      "progress": 97,
+      "progress": 49,
       "tags": []
     },
     {
@@ -6635,7 +6677,7 @@
       "level": "intermediate",
       "color": "#8B5CF6",
       "docPath": "Mathematics/旋量代数与李群李代数/旋量系关联关系理论",
-      "progress": 26,
+      "progress": 2,
       "tags": []
     },
     {
@@ -6646,7 +6688,7 @@
       "level": "intermediate",
       "color": "#8B5CF6",
       "docPath": "Mathematics/旋量代数与李群李代数/旋量系对偶原理与分解定理",
-      "progress": 49,
+      "progress": 44,
       "tags": []
     },
     {
@@ -6657,7 +6699,7 @@
       "level": "intermediate",
       "color": "#8B5CF6",
       "docPath": "Mathematics/旋量代数与李群李代数/旋量系零空间构造理论",
-      "progress": 49,
+      "progress": 87,
       "tags": []
     },
     {
@@ -6668,7 +6710,7 @@
       "level": "intermediate",
       "color": "#8B5CF6",
       "docPath": "Mathematics/旋量代数与李群李代数/直线几何",
-      "progress": 34,
+      "progress": 68,
       "tags": []
     },
     {
@@ -6679,7 +6721,7 @@
       "level": "intermediate",
       "color": "#8B5CF6",
       "docPath": "Mathematics/旋量代数与李群李代数/绪论",
-      "progress": 33,
+      "progress": 61,
       "tags": []
     },
     {
@@ -6699,7 +6741,7 @@
       "level": "intermediate",
       "color": "#8B5CF6",
       "docPath": "Mathematics/概率论与数理统计/bootstrap方法",
-      "progress": 49,
+      "progress": 39,
       "tags": []
     },
     {
@@ -6710,7 +6752,7 @@
       "level": "intermediate",
       "color": "#8B5CF6",
       "docPath": "Mathematics/概率论与数理统计/R的应用",
-      "progress": 24,
+      "progress": 74,
       "tags": []
     },
     {
@@ -6721,7 +6763,7 @@
       "level": "intermediate",
       "color": "#8B5CF6",
       "docPath": "Mathematics/概率论与数理统计/假设检验",
-      "progress": 74,
+      "progress": 26,
       "tags": []
     },
     {
@@ -6732,7 +6774,7 @@
       "level": "intermediate",
       "color": "#8B5CF6",
       "docPath": "Mathematics/概率论与数理统计/参数估计",
-      "progress": 18,
+      "progress": 49,
       "tags": []
     },
     {
@@ -6743,7 +6785,7 @@
       "level": "intermediate",
       "color": "#8B5CF6",
       "docPath": "Mathematics/概率论与数理统计/各种常用表",
-      "progress": 81,
+      "progress": 87,
       "tags": []
     },
     {
@@ -6754,7 +6796,7 @@
       "level": "intermediate",
       "color": "#8B5CF6",
       "docPath": "Mathematics/概率论与数理统计/基本概念",
-      "progress": 73,
+      "progress": 29,
       "tags": []
     },
     {
@@ -6765,7 +6807,7 @@
       "level": "intermediate",
       "color": "#8B5CF6",
       "docPath": "Mathematics/概率论与数理统计/多维随机变量及其分布",
-      "progress": 23,
+      "progress": 52,
       "tags": []
     },
     {
@@ -6776,7 +6818,7 @@
       "level": "intermediate",
       "color": "#8B5CF6",
       "docPath": "Mathematics/概率论与数理统计/大数定律及中心极限定理",
-      "progress": 65,
+      "progress": 93,
       "tags": []
     },
     {
@@ -6787,7 +6829,7 @@
       "level": "intermediate",
       "color": "#8B5CF6",
       "docPath": "Mathematics/概率论与数理统计/平稳随机过程",
-      "progress": 43,
+      "progress": 74,
       "tags": []
     },
     {
@@ -6798,7 +6840,7 @@
       "level": "intermediate",
       "color": "#8B5CF6",
       "docPath": "Mathematics/概率论与数理统计/方差分析及回归分析",
-      "progress": 66,
+      "progress": 5,
       "tags": []
     },
     {
@@ -6809,7 +6851,7 @@
       "level": "intermediate",
       "color": "#8B5CF6",
       "docPath": "Mathematics/概率论与数理统计/时间序列分析",
-      "progress": 39,
+      "progress": 26,
       "tags": []
     },
     {
@@ -6820,7 +6862,7 @@
       "level": "intermediate",
       "color": "#8B5CF6",
       "docPath": "Mathematics/概率论与数理统计/样本及抽样分布",
-      "progress": 15,
+      "progress": 46,
       "tags": []
     },
     {
@@ -6831,7 +6873,7 @@
       "level": "intermediate",
       "color": "#8B5CF6",
       "docPath": "Mathematics/概率论与数理统计/随机变量及其分布",
-      "progress": 87,
+      "progress": 11,
       "tags": []
     },
     {
@@ -6842,7 +6884,7 @@
       "level": "intermediate",
       "color": "#8B5CF6",
       "docPath": "Mathematics/概率论与数理统计/随机变量的数字特征",
-      "progress": 45,
+      "progress": 9,
       "tags": []
     },
     {
@@ -6853,7 +6895,7 @@
       "level": "intermediate",
       "color": "#8B5CF6",
       "docPath": "Mathematics/概率论与数理统计/随机过程",
-      "progress": 49,
+      "progress": 63,
       "tags": []
     },
     {
@@ -6864,7 +6906,7 @@
       "level": "intermediate",
       "color": "#8B5CF6",
       "docPath": "Mathematics/概率论与数理统计/马尔科夫链",
-      "progress": 80,
+      "progress": 38,
       "tags": []
     },
     {
@@ -6884,7 +6926,7 @@
       "level": "intermediate",
       "color": "#8B5CF6",
       "docPath": "Mathematics/线性代数/向量组的线性相关性",
-      "progress": 87,
+      "progress": 75,
       "tags": []
     },
     {
@@ -6895,7 +6937,7 @@
       "level": "intermediate",
       "color": "#8B5CF6",
       "docPath": "Mathematics/线性代数/相似矩阵及二次型",
-      "progress": 27,
+      "progress": 1,
       "tags": []
     },
     {
@@ -6906,7 +6948,7 @@
       "level": "intermediate",
       "color": "#8B5CF6",
       "docPath": "Mathematics/线性代数/矩阵及其运算",
-      "progress": 12,
+      "progress": 33,
       "tags": []
     },
     {
@@ -6917,7 +6959,7 @@
       "level": "intermediate",
       "color": "#8B5CF6",
       "docPath": "Mathematics/线性代数/矩阵的初等变换与线性方程组",
-      "progress": 83,
+      "progress": 76,
       "tags": []
     },
     {
@@ -6928,7 +6970,7 @@
       "level": "intermediate",
       "color": "#8B5CF6",
       "docPath": "Mathematics/线性代数/线性空间与线性变换",
-      "progress": 2,
+      "progress": 70,
       "tags": []
     },
     {
@@ -6939,7 +6981,7 @@
       "level": "intermediate",
       "color": "#8B5CF6",
       "docPath": "Mathematics/线性代数/行列式",
-      "progress": 89,
+      "progress": 79,
       "tags": []
     },
     {
@@ -6969,7 +7011,7 @@
       "level": "intermediate",
       "color": "#6B7280",
       "docPath": "Mechanics/Adams/Adams入门教程",
-      "progress": 79,
+      "progress": 58,
       "tags": []
     },
     {
@@ -6998,7 +7040,7 @@
       "level": "intermediate",
       "color": "#6B7280",
       "docPath": "Mechanics/刚体动力学/RBDL/Dynamics",
-      "progress": 80,
+      "progress": 20,
       "tags": []
     },
     {
@@ -7009,7 +7051,7 @@
       "level": "intermediate",
       "color": "#6B7280",
       "docPath": "Mechanics/刚体动力学/RBDL/Details",
-      "progress": 58,
+      "progress": 30,
       "tags": []
     },
     {
@@ -7039,7 +7081,7 @@
       "level": "intermediate",
       "color": "#F97316",
       "docPath": "Paper/论文复现/CodeAsPolicies-JackyLiang等",
-      "progress": 7,
+      "progress": 23,
       "tags": []
     },
     {
@@ -7050,7 +7092,7 @@
       "level": "intermediate",
       "color": "#F97316",
       "docPath": "Paper/论文复现/ViT-Alexey Dosovitskiy等",
-      "progress": 52,
+      "progress": 98,
       "tags": []
     },
     {
@@ -7061,7 +7103,7 @@
       "level": "intermediate",
       "color": "#F97316",
       "docPath": "Paper/论文复现/Voxposer-李飞飞等",
-      "progress": 67,
+      "progress": 84,
       "tags": []
     },
     {
@@ -7091,7 +7133,7 @@
       "level": "intermediate",
       "color": "#06B6D4",
       "docPath": "Robotics/MCAP/MCAP",
-      "progress": 49,
+      "progress": 21,
       "tags": []
     },
     {
@@ -7111,7 +7153,7 @@
       "level": "intermediate",
       "color": "#06B6D4",
       "docPath": "Robotics/ROS/ROS基本操作",
-      "progress": 9,
+      "progress": 40,
       "tags": []
     },
     {
@@ -7122,7 +7164,7 @@
       "level": "intermediate",
       "color": "#06B6D4",
       "docPath": "Robotics/ROS/话题通信机制",
-      "progress": 55,
+      "progress": 1,
       "tags": []
     },
     {
@@ -7133,7 +7175,7 @@
       "level": "intermediate",
       "color": "#06B6D4",
       "docPath": "Robotics/ROS/ROS安装流程",
-      "progress": 62,
+      "progress": 90,
       "tags": []
     },
     {
@@ -7153,7 +7195,7 @@
       "level": "intermediate",
       "color": "#06B6D4",
       "docPath": "Robotics/VLA/SmolVLA",
-      "progress": 82,
+      "progress": 34,
       "tags": []
     },
     {
@@ -7164,7 +7206,7 @@
       "level": "intermediate",
       "color": "#06B6D4",
       "docPath": "Robotics/VLA/π0.5",
-      "progress": 73,
+      "progress": 4,
       "tags": []
     },
     {
@@ -7175,7 +7217,7 @@
       "level": "intermediate",
       "color": "#06B6D4",
       "docPath": "Robotics/VLA/π0",
-      "progress": 89,
+      "progress": 11,
       "tags": []
     },
     {
@@ -7186,7 +7228,7 @@
       "level": "intermediate",
       "color": "#06B6D4",
       "docPath": "Robotics/VLA/ACT",
-      "progress": 73,
+      "progress": 71,
       "tags": []
     },
     {
@@ -7197,7 +7239,7 @@
       "level": "intermediate",
       "color": "#06B6D4",
       "docPath": "Robotics/VLA/OpenVLA",
-      "progress": 49,
+      "progress": 76,
       "tags": []
     },
     {
@@ -7208,7 +7250,7 @@
       "level": "intermediate",
       "color": "#06B6D4",
       "docPath": "Robotics/VLA/RT2",
-      "progress": 59,
+      "progress": 74,
       "tags": []
     },
     {
@@ -7219,7 +7261,7 @@
       "level": "intermediate",
       "color": "#06B6D4",
       "docPath": "Robotics/VLA/FastDriveVLA",
-      "progress": 0,
+      "progress": 54,
       "tags": []
     },
     {
@@ -7230,7 +7272,7 @@
       "level": "intermediate",
       "color": "#06B6D4",
       "docPath": "Robotics/VLA/π0.6",
-      "progress": 10,
+      "progress": 89,
       "tags": []
     },
     {
@@ -7250,7 +7292,7 @@
       "level": "intermediate",
       "color": "#06B6D4",
       "docPath": "Robotics/机器人不同构型实践/rikibotROS小车",
-      "progress": 19,
+      "progress": 30,
       "tags": []
     },
     {
@@ -7261,7 +7303,7 @@
       "level": "intermediate",
       "color": "#06B6D4",
       "docPath": "Robotics/机器人不同构型实践/云津日记",
-      "progress": 76,
+      "progress": 10,
       "tags": []
     },
     {
@@ -7281,7 +7323,7 @@
       "level": "intermediate",
       "color": "#06B6D4",
       "docPath": "Robotics/机器人学导论/空间描述与变换",
-      "progress": 21,
+      "progress": 75,
       "tags": []
     },
     {
@@ -7292,7 +7334,7 @@
       "level": "intermediate",
       "color": "#06B6D4",
       "docPath": "Robotics/机器人学导论/机器人正运动学",
-      "progress": 91,
+      "progress": 6,
       "tags": []
     },
     {
@@ -7303,7 +7345,7 @@
       "level": "intermediate",
       "color": "#06B6D4",
       "docPath": "Robotics/机器人学导论/机器人逆运动学",
-      "progress": 65,
+      "progress": 90,
       "tags": []
     },
     {
@@ -7314,7 +7356,7 @@
       "level": "intermediate",
       "color": "#06B6D4",
       "docPath": "Robotics/机器人学导论/速度与静力",
-      "progress": 19,
+      "progress": 95,
       "tags": []
     },
     {
@@ -7334,7 +7376,7 @@
       "level": "intermediate",
       "color": "#06B6D4",
       "docPath": "Robotics/机器人强化学习/RL项目复现计划",
-      "progress": 35,
+      "progress": 1,
       "tags": []
     },
     {
@@ -7345,7 +7387,7 @@
       "level": "intermediate",
       "color": "#06B6D4",
       "docPath": "Robotics/机器人强化学习/HumanoidGym",
-      "progress": 85,
+      "progress": 79,
       "tags": []
     },
     {
@@ -7356,7 +7398,7 @@
       "level": "intermediate",
       "color": "#06B6D4",
       "docPath": "Robotics/机器人强化学习/GMR",
-      "progress": 15,
+      "progress": 48,
       "tags": []
     },
     {
@@ -7367,7 +7409,7 @@
       "level": "intermediate",
       "color": "#06B6D4",
       "docPath": "Robotics/机器人强化学习/ASAP",
-      "progress": 27,
+      "progress": 75,
       "tags": []
     },
     {
@@ -7378,7 +7420,7 @@
       "level": "intermediate",
       "color": "#06B6D4",
       "docPath": "Robotics/机器人强化学习/Human2Humanoid",
-      "progress": 16,
+      "progress": 12,
       "tags": []
     },
     {
@@ -7389,7 +7431,7 @@
       "level": "intermediate",
       "color": "#06B6D4",
       "docPath": "Robotics/机器人强化学习/EmbraceCollisions",
-      "progress": 62,
+      "progress": 91,
       "tags": []
     },
     {
@@ -7409,7 +7451,7 @@
       "level": "intermediate",
       "color": "#06B6D4",
       "docPath": "Robotics/视觉SLAM十四讲/Eigen实验",
-      "progress": 84,
+      "progress": 74,
       "tags": []
     },
     {
@@ -7439,7 +7481,7 @@
       "level": "intermediate",
       "color": "#84CC16",
       "docPath": "Sensor/传感器与机器人感知技术/概述",
-      "progress": 10,
+      "progress": 63,
       "tags": []
     },
     {
@@ -7450,7 +7492,7 @@
       "level": "intermediate",
       "color": "#84CC16",
       "docPath": "Sensor/传感器与机器人感知技术/传感器信号采集及数据处理技术",
-      "progress": 93,
+      "progress": 75,
       "tags": []
     },
     {
@@ -7461,7 +7503,7 @@
       "level": "intermediate",
       "color": "#84CC16",
       "docPath": "Sensor/传感器与机器人感知技术/机器人内部传感器",
-      "progress": 69,
+      "progress": 61,
       "tags": []
     },
     {
@@ -7472,7 +7514,7 @@
       "level": "intermediate",
       "color": "#84CC16",
       "docPath": "Sensor/传感器与机器人感知技术/机器人外部传感器",
-      "progress": 37,
+      "progress": 59,
       "tags": []
     },
     {
@@ -7483,7 +7525,7 @@
       "level": "intermediate",
       "color": "#84CC16",
       "docPath": "Sensor/传感器与机器人感知技术/智能传感器及新型传感器",
-      "progress": 96,
+      "progress": 30,
       "tags": []
     },
     {
@@ -7494,7 +7536,7 @@
       "level": "intermediate",
       "color": "#84CC16",
       "docPath": "Sensor/传感器与机器人感知技术/机器人及机械臂上传感器的应用示例",
-      "progress": 21,
+      "progress": 0,
       "tags": []
     },
     {
@@ -7505,7 +7547,7 @@
       "level": "intermediate",
       "color": "#84CC16",
       "docPath": "Sensor/视触觉传感器",
-      "progress": 28,
+      "progress": 99,
       "tags": []
     },
     {
@@ -7526,7 +7568,7 @@
       "level": "intermediate",
       "color": "#14B8A6",
       "docPath": "Synbio/生物信息学",
-      "progress": 42,
+      "progress": 39,
       "tags": []
     },
     {
@@ -7537,7 +7579,7 @@
       "level": "intermediate",
       "color": "#14B8A6",
       "docPath": "Synbio/记替朋友解决的一个化信问题",
-      "progress": 97,
+      "progress": 86,
       "tags": []
     }
   ],
@@ -9938,6 +9980,16 @@
       "type": "contains"
     },
     {
+      "source": "Electronic-嵌入式-ARM",
+      "target": "Electronic-嵌入式-ARM-CortexM4",
+      "type": "contains"
+    },
+    {
+      "source": "Electronic-嵌入式-ARM-CortexM4",
+      "target": "Electronic-嵌入式-ARM-CortexM4-CortexM4寄存器",
+      "type": "contains"
+    },
+    {
       "source": "Electronic-嵌入式",
       "target": "Electronic-嵌入式-BEKEN",
       "type": "contains"
@@ -9950,6 +10002,11 @@
     {
       "source": "Electronic-嵌入式-BEKEN",
       "target": "Electronic-嵌入式-BEKEN-BK7258",
+      "type": "contains"
+    },
+    {
+      "source": "Electronic-嵌入式",
+      "target": "Electronic-嵌入式-CAN自定义协议",
       "type": "contains"
     },
     {
@@ -10130,6 +10187,11 @@
     {
       "source": "Electronic-嵌入式-STM32",
       "target": "Electronic-嵌入式-STM32-22-EtherCAT",
+      "type": "contains"
+    },
+    {
+      "source": "Electronic-嵌入式-STM32",
+      "target": "Electronic-嵌入式-STM32-23-Bootloader",
       "type": "contains"
     },
     {

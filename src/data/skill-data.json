@@ -1,6 +1,16 @@
 {
   "nodes": [
     {
+      "id": "CAE",
+      "title": "CAE",
+      "category": "CAE",
+      "type": "category",
+      "level": "expert",
+      "color": "#A78BFA",
+      "docPath": "CAE",
+      "progress": 100
+    },
+    {
       "id": "Computering",
       "title": "Computering",
       "category": "Computering",
@@ -266,8 +276,8 @@
       "tags": []
     },
     {
-      "id": "Computering-并行计算与分布式系统-RLHF技术-Reward Model",
-      "title": "Reward Model",
+      "id": "Computering-并行计算与分布式系统-RLHF技术-RLHF",
+      "title": "RLHF",
       "category": "Computering",
       "type": "skill",
       "level": "intermediate",
@@ -277,8 +287,8 @@
       "tags": []
     },
     {
-      "id": "Computering-并行计算与分布式系统-RLHF技术-RLHF",
-      "title": "RLHF",
+      "id": "Computering-并行计算与分布式系统-RLHF技术-Reward Model",
+      "title": "Reward Model",
       "category": "Computering",
       "type": "skill",
       "level": "intermediate",
@@ -1336,6 +1346,15 @@
       "tags": []
     },
     {
+      "id": "Computering-机器学习-Torch",
+      "title": "Torch",
+      "category": "Computering",
+      "type": "topic",
+      "color": "#3B82F6",
+      "docPath": "Computering/机器学习/Torch",
+      "progress": 60
+    },
+    {
       "id": "Computering-机器学习-推荐系统",
       "title": "推荐系统",
       "category": "Computering",
@@ -1438,7 +1457,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/机器学习/智能体系统/构建一个智能体框架",
-      "progress": 38,
+      "progress": 34,
       "tags": []
     },
     {
@@ -1978,6 +1997,7 @@
       "color": "#3B82F6",
       "docPath": "Computering/编程语言/C++/C++11/自动类型推导",
       "progress": 69,
+      "progress": 69,
       "tags": []
     },
     {
@@ -2047,8 +2067,8 @@
       "tags": []
     },
     {
-      "id": "Computering-编程语言-C++-C++11-09-新增容器",
-      "title": "新增容器",
+      "id": "Computering-编程语言-C++-C++11-09-C++11新增容器",
+      "title": "C++11新增容器",
       "category": "Computering",
       "type": "skill",
       "level": "intermediate",
@@ -2473,6 +2493,15 @@
       "docPath": "Computering/编程语言/C++/STL/Containers/vector",
       "progress": 66,
       "tags": []
+    },
+    {
+      "id": "Computering-编程语言-C++-STL-FunctionObjects",
+      "title": "FunctionObjects",
+      "category": "Computering",
+      "type": "topic",
+      "color": "#3B82F6",
+      "docPath": "Computering/编程语言/C++/STL/FunctionObjects",
+      "progress": 60
     },
     {
       "id": "Computering-编程语言-C++-STL-Iterators迭代器",
@@ -3126,6 +3155,7 @@
       "color": "#3B82F6",
       "docPath": "Computering/计算机图形学/阴影与遮挡/阴影体及其他阴影技术",
       "progress": 53,
+      "progress": 53,
       "tags": []
     },
     {
@@ -3201,6 +3231,7 @@
       "color": "#3B82F6",
       "docPath": "Computering/计算机网络/网络互联",
       "progress": 44,
+      "progress": 44,
       "tags": []
     },
     {
@@ -3255,7 +3286,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/计算机网络/网络管理",
-      "progress": 34,
+      "progress": 47,
       "tags": []
     },
     {
@@ -3607,6 +3638,15 @@
       "docPath": "Computering/设计模式/业务代表模式",
       "progress": 64,
       "tags": []
+    },
+    {
+      "id": "Computering-通信原理",
+      "title": "通信原理",
+      "category": "Computering",
+      "type": "subcategory",
+      "color": "#3B82F6",
+      "docPath": "Computering/通信原理",
+      "progress": 60
     },
     {
       "id": "Control",
@@ -4081,7 +4121,7 @@
       "level": "intermediate",
       "color": "#10B981",
       "docPath": "Control/自动控制原理/01-自动控制概念/控制系统的数学模型",
-      "progress": 75,
+      "progress": 86,
       "tags": []
     },
     {
@@ -4123,7 +4163,7 @@
       "level": "intermediate",
       "color": "#10B981",
       "docPath": "Control/自动控制原理/02-数学模型/控制系统复域数学模型",
-      "progress": 66,
+      "progress": 32,
       "tags": []
     },
     {
@@ -5067,6 +5107,178 @@
       "tags": []
     },
     {
+      "id": "Electronic-元器件设计-电源设计-开关电源设计",
+      "title": "开关电源设计",
+      "category": "Electronic",
+      "type": "topic",
+      "color": "#EF4444",
+      "docPath": "Electronic/元器件设计/电源设计/开关电源设计",
+      "progress": 60
+    },
+    {
+      "id": "Electronic-元器件设计-电源设计-开关电源设计-01-开关功率变换原理",
+      "title": "开关功率变换原理",
+      "category": "Electronic",
+      "type": "skill",
+      "level": "intermediate",
+      "color": "#EF4444",
+      "docPath": "Electronic/元器件设计/电源设计/开关电源设计/开关功率变换原理",
+      "progress": 28,
+      "tags": []
+    },
+    {
+      "id": "Electronic-元器件设计-电源设计-开关电源设计-02-DCDC变换器及磁性元件设计",
+      "title": "DCDC变换器及磁性元件设计",
+      "category": "Electronic",
+      "type": "skill",
+      "level": "intermediate",
+      "color": "#EF4444",
+      "docPath": "Electronic/元器件设计/电源设计/开关电源设计/DCDC变换器及磁性元件设计",
+      "progress": 54,
+      "tags": []
+    },
+    {
+      "id": "Electronic-元器件设计-电源设计-开关电源设计-03-离线式变换器及磁性元件设计",
+      "title": "离线式变换器及磁性元件设计",
+      "category": "Electronic",
+      "type": "skill",
+      "level": "intermediate",
+      "color": "#EF4444",
+      "docPath": "Electronic/元器件设计/电源设计/开关电源设计/离线式变换器及磁性元件设计",
+      "progress": 32,
+      "tags": []
+    },
+    {
+      "id": "Electronic-元器件设计-电源设计-开关电源设计-04-高级磁技术及磁芯选择",
+      "title": "高级磁技术及磁芯选择",
+      "category": "Electronic",
+      "type": "skill",
+      "level": "intermediate",
+      "color": "#EF4444",
+      "docPath": "Electronic/元器件设计/电源设计/开关电源设计/高级磁技术及磁芯选择",
+      "progress": 67,
+      "tags": []
+    },
+    {
+      "id": "Electronic-元器件设计-电源设计-开关电源设计-05-元器件额定值、应力及寿命",
+      "title": "元器件额定值、应力及寿命",
+      "category": "Electronic",
+      "type": "skill",
+      "level": "intermediate",
+      "color": "#EF4444",
+      "docPath": "Electronic/元器件设计/电源设计/开关电源设计/元器件额定值、应力及寿命",
+      "progress": 34,
+      "tags": []
+    },
+    {
+      "id": "Electronic-元器件设计-电源设计-开关电源设计-06-最优功率器件选择",
+      "title": "最优功率器件选择",
+      "category": "Electronic",
+      "type": "skill",
+      "level": "intermediate",
+      "color": "#EF4444",
+      "docPath": "Electronic/元器件设计/电源设计/开关电源设计/最优功率器件选择",
+      "progress": 94,
+      "tags": []
+    },
+    {
+      "id": "Electronic-元器件设计-电源设计-开关电源设计-07-导通损耗和开关损耗",
+      "title": "导通损耗和开关损耗",
+      "category": "Electronic",
+      "type": "skill",
+      "level": "intermediate",
+      "color": "#EF4444",
+      "docPath": "Electronic/元器件设计/电源设计/开关电源设计/导通损耗和开关损耗",
+      "progress": 91,
+      "tags": []
+    },
+    {
+      "id": "Electronic-元器件设计-电源设计-开关电源设计-08-新拓扑",
+      "title": "新拓扑",
+      "category": "Electronic",
+      "type": "skill",
+      "level": "intermediate",
+      "color": "#EF4444",
+      "docPath": "Electronic/元器件设计/电源设计/开关电源设计/新拓扑",
+      "progress": 39,
+      "tags": []
+    },
+    {
+      "id": "Electronic-元器件设计-电源设计-开关电源设计-09-印制电路板分析",
+      "title": "印制电路板分析",
+      "category": "Electronic",
+      "type": "skill",
+      "level": "intermediate",
+      "color": "#EF4444",
+      "docPath": "Electronic/元器件设计/电源设计/开关电源设计/印制电路板分析",
+      "progress": 48,
+      "tags": []
+    },
+    {
+      "id": "Electronic-元器件设计-电源设计-开关电源设计-10-热管理",
+      "title": "热管理",
+      "category": "Electronic",
+      "type": "skill",
+      "level": "intermediate",
+      "color": "#EF4444",
+      "docPath": "Electronic/元器件设计/电源设计/开关电源设计/热管理",
+      "progress": 59,
+      "tags": []
+    },
+    {
+      "id": "Electronic-元器件设计-电源设计-开关电源设计-11-反馈环路分析及稳定性",
+      "title": "反馈环路分析及稳定性",
+      "category": "Electronic",
+      "type": "skill",
+      "level": "intermediate",
+      "color": "#EF4444",
+      "docPath": "Electronic/元器件设计/电源设计/开关电源设计/反馈环路分析及稳定性",
+      "progress": 0,
+      "tags": []
+    },
+    {
+      "id": "Electronic-元器件设计-电源设计-开关电源设计-12-并联、交错和负载均流",
+      "title": "并联、交错和负载均流",
+      "category": "Electronic",
+      "type": "skill",
+      "level": "intermediate",
+      "color": "#EF4444",
+      "docPath": "Electronic/元器件设计/电源设计/开关电源设计/并联、交错和负载均流",
+      "progress": 36,
+      "tags": []
+    },
+    {
+      "id": "Electronic-元器件设计-电源设计-开关电源设计-13-ACDC电源前级",
+      "title": "ACDC电源前级",
+      "category": "Electronic",
+      "type": "skill",
+      "level": "intermediate",
+      "color": "#EF4444",
+      "docPath": "Electronic/元器件设计/电源设计/开关电源设计/ACDC电源前级",
+      "progress": 52,
+      "tags": []
+    },
+    {
+      "id": "Electronic-元器件设计-电源设计-开关电源设计-14-电磁干扰及测量",
+      "title": "电磁干扰及测量",
+      "category": "Electronic",
+      "type": "skill",
+      "level": "intermediate",
+      "color": "#EF4444",
+      "docPath": "Electronic/元器件设计/电源设计/开关电源设计/电磁干扰及测量",
+      "progress": 5,
+      "tags": []
+    },
+    {
+      "id": "Electronic-天线工程",
+      "title": "天线工程",
+      "category": "Electronic",
+      "type": "subcategory",
+      "color": "#EF4444",
+      "docPath": "Electronic/天线工程",
+      "progress": 60
+    },
+    {
       "id": "Electronic-嵌入式",
       "title": "嵌入式",
       "category": "Electronic",
@@ -5829,7 +6041,7 @@
       "level": "intermediate",
       "color": "#EF4444",
       "docPath": "Electronic/电子技术基础/模拟电子技术基础/频率响应",
-      "progress": 10,
+      "progress": 36,
       "tags": []
     },
     {
@@ -5906,6 +6118,15 @@
       "docPath": "Electronic/电子技术基础/电力电子技术/H桥驱动直流电机",
       "progress": 76,
       "tags": []
+    },
+    {
+      "id": "Electronic-电磁兼容EMC",
+      "title": "电磁兼容EMC",
+      "category": "Electronic",
+      "type": "subcategory",
+      "color": "#EF4444",
+      "docPath": "Electronic/电磁兼容EMC",
+      "progress": 60
     },
     {
       "id": "Electronic-电磁场与电磁波",
@@ -5985,6 +6206,7 @@
       "level": "intermediate",
       "color": "#F59E0B",
       "docPath": "Machinery/机械设计/平面连杆机构",
+      "progress": 55,
       "progress": 55,
       "tags": []
     },
@@ -6445,6 +6667,24 @@
       "progress": 100
     },
     {
+      "id": "Mathematics-偏微分方程",
+      "title": "偏微分方程",
+      "category": "Mathematics",
+      "type": "subcategory",
+      "color": "#8B5CF6",
+      "docPath": "Mathematics/偏微分方程",
+      "progress": 60
+    },
+    {
+      "id": "Mathematics-常微分方程",
+      "title": "常微分方程",
+      "category": "Mathematics",
+      "type": "subcategory",
+      "color": "#8B5CF6",
+      "docPath": "Mathematics/常微分方程",
+      "progress": 60
+    },
+    {
       "id": "Mathematics-微积分",
       "title": "微积分",
       "category": "Mathematics",
@@ -6560,6 +6800,7 @@
       "level": "intermediate",
       "color": "#8B5CF6",
       "docPath": "Mathematics/微积分/微分中值定理",
+      "progress": 88,
       "progress": 88,
       "tags": []
     },
@@ -6734,8 +6975,8 @@
       "progress": 60
     },
     {
-      "id": "Mathematics-概率论与数理统计-bootstrap方法",
-      "title": "bootstrap方法",
+      "id": "Mathematics-概率论与数理统计-R的应用",
+      "title": "R的应用",
       "category": "Mathematics",
       "type": "skill",
       "level": "intermediate",
@@ -6745,8 +6986,8 @@
       "tags": []
     },
     {
-      "id": "Mathematics-概率论与数理统计-R的应用",
-      "title": "R的应用",
+      "id": "Mathematics-概率论与数理统计-bootstrap方法",
+      "title": "bootstrap方法",
       "category": "Mathematics",
       "type": "skill",
       "level": "intermediate",
@@ -7179,6 +7420,44 @@
       "tags": []
     },
     {
+      "id": "Robotics-SLAM",
+      "title": "SLAM",
+      "category": "Robotics",
+      "type": "subcategory",
+      "color": "#06B6D4",
+      "docPath": "Robotics/SLAM",
+      "progress": 60
+    },
+    {
+      "id": "Robotics-SLAM-视觉SLAM十四讲",
+      "title": "视觉SLAM十四讲",
+      "category": "Robotics",
+      "type": "topic",
+      "color": "#06B6D4",
+      "docPath": "Robotics/SLAM/视觉SLAM十四讲",
+      "progress": 60
+    },
+    {
+      "id": "Robotics-SLAM-视觉SLAM十四讲-01-Eigen实验",
+      "title": "Eigen实验",
+      "category": "Robotics",
+      "type": "skill",
+      "level": "intermediate",
+      "color": "#06B6D4",
+      "docPath": "Robotics/SLAM/视觉SLAM十四讲/Eigen实验",
+      "progress": 88,
+      "tags": []
+    },
+    {
+      "id": "Robotics-SLAM-视觉惯性里程计VIO",
+      "title": "视觉惯性里程计VIO",
+      "category": "Robotics",
+      "type": "topic",
+      "color": "#06B6D4",
+      "docPath": "Robotics/SLAM/视觉惯性里程计VIO",
+      "progress": 60
+    },
+    {
       "id": "Robotics-VLA",
       "title": "VLA",
       "category": "Robotics",
@@ -7357,6 +7636,94 @@
       "color": "#06B6D4",
       "docPath": "Robotics/机器人学导论/速度与静力",
       "progress": 95,
+      "tags": []
+    },
+    {
+      "id": "Robotics-机器人学状态估计-02-线性高斯系统的状态估计",
+      "title": "线性高斯系统的状态估计",
+      "category": "Robotics",
+      "type": "skill",
+      "level": "intermediate",
+      "color": "#06B6D4",
+      "docPath": "Robotics/机器人学状态估计/线性高斯系统的状态估计",
+      "progress": 9,
+      "tags": []
+    },
+    {
+      "id": "Robotics-机器人学状态估计-03-非线性非高斯系统的状态估计",
+      "title": "非线性非高斯系统的状态估计",
+      "category": "Robotics",
+      "type": "skill",
+      "level": "intermediate",
+      "color": "#06B6D4",
+      "docPath": "Robotics/机器人学状态估计/非线性非高斯系统的状态估计",
+      "progress": 58,
+      "tags": []
+    },
+    {
+      "id": "Robotics-机器人学状态估计-04-偏差、匹配、外点",
+      "title": "偏差、匹配、外点",
+      "category": "Robotics",
+      "type": "skill",
+      "level": "intermediate",
+      "color": "#06B6D4",
+      "docPath": "Robotics/机器人学状态估计/偏差、匹配、外点",
+      "progress": 72,
+      "tags": []
+    },
+    {
+      "id": "Robotics-机器人学状态估计-05-三维几何学基础",
+      "title": "三维几何学基础",
+      "category": "Robotics",
+      "type": "skill",
+      "level": "intermediate",
+      "color": "#06B6D4",
+      "docPath": "Robotics/机器人学状态估计/三维几何学基础",
+      "progress": 18,
+      "tags": []
+    },
+    {
+      "id": "Robotics-机器人学状态估计-06-矩阵李群",
+      "title": "矩阵李群",
+      "category": "Robotics",
+      "type": "skill",
+      "level": "intermediate",
+      "color": "#06B6D4",
+      "docPath": "Robotics/机器人学状态估计/矩阵李群",
+      "progress": 33,
+      "tags": []
+    },
+    {
+      "id": "Robotics-机器人学状态估计-07-位姿估计问题",
+      "title": "位姿估计问题",
+      "category": "Robotics",
+      "type": "skill",
+      "level": "intermediate",
+      "color": "#06B6D4",
+      "docPath": "Robotics/机器人学状态估计/位姿估计问题",
+      "progress": 4,
+      "tags": []
+    },
+    {
+      "id": "Robotics-机器人学状态估计-08-位姿和点的估计问题",
+      "title": "位姿和点的估计问题",
+      "category": "Robotics",
+      "type": "skill",
+      "level": "intermediate",
+      "color": "#06B6D4",
+      "docPath": "Robotics/机器人学状态估计/位姿和点的估计问题",
+      "progress": 16,
+      "tags": []
+    },
+    {
+      "id": "Robotics-机器人学状态估计-10-连续时间估计",
+      "title": "连续时间估计",
+      "category": "Robotics",
+      "type": "skill",
+      "level": "intermediate",
+      "color": "#06B6D4",
+      "docPath": "Robotics/机器人学状态估计/连续时间估计",
+      "progress": 43,
       "tags": []
     },
     {
@@ -7711,12 +8078,12 @@
     },
     {
       "source": "Computering-并行计算与分布式系统-RLHF技术",
-      "target": "Computering-并行计算与分布式系统-RLHF技术-Reward Model",
+      "target": "Computering-并行计算与分布式系统-RLHF技术-RLHF",
       "type": "contains"
     },
     {
       "source": "Computering-并行计算与分布式系统-RLHF技术",
-      "target": "Computering-并行计算与分布式系统-RLHF技术-RLHF",
+      "target": "Computering-并行计算与分布式系统-RLHF技术-Reward Model",
       "type": "contains"
     },
     {
@@ -7822,6 +8189,11 @@
     {
       "source": "Computering-操作系统-Linux-Linux驱动开发",
       "target": "Computering-操作系统-Linux-Linux驱动开发-字符设备驱动框架",
+      "type": "contains"
+    },
+    {
+      "source": "Computering-操作系统-Linux",
+      "target": "Computering-操作系统-Linux-设备树",
       "type": "contains"
     },
     {
@@ -8211,6 +8583,11 @@
     },
     {
       "source": "Computering-机器学习",
+      "target": "Computering-机器学习-Torch",
+      "type": "contains"
+    },
+    {
+      "source": "Computering-机器学习",
       "target": "Computering-机器学习-推荐系统",
       "type": "contains"
     },
@@ -8501,6 +8878,11 @@
     },
     {
       "source": "Computering-编程语言-C++",
+      "target": "Computering-编程语言-C++-09-绑定",
+      "type": "contains"
+    },
+    {
+      "source": "Computering-编程语言-C++",
       "target": "Computering-编程语言-C++-C++11",
       "type": "contains"
     },
@@ -8546,7 +8928,12 @@
     },
     {
       "source": "Computering-编程语言-C++-C++11",
-      "target": "Computering-编程语言-C++-C++11-09-新增容器",
+      "target": "Computering-编程语言-C++-C++11-09-C++11新增容器",
+      "type": "contains"
+    },
+    {
+      "source": "Computering-编程语言-C++-C++11",
+      "target": "Computering-编程语言-C++-C++11-10-C++11新增关键字",
       "type": "contains"
     },
     {
@@ -8746,6 +9133,11 @@
     },
     {
       "source": "Computering-编程语言-C++-STL",
+      "target": "Computering-编程语言-C++-STL-FunctionObjects",
+      "type": "contains"
+    },
+    {
+      "source": "Computering-编程语言-C++-STL",
       "target": "Computering-编程语言-C++-STL-Iterators迭代器",
       "type": "contains"
     },
@@ -8757,6 +9149,11 @@
     {
       "source": "Computering-编程语言-CSharp",
       "target": "Computering-编程语言-CSharp-01-语法基础",
+      "type": "contains"
+    },
+    {
+      "source": "Computering-编程语言-CSharp",
+      "target": "Computering-编程语言-CSharp-02-LINQ查询",
       "type": "contains"
     },
     {
@@ -9061,6 +9458,46 @@
     },
     {
       "source": "Computering",
+      "target": "Computering-计算机组成原理",
+      "type": "contains"
+    },
+    {
+      "source": "Computering-计算机组成原理",
+      "target": "Computering-计算机组成原理-01-计算机系统概述",
+      "type": "contains"
+    },
+    {
+      "source": "Computering-计算机组成原理",
+      "target": "Computering-计算机组成原理-02-数据的表示和计算",
+      "type": "contains"
+    },
+    {
+      "source": "Computering-计算机组成原理",
+      "target": "Computering-计算机组成原理-03-存储系统",
+      "type": "contains"
+    },
+    {
+      "source": "Computering-计算机组成原理",
+      "target": "Computering-计算机组成原理-04-指令系统",
+      "type": "contains"
+    },
+    {
+      "source": "Computering-计算机组成原理",
+      "target": "Computering-计算机组成原理-05-中央处理器",
+      "type": "contains"
+    },
+    {
+      "source": "Computering-计算机组成原理",
+      "target": "Computering-计算机组成原理-06-总线",
+      "type": "contains"
+    },
+    {
+      "source": "Computering-计算机组成原理",
+      "target": "Computering-计算机组成原理-07-输入输出系统",
+      "type": "contains"
+    },
+    {
+      "source": "Computering",
       "target": "Computering-计算机网络",
       "type": "contains"
     },
@@ -9272,6 +9709,11 @@
     {
       "source": "Computering-设计模式",
       "target": "Computering-设计模式-26-业务代表模式",
+      "type": "contains"
+    },
+    {
+      "source": "Computering",
+      "target": "Computering-通信原理",
       "type": "contains"
     },
     {
@@ -9750,6 +10192,36 @@
       "type": "contains"
     },
     {
+      "source": "Electronic-FPGA-Verilog",
+      "target": "Electronic-FPGA-Verilog-03-数据流建模",
+      "type": "contains"
+    },
+    {
+      "source": "Electronic-FPGA-Verilog",
+      "target": "Electronic-FPGA-Verilog-04-行为级建模",
+      "type": "contains"
+    },
+    {
+      "source": "Electronic-FPGA-Verilog",
+      "target": "Electronic-FPGA-Verilog-05-结构化建模",
+      "type": "contains"
+    },
+    {
+      "source": "Electronic-FPGA-Verilog",
+      "target": "Electronic-FPGA-Verilog-06-Verilog高级设计与仿真",
+      "type": "contains"
+    },
+    {
+      "source": "Electronic-FPGA-Verilog",
+      "target": "Electronic-FPGA-Verilog-07-Verilog数字信号处理",
+      "type": "contains"
+    },
+    {
+      "source": "Electronic-FPGA-Verilog",
+      "target": "Electronic-FPGA-Verilog-08-Verilog数值转换",
+      "type": "contains"
+    },
+    {
       "source": "Electronic",
       "target": "Electronic-信号与系统",
       "type": "contains"
@@ -9827,6 +10299,56 @@
     {
       "source": "Electronic-信号与系统-信号完整性分析",
       "target": "Electronic-信号与系统-信号完整性分析-04-电感物理基础",
+      "type": "contains"
+    },
+    {
+      "source": "Electronic-信号与系统",
+      "target": "Electronic-信号与系统-多抽样率数字信号处理",
+      "type": "contains"
+    },
+    {
+      "source": "Electronic-信号与系统",
+      "target": "Electronic-信号与系统-数字信号处理基础",
+      "type": "contains"
+    },
+    {
+      "source": "Electronic-信号与系统-数字信号处理基础",
+      "target": "Electronic-信号与系统-数字信号处理基础-DSP算法设计",
+      "type": "contains"
+    },
+    {
+      "source": "Electronic-信号与系统-数字信号处理基础",
+      "target": "Electronic-信号与系统-数字信号处理基础-FIR数字滤波器设计",
+      "type": "contains"
+    },
+    {
+      "source": "Electronic-信号与系统-数字信号处理基础",
+      "target": "Electronic-信号与系统-数字信号处理基础-IIR数字滤波器设计",
+      "type": "contains"
+    },
+    {
+      "source": "Electronic-信号与系统-数字信号处理基础",
+      "target": "Electronic-信号与系统-数字信号处理基础-LTI变换域中的离散时间系统",
+      "type": "contains"
+    },
+    {
+      "source": "Electronic-信号与系统-数字信号处理基础",
+      "target": "Electronic-信号与系统-数字信号处理基础-数字滤波器结构",
+      "type": "contains"
+    },
+    {
+      "source": "Electronic-信号与系统-数字信号处理基础",
+      "target": "Electronic-信号与系统-数字信号处理基础-有限字长效应的分析",
+      "type": "contains"
+    },
+    {
+      "source": "Electronic-信号与系统-数字信号处理基础",
+      "target": "Electronic-信号与系统-数字信号处理基础-有限长离散变换",
+      "type": "contains"
+    },
+    {
+      "source": "Electronic-信号与系统-数字信号处理基础",
+      "target": "Electronic-信号与系统-数字信号处理基础-离散时间系统",
       "type": "contains"
     },
     {
@@ -9955,6 +10477,86 @@
       "type": "contains"
     },
     {
+      "source": "Electronic-元器件设计-电源设计",
+      "target": "Electronic-元器件设计-电源设计-开关电源设计",
+      "type": "contains"
+    },
+    {
+      "source": "Electronic-元器件设计-电源设计-开关电源设计",
+      "target": "Electronic-元器件设计-电源设计-开关电源设计-01-开关功率变换原理",
+      "type": "contains"
+    },
+    {
+      "source": "Electronic-元器件设计-电源设计-开关电源设计",
+      "target": "Electronic-元器件设计-电源设计-开关电源设计-02-DCDC变换器及磁性元件设计",
+      "type": "contains"
+    },
+    {
+      "source": "Electronic-元器件设计-电源设计-开关电源设计",
+      "target": "Electronic-元器件设计-电源设计-开关电源设计-03-离线式变换器及磁性元件设计",
+      "type": "contains"
+    },
+    {
+      "source": "Electronic-元器件设计-电源设计-开关电源设计",
+      "target": "Electronic-元器件设计-电源设计-开关电源设计-04-高级磁技术及磁芯选择",
+      "type": "contains"
+    },
+    {
+      "source": "Electronic-元器件设计-电源设计-开关电源设计",
+      "target": "Electronic-元器件设计-电源设计-开关电源设计-05-元器件额定值、应力及寿命",
+      "type": "contains"
+    },
+    {
+      "source": "Electronic-元器件设计-电源设计-开关电源设计",
+      "target": "Electronic-元器件设计-电源设计-开关电源设计-06-最优功率器件选择",
+      "type": "contains"
+    },
+    {
+      "source": "Electronic-元器件设计-电源设计-开关电源设计",
+      "target": "Electronic-元器件设计-电源设计-开关电源设计-07-导通损耗和开关损耗",
+      "type": "contains"
+    },
+    {
+      "source": "Electronic-元器件设计-电源设计-开关电源设计",
+      "target": "Electronic-元器件设计-电源设计-开关电源设计-08-新拓扑",
+      "type": "contains"
+    },
+    {
+      "source": "Electronic-元器件设计-电源设计-开关电源设计",
+      "target": "Electronic-元器件设计-电源设计-开关电源设计-09-印制电路板分析",
+      "type": "contains"
+    },
+    {
+      "source": "Electronic-元器件设计-电源设计-开关电源设计",
+      "target": "Electronic-元器件设计-电源设计-开关电源设计-10-热管理",
+      "type": "contains"
+    },
+    {
+      "source": "Electronic-元器件设计-电源设计-开关电源设计",
+      "target": "Electronic-元器件设计-电源设计-开关电源设计-11-反馈环路分析及稳定性",
+      "type": "contains"
+    },
+    {
+      "source": "Electronic-元器件设计-电源设计-开关电源设计",
+      "target": "Electronic-元器件设计-电源设计-开关电源设计-12-并联、交错和负载均流",
+      "type": "contains"
+    },
+    {
+      "source": "Electronic-元器件设计-电源设计-开关电源设计",
+      "target": "Electronic-元器件设计-电源设计-开关电源设计-13-ACDC电源前级",
+      "type": "contains"
+    },
+    {
+      "source": "Electronic-元器件设计-电源设计-开关电源设计",
+      "target": "Electronic-元器件设计-电源设计-开关电源设计-14-电磁干扰及测量",
+      "type": "contains"
+    },
+    {
+      "source": "Electronic",
+      "target": "Electronic-天线工程",
+      "type": "contains"
+    },
+    {
       "source": "Electronic",
       "target": "Electronic-嵌入式",
       "type": "contains"
@@ -10032,6 +10634,51 @@
     {
       "source": "Electronic-嵌入式-RISC-V",
       "target": "Electronic-嵌入式-RISC-V-01-RISCV简介",
+      "type": "contains"
+    },
+    {
+      "source": "Electronic-嵌入式-RISC-V",
+      "target": "Electronic-嵌入式-RISC-V-02-RV32I：RISC-V 基础整数指令集",
+      "type": "contains"
+    },
+    {
+      "source": "Electronic-嵌入式-RISC-V",
+      "target": "Electronic-嵌入式-RISC-V-03-RISCV汇编语言",
+      "type": "contains"
+    },
+    {
+      "source": "Electronic-嵌入式-RISC-V",
+      "target": "Electronic-嵌入式-RISC-V-04-RV32M：乘法和除法指令",
+      "type": "contains"
+    },
+    {
+      "source": "Electronic-嵌入式-RISC-V",
+      "target": "Electronic-嵌入式-RISC-V-05-RV32F 和 RV32D：单精度和双精 度浮点数",
+      "type": "contains"
+    },
+    {
+      "source": "Electronic-嵌入式-RISC-V",
+      "target": "Electronic-嵌入式-RISC-V-06-RV32A：原子指令",
+      "type": "contains"
+    },
+    {
+      "source": "Electronic-嵌入式-RISC-V",
+      "target": "Electronic-嵌入式-RISC-V-07-RV32C：压缩指令",
+      "type": "contains"
+    },
+    {
+      "source": "Electronic-嵌入式-RISC-V",
+      "target": "Electronic-嵌入式-RISC-V-08-RV32V：向量",
+      "type": "contains"
+    },
+    {
+      "source": "Electronic-嵌入式-RISC-V",
+      "target": "Electronic-嵌入式-RISC-V-09-RV64：64 位地址指令",
+      "type": "contains"
+    },
+    {
+      "source": "Electronic-嵌入式-RISC-V",
+      "target": "Electronic-嵌入式-RISC-V-10-RV32RV64 特权架构",
       "type": "contains"
     },
     {
@@ -10351,6 +10998,11 @@
     },
     {
       "source": "Electronic",
+      "target": "Electronic-电磁兼容EMC",
+      "type": "contains"
+    },
+    {
+      "source": "Electronic",
       "target": "Electronic-电磁场与电磁波",
       "type": "contains"
     },
@@ -10586,6 +11238,16 @@
     },
     {
       "source": "Mathematics",
+      "target": "Mathematics-偏微分方程",
+      "type": "contains"
+    },
+    {
+      "source": "Mathematics",
+      "target": "Mathematics-常微分方程",
+      "type": "contains"
+    },
+    {
+      "source": "Mathematics",
       "target": "Mathematics-微积分",
       "type": "contains"
     },
@@ -10721,12 +11383,12 @@
     },
     {
       "source": "Mathematics-概率论与数理统计",
-      "target": "Mathematics-概率论与数理统计-bootstrap方法",
+      "target": "Mathematics-概率论与数理统计-R的应用",
       "type": "contains"
     },
     {
       "source": "Mathematics-概率论与数理统计",
-      "target": "Mathematics-概率论与数理统计-R的应用",
+      "target": "Mathematics-概率论与数理统计-bootstrap方法",
       "type": "contains"
     },
     {
@@ -10916,6 +11578,26 @@
     },
     {
       "source": "Robotics",
+      "target": "Robotics-SLAM",
+      "type": "contains"
+    },
+    {
+      "source": "Robotics-SLAM",
+      "target": "Robotics-SLAM-视觉SLAM十四讲",
+      "type": "contains"
+    },
+    {
+      "source": "Robotics-SLAM-视觉SLAM十四讲",
+      "target": "Robotics-SLAM-视觉SLAM十四讲-01-Eigen实验",
+      "type": "contains"
+    },
+    {
+      "source": "Robotics-SLAM",
+      "target": "Robotics-SLAM-视觉惯性里程计VIO",
+      "type": "contains"
+    },
+    {
+      "source": "Robotics",
       "target": "Robotics-VLA",
       "type": "contains"
     },
@@ -11001,6 +11683,56 @@
     },
     {
       "source": "Robotics",
+      "target": "Robotics-机器人学状态估计",
+      "type": "contains"
+    },
+    {
+      "source": "Robotics-机器人学状态估计",
+      "target": "Robotics-机器人学状态估计-01-概率论基础",
+      "type": "contains"
+    },
+    {
+      "source": "Robotics-机器人学状态估计",
+      "target": "Robotics-机器人学状态估计-02-线性高斯系统的状态估计",
+      "type": "contains"
+    },
+    {
+      "source": "Robotics-机器人学状态估计",
+      "target": "Robotics-机器人学状态估计-03-非线性非高斯系统的状态估计",
+      "type": "contains"
+    },
+    {
+      "source": "Robotics-机器人学状态估计",
+      "target": "Robotics-机器人学状态估计-04-偏差、匹配、外点",
+      "type": "contains"
+    },
+    {
+      "source": "Robotics-机器人学状态估计",
+      "target": "Robotics-机器人学状态估计-05-三维几何学基础",
+      "type": "contains"
+    },
+    {
+      "source": "Robotics-机器人学状态估计",
+      "target": "Robotics-机器人学状态估计-06-矩阵李群",
+      "type": "contains"
+    },
+    {
+      "source": "Robotics-机器人学状态估计",
+      "target": "Robotics-机器人学状态估计-07-位姿估计问题",
+      "type": "contains"
+    },
+    {
+      "source": "Robotics-机器人学状态估计",
+      "target": "Robotics-机器人学状态估计-08-位姿和点的估计问题",
+      "type": "contains"
+    },
+    {
+      "source": "Robotics-机器人学状态估计",
+      "target": "Robotics-机器人学状态估计-10-连续时间估计",
+      "type": "contains"
+    },
+    {
+      "source": "Robotics",
       "target": "Robotics-机器人强化学习",
       "type": "contains"
     },
@@ -11032,16 +11764,6 @@
     {
       "source": "Robotics-机器人强化学习",
       "target": "Robotics-机器人强化学习-06-EmbraceCollisions",
-      "type": "contains"
-    },
-    {
-      "source": "Robotics",
-      "target": "Robotics-视觉SLAM十四讲",
-      "type": "contains"
-    },
-    {
-      "source": "Robotics-视觉SLAM十四讲",
-      "target": "Robotics-视觉SLAM十四讲-01-Eigen实验",
       "type": "contains"
     },
     {

@@ -284,11 +284,11 @@ x(t)=e^{j\omega_0t} \Longrightarrow X(j\omega)=2\pi\delta{j(\omega-\omega_0)}
 $$
 
 $$
-F\{cos\omega_0 t\} = \frac{1}{2}F{e^{j\omega_0t}+e^{-j\omega_0t}}=\pi\delta(\omega-\omega_0)+\pi\delta(\omega+\omega_0)
+\mathcal{F}\{cos\omega_0 t\} = \frac{1}{2}\mathcal{F}\{e^{j\omega_0t}+e^{-j\omega_0t}}=\pi\delta(\omega-\omega_0)+\pi\delta(\omega+\omega_0)
 $$
 
 $$
-F\{sin\omega_0 t\} = \frac{1}{2j}F{e^{j\omega_0t}-e^{-j\omega_0t}}=j\pi\delta(\omega+\omega_0)-j\pi\delta(\omega-\omega_0)
+\mathcal{F}\{sin\omega_0 t\} = \frac{1}{2j}\mathcal{F}\{e^{j\omega_0t}-e^{-j\omega_0t}}=j\pi\delta(\omega+\omega_0)-j\pi\delta(\omega-\omega_0)
 $$
 
 ## 4.2 周期信号的傅里叶变换
@@ -325,11 +325,145 @@ $$
 
 ## 4.3 连续时间傅立叶变换性质
 
+约定一个信号用于研究。假设一个信号及其傅里叶变换的性质是：
+
+$$
+x(t) = \frac{1}{2\pi}\int^{\infty}_{-\infty}X(j\omega)e^{j\omega t}d\omega \tag{4.24}
+$$
+
+$$
+X(j\omega) = \int^{\infty}_{-\infty}x(t)e^{-j\omega t}dt \tag{4.25}
+$$
+
+后续的$\mathcal{F}\{x(t)\}$都表示$X(j\omega)$，而$\mathcal{F}^{-1}\{X(j\omega)\}$都表示$x(t)$。表示其傅里叶变换：
+
+$$
+x(t) \overset{F}\longleftrightarrow X(j\omega)
+$$
+
 ### 4.3.1 线性
+
+若：
+
+$$
+x(t) \overset{F}\longleftrightarrow X(j\omega)
+$$
+
+且：
+
+$$
+y(t) \overset{F}\longleftrightarrow Y(j\omega)
+$$
+
+则：
+
+$$
+ax(t) + by(t) \overset{F}\longleftrightarrow aX(j\omega) + bY(j\omega) \tag{4.26}
+$$
+
+
+
 
 ### 4.3.2 时移
 
+时移性质描述了信号在时域中平移后，其频谱如何变化。
+
+若
+
+$$
+x(t) \overset{F}\longleftrightarrow X(j\omega)
+$$
+
+则
+
+$$
+x(t-t_0) \overset{F}\longleftrightarrow e^{-j\omega t_0}X(j\omega) \tag{4.27}
+$$
+
+在
+
+$$
+x(t) = \frac{1}{2\pi}\int^{\infty}_{-\infty}X(j\omega)e^{j\omega t}d\omega
+$$
+
+中，以$t-t_0$取代$t$，得到
+
+$$
+x(t-t_0) = \frac{1}{2\pi}\int^{\infty}_{-\infty}X(j\omega)e^{j\omega (t-t_0)}d\omega
+$$
+
+$$
+= \frac{1}{2\pi}\int^{\infty}_{-\infty}(e^{j\omega (t_0)}X(j\omega))e^{j\omega t}d\omega
+$$
+
+所以
+
+$$
+\mathcal{F}\{x(t-t_0)\} = e^{-j\omega t_0}X(j\omega) 
+$$
+
+说明：**信号在时间上移位，不改变其傅里叶变换的模。**
+
+用极坐标表示$X(j\omega)$：
+
+$$
+\mathcal{F}\{x(t)\} = X(j\omega) = |X(j\omega)|e^{j\sphericalangle X(j\omega)}
+$$
+
+> 注：$\sphericalangle$是球面角符号
+
+则：
+
+$$
+\mathcal{F}\{x(t-t_0)\} = |X(j\omega)|e^{j\sphericalangle [X(j\omega)-\omega t_0]}
+$$
+
+这证明信号在时间上的变换只会引入相位的移动$-\omega_0 t$，说明相移和频率成线性关系。
+
+
 ### 4.3.3 共轭及共轭对称
+
+共轭是指对于实信号，正负频率分量的幅度相同，相位相反。因此，实信号的频谱只需给出 $\omega \geq 0$ 的部分即可完全描述。
+
+若：
+
+$$
+x(t) \overset{F}\longleftrightarrow X(j\omega)
+$$
+
+有：
+
+$$
+x^{*}(t) \overset{F}\longleftrightarrow X(-j\omega)^* \tag{4.28}
+$$
+
+> 其中 $*$ 表示复共轭。
+
+对式4.25做共轭变换，得到：
+
+$$
+X(j\omega)^* = [\int^{\infty}_{-\infty}x(t)e^{-j\omega t}]^{*}dt 
+$$
+
+$$
+= \int^{\infty}_{-\infty}x^{*}(t)e^{j\omega t}dt 
+$$
+
+则对$\omega$取反后：
+
+$$
+X(-j\omega)^* = \int^{\infty}_{-\infty}x^{*}(t)e^{-j\omega t}dt \tag{4.29}
+$$
+
+由此可证明实函数$x(t)$的傅里叶变换$X(j\omega)$具有共轭对称性。
+
+得到共轭对称性质：
+
+$$
+X(-j\omega) = X^{*}(j\omega) \tag{4.30}
+$$
+
+实函数$x(t)$傅里叶变换的实部是频率的偶函数，而虚部是奇函数。
 
 ### 4.3.4 微分与积分
 

@@ -292,7 +292,7 @@ nn.utils.clip_grad_norm_(self.actor_critic.parameters(), self.max_grad_norm)
 self.optimizer.step()
 ```
 
-上述代码是PPO的更新策略，优化策略网络和值网络。。
+上述代码是PPO的更新策略，优化策略网络和值网络。
 
 看最重要的状态估计模块：
 
@@ -311,7 +311,7 @@ self.adaptation_decoder_module = nn.Sequential(...)   # 输入 latent，输出 s
 
 动作生成时隐式使用：
 
-调用 self.alg.act(obs, privileged_obs, obs_pred) → 最终进入 ActorCritic.act() → update_distribution() 中：
+调用 `self.alg.act(obs, privileged_obs, obs_pred)` → 最终进入 `ActorCritic.act()` → `update_distribution()` 中：
 ```python
 latent = self.adaptation_encoder_module(observations)          # 编码器
 mean = self.actor_body(torch.cat((observations[:, -self.num_obs_now:], latent), dim=-1))
@@ -319,7 +319,7 @@ mean = self.actor_body(torch.cat((observations[:, -self.num_obs_now:], latent), 
 即 每个动作都依赖于编码器输出的隐变量。
 
 显式获取隐变量：
-在 rollout 循环中，OnPolicyRunner.learn 里：
+在 `rollout` 循环中，`OnPolicyRunner.learn` 里：
 ```python
 with torch.no_grad():
     latent = self.alg.actor_critic.get_student_latent(obs)   # 仅用于记录或调试
@@ -338,7 +338,7 @@ self.transition.observation_preds = obs_pred
 
 然后更新阶段训练状态估计模块。
 
-在 update() 方法中，额外的一个训练循环：
+在 `update()` 方法中，额外的一个训练循环：
 ```python
 
 if len(self.adaptation_labels) > 0:

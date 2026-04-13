@@ -75,7 +75,9 @@ STM32有一段内嵌的自举程序，存放在系统存储区（ROM），这个
 
 看到第一条数据就是`__initial_sp`，它指的是栈顶地址，可以设置栈顶指针，复位时 CPU 会把这个值加载到堆栈指针 SP。然后到下一个地址0x08000004开始执行指令，也就是Reset_Handler（调用SystemInit，然后进入`__main`即运行时环境）。如此之后执行其他初始化流程。
 
-我们深入看看`__initial_sp`，它被定义在文件开头
+我们深入看看`__initial_sp`，它被定义在文件开头，如下：
+
+![](https://github.com/user-attachments/assets/8a4ca3c5-6583-400c-9bdb-d8b46e530422)
 
 
 

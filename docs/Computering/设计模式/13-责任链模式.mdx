@@ -2,4 +2,117 @@ import WordCount from '../../../src/components/WordCount/WordCount';
 
 <WordCount>
 
+## 责任链模式
+
+责任链模式是一种行为型设计模式，它允许多个对象都有机会处理请求，从而避免请求的发送者与接收者之间的耦合。这些接收对象被连成一条链，请求沿着链传递，直到有一个对象处理它为止。
+
+> 通俗理解：就像公司里的报销审批流程——你提交一张报销单，先经过组长，组长处理不了就转给经理，经理处理不了再转给总监……直到有人能批准。
+
+假设现在要过一个请假的OA：
+
+组长：可批1天以内
+
+经理：可批3天以内
+
+总监：可批7天以内
+
+超过7天：无法处理
+
+```java
+// 1. 抽象处理者
+abstract class Approver {
+    protected Approver next;  // 下一个处理者
+    protected String name;
+
+    public Approver(String name) {
+        this.name = name;
+    }
+
+    public void setNext(Approver next) {
+        this.next = next;
+    }
+
+    // 处理请求的抽象方法
+    public abstract void handleRequest(int days);
+}
+
+// 2. 具体处理者：组长
+class TeamLeader extends Approver {
+    public TeamLeader(String name) {
+        super(name);
+    }
+
+    @Override
+    public void handleRequest(int days) {
+        if (days <= 1) {
+            System.out.println(name + "（组长）批准了 " + days + " 天请假");
+        } else if (next != null) {
+            System.out.println(name + "（组长）无法处理，转交上级");
+            next.handleRequest(days);
+        } else {
+            System.out.println("没有人能处理 " + days + " 天请假");
+        }
+    }
+}
+
+// 经理
+class Manager extends Approver {
+    public Manager(String name) {
+        super(name);
+    }
+
+    @Override
+    public void handleRequest(int days) {
+        if (days <= 3) {
+            System.out.println(name + "（经理）批准了 " + days + " 天请假");
+        } else if (next != null) {
+            System.out.println(name + "（经理）无法处理，转交上级");
+            next.handleRequest(days);
+        } else {
+            System.out.println("没有人能处理 " + days + " 天请假");
+        }
+    }
+}
+
+// 总监
+class Director extends Approver {
+    public Director(String name) {
+        super(name);
+    }
+
+    @Override
+    public void handleRequest(int days) {
+        if (days <= 7) {
+            System.out.println(name + "（总监）批准了 " + days + " 天请假");
+        } else if (next != null) {
+            System.out.println(name + "（总监）无法处理，转交上级");
+            next.handleRequest(days);
+        } else {
+            System.out.println("没有人能处理 " + days + " 天请假");
+        }
+    }
+}
+
+// 3. 客户端
+public class Client {
+    public static void main(String[] args) {
+        // 创建处理者
+        Approver leader = new TeamLeader("张三");
+        Approver manager = new Manager("李四");
+        Approver director = new Director("王五");
+
+        // 组建责任链
+        leader.setNext(manager);
+        manager.setNext(director);
+
+        // 发起请求
+        leader.handleRequest(1);   // 组长直接批
+        leader.handleRequest(2);   // 组长->经理批
+        leader.handleRequest(5);   // 组长->经理->总监批
+        leader.handleRequest(10);  // 无人能批
+    }
+}
+```
+
+
 </WordCount>

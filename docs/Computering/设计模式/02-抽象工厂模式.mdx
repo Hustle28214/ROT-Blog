@@ -2,4 +2,172 @@ import WordCount from '../../../src/components/WordCount/WordCount';
 
 <WordCount>
 
+## 抽象工厂模式
+
+抽象工厂模式是一种创建型设计模式，它提供了一个接口，用于创建一系列相关或相互依赖的对象，而无需指定它们具体的类。
+
+和工厂模式有什么不同？工厂模式用于创建单个产品，让子类决定实例化哪一个具体类；抽象工厂模式用于创建产品族，无需指定具体类。
+
+有点抽象，看看例子：
+
+```cpp
+#include <iostream>
+#include <memory>
+#include <string>
+
+// 抽象产品 A：按钮。客户端只依赖接口，不依赖具体平台实现。
+struct Button {
+    virtual ~Button() = default;
+    virtual std::string render() const = 0;
+};
+
+// 抽象产品 B：复选框。同样只暴露统一接口。
+struct Checkbox {
+    virtual ~Checkbox() = default;
+    virtual std::string render() const = 0;
+};
+
+// 抽象工厂：定义“成套创建”的能力。
+// 关键点：同一个工厂负责创建同一产品族中的多个产品（Button + Checkbox），以保证一致性。
+struct GUIFactory {
+    virtual ~GUIFactory() = default;
+    virtual std::unique_ptr<Button> createButton() const = 0;
+    virtual std::unique_ptr<Checkbox> createCheckbox() const = 0;
+};
+
+// 具体产品族：Windows 风格的一组组件
+struct WindowsButton final : Button {
+    std::string render() const override { return "WindowsButton"; }
+};
+
+struct WindowsCheckbox final : Checkbox {
+    std::string render() const override { return "WindowsCheckbox"; }
+};
+
+// 具体产品族：Mac 风格的一组组件
+struct MacButton final : Button {
+    std::string render() const override { return "MacButton"; }
+};
+
+struct MacCheckbox final : Checkbox {
+    std::string render() const override { return "MacCheckbox"; }
+};
+
+// 具体工厂：负责创建 Windows 产品族，天然保证“WindowsButton 搭配 WindowsCheckbox”
+struct WindowsFactory final : GUIFactory {
+    std::unique_ptr<Button> createButton() const override {
+        return std::make_unique<WindowsButton>();
+    }
+    std::unique_ptr<Checkbox> createCheckbox() const override {
+        return std::make_unique<WindowsCheckbox>();
+    }
+};
+
+// 具体工厂：负责创建 Mac 产品族，天然保证“MacButton 搭配 MacCheckbox”
+struct MacFactory final : GUIFactory {
+    std::unique_ptr<Button> createButton() const override {
+        return std::make_unique<MacButton>();
+    }
+    std::unique_ptr<Checkbox> createCheckbox() const override {
+        return std::make_unique<MacCheckbox>();
+    }
+};
+
+// 客户端：只拿到抽象工厂 GUIFactory，就可以拿到一整套产品并完成工作。
+// 客户端不需要知道具体类名，也不需要写平台判断分支。
+struct App {
+    explicit App(std::unique_ptr<GUIFactory> factory)
+        : factory_(std::move(factory)) {}
+
+    void draw() const {
+        // 成套创建：从同一个工厂拿到 Button + Checkbox，风格/兼容性由工厂保证。
+        auto button = factory_->createButton();
+        auto checkbox = factory_->createCheckbox();
+        std::cout << "draw: " << button->render() << " + " << checkbox->render() << "\n";
+    }
+
+private:
+    std::unique_ptr<GUIFactory> factory_;
+};
+
+// 工厂选择逻辑：把“选哪一个产品族”的分支收敛到应用初始化阶段（配置/环境判断）。
+// 注意：这里返回的是抽象工厂类型，让客户端保持对具体工厂无感知。
+std::unique_ptr<GUIFactory> buildFactory(const std::string& os) {
+    if (os == "windows") return std::make_unique<WindowsFactory>();
+    if (os == "mac") return std::make_unique<MacFactory>();
+    return std::make_unique<WindowsFactory>();
+}
+
+int main() {
+    // 运行时选择不同工厂 => 得到不同产品族，但 App 的代码完全不变。
+    auto app1 = App(buildFactory("windows"));
+    auto app2 = App(buildFactory("mac"));
+    app1.draw();
+    app2.draw();
+}
+```
+
+这个例子里，“产品族”是 GUI 组件：`Button` + `Checkbox`。
+
+对于不同平台（Windows/Mac），它们需要保持风格一致（同一套 Look & Feel）。抽象工厂把“创建一套相关对象”的逻辑聚合在一起，客户端只依赖抽象接口而不是具体类。
+
+## 角色拆解
+
+先看接口层。`GUIFactory` 是抽象工厂，它定义了一组“成套创建”的方法：`createButton()` 和 `createCheckbox()`。这两个方法的返回类型都是抽象产品（`Button`/`Checkbox`），意味着客户端拿到的是接口而不是具体实现。
+
+接着是实现层。`WindowsFactory` 与 `MacFactory` 是具体工厂，它们分别产出 Windows 风格或 Mac 风格的组件：`WindowsButton/WindowsCheckbox` 与 `MacButton/MacCheckbox`。这里要注意的不是“多态本身”，而是“一致性”：同一个具体工厂会把同一套 Look & Feel 的产品一起产出，避免出现按钮是 Mac 风格、复选框却是 Windows 风格这种不协调的组合。
+
+最后是客户端。`App` 只持有 `GUIFactory` 这个抽象，通过它拿到一整套组件并完成渲染。至于究竟使用 Windows 还是 Mac，选择发生在 `buildFactory()` 里（也可以是配置或启动参数），业务路径上不再散落平台分支。
+
+## 设计考量
+
+抽象工厂经常被误解为“把 `new` 挪到别处”，但它真正解决的是“成套对象的一致性”以及“分支扩散”。当你的对象不是孤立存在，而是要以某种风格、协议或兼容性规则成套出现（同一主题的 UI 组件、同一云厂商的一组 SDK 客户端、同一数据库方言的一组访问器），抽象工厂就能把这种约束变成结构：你只要选对工厂，产出的天然是一套匹配的东西。
+
+另外，抽象工厂能把环境差异隔离在初始化阶段。平台判断、资源装载、主题初始化等细节都收敛到具体工厂里，`App` 这样的业务代码只面向 `GUIFactory/Button/Checkbox` 这些抽象，代码会更稳定、更容易测试（用一个假的工厂返回测试替身即可）。
+
+### 代价与权衡
+
+这种模式的代价也非常明确：它偏向“产品族维度的扩展”，不偏向“产品种类维度的扩展”。也就是说，如果你经常新增平台（再来一个 Linux、Web、Android），抽象工厂会很舒服：加一组 `LinuxFactory` 和对应产品实现即可，客户端基本不动。但如果你经常新增产品类型（在产品族里加入 `Slider`、`TextInput`），那就会痛：抽象工厂接口要变，所有具体工厂都要跟着补方法，改动面天然是横向扩散的。
+
+此外，抽象层会变多，类/接口数量会上升。它更适合“长期演进、产品必须成套、平台族多”的系统；如果只是一个小页面里创建两个对象，直接 if/else 或简单工厂反而更划算。
+
+那么问题来了，什么时候用抽象工厂？什么时候不用？
+
+当你需要创建“成套对象”，而且套内对象存在明确的兼容性或一致性要求时，用抽象工厂会很自然。再加上你希望在运行时按环境切换（OS、地区、客户版本、AB 实验），它就更有价值。
+
+反过来，如果你其实只是在创建一个对象，或者产品类型经常变化、不断加新部件，那么抽象工厂会让接口频繁震荡，此时工厂方法、简单工厂甚至直接构造可能更合适。
+
+
+理解抽象工厂最顺手的方式，是把变化拆成两个维度：一个是“产品族”（Windows/Mac/Linux…），一个是“产品种类”（Button/Checkbox/Slider…）。抽象工厂的策略是：在接口层固定住“有哪些产品种类需要一起被创建”，把变化主要留给“产品族”。所以它对新增平台非常友好，对新增产品类型相对不友好；这并不是缺陷，而是明确的设计取舍。
+
+#### 抽象工厂 vs 工厂方法（Factory Method）
+
+如果系统里只有一个产品等级结构，比如只关心 `Button`，但 Button 有 Windows/Mac 两种实现，那么工厂方法就够了：你只需要一个 `createButton()` 的多态点，类数量更少，也更直观。抽象工厂往往在“有多个产品等级结构且必须成套一致”时才显示优势：一旦 `Button` 和 `Checkbox` 必须来自同一平台族，用工厂方法容易让客户端写出两套选择逻辑，然后出现混搭错误；抽象工厂则把“成套”这件事做成结构约束。
+
+#### 抽象工厂 vs 简单工厂（Simple Factory / 静态工厂）
+
+简单工厂的优点是门槛低、上手快：一个函数里 `switch(os)` 返回不同实现就能跑。但当“平台分支”和“产品种类”叠加，简单工厂要么在一个地方长成二维分支（越写越难维护），要么分散在多个地方（风格一致性难保证）。抽象工厂的做法更像是把平台选择前置（选哪一个 factory），然后由 factory 内部统一负责创建各个产品，分支不会在业务代码里蔓延。
+
+#### 抽象工厂 vs 建造者（Builder）
+
+建造者更关心“同一个复杂对象的分步构建过程”，强调步骤、顺序、可选部件，常用于生成一个大对象（比如复杂报文、文档、SQL）。抽象工厂关心的是“多个相关对象的成套创建”，强调对象之间的兼容与一致；两者都在做构建，但解决的问题焦点不同。
+
+#### 抽象工厂 vs 依赖注入容器（DI Container）
+
+DI 容器也能按环境注入不同实现，看起来像是“更通用的抽象工厂”。差别在于抽象工厂更偏向“业务域内的约束表达”：你显式描述“这一族里应该有哪些产品，以及如何配套”，从代码结构上把一致性固定住。实践里两者经常组合使用：DI 负责挑选并提供 `GUIFactory`，抽象工厂负责从该 factory 里创建一整套产品。
+
+#### 实践建议
+
+落地时有几个点很关键。
+
+第一，工厂返回的最好是抽象产品（例子里是 `std::unique_ptr<Button>`），不要把具体类泄漏给客户端，否则“解耦”会被打折。
+
+第二，把“选哪个具体工厂”的逻辑尽量前置到应用初始化阶段（配置读取、环境判断），让业务路径里不再出现平台分支。
+
+第三，如果产品创建昂贵、需要共享资源，具体工厂内部完全可以做缓存/复用（字体、主题、连接池句柄等），对外保持接口不变。
+
+最后，如果你发现抽象工厂的接口总是因为新增产品种类而变动，说明你的需求更像“可插拔部件集合”而不是“固定产品族”。这时候继续硬套抽象工厂会很累，不如考虑插件注册表（registry）或借助 DI 来降低接口震荡。
+
 </WordCount>
+
+

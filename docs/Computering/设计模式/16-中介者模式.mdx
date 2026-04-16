@@ -2,4 +2,131 @@ import WordCount from '../../../src/components/WordCount/WordCount';
 
 <WordCount>
 
+## 中介者模式
+
+中介者模式（Mediator Pattern）是一种行为型设计模式，它通过引入一个中介对象来封装一组对象之间的交互，使这些对象不再直接相互引用，从而降低它们之间的耦合度，并且可以独立地改变它们之间的交互。
+
+> 通俗理解：就像机场的塔台——飞机之间不直接通信，而是全部与塔台通信。塔台负责协调起飞、降落、滑行等所有事务，避免飞机之间的混乱交互。
+
+当系统中的对象之间存在复杂的网状交互时，每个对象都需要知道其他多个对象的接口。
+
+但是你现在面临3+的问题：
+
+1. 对象之间高度耦合，修改一个对象可能影响许多其他对象。
+
+2. 逻辑分散在各个对象中，难以复用和理解。
+
+3. 难以增加新的交互规则。
+
+中介者模式将这种多对多的交互转变为一对多的交互（所有对象只与中介者交互），从而简化了系统。
+
+假设聊天室（中介者）中的用户（同事）发送消息：
+
+```java
+// 1. 抽象中介者
+interface ChatRoomMediator {
+    void sendMessage(User user, String message);
+    void addUser(User user);
+}
+
+// 2. 具体中介者：聊天室
+class ChatRoom implements ChatRoomMediator {
+    private List<User> users = new ArrayList<>();
+
+    @Override
+    public void addUser(User user) {
+        users.add(user);
+        System.out.println(user.getName() + " 加入聊天室");
+    }
+
+    @Override
+    public void sendMessage(User sender, String message) {
+        // 广播给所有其他用户
+        for (User user : users) {
+            if (user != sender) {
+                user.receive(sender.getName(), message);
+            }
+        }
+    }
+}
+
+// 3. 抽象同事类
+abstract class User {
+    protected String name;
+    protected ChatRoomMediator mediator;
+
+    public User(String name, ChatRoomMediator mediator) {
+        this.name = name;
+        this.mediator = mediator;
+        mediator.addUser(this);
+    }
+
+    public String getName() { return name; }
+
+    // 发送消息（通过中介者）
+    public abstract void send(String message);
+    // 接收消息
+    public abstract void receive(String from, String message);
+}
+
+// 4. 具体同事类
+class ChatUser extends User {
+    public ChatUser(String name, ChatRoomMediator mediator) {
+        super(name, mediator);
+    }
+
+    @Override
+    public void send(String message) {
+        System.out.println(this.name + " 发送消息: " + message);
+        mediator.sendMessage(this, message);
+    }
+
+    @Override
+    public void receive(String from, String message) {
+        System.out.println(this.name + " 收到来自 " + from + " 的消息: " + message);
+    }
+}
+
+// 客户端使用
+public class Client {
+    public static void main(String[] args) {
+        ChatRoomMediator chatRoom = new ChatRoom();
+
+        User alice = new ChatUser("Alice", chatRoom);
+        User bob = new ChatUser("Bob", chatRoom);
+        User charlie = new ChatUser("Charlie", chatRoom);
+
+        alice.send("Hi everyone!");
+        bob.send("Hello Alice!");
+    }
+}
+```
+
+输出：
+
+```text
+Alice 加入聊天室
+Bob 加入聊天室
+Charlie 加入聊天室
+Alice 发送消息: Hi everyone!
+Bob 收到来自 Alice 的消息: Hi everyone!
+Charlie 收到来自 Alice 的消息: Hi everyone!
+Bob 发送消息: Hello Alice!
+Alice 收到来自 Bob 的消息: Hello Alice!
+Charlie 收到来自 Bob 的消息: Hello Alice!
+```
+
+中介者模式有4个角色：
+
+1. 抽象中介者（Mediator）：定义通信接口，通常包含一个或多个`notify()`方法。
+
+2. 具体中介者（ConcreteMediator）：实现中介者接口，协调各同事对象的交互。
+
+3. 抽象同事类（Colleague）：定义同事对象的接口，持有中介者的引用。
+
+4. 具体同事类（ConcreteColleague）：实现自己的业务逻辑，当需要与其他同事通信时，通知中介者而非直接调用。
+
+
+
+
 </WordCount>

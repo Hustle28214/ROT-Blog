@@ -2,4 +2,72 @@ import WordCount from '../../../src/components/WordCount/WordCount';
 
 <WordCount>
 
+## 原型模式
+
+原型模式是一种创建型设计模式，它通过复制一个已存在的实例（原型）来创建新对象，而不是通过 `new` 关键字调用构造函数。
+
+> 通俗理解：就像细胞分裂——用一个已有的细胞直接复制出一个几乎相同的细胞，而不是从头合成。
+
+当创建对象的成本较高（例如需要复杂的计算、频繁的数据库查询、耗时的 I/O 操作）或者对象构造函数逻辑复杂时，直接复制现有对象比重新创建更高效。
+
+上代码：
+
+```java
+// 具体原型类
+class Address {
+    String city;
+    Address(String city) { this.city = city; }
+}
+
+class User implements Cloneable {
+    String name;
+    int age;
+    Address address;
+
+    public User(String name, int age, Address address) {
+        this.name = name;
+        this.age = age;
+        this.address = address;
+    }
+
+    @Override
+    protected User clone() throws CloneNotSupportedException {
+        return (User) super.clone(); // 浅拷贝
+    }
+
+    @Override
+    public String toString() {
+        return "User{name='" + name + "', age=" + age + ", address=" + address.city + "}";
+    }
+}
+
+// 客户端
+public class Client {
+    public static void main(String[] args) throws CloneNotSupportedException {
+        Address addr = new Address("北京");
+        User user1 = new User("张三", 25, addr);
+        User user2 = user1.clone();  // 克隆
+
+        user2.name = "李四";
+        user2.address.city = "上海";  // 注意：这会影响 user1 的地址！
+
+        System.out.println(user1);  // User{name='张三', age=25, address=上海}
+        System.out.println(user2);  // User{name='李四', age=25, address=上海}
+    }
+}
+```
+
+
+
+
+典型场景：
+
+- 对象初始化需要大量资源（读取配置、网络请求）。
+
+- 对象状态需要在运行时动态生成，且有很多相同或相似实例。
+
+- 系统需要避免构造函数带来的耦合（例如框架内动态加载类）。
+
+
+
 </WordCount>

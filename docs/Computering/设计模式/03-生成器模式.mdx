@@ -2,4 +2,119 @@ import WordCount from '../../../src/components/WordCount/WordCount';
 
 <WordCount>
 
+## 生成器模式
+
+生成器模式（Builder Pattern）是一种创建型设计模式，它将一个复杂对象的构建过程与它的表示分离，使得同样的构建过程可以创建不同的表示。
+
+它采取的是分步构建+链式调用的方式。
+
+通俗理解：就像组装一台电脑，你不需要关心 CPU、内存、硬盘是如何生产的，只需要按照“配置单”一步步组装，最终得到不同配置的电脑。
+
+```java
+// 产品类：Computer
+class Computer {
+    private String cpu;
+    private String memory;
+    private String disk;
+    private String gpu;   // 可选
+
+    // 私有构造函数，只允许 Builder 调用
+    private Computer() {}
+
+    // 静态内部 Builder 类
+    public static class Builder {
+        private Computer computer = new Computer();
+
+        public Builder buildCPU(String cpu) {
+            computer.cpu = cpu;
+            return this;
+        }
+        public Builder buildMemory(String memory) {
+            computer.memory = memory;
+            return this;
+        }
+        public Builder buildDisk(String disk) {
+            computer.disk = disk;
+            return this;
+        }
+        public Builder buildGPU(String gpu) {
+            computer.gpu = gpu;
+            return this;
+        }
+        public Computer build() {
+            // 可在此添加校验逻辑
+            if (computer.cpu == null) throw new IllegalStateException("CPU不能为空");
+            return computer;
+        }
+    }
+
+    @Override
+    public String toString() {
+        return String.format("Computer [CPU=%s, Memory=%s, Disk=%s, GPU=%s]",
+                             cpu, memory, disk, gpu);
+    }
+}
+
+// 指挥者：定义了固定的装配流程（比如标准办公电脑）
+class Director {
+    private Computer.Builder builder;
+
+    public Director(Computer.Builder builder) {
+        this.builder = builder;
+    }
+
+    public Computer constructOfficePC() {
+        return builder.buildCPU("Intel i5")
+                      .buildMemory("16GB")
+                      .buildDisk("512GB SSD")
+                      .buildGPU("集成显卡")
+                      .build();
+    }
+
+    public Computer constructGamingPC() {
+        return builder.buildCPU("Intel i9")
+                      .buildMemory("32GB")
+                      .buildDisk("1TB NVMe")
+                      .buildGPU("RTX 4080")
+                      .build();
+    }
+}
+
+// 客户端使用
+public class Client {
+    public static void main(String[] args) {
+        // 不使用 Director，客户端自由组合
+        Computer gamingPC = new Computer.Builder()
+                .buildCPU("AMD Ryzen 9")
+                .buildMemory("32GB")
+                .buildDisk("2TB SSD")
+                .buildGPU("RX 7900 XT")
+                .build();
+        System.out.println(gamingPC);
+
+        // 使用 Director 创建预定义配置
+        Director director = new Director(new Computer.Builder());
+        Computer officePC = director.constructOfficePC();
+        System.out.println(officePC);
+    }
+}
+```
+
+乍一看，生成器模式和工厂模式似乎有点像，但是不太一样的是：
+
+工厂方法：一步创建，对象完整返回。适合**创建步骤固定、参数不太复杂**的对象。
+
+生成器：分步创建，可以控制构建顺序，支持可选参数。适合**参数很多、有默认值、需要链式调用**的复杂对象*。
+
+生成器模式中有4个角色：
+
+1. 产品（Product）：最终要构建的复杂对象（如 Computer、User）。
+
+2. 抽象生成器（Builder）：为创建一个产品对象的各个部件定义抽象步骤（如 buildCPU()、buildMemory()）。
+
+3. 具体生成器（ConcreteBuilder）：实现抽象生成器，完成具体部件的构建，并提供获取最终产品的方法。
+
+4. 指挥者（Director）：可选角色，负责按特定顺序调用生成器步骤来构建产品（如固定流程的套餐组装）。客户端也可以直接调用生成器。
+
+
 </WordCount>

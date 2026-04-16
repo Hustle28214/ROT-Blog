@@ -2,4 +2,134 @@ import WordCount from '../../../src/components/WordCount/WordCount';
 
 <WordCount>
 
+## 单例模式
+
+单例模式是一种创建型设计模式，它确保一个类只有一个实例，并提供一个全局访问点来获取该实例。
+
+> 通俗理解：就像一个公司只有一个CEO，无论你在哪里请求CEO，得到的都是同一个人。
+
+## 实现方式
+
+单例模式的实现方法有很多种：
+
+### 饿汉式
+
+在类加载时就创建实例，JVM保证线程安全。
+
+```java
+public class HungrySingleton {
+    // 类加载时即创建实例，JVM保证线程安全
+    private static final HungrySingleton INSTANCE = new HungrySingleton();
+    
+    private HungrySingleton() {}  // 私有构造，防止外部new
+    
+    public static HungrySingleton getInstance() {
+        return INSTANCE;
+    }
+}
+```
+
+这种实现非常直观，简单，但缺点是即使从未使用也会占用内存（类加载时初始化）。
+
+### 懒汉式
+
+在第一次调用 `getInstance()` 方法时创建实例，线程不安全。
+
+简单同步：
+
+```java
+public class LazySingleton {
+    private static LazySingleton instance;
+    private LazySingleton() {}
+    
+    public static synchronized LazySingleton getInstance() {
+        if (instance == null) {
+            instance = new LazySingleton();
+        }
+        return instance;
+    }
+}
+```
+但是每次调用都同步，性能差。
+
+
+双重检查锁(DCL):
+
+```java
+public class DCLSingleton {
+    // volatile 防止指令重排序
+    private static volatile DCLSingleton instance;
+    private DCLSingleton() {}
+    
+    public static DCLSingleton getInstance() {
+        if (instance == null) {          // 第一次检查（无锁）
+            synchronized (DCLSingleton.class) {
+                if (instance == null) {  // 第二次检查（有锁）
+                    instance = new DCLSingleton();
+                }
+            }
+        }
+        return instance;
+    }
+}
+```
+这种实现延迟加载，高并发下性能好。
+:::warning
+必须使用 ``volatile``，否则可能返回未完全初始化的对象。
+:::
+
+
+静态内部类:
+```java
+public class StaticInnerSingleton {
+    private StaticInnerSingleton() {}
+    
+    // 静态内部类在第一次调用 getInstance 时才加载
+    private static class Holder {
+        private static final StaticInnerSingleton INSTANCE = new StaticInnerSingleton();
+    }
+    
+    public static StaticInnerSingleton getInstance() {
+        return Holder.INSTANCE;
+    }
+}
+```
+JVM 在类加载阶段保证静态内部类的初始化线程安全。
+
+此外，你当然也可以采用一个非常简单的方法，那就是枚举，一事一办：
+
+```java
+public enum EnumSingleton {
+    INSTANCE;
+    
+    // 可以添加业务方法
+    public void doSomething() {
+        System.out.println("枚举单例执行操作");
+    }
+}
+
+// 使用
+EnumSingleton.INSTANCE.doSomething();
+```
+
+天然线程安全，由 JVM 保证。
+
+有一个搞笑的地方是这样可以防止反射和反序列化破坏单例（枚举类对这两种攻击有内置防御）。
+
+
+## 应用场景
+
+1. 配置管理器：读取配置文件，全局唯一。
+
+2. 日志记录器：避免多个日志对象同时写文件。
+
+3. 数据库连接池：统一管理连接，避免资源耗尽。
+
+4. 缓存：如 Spring 中的单例 Bean。
+
+5. 线程池：`Executors.newSingleThreadExecutor()` 返回单例线程池。
+
+6. 硬件接口：打印机、显卡驱动等应全局唯一控制。
+
+
 </WordCount>

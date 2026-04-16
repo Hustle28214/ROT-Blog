@@ -2,4 +2,101 @@ import WordCount from '../../../src/components/WordCount/WordCount';
 
 <WordCount>
 
+## 享元模式
+
+享元模式是一种结构型设计模式，它通过共享大量细粒度对象来减少内存占用和对象创建开销，尤其适合那些大量重复、内部状态可共享的场景。
+
+将对象的**内在状态与外在状态分离**，通过共享内在状态相同的对象来节省内存。
+
+> 内在状态：对象固有的、不变的属性，可被多个上下文共享（如字符的字体、颜色）。
+
+> 外在状态：对象依赖的、变化的属性，由客户端在调用时传入（如字符的位置坐标）。
+
+享元模式有4个角色：
+
+1. 享元接口（Flyweight）：声明了接收外在状态的方法（如operation(extrinsicState)）。
+
+2. 具体享元（ConcreteFlyweight）：实现享元接口，存储内在状态。该对象必须可共享。
+
+3. 非共享具体享元（UnsharedConcreteFlyweight）：不一定需要共享的子类（可选）。
+
+4. 享元工厂（FlyweightFactory）：创建并管理享元对象，维护一个对象池。
+
+```java
+// 1. 享元接口
+interface CharacterFlyweight {
+    void display(int x, int y);  // 外在状态：坐标位置
+}
+
+// 2. 具体享元：存储内在状态（字符的Unicode值、字体、颜色）
+class ConcreteCharacter implements CharacterFlyweight {
+    private char symbol;      // 内在状态
+    private String font;      // 内在状态
+    private int size;         // 内在状态
+
+    public ConcreteCharacter(char symbol, String font, int size) {
+        this.symbol = symbol;
+        this.font = font;
+        this.size = size;
+    }
+
+    @Override
+    public void display(int x, int y) {
+        System.out.printf("字符 '%c' (字体:%s,大小:%d) 显示在 (%d,%d)\n",
+                          symbol, font, size, x, y);
+    }
+}
+
+// 3. 享元工厂（带对象池）
+class CharacterFactory {
+    private static final Map<String, CharacterFlyweight> pool = new HashMap<>();
+
+    public static CharacterFlyweight getCharacter(char symbol, String font, int size) {
+        String key = symbol + "_" + font + "_" + size;
+        if (!pool.containsKey(key)) {
+            pool.put(key, new ConcreteCharacter(symbol, font, size));
+            System.out.println("创建新享元：" + key);
+        } else {
+            System.out.println("复用享元：" + key);
+        }
+        return pool.get(key);
+    }
+}
+
+// 客户端使用
+public class Editor {
+    public static void main(String[] args) {
+        // 需要显示大量 'A' 字符，但只有两种样式组合
+        CharacterFlyweight c1 = CharacterFactory.getCharacter('A', "宋体", 12);
+        c1.display(10, 20);
+
+        CharacterFlyweight c2 = CharacterFactory.getCharacter('A', "宋体", 12);
+        c2.display(15, 30);  // 复用同一享元
+
+        CharacterFlyweight c3 = CharacterFactory.getCharacter('B', "宋体", 12);
+        c3.display(20, 40);  // 不同字符，创建新享元
+    }
+}
+```
+
+输出：
+
+```text
+创建新享元：A_宋体_12
+字符 'A' (字体:宋体,大小:12) 显示在 (10,20)
+复用享元：A_宋体_12
+字符 'A' (字体:宋体,大小:12) 显示在 (15,30)
+创建新享元：B_宋体_12
+字符 'B' (字体:宋体,大小:12) 显示在 (20,40)
+```
+
+把这段代码“翻译”成享元模式的直觉，其实就是：编辑器里有海量字符要画出来，但真正决定渲染开销的，往往不是“这个字符在第几行第几列”，而是“它长什么样”。所以我们把字符对象拆成两部分：字符的样式信息（`symbol/font/size`）作为内在状态，留在 `ConcreteCharacter` 里并允许复用；字符出现的位置（`x/y`）作为外在状态，不存进对象，而是在每次 `display(x, y)` 调用时由客户端传入。这样同一个 `'A' + 宋体 + 12` 的渲染配置可以被反复共享，位置不同也不会影响它被复用。
+
+你可以注意 `CharacterFactory.getCharacter(...)` 这段：它用 `symbol + "_" + font + "_" + size` 拼了一个 key，本质是在回答“哪些内在状态完全相同，应该对应同一个享元对象”。第一次请求 `A_宋体_12` 时，池子里没有，就创建并放进 `pool`；第二次再请求同样的 key 时，工厂直接返回池中对象，于是输出里出现“复用享元：A_宋体_12”。这就是享元工厂的价值：它把“共享”这件事集中起来管理，客户端只需要要对象、用对象，不需要自己维护缓存规则。
+
+真正用在工程里时，有几个细节要提前想清楚。首先是可共享性的前提：`ConcreteCharacter` 里的内在状态最好是不可变的，否则共享对象就会因为被某个调用方改了状态而污染所有使用者（这也是为什么享元常配合不可变对象或只读配置）。其次是对象池的策略：示例里用一个静态 `HashMap` 永久缓存，能说明原理，但实际系统可能需要考虑并发安全（多线程下要避免重复创建或竞态），也可能需要淘汰策略来防止池子无限长大（例如 LRU、弱引用、按场景生命周期清空等）。
+
+最后别忘了它的本质是一种“空间换时间/时间换空间”的折中：当对象的内在状态组合数量远小于对象总数时（大量重复），享元能明显省内存、减少构造开销；但如果内在状态几乎都不重复（key 几乎都不同），对象池会退化成一个巨大的缓存，反而让内存更紧张。这也是判断要不要用享元最简单的经验法则：先确认“重复度”是否足够高，再决定是否把共享机制引入系统。
+
+
 </WordCount>

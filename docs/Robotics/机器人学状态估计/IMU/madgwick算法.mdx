@@ -1,0 +1,74 @@
+import WordCount from '../../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+## 1. 算法推导
+
+> Madgwick在低采样率（如 20Hz~50Hz）下表现比 Mahony 更好一些。而 Mahony 计算量比 Madgwick 还要少（连梯度下降的那点乘法都省了），而且引入了积分项，对抗长期稳定干扰的能力略强。
+
+## 2. 代码实现
+
+```py
+import numpy as np
+
+# 算法唯一需要调节的增益参数 Beta
+beta = 0.1 
+
+def madgwick_update_6dof(q, gx, gy, gz, ax, ay, az, dt):
+    """
+    q: 当前姿态四元数 [qw, qx, qy, qz]
+    gx, gy, gz: 陀螺仪角速度 (rad/s)
+    ax, ay, az: 加速度计数据
+    dt: 采样时间间隔
+    """
+    qw, qx, qy, qz = q
+
+    # 1. 归一化加速度计数据
+    norm = np.sqrt(ax**2 + ay**2 + az**2)
+    if norm == 0: return q # 防止除以0
+    ax, ay, az = ax/norm, ay/norm, az/norm
+
+    # 2. 梯度下降法：构建误差目标函数 f 和 雅可比矩阵 J
+    # 这里的公式由四元数旋转矩阵与重力向量 [0, 0, 1] 的推导而来
+    f_1 = 2.0 * (qx*qz - qw*qy) - ax
+    f_2 = 2.0 * (qw*qx + qy*qz) - ay
+    f_3 = 2.0 * (0.5 - qx**2 - qy**2) - az
+    
+    J_11_or_24 = 2.0 * qy
+    J_12_or_23 = 2.0 * qz
+    J_13_or_22 = 2.0 * qw
+    J_14_or_21 = 2.0 * qx
+    J_32 = 2.0 * J_14_or_21 # 4 * qx
+    J_33 = 2.0 * J_11_or_24 # 4 * qy
+
+    # 计算梯度 step = J^T * f
+    step_w = -J_13_or_22 * f_1 + J_14_or_21 * f_2
+    step_x =  J_12_or_23 * f_1 + J_11_or_24 * f_2 - J_32 * f_3
+    step_y = -J_11_or_24 * f_1 + J_12_or_23 * f_2 - J_33 * f_3
+    step_z =  J_14_or_21 * f_1 + J_13_or_22 * f_2
+
+    # 归一化梯度 Step
+    norm = np.sqrt(step_w**2 + step_x**2 + step_y**2 + step_z**2)
+    step_w, step_x, step_y, step_z = step_w/norm, step_x/norm, step_y/norm, step_z/norm
+
+    # 3. 陀螺仪计算四元数微分
+    q_dot_w = 0.5 * (-qx*gx - qy*gy - qz*gz)
+    q_dot_x = 0.5 * ( qw*gx + qy*gz - qz*gy)
+    q_dot_y = 0.5 * ( qw*gy - qx*gz + qz*gx)
+    q_dot_z = 0.5 * ( qw*gz + qx*gy - qy*gx)
+
+    # 4. 融合：陀螺仪微分 减去 beta * 梯度方向
+    qw += (q_dot_w - beta * step_w) * dt
+    qx += (q_dot_x - beta * step_x) * dt
+    qy += (q_dot_y - beta * step_y) * dt
+    qz += (q_dot_z - beta * step_z) * dt
+
+    # 5. 最终归一化四元数输出
+    norm = np.sqrt(qw**2 + qx**2 + qy**2 + qz**2)
+    return [qw/norm, qx/norm, qy/norm, qz/norm]
+```
+
+
+
+
+</WordCount>

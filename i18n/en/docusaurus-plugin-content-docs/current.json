@@ -206,5 +206,9 @@
   "sidebar.tutorialSidebar.category.机电传动控制": {
     "message": "机电传动控制",
     "description": "The label for category 机电传动控制 in sidebar tutorialSidebar"
+  },
+  "sidebar.tutorialSidebar.category.光学工程": {
+    "message": "Optics",
+    "description": "The label for category Optics in sidebar tutorialSidebar"
   }
 }

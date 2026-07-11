@@ -4,6 +4,207 @@ import WordCount from '../../../src/components/WordCount/WordCount';
 
 ## 装饰模式
 
+装饰模式（Decorator Pattern）是一种结构型设计模式，它允许动态地为一个对象添加额外的职责，而不需要修改该对象原有的类结构。装饰模式通过组合替代继承来扩展功能，比生成子类更加灵活。
 
+> 通俗理解：就像给手机贴膜、戴壳、加镜头——你可以在不改变手机本身的前提下，动态地给它增加各种功能。想贴膜就贴膜，想拆就拆，完全不影响手机的核心通话能力。
+
+装饰模式用**组合+委托**的方式，让你可以按需组装功能，且不影响其他对象。
+
+1. 抽象组件（Component）：定义一个对象接口，可以动态地给这些对象添加职责。
+
+2. 具体组件（ConcreteComponent）：实现抽象组件，是被装饰的原始对象。
+
+3. 抽象装饰（Decorator）：继承自抽象组件，并持有一个抽象组件的引用。它的存在是为了让具体装饰者能够统一地包装组件。
+
+4. 具体装饰（ConcreteDecorator）：实现抽象装饰，负责给组件添加额外职责。
+
+比如，现在有一个咖啡点单系统。
+
+咖啡有不同种类，可以添加调料（牛奶、摩卡、奶泡、糖浆），每种调料会增加价格和描述。
+
+这里使用了经典装饰模式：
+
+```java
+// 1. 抽象组件：咖啡
+interface Coffee {
+    String getDescription();
+    double cost();
+}
+
+// 2. 具体组件：浓缩咖啡
+class Espresso implements Coffee {
+    @Override
+    public String getDescription() { return "浓缩咖啡"; }
+    @Override
+    public double cost() { return 1.99; }
+}
+
+// 具体组件：混合咖啡
+class HouseBlend implements Coffee {
+    @Override
+    public String getDescription() { return "混合咖啡"; }
+    @Override
+    public double cost() { return 0.89; }
+}
+
+// 3. 抽象装饰：调料装饰器
+abstract class CondimentDecorator implements Coffee {
+    protected Coffee coffee;  // 持有一个咖啡对象的引用
+    public CondimentDecorator(Coffee coffee) {
+        this.coffee = coffee;
+    }
+    // 抽象装饰通常不实现 getDescription 和 cost，留给子类
+    public abstract String getDescription();
+    public abstract double cost();
+}
+
+// 4. 具体装饰：牛奶
+class Milk extends CondimentDecorator {
+    public Milk(Coffee coffee) { super(coffee); }
+    @Override
+    public String getDescription() { return coffee.getDescription() + " + 牛奶"; }
+    @Override
+    public double cost() { return coffee.cost() + 0.30; }
+}
+
+// 具体装饰：摩卡
+class Mocha extends CondimentDecorator {
+    public Mocha(Coffee coffee) { super(coffee); }
+    @Override
+    public String getDescription() { return coffee.getDescription() + " + 摩卡"; }
+    @Override
+    public double cost() { return coffee.cost() + 0.20; }
+}
+
+// 具体装饰：奶泡
+class Whip extends CondimentDecorator {
+    public Whip(Coffee coffee) { super(coffee); }
+    @Override
+    public String getDescription() { return coffee.getDescription() + " + 奶泡"; }
+    @Override
+    public double cost() { return coffee.cost() + 0.10; }
+}
+
+// 客户端使用
+public class CoffeeShop {
+    public static void main(String[] args) {
+        // 点一杯浓缩咖啡，加两份摩卡、一份奶泡
+        Coffee order = new Espresso();
+        order = new Mocha(order);
+        order = new Mocha(order);
+        order = new Whip(order);
+        
+        System.out.println(order.getDescription() + " ￥" + order.cost());
+        // 输出：浓缩咖啡 + 摩卡 + 摩卡 + 奶泡 ￥2.49
+    }
+}
+```
+
+Java I/O 风格的装饰器，可以简化代码：
+
+```java
+// 抽象组件
+interface DataSource {
+    void writeData(String data);
+    String readData();
+}
+
+// 具体组件：文件数据源
+class FileDataSource implements DataSource {
+    private String filename;
+    public FileDataSource(String filename) { this.filename = filename; }
+    @Override
+    public void writeData(String data) {
+        System.out.println("写入文件 " + filename + " : " + data);
+    }
+    @Override
+    public String readData() {
+        return "从文件读取的数据";
+    }
+}
+
+// 抽象装饰（这里直接实现具体装饰，省略抽象装饰类，但思想一致）
+class EncryptionDecorator implements DataSource {
+    private DataSource wrappee;
+    public EncryptionDecorator(DataSource source) { this.wrappee = source; }
+    @Override
+    public void writeData(String data) {
+        String encrypted = encrypt(data);
+        wrappee.writeData(encrypted);
+    }
+    @Override
+    public String readData() {
+        String data = wrappee.readData();
+        return decrypt(data);
+    }
+    private String encrypt(String data) { return "加密(" + data + ")"; }
+    private String decrypt(String data) { return data.replace("加密(", "").replace(")", ""); }
+}
+
+class CompressionDecorator implements DataSource {
+    private DataSource wrappee;
+    public CompressionDecorator(DataSource source) { this.wrappee = source; }
+    @Override
+    public void writeData(String data) {
+        String compressed = compress(data);
+        wrappee.writeData(compressed);
+    }
+    @Override
+    public String readData() {
+        String data = wrappee.readData();
+        return decompress(data);
+    }
+    private String compress(String data) { return "压缩(" + data + ")"; }
+    private String decompress(String data) { return data.replace("压缩(", "").replace(")", ""); }
+}
+
+// 使用
+public class Demo {
+    public static void main(String[] args) {
+        DataSource source = new FileDataSource("test.txt");
+        // 先压缩再加密
+        source = new CompressionDecorator(source);
+        source = new EncryptionDecorator(source);
+        
+        source.writeData("Hello World");
+        // 输出：写入文件 test.txt : 加密(压缩(Hello World))
+        
+        String read = source.readData();
+        System.out.println(read);  // Hello World
+    }
+}
+```
+
+如果你把这两段代码对照着看，会发现装饰模式真正“动人”的地方不是类名里带了 `Decorator`，而是它给了你一种非常顺滑的扩展方式：同一个对象在运行时可以不断被“包一层”，而每一层都只关心自己要额外做的那点事情，然后把其余工作委托给被包裹对象。你不需要为了“浓缩咖啡 + 牛奶 + 两份摩卡 + 奶泡”去定义一个 `EspressoWithMilkWithDoubleMochaWithWhip` 这种组合爆炸的子类，功能组合变成了对象组装问题，而不是类型继承问题。
+
+顺着咖啡的例子理解，`Espresso`/`HouseBlend` 是稳定的“核心能力”（描述、成本），调料则是横切的附加职责。每个调料装饰器都实现同一个 `Coffee` 接口，所以它对外仍然“看起来像咖啡”，这点非常关键：客户端不需要为了适配调料而改动类型，它只是在不断替换手里的 `Coffee order` 引用而已。装饰器内部做的事情也很固定：先拿到被包裹对象已有的结果（`coffee.getDescription()` / `coffee.cost()`），再在此基础上做增量修改。只要你坚持“增量”这个原则，装饰链就会天然可叠加。
+
+第二段 `DataSource` 的例子更接近工程实践，因为它直接体现了“顺序的重要性”。你现在的写法是先压缩再加密，所以写出去的是 `加密(压缩(Hello World))`；如果把顺序反过来，先加密再压缩，得到的就会是 `压缩(加密(Hello World))`，语义完全不同。现实系统里也是这样：日志链路可能先做脱敏再做序列化，缓存写入可能先序列化再压缩，网络传输可能先压缩再加密（或者反过来，取决于算法特性）。装饰模式把“管道”的构建交给了组装方，你可以在不改动每个功能实现的前提下，调整功能叠加的顺序与组合。
+
+从设计角度看，装饰模式经常被拿来和继承对比：继承是编译期决定结构，适合“核心类型层次清晰、扩展点固定”的场景；装饰是运行时组装行为，适合“横切功能多、组合变化快”的场景。你也可以把它看作“组合优于继承”的一个具体落地：装饰器不是去扩展类的类型层级，而是把扩展变成一段可组合的对象链。这样做的副作用也很真实：对象数量会变多，调用栈会更深，调试时看到一串 wrapper 也更费脑子。所以装饰模式的使用动机通常不是“写起来更优雅”，而是“避免子类爆炸，同时允许以可控方式叠加职责”。
+
+## 注意事项
+
+工程落地时建议特别留意三个问题。
+
+第一，装饰器要尽量保持“接口透明”：对外表现得像组件，而不是暴露很多“只有装饰器才有”的额外方法，否则客户端就会被迫知道装饰链里有哪些具体装饰器，解耦收益会立刻缩水。
+
+第二，装饰链上的每一层最好是小而纯粹的增量逻辑，避免某一层同时干太多事导致顺序依赖变复杂。
+
+第三，要想清楚状态与幂等性：如果某个装饰器会缓存结果、累计计数、或者对输入做不可逆变换，那么重复包两层是否合理、读写顺序是否可逆，就必须在设计时明确（比如加密/解密、压缩/解压是成对出现的，否则读出来的数据还原不了）。
+
+最后补一个容易混淆但很有用的对比：
+
+装饰模式和代理（Proxy）都长得像“持有一个对象并转发调用”，区别在于意图。代理更关注访问控制与间接性（远程代理、缓存代理、保护代理），强调“控制你能不能/怎么访问”；装饰更关注在不改变接口的情况下增强职责，强调“在调用前后多做点事”。在很多框架里二者实现手法几乎一样，但你在建模时想清楚意图，后续类名、职责边界和组合方式就会更清晰。
+
+## 使用场景
+
+装饰模式最适合用在“横切能力很多、组合方式又不稳定”的地方。你已经在咖啡例子里看到它的典型收益：基础对象（咖啡）比较稳定，变化发生在各种附加项（调料）上，而且这些附加项可以任意叠加、顺序还可能影响最终结果。这类需求如果用继承来做，子类会随着组合数爆炸；用装饰则变成运行时把一层层能力套上去，按需组装即可。
+
+在工程里，装饰器经常以“管道/链”的形态出现，尤其是在 I/O 与通信边界。比如文件或网络的数据写入前，你可能要做压缩、加密、签名、分块、校验；读出来时再按相反顺序解密、解压、验签。每个步骤都很独立，但组合与顺序会随环境（是否启用 TLS、是否开启压缩、是否开启审计）而变化，用装饰器把它们拆成可插拔的层，既避免单个类变成“万能类”，也方便按配置拼装链路。
+
+另一个常见场景是“给现有接口加一层非业务职责”，也就是常说的横切关注点：日志、指标埋点、耗时统计、重试、限流、熔断、缓存、权限检查等。它们往往不希望污染核心业务类，但又需要在调用前后做点事情。用装饰器实现同一个接口，把真实实现包起来，就能在不改动业务实现的前提下加能力，而且可以很容易地决定只对某些实现、某些环境、某些调用链启用。
+
+如果你在用框架，会发现很多地方“看起来不像装饰器但其实是同一个思想”。Java 的 `InputStream/Reader` 链、HTTP 客户端的拦截器链、Spring 的各种 wrapper、甚至不少中间件的 filter/handler 链，本质上都是让你把能力拆成一层层可组合的包装，再由组装方决定最终的链路形态。
 
 </WordCount>

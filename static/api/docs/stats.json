@@ -1,5 +1,11 @@
 {
-  "totalWordCount": 697808,
-  "totalReadingTime": 1396,
-  "generatedAt": "2026-07-15T07:11:53.697Z"
+<<<<<<< HEAD
+  "totalWordCount": 699683,
+  "totalReadingTime": 1400,
+  "generatedAt": "2026-07-06T16:24:45.599Z"
+=======
+  "totalWordCount": 696566,
+  "totalReadingTime": 1394,
+  "generatedAt": "2026-07-09T09:59:03.413Z"
+>>>>>>> c895340acaafef284dd2fa700d71beaca91c0649
 }

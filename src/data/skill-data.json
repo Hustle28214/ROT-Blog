@@ -11,6 +11,42 @@
       "progress": 100
     },
     {
+      "id": "Computering-AI Infra",
+      "title": "AI Infra",
+      "category": "Computering",
+      "type": "subcategory",
+      "color": "#3B82F6",
+      "docPath": "Computering/AI Infra",
+      "progress": 60
+    },
+    {
+      "id": "Computering-AI Infra-Attention",
+      "title": "Attention",
+      "category": "Computering",
+      "type": "topic",
+      "color": "#3B82F6",
+      "docPath": "Computering/AI Infra/Attention",
+      "progress": 60
+    },
+    {
+      "id": "Computering-AI Infra-KVCache",
+      "title": "KVCache",
+      "category": "Computering",
+      "type": "topic",
+      "color": "#3B82F6",
+      "docPath": "Computering/AI Infra/KVCache",
+      "progress": 60
+    },
+    {
+      "id": "Computering-AI Infra-LLM",
+      "title": "LLM",
+      "category": "Computering",
+      "type": "topic",
+      "color": "#3B82F6",
+      "docPath": "Computering/AI Infra/LLM",
+      "progress": 60
+    },
+    {
       "id": "Computering-WEB开发",
       "title": "WEB开发",
       "category": "Computering",
@@ -162,6 +198,15 @@
       "docPath": "Computering/实用工作流/Git",
       "progress": 79,
       "tags": []
+    },
+    {
+      "id": "Computering-并发编程",
+      "title": "并发编程",
+      "category": "Computering",
+      "type": "subcategory",
+      "color": "#3B82F6",
+      "docPath": "Computering/并发编程",
+      "progress": 60
     },
     {
       "id": "Computering-并行计算与分布式系统",
@@ -783,7 +828,11 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/操作系统/操作系统导论/锁",
+<<<<<<< HEAD
+      "progress": 37,
+=======
       "progress": 98,
+>>>>>>> c895340acaafef284dd2fa700d71beaca91c0649
       "tags": []
     },
     {
@@ -1204,7 +1253,11 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/数据结构/Trie字典树",
+<<<<<<< HEAD
+      "progress": 50,
+=======
       "progress": 74,
+>>>>>>> c895340acaafef284dd2fa700d71beaca91c0649
       "tags": []
     },
     {
@@ -2091,7 +2144,11 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/算法/搜索/遗传算法",
+<<<<<<< HEAD
+      "progress": 0,
+=======
       "progress": 70,
+>>>>>>> c895340acaafef284dd2fa700d71beaca91c0649
       "tags": []
     },
     {
@@ -4134,7 +4191,11 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/软件测试/按粒度：测试层次",
+<<<<<<< HEAD
+      "progress": 27,
+=======
       "progress": 52,
+>>>>>>> c895340acaafef284dd2fa700d71beaca91c0649
       "tags": []
     },
     {
@@ -4559,7 +4620,11 @@
       "level": "intermediate",
       "color": "#10B981",
       "docPath": "Control/模仿学习/规定长度的马尔可夫决策过程",
+<<<<<<< HEAD
+      "progress": 62,
+=======
       "progress": 28,
+>>>>>>> c895340acaafef284dd2fa700d71beaca91c0649
       "tags": []
     },
     {
@@ -5786,7 +5851,11 @@
       "level": "intermediate",
       "color": "#EF4444",
       "docPath": "Electronic/元器件设计/电机设计/FOC/ABZ编码器",
+<<<<<<< HEAD
+      "progress": 64,
+=======
       "progress": 79,
+>>>>>>> c895340acaafef284dd2fa700d71beaca91c0649
       "tags": []
     },
     {
@@ -6808,7 +6877,11 @@
       "level": "intermediate",
       "color": "#EF4444",
       "docPath": "Electronic/电子技术基础/数字电子技术基础/锁存器和触发器",
+<<<<<<< HEAD
+      "progress": 11,
+=======
       "progress": 94,
+>>>>>>> c895340acaafef284dd2fa700d71beaca91c0649
       "tags": []
     },
     {
@@ -7854,6 +7927,20 @@
       "progress": 60
     },
     {
+<<<<<<< HEAD
+      "id": "Mathematics-概率论与数理统计-bootstrap方法",
+      "title": "bootstrap方法",
+      "category": "Mathematics",
+      "type": "skill",
+      "level": "intermediate",
+      "color": "#8B5CF6",
+      "docPath": "Mathematics/概率论与数理统计/bootstrap方法",
+      "progress": 29,
+      "tags": []
+    },
+    {
+=======
+>>>>>>> c895340acaafef284dd2fa700d71beaca91c0649
       "id": "Mathematics-概率论与数理统计-R的应用",
       "title": "R的应用",
       "category": "Mathematics",
@@ -8171,10 +8258,94 @@
       "level": "intermediate",
       "color": "#6B7280",
       "docPath": "Mechanics/刚体动力学/RBDL/Details",
+<<<<<<< HEAD
+      "progress": 1,
+      "tags": []
+    },
+    {
+      "id": "Mechanics-材料力学",
+      "title": "材料力学",
+      "category": "Mechanics",
+      "type": "subcategory",
+      "color": "#6B7280",
+      "docPath": "Mechanics/材料力学",
+      "progress": 60
+    },
+    {
+      "id": "Mechanics-理论力学",
+      "title": "理论力学",
+      "category": "Mechanics",
+      "type": "subcategory",
+      "color": "#6B7280",
+      "docPath": "Mechanics/理论力学",
+      "progress": 60
+    },
+    {
+      "id": "Mechanics-飞行器结构力学",
+      "title": "飞行器结构力学",
+      "category": "Mechanics",
+      "type": "subcategory",
+      "color": "#6B7280",
+      "docPath": "Mechanics/飞行器结构力学",
+      "progress": 60
+    },
+    {
+      "id": "Optics",
+      "title": "Optics",
+      "category": "Optics",
+      "type": "category",
+      "level": "expert",
+      "color": "#CCCCCC",
+      "docPath": "Optics",
+      "progress": 100
+    },
+    {
+      "id": "Optics-工程光学",
+      "title": "工程光学",
+      "category": "Optics",
+      "type": "subcategory",
+      "color": "#CCCCCC",
+      "docPath": "Optics/工程光学",
+      "progress": 60
+    },
+    {
+      "id": "Optics-工程光学-01-几何光学基本定律与成像基础",
+      "title": "几何光学基本定律与成像基础",
+      "category": "Optics",
+      "type": "skill",
+      "level": "intermediate",
+      "color": "#CCCCCC",
+      "docPath": "Optics/工程光学/几何光学基本定律与成像基础",
+      "progress": 51,
+      "tags": []
+    },
+    {
+      "id": "Optics-工程光学-02-理想光学系统",
+      "title": "理想光学系统",
+      "category": "Optics",
+      "type": "skill",
+      "level": "intermediate",
+      "color": "#CCCCCC",
+      "docPath": "Optics/工程光学/理想光学系统",
+      "progress": 13,
+      "tags": []
+    },
+    {
+      "id": "Optics-应用光学",
+      "title": "应用光学",
+      "category": "Optics",
+      "type": "subcategory",
+      "color": "#CCCCCC",
+      "docPath": "Optics/应用光学",
+      "progress": 60
+    },
+    {
+=======
       "progress": 66,
       "tags": []
     },
     {
+>>>>>>> c895340acaafef284dd2fa700d71beaca91c0649
       "id": "Paper",
       "title": "Paper",
       "category": "Paper",
@@ -8386,6 +8557,10 @@
       "type": "skill",
       "level": "intermediate",
       "color": "#06B6D4",
+<<<<<<< HEAD
+      "docPath": "Robotics/SLAM/视觉SLAM十四讲/Eigen实验",
+      "progress": 58,
+=======
       "docPath": "Robotics/SLAM/点云配准/NDT",
       "progress": 62,
       "tags": []
@@ -9182,6 +9357,26 @@
   "links": [
     {
       "source": "Computering",
+      "target": "Computering-AI Infra",
+      "type": "contains"
+    },
+    {
+      "source": "Computering-AI Infra",
+      "target": "Computering-AI Infra-Attention",
+      "type": "contains"
+    },
+    {
+      "source": "Computering-AI Infra",
+      "target": "Computering-AI Infra-KVCache",
+      "type": "contains"
+    },
+    {
+      "source": "Computering-AI Infra",
+      "target": "Computering-AI Infra-LLM",
+      "type": "contains"
+    },
+    {
+      "source": "Computering",
       "target": "Computering-WEB开发",
       "type": "contains"
     },
@@ -9253,6 +9448,11 @@
     {
       "source": "Computering-实用工作流",
       "target": "Computering-实用工作流-Git",
+      "type": "contains"
+    },
+    {
+      "source": "Computering",
+      "target": "Computering-并发编程",
       "type": "contains"
     },
     {
@@ -12981,6 +13181,44 @@
       "type": "contains"
     },
     {
+<<<<<<< HEAD
+      "source": "Mechanics",
+      "target": "Mechanics-材料力学",
+      "type": "contains"
+    },
+    {
+      "source": "Mechanics",
+      "target": "Mechanics-理论力学",
+      "type": "contains"
+    },
+    {
+      "source": "Mechanics",
+      "target": "Mechanics-飞行器结构力学",
+      "type": "contains"
+    },
+    {
+      "source": "Optics",
+      "target": "Optics-工程光学",
+      "type": "contains"
+    },
+    {
+      "source": "Optics-工程光学",
+      "target": "Optics-工程光学-01-几何光学基本定律与成像基础",
+      "type": "contains"
+    },
+    {
+      "source": "Optics-工程光学",
+      "target": "Optics-工程光学-02-理想光学系统",
+      "type": "contains"
+    },
+    {
+      "source": "Optics",
+      "target": "Optics-应用光学",
+      "type": "contains"
+    },
+    {
+=======
+>>>>>>> c895340acaafef284dd2fa700d71beaca91c0649
       "source": "Paper",
       "target": "Paper-论文复现",
       "type": "contains"

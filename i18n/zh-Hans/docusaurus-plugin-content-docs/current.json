@@ -218,5 +218,9 @@
   "sidebar.tutorialSidebar.category.Materials": {
     "message": "材料科学与工程",
     "description": "The label for category Materials in sidebar tutorialSidebar"
+  },
+  "sidebar.tutorialSidebar.category.Optics": {
+    "message": "光学工程",
+    "description": "The label for category Optics in sidebar tutorialSidebar"
   }
 }

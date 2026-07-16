@@ -1,0 +1,49 @@
+import WordCount from '../../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+## 1. 数学推导
+
+## 2. 代码实现
+
+```py
+import numpy as np
+
+def quaternion_derivative(q, w):
+    """
+    计算四元数的导数 q_dot = 0.5 * q * w
+    w: [gx, gy, gz] 补偿后的角速度 (rad/s)
+    """
+    qw, qx, qy, qz = q
+    gx, gy, gz = w
+    
+    # 四元数微分方程的展开形式
+    dq_w = 0.5 * (-qx * gx - qy * gy - qz * gz)
+    dq_x = 0.5 * ( qw * gx + qy * gz - qz * gy)
+    dq_y = 0.5 * ( qw * gy - qx * gz + qz * gx)
+    dq_z = 0.5 * ( qw * gz + qx * gy - qy * gx)
+    
+    return np.array([dq_w, dq_x, dq_y, dq_z])
+
+def update_pose_rk4(q, w, dt):
+    """
+    使用四阶龙格库塔法(RK4)更新姿态四元数
+    q: 档前四元数 np.array([qw, qx, qy, qz])
+    w: 补偿后的角速度 np.array([gx, gy, gz])
+    dt: 采样时间
+    """## 
+    # 如果运动极快，可以假设一小步内 w 是恒定的，或者用前后两帧 w 线性插值（这里假设恒定）
+    k1 = quaternion_derivative(q, w)
+    k2 = quaternion_derivative(q + 0.5 * dt * k1, w)
+    k3 = quaternion_derivative(q + 0.5 * dt * k2, w)
+    k4 = quaternion_derivative(q + dt * k3, w)
+    
+    # RK4 整合
+    q_next = q + (dt / 6.0) * (k1 + 2*k2 + 2*k3 + k4)
+    
+    # ⚠️ 关键：四元数由于数值计算误差会失去单位化，必须强行归一化！
+    norm = np.linalg.norm(q_next)
+    return q_next / norm
+```
+
+</WordCount>

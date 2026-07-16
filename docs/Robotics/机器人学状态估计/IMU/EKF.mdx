@@ -1,5 +1,72 @@
 import WordCount from '../../../../src/components/WordCount/WordCount';
+import CovarianceMatrixVisualizer from '../../../../src/components/CovarianceMatrixVisualizer/CovarianceMatrixVisualizer';
 
 <WordCount>
 
+EKF(Extended Kalman Filter)是一种基于卡尔曼滤波的非线性状态估计方法。核心在于持续更新状态变量，使其逼近真实值。
+
+EKF依赖过程模型，像大疆的飞控，就有用到EKF，用多维的状态变量来描述飞行器的状态，包括位置、速度、加速度、角度、角速度等。
+
+## 1. 协方差矩阵
+
+协方差矩阵简单来说就是用一个整齐的矩阵，把一堆随机变量之间的“个体波动”（方差）和“两两关联”（协方差）全部打包压缩在了一起。
+
+回顾一下协方差的计算公式：
+
+$$
+\text{cov}(x_i, x_j) = E[(x_i - E[x_i])(x_j - E[x_j])]=\frac{1}{n-1} \sum_{k=1}^{n} (x_i - \bar{x_i})(x_j - \bar{x_j})
+$$
+
+假设现在有一组随机向量，维度为d，可表示为$\mathbf{x} = [x_1, x_2, \cdots, x_d]^T$，它的协方差矩阵 $\Sigma$（通常用希腊字母 $\Sigma$ 表示）定义为：
+
+$$
+\Sigma = E\left[ (\mathbf{X} - E[\mathbf{X}])(\mathbf{X} - E[\mathbf{X}])^T \right]
+$$
+
+
+可展开为：
+
+$$
+\Sigma = \begin{bmatrix}  \text{Cov}(X_1, X_1) & \text{Cov}(X_1, X_2) & \cdots & \text{Cov}(X_1, X_d) \\ \text{Cov}(X_2, X_1) & \text{Cov}(X_2, X_2) & \cdots & \text{Cov}(X_2, X_d) \\ \vdots & \vdots & \dots & \vdots \\ \text{Cov}(X_d, X_1) & \text{Cov}(X_d, X_2) & \cdots & \text{Cov}(X_d, X_d) \end{bmatrix}
+$$
+
+展开之后我们很容易看出它能够干什么。首先他是基于方差计算方法计算的，任何一个变量与它自身的协方差，就是它自身的方差（Variance）。
+
+$$
+\text{Cov}(X_i, X_i) = \text{Var}(X_i)
+$$
+
+对角线上的数据，就是方差功能，他们反映了每一个维度数据各自的离散程度，也就是说如果这个数据越接近0,说明这个维度数据越稳定，如果这个数据越大，说明这个维度数据越不稳定。
+
+
+再来看一下协方差$\text{Cov}(X_i, X_j)$（其中 $i \neq j$），也就是对角线外的元素：
+
+
+
+根据协方差公式 $\text{Cov}(X_i, X_j) = E[(X_i - \mu_i)(X_j - \mu_j)]$：
+
+如果 $\text{Cov} > 0$：说明 $X_i$ 和 $X_j$ 倾向于同向变化（一个变大，另一个也变大），这叫正相关。
+
+如果 $\text{Cov} < 0$：说明它们倾向于反向变化，这叫负相关。
+
+如果 $\text{Cov} = 0$：说明它们之间没有线性相关性。
+
+数据降维（PCA 主成分分析）：在 PCA 中，我们想找到数据波动最大的方向，并去除冗余信息。协方差矩阵的特征向量代表了数据分布的主偏差方向（新坐标轴），而特征值的大小则代表了数据在这些方向上的波动烈度（信息量）。通过投影到特征向量上，我们就能把高维数据完美降维。
+
+衡量多维空间的距离（马氏距离 Mahalanobis Distance）：在多维空间中，简单的欧氏距离会忽略不同维度的波动幅度以及维度间的相关性。马氏距离通过引入协方差矩阵的逆 $\Sigma^{-1}$，对数据进行了“去相关”和“标准化”缩放，使得距离测量更加客观。
+
+高斯分布（正态分布）的灵魂：多元高斯分布的概率密度函数完全由均值向量 $\boldsymbol\mu$ 和协方差矩阵 $\Sigma$ 决定。只要知道了协方差矩阵，我们就彻底掌握了这个多维数据的概率轮廓（它是像一个圆球，还是像一个被拉长、倾斜的椭球）。
+
+协方差矩阵通过对角线承载个体特征、非对角线承载联动特征的精妙结构，成为了人类观测、旋转、压缩多维数据时最不可或缺的“后视镜”。
+
+<CovarianceMatrixVisualizer
+  initialVarX={2.0}
+  initialVarY={1.2}
+  initialCovXY={0.4}
+  pointsCount={700}
+/>
+
+
 </WordCount>
+
+

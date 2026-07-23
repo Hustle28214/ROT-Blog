@@ -2,4 +2,56 @@ import WordCount from '../../../src/components/WordCount/WordCount';
 
 <WordCount>
 
+## 迭代器模式
+
+> 电视机内部有复杂的电路和频道存储逻辑（这就是“聚合对象”），但你不需要知道它是怎么存频道的。你只需要拿着遥控器（这就是“迭代器”），按 “下一频道”（next()）和 “是否播完”（hasNext()）两个按钮，就能挨个遍历所有频道。遥控器封装了遍历的算法，保护了电视的内部结构。
+
+迭代器模式提供一种方法顺序访问一个聚合对象中的各个元素，而又不暴露其内部的表示。
+
+```java
+// 1. 迭代器接口
+interface Iterator {
+    boolean hasNext();
+    Object next();
+}
+
+// 2. 聚合接口
+interface Aggregate {
+    Iterator createIterator();
+}
+
+// 3. 具体聚合（书架）
+class BookShelf implements Aggregate {
+    private Book[] books;
+    private int index = 0;
+    
+    public BookShelf(int maxSize) { books = new Book[maxSize]; }
+    public void addBook(Book b) { books[index++] = b; }
+    public int getLength() { return index; }
+    
+    @Override
+    public Iterator createIterator() {
+        return new BookShelfIterator(this); // 将自身传给迭代器
+    }
+}
+
+// 4. 具体迭代器（书架遍历器）
+class BookShelfIterator implements Iterator {
+    private BookShelf shelf;
+    private int cursor = 0;
+    
+    public BookShelfIterator(BookShelf shelf) { this.shelf = shelf; }
+    
+    @Override
+    public boolean hasNext() {
+        return cursor < shelf.getLength();
+    }
+    
+    @Override
+    public Object next() {
+        return shelf.getBookAt(cursor++);
+    }
+}
+```
+
 </WordCount>

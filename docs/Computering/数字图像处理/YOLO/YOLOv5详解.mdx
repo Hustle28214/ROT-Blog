@@ -1,0 +1,22 @@
+import WordCount from '../../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+## 1. 模型结构
+
+
+
+## 2. 训练流水线
+
+1. 解析 --cfg（模型 yaml）、--data（数据 yaml，如 data/coco128.yaml）、--hyp（超参 yaml，data/hyps/）。
+2. 用 DetectionModel(cfg) 建网络；若给 --weights 则 attempt_load 迁移权重。
+3. 用 utils/dataloaders.py 的 create_dataloader() 建 LoadImagesAndLabels → DataLoader；里面串起 utils/augmentations.py（Mosaic、HSV、翻转等）。
+4. utils/autoanchor.py 检查 anchor 是否匹配数据集，必要时 k-means 重算。
+5. 优化器/调度器/EMA 在 utils/torch_utils.py。
+6. 训练循环里：pred = model(imgs) → loss = ComputeLoss(pred, targets)（utils/loss.py，含 box/obj/cls 三项 + 正样本匹配）→ backward → step。
+7. 每个 epoch 末调用 val.py 算 mAP；日志走 utils/loggers/（TensorBoard/W&B/ClearML/Comet）。
+8. 保存 last.pt / best.pt。
+
+### 2.1 数据准备
+
+</WordCount>

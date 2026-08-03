@@ -1,8 +1,171 @@
 import WordCount from '../../../src/components/WordCount/WordCount';
+import Mermaid from '@theme/Mermaid';
 
 <WordCount>
 
-## 
+> 不妨先想一想这个问题：
+
+假设我有 10 万个单词，我想快速查找“cat”是否存在。
+
+首先想到数组，但是数组的查找时间复杂度是 $O(n)$，而 $n$ 是单词的长度。如果单词的长度很长，查找时间就会很长。
+
+哈希表当然可以，但我又想找到所有以 "ca" 开头的单词（前缀搜索），那哈希表就傻眼了，因为哈希表只能根据键值来查找，不能根据前缀来查找。也不快。
+
+有没有一种结构，既能快速查完整单词，又能瞬间把相同前缀的单词归拢到一起？
+
+现在考虑这样一种存储结构，它能解决这个问题，把重复的前缀合并成一份，共用。
+
+当我有一个单词cat，现在存到这一颗树中，那就是根节点->c->a->t。当我有一个单词car，现在存到这一颗树中，那就是根节点->c->a->r。此时我们发现，只需要在根节点->c->a后面加一个r分支就可以了。
+
+现在如果我有一个单词carry，那我就在根节点->c->a->r后面依次加入节点，以此类推.
+
+我们称这样的结构为字典树。
+
+<Mermaid
+value={`graph TD
+    R[root] --> C[c]
+    R --> D[d]
+    
+    C --> CA[a]
+    CA --> CAT[t]:::endword
+    CA --> CAR[r]:::endword
+    
+    D --> DO[o]:::endword
+    DO --> DOG[g]:::endword
+`}
+/>
+
+## 字典树
+
+字典树（Trie，又称前缀树）就是一棵很像是字典，由节点和边组成的树，每个节点表示一个字符，每个边表示一个字符的顺序。
+
+字典树一定是从根节点开始构建的，不像哈夫曼树等树结构。我们从根节点开始，设某节点为u的字符c指向下一个结点，这个指向的结点用$\delta(u,c)$表示。你也可以这样理解，每个节点代表一个字符，从根到某一节点的路径对应一个前缀。
+
+相同前缀的字符串共用前面的节点，节省空间。
+
+现在回到刚刚的情景. 注意到, 形如car和carry的前缀是相同的, 那会有一个问题, 我们怎么知道这个car是一个独立单词的结尾, 还是carry的前缀?
+
+自然, 我们想到用**标志位**来标记这样的字符. 
+
+于是, 我们用 `exist[]` 标记某个节点是否是某个插入字符串的结尾。
+
+
+
+> 不要被26个字母限制了想象力，这个字典树结构可以推广到任意的字符集上。
+
+trie结构可以用于构造AC自动机, 维护异或极值或者维护异或和等。
+
+## 字典树的构建
+
+用二维数组来维护一棵字典树：
+
+```cpp
+#define MAX_CHAR 26
+#define NODE_NUM 100000
+struct trie_node {
+    int next[NODE_NUM][MAX_CHAR];// 存放的是下一个节点的编号, [当前节点编号][对应字符的ascii索引]
+    bool exist[NODE_NUM];
+    int cnt = 0;
+    void insert(char *s, int len){
+        // 插入长度为len的字符串s
+        int p = 0; // 当前节点
+        for (int i = 0; i < len; i++){
+            int u = s[i] - 'a'; // 当前字符的ascii索引
+            // 如果当前字符不存在,就添加一个节点
+            if (!next[p][u]){next[p][u] = ++cnt;}
+            // 比方说, 现在这个节点是根节点, 当前字符是c, 那么就去根节点的c分支, 如果c分支不存在, 就创建一个节点, 并把c分支指向这个新节点, 新节点编号变为1
+            p = next[p][u];
+            // 此时, p指向了c分支的节点了! 下一个字符就是a, 所以就去c分支的a分支, 如果a分支不存在, 就创建一个节点, 并把a分支指向这个新节点, 新节点编号变为2
+        }
+        exist[p] = true;
+    }
+
+    bool find(char *s, int len){
+        int p=0; // 当前节点
+        for (int i=0;i<len;++i){
+            // 遍历字符串的每一个字符找到每个字符对应的编号,然后根据编号去找到下一个
+            int u = s[i]-'a';
+            if(!next[p][u]){
+                return false;
+            }
+            p = next[p][u];
+        }
+        return exist[p];
+    }
+};
+```
+
+> 节点编号在树上是横着走还是竖着走，只取决于你 insert 字符串的先后顺序. 假设你第一次先插入了根节点->c->a->r, 那么编号就是从根节点的0开始到3, 他们是这一分支上根节点到叶子节点的编号. 假设你是先插入了c, 再插入了a, 再插入了b, 那1, 2, 3就会在同一层.
+
+## 删除字符串和查询前缀
+
+```cpp
+struct trie {
+    int nex[100000][26], cnt;
+    int pass[100000];  // 记录有多少个单词经过了此节点（前缀计数）
+    int end[100000];   // 记录有多少个单词在此节点结尾（替代 bool exist）
+
+    // 构造函数，初始化清零
+    trie() {
+        memset(nex, 0, sizeof(nex));
+        memset(pass, 0, sizeof(pass));
+        memset(end, 0, sizeof(end));
+        cnt = 0;
+    }
+
+    // 插入字符串
+    void insert(char *s, int l) {
+        int p = 0;
+        pass[0]++;  // 根节点经过次数+1，代表树中单词总数
+        for (int i = 0; i < l; i++) {
+            int c = s[i] - 'a';
+            if (!nex[p][c]) nex[p][c] = ++cnt;
+            p = nex[p][c];
+            pass[p]++;  // 路径上每个节点的经过次数都 +1
+        }
+        end[p]++;  // 结尾节点的结束次数 +1
+    }
+
+    // 查找字符串是否存在（逻辑完全兼容原来的 find）
+    bool find(char *s, int l) {
+        int p = 0;
+        for (int i = 0; i < l; i++) {
+            int c = s[i] - 'a';
+            if (!nex[p][c]) return false;
+            p = nex[p][c];
+        }
+        return end[p] > 0;  // 只要结尾计数大于0，就存在
+    }
+
+    // 删除一个字符串（必须保证它存在，否则计数会变负数）
+    void erase(char *s, int l) {
+        // 保险起见：如果要删的单词根本不存在，直接返回
+        if (!find(s, l)) return;
+
+        int p = 0;
+        pass[0]--;  // 根节点总数减1
+        for (int i = 0; i < l; i++) {
+            int c = s[i] - 'a';
+            // 由于 find 保证了路径存在，这里 nex[p][c] 一定不为 0
+            p = nex[p][c];
+            pass[p]--;  // 路径上每个节点的经过次数减1
+        }
+        end[p]--;  // 结尾节点的结束次数减1
+    }
+
+    // 查询有多少个单词以 s 为前缀
+    int prefixCount(char *s, int l) {
+        int p = 0;
+        for (int i = 0; i < l; i++) {
+            int c = s[i] - 'a';
+            if (!nex[p][c]) return 0;  // 压根没有这个前缀
+            p = nex[p][c];
+        }
+        return pass[p];  // 返回该节点被经过的次数
+    }
+};
+```
+
 
 
 </WordCount>

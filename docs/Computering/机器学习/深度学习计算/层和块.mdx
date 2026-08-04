@@ -1,0 +1,40 @@
+import WordCount from '../../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+## 自定义块
+
+这里直接引用沐神的一句话：“比单个层大”但“比整个模型小”的组件更有价值。
+
+块（block）可以描述单个层、由多个层组成的组件或整个模型本身。组件化这些层，方便我们**递归地**组成一个更大的模型。
+
+
+
+
+![](https://github.com/user-attachments/assets/af153295-28f5-48ee-a7c8-67303d2a5a3a)
+
+在代码中块由类(Class)表示，块的任何子类都必须定义一个将其输入转换为输出的前向传播函数，并且必须存储任何必需的参数。
+
+
+为了计算梯度，块必须具有反向传播函数。 
+
+用`nn.Sequential()`初始化一个网络，其中包含一个具有256个单元和ReLU激活函数的全连接隐藏层，然后是一个具有10个隐藏单元且不带激活函数的全连接输出层。
+
+```python
+import torch
+from torch import nn
+from torch.nn import functional as F
+
+net = nn.Sequential(nn.Linear(20, 256), nn.ReLU(), nn.Linear(256, 10))
+
+X = torch.rand(2, 20)
+net(X)
+```
+`net(X)`实际上是`net.__call__(X)`的简写。
+
+
+
+
+
+
+</WordCount>

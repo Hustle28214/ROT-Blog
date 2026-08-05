@@ -17,6 +17,36 @@ $$
 \text{cov}(x_i, x_j) = E[(x_i - E[x_i])(x_j - E[x_j])]=\frac{1}{n-1} \sum_{k=1}^{n} (x_i - \bar{x_i})(x_j - \bar{x_j})
 $$
 
+我们先来看一下随机变量的协方差如何计算：
+
+$$
+\sigma_{ij} = \text{cov}(x_i, x_j)
+$$
+
+$$
+=E((x_i - E[x_i])(x_j - E[x_j]))
+$$
+
+$$
+=E(x_ix_j-x_iE[x_j]-x_jE[x_i]+E[x_i]E[x_j])
+$$
+
+$$
+=E(x_ix_j)-E(x_iE[x_j])-E(x_jE[x_i])+E(E[x_i]E[x_j])
+$$
+
+$$
+=E(x_ix_j)-E(x_i)E(x_j)-E(x_j)E(x_i)+E(x_i)E(x_j)
+$$
+
+$$
+=E(x_ix_j)-E(x_i)E(x_j)
+$$
+
+当$x_i$和$x_j$相等时。此时$\sigma_{ij}$就是$x_i$的方差。这说明，**方差就是一个随机变量与他自身的协方差**。
+
+而如果$x_i$和$x_j$相互独立，那么$E(x_ix_j)=E(x_i)E(x_j)$，此时$\sigma_{ij}=0$。这说明，**如果两个随机变量相互独立，那么它们的协方差为0**。
+
 假设现在有一组随机向量，维度为d，可表示为$\mathbf{x} = [x_1, x_2, \cdots, x_d]^T$，它的协方差矩阵 $\Sigma$（通常用希腊字母 $\Sigma$ 表示）定义为：
 
 $$
@@ -65,6 +95,25 @@ $$
   initialCovXY={0.4}
   pointsCount={700}
 />
+
+假设我们现在有2个二维随机变量$X_1$和$X_2$，它们的协方差矩阵为：
+
+$$
+\Sigma = \begin{bmatrix} \sigma_{11} & \sigma_{12} \\ \sigma_{21} & \sigma_{22} \end{bmatrix}
+$$
+
+其中$\sigma_{11}$是$X_1$的方差，$\sigma_{22}$是$X_2$的方差，$\sigma_{12}$和$\sigma_{21}$是$X_1$和$X_2$的协方差。
+
+展开：
+
+$$
+
+$$
+
+
+
+## 2. EKF
+
 
 
 </WordCount>

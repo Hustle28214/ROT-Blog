@@ -56,7 +56,7 @@
 /* 通用背景色 */
 body {
   background-color: var(--ifm-background-color);
-  font-family: 'DreamHanSansCN', 'Mengyuan', system-ui, -apple-system, 'PingFang SC' !important;
+  font-family: 'DreamHanSansCN', 'Mengyuan', system-ui, -apple-system, 'PingFang SC';
 }
 
 

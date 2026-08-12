@@ -12,5 +12,245 @@ import Mermaid from '@theme/Mermaid';
 3. 红色节点的子节点为黑色
 4. 从根节点到NIL节点的每条路径上的黑色节点数量相同
 
+合法红黑树：
+
+![](https://github.com/user-attachments/assets/b1bdc24d-2286-4059-a342-ebe0148fc8b8)
+
+
+这么多建树规则看着头疼，说穿了红黑树就是实现了恰到好处的“懒”。使得它成为用来维护**“有序动态集合”**的基石。
+
+红黑树在插入时最多旋转 **2 次**，删除时最多旋转 **3 次**。这种“松散平衡”让它在动态变化剧烈的场景下，把性能损耗降到了最低。
+
+增删改查极为频繁的场景下，红黑树的性能表现极为出色。事实上，现代互联网工业的绝大多数场景都要面对这一难题。凭借优越的性能，它已经用到了STL库/Linux内核公平调度器/Redis 的有序集合/SQL的Buffer Pool等重要场景中。
+
+
+## 红黑树实现模板
+
+首先我们来看一下红黑树的实现逻辑。
+
+要搞清楚建树逻辑，
+
+
+```cpp
+#include <functional> // for std::less
+#include <utility>    // for std::exchange, std::move
+
+/**
+ * An RBTree-based set implementation (with subtree size for order statistics)
+ *
+ * @tparam key_t key type
+ * @tparam compare_t comparison functor
+ */
+template <typename key_t, typename compare_t = std::less<key_t>>
+struct rb_tree {
+    // ==================== Node Definition ====================
+    struct node_t {
+        node_t *fa{nullptr};
+        node_t *ch[2]{nullptr, nullptr}; // ch[0]: left, ch[1]: right
+        key_t data;
+        size_t sz{1};   // Subtree size (including self)
+        bool red{true}; // New node is red by default
+
+        explicit node_t(const key_t& k) : data(k) {}
+
+        // Safe child direction. Returns false if this is root (fa == nullptr)
+        bool child_dir() const noexcept {
+            return fa != nullptr && this == fa->ch[1];
+        }
+    };
+
+    using pointer = node_t*;
+    using const_pointer = const node_t*;
+
+    // ==================== RAII & Rule of Five ====================
+    compare_t compare;
+    pointer root{nullptr};
+
+    rb_tree() = default;
+
+    // Copy constructor (deep copy)
+    rb_tree(const rb_tree& other) : compare(other.compare) {
+        root = clone(other.root, nullptr);
+    }
+
+    // Move constructor
+    rb_tree(rb_tree&& other) noexcept 
+        : compare(std::move(other.compare)), root(std::exchange(other.root, nullptr)) {}
+
+    // Copy assignment
+    rb_tree& operator=(const rb_tree& other) {
+        if (this != &other) {
+            clear(root);
+            compare = other.compare;
+            root = clone(other.root, nullptr);
+        }
+        return *this;
+    }
+
+    // Move assignment
+    rb_tree& operator=(rb_tree&& other) noexcept {
+        if (this != &other) {
+            clear(root);
+            compare = std::move(other.compare);
+            root = std::exchange(other.root, nullptr);
+        }
+        return *this;
+    }
+
+    // Destructor
+    ~rb_tree() {
+        clear(root);
+    }
+
+    // ==================== Public Interface ====================
+    void insert(const key_t& key) {
+        pointer parent = nullptr;
+        pointer cur = root;
+        while (cur) {
+            parent = cur;
+            cur = (compare(key, cur->data)) ? cur->ch[0] : cur->ch[1];
+        }
+
+        pointer new_node = new node_t(key);
+        new_node->fa = parent;
+
+        if (!parent) {
+            root = new_node;
+        } else if (compare(key, parent->data)) {
+            parent->ch[0] = new_node;
+        } else {
+            parent->ch[1] = new_node;
+        }
+
+        // Update subtree sizes along the path
+        for (pointer p = parent; p; p = p->fa) pull(p);
+
+        insert_fixup(new_node);
+    }
+
+    void erase(const key_t& key) {
+        // ... (Standard BST deletion + erase_fixup, omitted for brevity)
+        // Remember to call pull(parent) after rotations/deletion.
+    }
+
+    pointer find(const key_t& key) const {
+        pointer cur = root;
+        while (cur) {
+            if (compare(key, cur->data)) cur = cur->ch[0];
+            else if (compare(cur->data, key)) cur = cur->ch[1];
+            else return cur;
+        }
+        return nullptr;
+    }
+
+    // Order statistic: select k-th smallest (0-indexed)
+    pointer select(size_t k) const {
+        pointer cur = root;
+        while (cur) {
+            size_t left_sz = size(cur->ch[0]);
+            if (k < left_sz) cur = cur->ch[0];
+            else if (k == left_sz) return cur;
+            else { k -= left_sz + 1; cur = cur->ch[1]; }
+        }
+        return nullptr;
+    }
+
+private:
+    // ==================== Helpers (Safe for nullptr) ====================
+    static size_t size(pointer p) noexcept { return p ? p->sz : 0; }
+    static bool is_red(pointer p) noexcept { return p && p->red; }
+    static bool is_black(pointer p) noexcept { return !p || !p->red; } // nullptr is black
+
+    void pull(pointer p) noexcept {
+        if (p) p->sz = 1 + size(p->ch[0]) + size(p->ch[1]);
+    }
+
+    void clear(pointer p) noexcept {
+        if (!p) return;
+        clear(p->ch[0]);
+        clear(p->ch[1]);
+        delete p;
+    }
+
+    pointer clone(pointer p, pointer parent) {
+        if (!p) return nullptr;
+        pointer new_node = new node_t(p->data);
+        new_node->red = p->red;
+        new_node->fa = parent;
+        new_node->ch[0] = clone(p->ch[0], new_node);
+        new_node->ch[1] = clone(p->ch[1], new_node);
+        pull(new_node); // Maintain sz during clone
+        return new_node;
+    }
+
+    // ==================== Rotations (Unified via direction) ====================
+    void rotate(pointer p, bool dir) {
+        // dir = 0 -> left rotate, dir = 1 -> right rotate
+        pointer child = p->ch[!dir];
+        if (!child) return;
+
+        p->ch[!dir] = child->ch[dir];
+        if (child->ch[dir]) child->ch[dir]->fa = p;
+
+        child->fa = p->fa;
+        if (!p->fa) {
+            root = child;
+        } else {
+            p->fa->ch[p->child_dir()] = child;
+        }
+
+        child->ch[dir] = p;
+        p->fa = child;
+
+        // Maintain sizes: p becomes child, so pull p first, then child
+        pull(p);
+        pull(child);
+    }
+
+    // ==================== Insertion Fixup ====================
+    void insert_fixup(pointer z) {
+        while (is_red(z->fa)) {
+            pointer fa = z->fa;
+            bool dir = fa->child_dir(); // direction of father relative to grandparent
+            pointer uncle = fa->fa->ch[!dir];
+
+            if (is_red(uncle)) {
+                // Case 1: Uncle is red -> recolor
+                fa->red = false;
+                uncle->red = false;
+                fa->fa->red = true;
+                z = fa->fa;
+            } else {
+                // Case 2 & 3: Uncle is black
+                if (z == fa->ch[!dir]) {
+                    // Case 2: z is inner child -> rotate father to make it outer
+                    z = fa;
+                    rotate(z, dir); // dir == 0 -> left, etc.
+                }
+                // Case 3: z is outer child -> rotate grandparent
+                fa = z->fa; // update fa after potential rotation
+                fa->red = false;
+                fa->fa->red = true;
+                rotate(fa->fa, !dir);
+                // Note: We need to carefully update pointer references here.
+                // The standard algorithm requires careful pointer tracking.
+                // For brevity, this shows the logical structure.
+                break;
+            }
+        }
+        root->red = false;
+        // Since rotations changed structure, we need to pull ancestors.
+        // In a full implementation, rotate() already pulls local nodes.
+        // A full recursive pull from z->fa upwards is safer here.
+        for (pointer p = z->fa; p; p = p->fa) pull(p);
+    }
+
+    // erase_fixup would follow similar CLRS logic with nullptr checks.
+};
+
+```
+
+
+
 
 </WordCount>

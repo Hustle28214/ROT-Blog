@@ -49,6 +49,19 @@ $$
 
 涉及两个坐标系：**地球系**（Earth frame，记 $E$）是重力和地磁方向已知的固定参考系；**传感器系**（Sensor frame，记 $S$）固连在器件上，随载体一起转动。约定 $\mathbf{q}$ 描述地球系相对传感器系的姿态。三维向量参与四元数运算时一律补零写成纯四元数，即 $\mathbf{x} = (x, y, z)$ 记为 $(0, x, y, z)$，所有乘法取 Hamilton 积。
 
+> 哈密顿积 (Hamilton Product)
+> 哈密顿积是四元数乘法的一种定义方式，它满足结合律和分配律，但不满足交换律。
+> 哈密顿积的定义为：
+> $$
+> \mathbf{q}_1 \otimes \mathbf{q}_2 = (q_{1w}q_{2w} - \mathbf{q}_1 \cdot \mathbf{q}_2, q_{1w} \mathbf{q}_2 + q_{2w} \mathbf{q}_1 + \mathbf{q}_1 \times \mathbf{q}_2)
+> $$
+> 其中 $\mathbf{q}_1 = (q_{1w}, \mathbf{q}_{1v})$ 和 $\mathbf{q}_2 = (q_{2w}, \mathbf{q}_{2v})$ 是两个四元数，$\mathbf{q}_1 \cdot \mathbf{q}_2$ 是它们的点积，$\mathbf{q}_1 \times \mathbf{q}_2$ 是它们的叉积。
+> 哈密顿积的逆为：
+> $$
+> \mathbf{q}_1 \otimes \mathbf{q}_2 = (q_{1w}q_{2w} - \mathbf{q}_1 \cdot \mathbf{q}_2, q_{1w} \mathbf{q}_2 + q_{2w} \mathbf{q}_1 - \mathbf{q}_1 \times \mathbf{q}_2)
+> $$
+> 其中 $\mathbf{q}_1 = (q_{1w}, \mathbf{q}_{1v})$ 和 $\mathbf{q}_2 = (q_{2w}, \mathbf{q}_{2v})$ 是两个四元数，$\mathbf{q}_1 \cdot \mathbf{q}_2$ 是它们的点积，$\mathbf{q}_1 \times \mathbf{q}_2$ 是它们的叉积。
+
 两个方向的坐标变换分别是
 
 $$

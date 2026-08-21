@@ -1,150 +1,135 @@
 ---
 sidebar_position: 1
+title: 基本概念与绘制法则
 ---
-
-
 
 import VideoPlayer from '../../../../src/components/Videoplayer/Videoplayer.jsx';
 import WordCount from '../../../../src/components/WordCount/WordCount';
 
 <WordCount>
-> 1
 
-<VideoPlayer src="//player.bilibili.com/player.html?isOutside=true&aid=811394492&bvid=BV1F34y1h7so&cid=718443513&p=26" />
-<br />
+## 4.1 根轨迹的定义
 
-## 4.1 根轨迹法的特点
+设负反馈系统的开环传递函数写成首一型
 
-根轨迹法，是三大分析校正方法之一，它的特点有：
+$$
+L(s)=G(s)H(s)=K^*\frac{\prod_{j=1}^{m}(s-z_j)}
+{\prod_{i=1}^{n}(s-p_i)},\qquad K^*\ge 0.
+$$
 
-1. 图解，直观形象
-2. 研究当系统中某一参数变化时，系统性能的变化趋势
-3. 近似方法，不十分准确
+当根轨迹增益 $K^*$ 从 $0$ 变化到 $\infty$ 时，闭环特征方程 $1+L(s)=0$ 的全部根（闭环极点）在 $s$ 平面上形成的轨迹称为**根轨迹**。$K^*$ 是开环传递函数首一型中的系数，不应称为“闭环根轨迹增益”。
 
-根轨迹是说：系统某一参数由$0-\infty$变化时，$\lambda$(闭环系统极点，即特征方程的根)在s平面相应变化所描绘出来的轨迹。
-:::danger
-一定是<mark>闭环</mark>的根轨迹，没有开环根轨迹、闭环根轨迹增益一说！
+一点 $s$ 位于根轨迹上的充要条件为
+
+$$
+\sum_{j=1}^{m}\angle(s-z_j)-\sum_{i=1}^{n}\angle(s-p_i)
+=(2k+1)180^\circ,
+$$
+
+其对应增益由幅值条件给出：
+
+$$
+K^*=\frac{\prod_{i=1}^{n}|s-p_i|}{\prod_{j=1}^{m}|s-z_j|}.
+$$
+
+<svg viewBox="0 0 680 310" width="100%" role="img" aria-label="根轨迹的 s 平面示意图，显示开环极点、零点、实轴根轨迹、分离点和渐近线">
+  <defs>
+    <marker id="rl-arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+      <path d="M0,0 L8,4 L0,8 Z" fill="currentColor" />
+    </marker>
+  </defs>
+  <g fill="none" stroke="currentColor" strokeWidth="2">
+    <line x1="40" y1="155" x2="650" y2="155" markerEnd="url(#rl-arrow)" />
+    <line x1="410" y1="285" x2="410" y2="24" markerEnd="url(#rl-arrow)" />
+    <line x1="410" y1="155" x2="620" y2="40" strokeDasharray="7 6" opacity="0.55" />
+    <line x1="410" y1="155" x2="620" y2="270" strokeDasharray="7 6" opacity="0.55" />
+    <path d="M140 155 C205 155,245 155,280 155 C325 155,350 112,410 75" stroke="#58a6ff" markerEnd="url(#rl-arrow)" />
+    <path d="M330 155 C350 155,365 185,410 235" stroke="#58a6ff" markerEnd="url(#rl-arrow)" />
+  </g>
+  <g stroke="currentColor" strokeWidth="3">
+    <path d="M130 146 L148 164 M148 146 L130 164" />
+    <path d="M270 146 L288 164 M288 146 L270 164" />
+    <path d="M320 146 L338 164 M338 146 L320 164" />
+  </g>
+  <circle cx="500" cy="155" r="8" fill="none" stroke="currentColor" strokeWidth="3" />
+  <g fill="currentColor" fontSize="15">
+    <text x="625" y="145">Re(s)</text><text x="420" y="28">Im(s)</text>
+    <text x="122" y="182">p₁</text><text x="263" y="182">p₂</text><text x="315" y="182">p₃</text>
+    <text x="488" y="182">z₁</text><text x="342" y="137">分离点</text>
+    <text x="590" y="57">渐近线</text><text x="50" y="180">实轴根轨迹</text>
+  </g>
+</svg>
+
+“$\times$”表示开环极点，“$\circ$”表示开环零点；蓝线表示闭环极点随增益增大的运动方向。
+
+## 4.2 八条绘制法则
+
+以下均针对 $K^*\ge 0$ 的常规根轨迹。
+
+1. **分支数、起点和终点**：有 $n$ 条分支；从 $n$ 个开环极点出发，$m$ 条终止于有限开环零点，其余 $n-m$ 条趋于无穷远。
+2. **对称性**：实系数系统的根轨迹关于实轴对称。
+3. **实轴区段**：实轴上一点属于根轨迹，当且仅当其右侧开环实极点和实零点总数为奇数；重根按重数计。
+4. **无穷远渐近线**：当 $n>m$ 时有 $n-m$ 条，重心和倾角为
+
+   $$
+   \sigma_a=\frac{\sum p_i-\sum z_j}{n-m},\qquad
+   \theta_q=\frac{(2q+1)180^\circ}{n-m},
+   $$
+
+   其中 $q=0,1,\ldots,n-m-1$。
+
+5. **分离点与会合点**：由
+
+   $$
+   K^*(s)=-\frac{\prod(s-p_i)}{\prod(s-z_j)}
+   $$
+
+   求 $\mathrm dK^*/\mathrm ds=0$。所得点还必须满足相角条件且 $K^*>0$，不能把所有驻点都画入轨迹。
+
+6. **复极点出射角与复零点入射角**：
+
+   $$
+   \theta_{\rm dep}=180^\circ+\sum_j\angle(p_k-z_j)
+   -\sum_{i\ne k}\angle(p_k-p_i)\pmod{360^\circ},
+   $$
+
+   $$
+   \theta_{\rm arr}=180^\circ-\sum_{j\ne k}\angle(z_k-z_j)
+   +\sum_i\angle(z_k-p_i)\pmod{360^\circ}.
+   $$
+
+7. **与虚轴的交点**：对闭环特征多项式列 Routh 表，令相应首列元素为零求临界 $K^*$；再由上一行的辅助多项式求 $\omega$。也可令 $s=j\omega$ 后联立实部、虚部。
+8. **增益与方向**：用相角条件判断点是否在轨迹上，再用幅值条件求 $K^*$。箭头从开环极点指向开环零点或无穷远，对应 $K^*:0\to\infty$。
+
+:::tip[推荐作图顺序]
+标极点零点 → 判实轴区段 → 画渐近线 → 求分离点 → 求出射角/入射角 → 求虚轴交点 → 按对称性和增益方向连线。
 :::
 
-04:30：
+## 4.3 二阶例题
 
-例1：系统结构图如图所示，分析$\lambda$随开环增益K的变化趋势。
-
-![](https://github.com/user-attachments/assets/2716b70a-f051-484e-94bb-361c1951b7c3)
-
-
-
-<details>
-
-<summary>解法</summary>
-
-先写出开环传递函数尾1标准型，在根轨迹法中，习惯把传递函数写成首1标准型。
+若 $L(s)=K^*/[s(s+2)]$，则
 
 $$
-G(s)=\frac{K}{s(0.5s+1)}=\frac{K* = 2K}{s(s+2)}
+s^2+2s+K^*=0,\qquad s_{1,2}=-1\pm\sqrt{1-K^*}.
 $$
 
-尾1标准型（开环传递函数）时，K为开环增益；为标准型（闭环传递函数）时，K为闭环增益；
-
-但是，根轨迹增益仅对开环传递函数而言。化为首1标准型时，K\*为根轨迹增益。
-
-这时你会想，诶，那如果把闭环传递函数化为首1标准型，那这个增益不就叫闭环根轨迹增益吗？不是的，没有这么一说。根轨迹增益只对开环而言。
-
-而且根轨迹增益只在根轨迹法研究的过程中用它。
-
-现在要研究闭环极点随着K\*从0到无穷的变化，等价于K从0到无穷的变化。
-
-首先写出闭环传递函数，写出特征多项式，让其等于0。得到特征方程。解这个二次方程，得到06:45的结果。
+$0<K^*<1$ 时，两极点在 $(-2,-1)$ 和 $(-1,0)$ 上相向运动；$K^*=1$ 时在 $s=-1$ 分离；$K^*>1$ 时沿 $\operatorname{Re}s=-1$ 上下运动。此时
 
 $$
-\Phi = \frac{C(s)}{R(s)} = \frac{K^{*}}{s^2+2s+K^{*}}
-$$
-$$
-D(s) = s^2+2s+K^{*} = 0
+\omega_n=\sqrt{K^*},\qquad \zeta=\frac{1}{\sqrt{K^*}},\qquad
+\zeta\omega_n=1.
 $$
 
-解得：
-$$
-\lambda = -1±\sqrt{1-K^{*}}
-$$
+所以增益增大会降低阻尼比、增大超调，而按 $2\%$ 准则估算的 $t_s\approx4/(\zeta\omega_n)\approx4$ 基本不变。
 
-画出s平面。标出开环极点。
+## 视频补充
 
-![](https://github.com/user-attachments/assets/304a1f7e-12b3-4d2a-8360-8053603239c1)
-
-![](https://github.com/user-attachments/assets/9b9f172f-6870-44e5-a0dd-5839a1bc18d0)
-
-所以，在$K^{*}$从0到1变化时，$\lambda$是互异单根，呈现出过阻尼的状态，所以此区间系统动态性能：$\xi>1$,$\sigma\%=0$,$t_s\downarrow$，。
-
-在$K^{*}$从1到$\infty$变化时，$\lambda$是共轭复根，系统进入欠阻尼状态，所以此区间系统动态性能：$0<\xi<1$,$\beta \uparrow \rightarrow \xi \downarrow \rightarrow \sigma\% \uparrow$,$t_s=\frac{3.5}{\xi \omega_n}$基本不变。
-
-
-
-系统稳定性：$Re[\lambda_{1,2}]<0$，系统绝对稳定。
-
-系统稳态误差($r(t) = \delta t$)：$K^{*} \uparrow \rightarrow e_{ss}=\frac{A}{K} = \frac{2A}{K^{*}} \downarrow$
-
-
-</details>
-
-系统结构图如图，确定闭环零点：
-
-
-![](https://github.com/user-attachments/assets/8cd81381-e9c6-4386-9b7c-9162c3dd96d4)
-
-$$
-G(s) = \frac{K_1K_2(s+2)(s+4)}{s(s+5)(s+3)}
-$$
-
-$$
-\Phi = \frac{\frac{K_1(s+2)}{s(s+3)}}{1+\frac{K_1K_2(s+2)(s+4)}{s(s+5)(s+3)}} = \frac{K_1(s+2)(s+5)}{s(s+5)(s+3)+K_1K_2(s+2)(s+4)}
-$$
-
-闭环零点 = 前向通道开环零点 + 反馈通道开环极点，闭环极点与开环零点、开环极点及$K^{*}$均有关。
-
-![](https://github.com/user-attachments/assets/6861a9fd-d749-449d-b8fe-0867e574631c)
-
-根轨迹方程及其含义：
-
-$$
-G(s) = \frac{K^{*}}{s-p}
-$$
-
-$$
-\Phi(s) = \frac{G(s)}{1+G(s)}
-$$
-
-$$
-1+G(s) = 0
-$$
-
-$$
-G(s) = -1
-$$
-
-$$
-|G(s)| = \frac{K^{*}}{|s-p|} =1
-$$
-
-$$
-∠G(s) = -∠(s-p) = (2k+1)\pi
-$$
-
-![](https://github.com/user-attachments/assets/4486ffcf-3654-40f7-bd66-267f148a5e70)
-
-![](https://github.com/user-attachments/assets/41652697-d3a2-4c44-840f-897ac7aa8aed)
-
-> 2
+<VideoPlayer src="//player.bilibili.com/player.html?isOutside=true&aid=811394492&bvid=BV1F34y1h7so&cid=718443513&p=26" />
 
 <VideoPlayer src="//player.bilibili.com/player.html?isOutside=true&aid=811394492&bvid=BV1F34y1h7so&cid=718436798&p=27" />
 
-> 3
-
 <VideoPlayer src="//player.bilibili.com/player.html?isOutside=true&aid=811394492&bvid=BV1F34y1h7so&cid=718445314&p=28" />
-<br />
-> 4
 
 <VideoPlayer src="//player.bilibili.com/player.html?isOutside=true&aid=811394492&bvid=BV1F34y1h7so&cid=718449094&p=29" />
-
 
 </WordCount>

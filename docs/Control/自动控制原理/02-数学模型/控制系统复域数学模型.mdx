@@ -4,6 +4,92 @@ sidebar_position: 2
 
 import VideoPlayer from '../../../../src/components/Videoplayer/Videoplayer.jsx';
 
+## 拉氏变换与复域模型
+
+单边拉氏变换定义为
+
+$$
+F(s)=\mathcal L\{f(t)\}=\int_{0^-}^{\infty}f(t)e^{-st}\,\mathrm dt.
+$$
+
+常用变换为
+
+$$
+\mathcal L\{1\}=\frac1s,\qquad
+\mathcal L\{t\}=\frac1{s^2},\qquad
+\mathcal L\{e^{-at}\}=\frac1{s+a}.
+$$
+
+导数性质会把初始状态带入代数方程：
+
+$$
+\mathcal L\{\dot f\}=sF(s)-f(0^-),
+$$
+
+$$
+\mathcal L\{\ddot f\}=s^2F(s)-sf(0^-)-\dot f(0^-).
+$$
+
+因此拉氏变换既能求零状态响应，也能处理非零初始条件。只有在定义传递函数时，才把初始条件全部置零。
+
+## 由微分方程得到响应
+
+对
+
+$$
+a_n y^{(n)}+\cdots+a_1\dot y+a_0y
+=b_m u^{(m)}+\cdots+b_0u,
+$$
+
+零初始条件下有
+
+$$
+G(s)=\frac{Y(s)}{U(s)}
+=\frac{b_ms^m+\cdots+b_0}{a_ns^n+\cdots+a_0}.
+$$
+
+若初始条件不为零，则应写成
+
+$$
+Y(s)=G(s)U(s)+Y_{\mathrm{zi}}(s),
+$$
+
+其中 $Y_{\mathrm{zi}}$ 是初始储能引起的零输入响应，不能塞进传递函数。
+
+## 部分分式与时域响应
+
+求响应的基本流程是：列复域方程 $\to$ 解出 $Y(s)$ $\to$ 部分分式展开 $\to$ 反变换。若
+
+$$
+Y(s)=\sum_i\frac{A_i}{s-p_i},
+$$
+
+则
+
+$$
+y(t)=\sum_i A_i e^{p_i t}.
+$$
+
+极点 $p_i$ 决定自然响应模态：负实部模态衰减，正实部模态增长，纯虚轴上的单极点产生等幅振荡。
+
+## 初值与终值定理
+
+在相应极限存在时，
+
+$$
+f(0^+)=\lim_{s\to\infty}sF(s).
+$$
+
+终值定理
+
+$$
+f(\infty)=\lim_{s\to0}sF(s)
+$$
+
+要求 $sF(s)$ 的全部极点位于开左半平面；允许在原点约掉后的情形，但不能对发散或持续振荡信号机械套用。
+
+## 配套视频
+
 > 上
 
 <VideoPlayer src="//player.bilibili.com/player.html?isOutside=true&aid=811394492&bvid=BV1F34y1h7so&cid=718318151&p=10" />

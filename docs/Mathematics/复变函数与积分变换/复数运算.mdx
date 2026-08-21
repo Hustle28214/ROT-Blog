@@ -1,0 +1,472 @@
+
+import WordCount from '../../../src/components/WordCount/WordCount.jsx';
+
+<WordCount>
+
+## 1. 复数定义
+
+任意一个复数 $z \in \mathbb{C}$ 都可以表示为
+
+$$
+z = a + bi, \quad a, b \in \mathbb{R}, \quad i^2 = -1
+\tag{1.1}
+$$
+
+的形式。其中 $a$ 称为这个复数的**实部**（Real Part），$b$ 称为它的**虚部**（Imaginary Part），分别记作 $\operatorname{Re}(z) = a$、$\operatorname{Im}(z) = b$。
+
+因为 $z = a + bi$ 其实就是对于 $\{1, i\}$ 这个基（Basis）的线性组合（Linear Combination），我们也可以用向量来表示一个复数：
+
+$$
+z = \begin{bmatrix} a \\ b \end{bmatrix}
+\tag{1.2}
+$$
+
+因为这个向量有两个元素，我们可以使用复平面上的一个点来表示一个复数。复平面的横坐标 $\operatorname{Re}$ 代表它的实部，纵坐标 $\operatorname{Im}$ 代表它的虚部：
+
+<div style={{ textAlign: 'center', margin: '1.5rem 0' }}>
+  <svg
+    width="360"
+    height="250"
+    viewBox="0 0 360 250"
+    role="img"
+    aria-label="复平面上的复数 z = a + bi"
+    style={{ color: 'var(--ifm-font-color-base)', maxWidth: '100%' }}
+  >
+    <defs>
+      <marker
+        id="cplx-arrow"
+        viewBox="0 0 10 10"
+        refX="9"
+        refY="5"
+        markerWidth="6"
+        markerHeight="6"
+        orient="auto-start-reverse"
+      >
+        <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor" />
+      </marker>
+    </defs>
+    {/* 坐标轴 */}
+    <line x1="40" y1="210" x2="332" y2="210" stroke="currentColor" strokeWidth="1.2" markerEnd="url(#cplx-arrow)" />
+    <line x1="40" y1="210" x2="40" y2="28" stroke="currentColor" strokeWidth="1.2" markerEnd="url(#cplx-arrow)" />
+    {/* 投影虚线 */}
+    <line x1="240" y1="210" x2="240" y2="70" stroke="currentColor" strokeWidth="1" strokeDasharray="4 4" opacity="0.55" />
+    <line x1="40" y1="70" x2="240" y2="70" stroke="currentColor" strokeWidth="1" strokeDasharray="4 4" opacity="0.55" />
+    {/* 复数本身 */}
+    <line x1="40" y1="210" x2="240" y2="70" stroke="currentColor" strokeWidth="1.8" markerEnd="url(#cplx-arrow)" />
+    <circle cx="240" cy="70" r="3.5" fill="currentColor" />
+    {/* 标注 */}
+    <text x="326" y="230" fill="currentColor" fontSize="14" fontStyle="italic" textAnchor="end">Re</text>
+    <text x="52" y="38" fill="currentColor" fontSize="14" fontStyle="italic">Im</text>
+    <text x="32" y="228" fill="currentColor" fontSize="13" textAnchor="end">O</text>
+    <text x="240" y="230" fill="currentColor" fontSize="14" fontStyle="italic" textAnchor="middle">a</text>
+    <text x="30" y="75" fill="currentColor" fontSize="14" fontStyle="italic" textAnchor="end">b</text>
+    <text x="252" y="60" fill="currentColor" fontSize="14" fontStyle="italic">z = a + bi</text>
+  </svg>
+</div>
+
+### 1.1 复数加减法
+
+两个复数的和就是分量相加的结果，即
+$$
+z_1 + z_2 = (a_1 + a_2) + (b_1 + b_2)i
+$$
+
+同样，对于减法也是：
+
+$$
+z_1 - z_2 = (a_1 - a_2) + (b_1 - b_2)i
+$$
+
+在机器人学中更多关心复数的乘法。所以本节往后再补充。
+
+### 1.2 复数乘法
+
+
+可以使用分配律展开：
+
+$$
+z_1 z_2 = (a_1 + b_1 i)(a_2 + b_2 i) = a_1 a_2 + a_1 b_2 i + b_1 i a_2 + b_1 i b_2 i^2
+$$
+
+因为 $i^2 = -1$，所以：
+
+$$
+z_1 z_2 = a_1 a_2 + a_1 b_2 i + b_1 i a_2 - b_1 b_2
+$$
+
+$$
+= (a_1 a_2 - b_1 b_2) + (a_1 b_2 + b_1 a_2)i
+$$
+
+此时仔细观察，可以把复数 $z_1$ 乘以 $z_2$ 看作矩阵与向量相乘：
+
+$$
+\begin{bmatrix}
+a_1 & -b_1 \\
+b_1 & a_1
+\end{bmatrix}
+\begin{bmatrix}
+a_2 \\
+b_2
+\end{bmatrix}
+=
+\begin{bmatrix}
+a_1a_2-b_1b_2 \\
+a_1b_2+b_1a_2
+\end{bmatrix}
+$$
+
+这里需要区分复数的两种表示：
+
+- 向量 $\left(a_2,b_2\right)^\mathsf T$ 是复数 $z_2$ 在基 $\{1,i\}$ 下的坐标；
+- 矩阵 $\begin{bmatrix}a_1&-b_1\\b_1&a_1\end{bmatrix}$ 表示“乘以 $z_1$”这一线性变换，而不只是 $z_1$ 的坐标。
+
+这个矩阵的两列可以由该线性变换对基 $\{1,i\}$ 的作用得到：
+
+$$
+z_1\cdot 1=a_1+b_1i,\qquad
+z_1\cdot i=-b_1+a_1i.
+$$
+
+因此，也可以把任意复数 $z=a+bi$ 与一个实矩阵对应起来：
+
+$$
+M(z)=
+\begin{bmatrix}
+a&-b\\
+b&a
+\end{bmatrix}.
+$$
+
+设 $z_1=a+bi$、$z_2=c+di$，则复数乘法对应于矩阵乘法：
+
+$$
+\begin{aligned}
+M(z_1)M(z_2)
+&=
+\begin{bmatrix}
+a&-b\\
+b&a
+\end{bmatrix}
+\begin{bmatrix}
+c&-d\\
+d&c
+\end{bmatrix} \\[4pt]
+&=
+\begin{bmatrix}
+ac-bd&-(ad+bc)\\
+ad+bc&ac-bd
+\end{bmatrix} \\
+&=M(z_1z_2).
+\end{aligned}
+$$
+
+所以，复数乘法既可以看作**矩阵与向量相乘**，也可以看作对应矩阵之间的乘法。由于这类矩阵满足
+
+$$
+M(z_1)M(z_2)=M(z_2)M(z_1),
+$$
+
+因此也能从矩阵表示中看出复数乘法满足交换律，即 $z_1z_2=z_2z_1$。需要注意的是，一般的矩阵乘法并不满足交换律；这是上述特殊形式的矩阵所具有的性质。
+
+:::info 特殊复数的矩阵形式
+
+根据 $M(a+bi)=\begin{bmatrix}a&-b\\b&a\end{bmatrix}$，实数单位 $1$ 对应单位矩阵：
+
+$$
+M(1)=
+\begin{bmatrix}
+1&0\\
+0&1
+\end{bmatrix}
+=I
+\qquad (a=1,\ b=0).
+$$
+
+虚数单位 $i$ 对应逆时针旋转 $90^\circ$ 的矩阵：
+
+$$
+M(i)=
+\begin{bmatrix}
+0&-1\\
+1&0
+\end{bmatrix}
+\qquad (a=0,\ b=1).
+$$
+
+这也解释了 $i^2=-1$：
+
+$$
+M(i)^2=
+\begin{bmatrix}
+-1&0\\
+0&-1
+\end{bmatrix}
+=-I=M(-1).
+$$
+
+:::
+
+### 1.3 复数乘法的几何意义
+
+> 注意，复数除法理论上不存在，你不能除以一个复数，除非上下同时乘以一个虚数i
+
+既然乘以复数 $z=a+bi$ 可以表示为线性变换
+
+$$
+M(z)=
+\begin{bmatrix}
+a&-b\\
+b&a
+\end{bmatrix},
+$$
+
+那么这个变换在几何上意味着什么？
+
+当 $z\neq 0$ 时，它的模长为
+
+$$
+r=|z|=\sqrt{a^2+b^2},
+$$
+
+因此可以从矩阵中提出公因子 $r$：
+
+$$
+\begin{aligned}
+M(z)
+&=
+\sqrt{a^2+b^2}
+\begin{bmatrix}
+a/r&-b/r\\
+b/r&a/r
+\end{bmatrix}.
+\end{aligned}
+$$
+
+设复数 $z$ 的辐角为
+
+$$
+\theta=\arg z=\operatorname{atan2}(b,a).
+$$
+
+在复平面中，$a$ 和 $b$ 分别是直角三角形的两条直角边，而 $|z|$ 是斜边，因此
+
+$$
+\cos\theta=a/r,
+\qquad
+\sin\theta=b/r.
+$$
+
+<div style={{ textAlign: 'center', margin: '1.5rem 0' }}>
+  <svg
+    width="820"
+    height="360"
+    viewBox="0 0 820 360"
+    role="img"
+    aria-label="复数的模长、辐角以及标准基经过复数乘法后的变化"
+    style={{ color: 'var(--ifm-font-color-base)', maxWidth: '100%' }}
+  >
+    <defs>
+      <marker
+        id="transform-axis-arrow"
+        viewBox="0 0 10 10"
+        refX="9"
+        refY="5"
+        markerWidth="6"
+        markerHeight="6"
+        orient="auto-start-reverse"
+      >
+        <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor" />
+      </marker>
+      <marker
+        id="transform-blue-arrow"
+        viewBox="0 0 10 10"
+        refX="9"
+        refY="5"
+        markerWidth="6"
+        markerHeight="6"
+        orient="auto-start-reverse"
+      >
+        <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--ifm-color-primary)" />
+      </marker>
+    </defs>
+
+    {/* 左图：复数 z 的模长和辐角 */}
+    <text x="205" y="24" fill="currentColor" fontSize="16" fontWeight="600" textAnchor="middle">
+      z = a + bi 的模长与辐角
+    </text>
+    <line x1="35" y1="300" x2="385" y2="300" stroke="currentColor" strokeWidth="1.2" markerEnd="url(#transform-axis-arrow)" />
+    <line x1="75" y1="330" x2="75" y2="48" stroke="currentColor" strokeWidth="1.2" markerEnd="url(#transform-axis-arrow)" />
+    <line x1="75" y1="300" x2="315" y2="95" stroke="var(--ifm-color-primary)" strokeWidth="2.2" markerEnd="url(#transform-blue-arrow)" />
+    <line x1="315" y1="95" x2="315" y2="300" stroke="currentColor" strokeWidth="1" strokeDasharray="4 4" opacity="0.55" />
+    <path d="M 130 300 A 55 55 0 0 0 117 265" fill="none" stroke="var(--ifm-color-primary)" strokeWidth="1.5" />
+    <circle cx="315" cy="95" r="3.5" fill="var(--ifm-color-primary)" />
+    <text x="375" y="320" fill="currentColor" fontSize="14" fontStyle="italic">Re</text>
+    <text x="55" y="52" fill="currentColor" fontSize="14" fontStyle="italic">Im</text>
+    <text x="192" y="320" fill="currentColor" fontSize="14" fontStyle="italic">a</text>
+    <text x="325" y="202" fill="currentColor" fontSize="14" fontStyle="italic">b</text>
+    <text x="132" y="270" fill="currentColor" fontSize="14" fontStyle="italic">θ</text>
+    <text x="162" y="185" fill="currentColor" fontSize="14">|z| = √(a²+b²)</text>
+    <text x="324" y="84" fill="currentColor" fontSize="14" fontStyle="italic">z = (a,b)</text>
+
+    {/* 分隔线 */}
+    <line x1="410" y1="35" x2="410" y2="330" stroke="currentColor" strokeWidth="1" opacity="0.2" />
+
+    {/* 右图：标准基经过 M(z) 后的像 */}
+    <text x="615" y="24" fill="currentColor" fontSize="16" fontWeight="600" textAnchor="middle">
+      标准基经过 M(z) 后的像
+    </text>
+    <line x1="440" y1="300" x2="795" y2="300" stroke="currentColor" strokeWidth="1.2" markerEnd="url(#transform-axis-arrow)" />
+    <line x1="610" y1="330" x2="610" y2="48" stroke="currentColor" strokeWidth="1.2" markerEnd="url(#transform-axis-arrow)" />
+    <line x1="610" y1="300" x2="710" y2="300" stroke="currentColor" strokeWidth="1.5" markerEnd="url(#transform-axis-arrow)" opacity="0.55" />
+    <line x1="610" y1="300" x2="610" y2="200" stroke="currentColor" strokeWidth="1.5" markerEnd="url(#transform-axis-arrow)" opacity="0.55" />
+    <line x1="610" y1="300" x2="760" y2="175" stroke="var(--ifm-color-primary)" strokeWidth="2.2" markerEnd="url(#transform-blue-arrow)" />
+    <line x1="610" y1="300" x2="485" y2="150" stroke="#e76f51" strokeWidth="2.2" />
+    <path d="M 665 300 A 55 55 0 0 0 652 265" fill="none" stroke="var(--ifm-color-primary)" strokeWidth="1.5" />
+    <text x="785" y="320" fill="currentColor" fontSize="14" fontStyle="italic">Re</text>
+    <text x="590" y="52" fill="currentColor" fontSize="14" fontStyle="italic">Im</text>
+    <text x="695" y="320" fill="currentColor" fontSize="13">e₁</text>
+    <text x="590" y="205" fill="currentColor" fontSize="13">e₂</text>
+    <text x="668" y="270" fill="currentColor" fontSize="14" fontStyle="italic">θ</text>
+    <text x="675" y="165" fill="currentColor" fontSize="13">M(z)e₁ = (a,b)</text>
+    <text x="445" y="138" fill="currentColor" fontSize="13">M(z)e₂ = (−b,a)</text>
+    <text x="615" y="348" fill="currentColor" fontSize="13" textAnchor="middle" opacity="0.75">
+      两个基向量均旋转 θ，并将长度缩放 |z| 倍
+    </text>
+  </svg>
+</div>
+
+代回原矩阵可得
+
+$$
+\begin{aligned}
+M(z)
+&=
+|z|
+\begin{bmatrix}
+\cos\theta&-\sin\theta\\
+\sin\theta&\cos\theta
+\end{bmatrix}\\[4pt]
+&=
+\begin{bmatrix}
+|z|&0\\
+0&|z|
+\end{bmatrix}
+\begin{bmatrix}
+\cos\theta&-\sin\theta\\
+\sin\theta&\cos\theta
+\end{bmatrix}.
+\end{aligned}
+$$
+
+这个分解包含两个几何变换：
+
+1. 右边的旋转矩阵将向量逆时针旋转 $\theta$；
+2. 左边的缩放矩阵将向量的长度放大为原来的 $|z|$ 倍。
+
+所以，**乘以复数 $z$，等价于先旋转 $\arg z$，再缩放 $|z|$ 倍**。由于均匀缩放和旋转可以交换顺序，也可以理解为先缩放再旋转。
+
+#### 从标准基观察变换
+
+即使暂时不熟悉二维旋转矩阵，也可以观察它对标准基向量
+
+$$
+\boldsymbol e_1=
+\begin{bmatrix}
+1\\
+0
+\end{bmatrix},
+\qquad
+\boldsymbol e_2=
+\begin{bmatrix}
+0\\
+1
+\end{bmatrix}
+$$
+
+的作用。对于 $\boldsymbol e_1$，有
+
+$$
+\begin{aligned}
+M(z)\boldsymbol e_1
+&=
+|z|
+\begin{bmatrix}
+\cos\theta&-\sin\theta\\
+\sin\theta&\cos\theta
+\end{bmatrix}
+\begin{bmatrix}
+1\\
+0
+\end{bmatrix}\\
+&=
+|z|
+\begin{bmatrix}
+\cos\theta\\
+\sin\theta
+\end{bmatrix}
+=
+\begin{bmatrix}
+a\\
+b
+\end{bmatrix}.
+\end{aligned}
+$$
+
+这表示 $\boldsymbol e_1$ 先逆时针旋转 $\theta$，再将长度缩放为原来的 $|z|$ 倍。对于 $\boldsymbol e_2$，同理可得
+
+$$
+\begin{aligned}
+M(z)\boldsymbol e_2
+&=
+|z|
+\begin{bmatrix}
+-\sin\theta\\
+\cos\theta
+\end{bmatrix}
+=
+\begin{bmatrix}
+-b\\
+a
+\end{bmatrix}.
+\end{aligned}
+$$
+
+$\boldsymbol e_2$ 同样逆时针旋转了 $\theta$，并缩放了 $|z|$ 倍。由于线性变换由它对一组基的作用唯一确定，所以整个复平面中的向量都会进行相同的旋转和缩放。
+
+#### 单位复数与二维旋转
+
+如果 $|z|=1$，那么 $a^2+b^2=1$，此时
+
+$$
+z=\cos\theta+i\sin\theta,
+$$
+
+对应矩阵中不再包含缩放，只剩下纯旋转：
+
+$$
+M(z)=R(\theta)=
+\begin{bmatrix}
+\cos\theta&-\sin\theta\\
+\sin\theta&\cos\theta
+\end{bmatrix}.
+$$
+
+因此，二维向量 $\boldsymbol v=\left(x,y\right)^\mathsf T$ 逆时针旋转 $\theta$ 后为
+
+$$
+\boldsymbol v'
+=R(\theta)\boldsymbol v
+=
+\begin{bmatrix}
+x\cos\theta-y\sin\theta\\
+x\sin\theta+y\cos\theta
+\end{bmatrix}.
+$$
+
+特别地，当 $z=0$ 时，$M(z)$ 是零矩阵，会把所有向量映射到原点，此时辐角没有定义。
+
+
+
+
+</WordCount>

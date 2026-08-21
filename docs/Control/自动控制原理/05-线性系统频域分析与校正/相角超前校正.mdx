@@ -1,17 +1,118 @@
 ---
 sidebar_position: 7
+title: 相角超前校正
 ---
 
-
-
 import VideoPlayer from '../../../../src/components/Videoplayer/Videoplayer.jsx';
+import WordCount from '../../../../src/components/WordCount/WordCount';
 
-> 上
+<WordCount>
+
+## 1. 校正器形式与作用
+
+常用串联超前校正器写成
+
+$$
+G_c(s)=K_c\frac{1+Ts}{1+\alpha Ts},\qquad 0<\alpha<1.
+$$
+
+其零点频率为 $1/T$，极点频率为 $1/(\alpha T)$，零点先于极点出现。幅值在两转折频率间以 $+20\,\mathrm{dB/dec}$ 上升，高频增益为低频增益的 $1/\alpha$ 倍；相位贡献为
+
+$$
+\varphi_c(\omega)=\arctan(\omega T)-\arctan(\alpha\omega T)>0.
+$$
+
+最大超前角及其频率为
+
+$$
+\sin\varphi_{\max}=\frac{1-\alpha}{1+\alpha},
+\qquad
+\omega_m=\frac{1}{T\sqrt\alpha},
+$$
+
+且在 $\omega_m$ 处
+
+$$
+|G_c(j\omega_m)|=\frac{K_c}{\sqrt\alpha}.
+$$
+
+超前校正主要用于提高相位裕度和交越频率，从而改善阻尼并加快响应；代价是提高中高频增益，可能放大噪声并增加控制作用。
+
+## 2. 基于 Bode 图的设计步骤
+
+设已按稳态误差要求选定被控对象增益。
+
+1. 画未校正开环 $L_0(s)$ 的 Bode 图，求原 $PM$、$GM$ 和 $\omega_c$。
+2. 根据期望相位裕度确定所需附加相位：
+
+   $$
+   \varphi_{\max}\approx PM_{\rm des}-PM_0+\varepsilon,
+   $$
+
+   其中 $\varepsilon$ 常取 $5^\circ\sim12^\circ$，补偿交越频率右移带来的附加相位滞后。
+3. 由
+
+   $$
+   \alpha=\frac{1-\sin\varphi_{\max}}{1+\sin\varphi_{\max}}
+   $$
+
+   求 $\alpha$。
+4. 选择新交越频率 $\omega_c'$，使未校正开环在该处满足
+
+   $$
+   20\lg|L_0(j\omega_c')|
+   =-20\lg\frac{1}{\sqrt\alpha}
+   =10\lg\alpha.
+   $$
+
+   通常令最大超前频率 $\omega_m=\omega_c'$。
+5. 由 $T=1/(\omega_c'\sqrt\alpha)$ 求零、极点位置；再调 $K_c$ 以保持规定的低频增益。
+6. 重画精确 Bode 图，核对 $PM$、$GM$、带宽、稳态误差及噪声增益，必要时迭代。
+
+<svg viewBox="0 0 760 440" width="100%" role="img" aria-label="相角超前校正前后 Bode 对比图，标出零分贝线、原交越频率、新交越频率以及校正带来的相位抬升">
+  <defs>
+    <marker id="lead-arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+      <path d="M0 0 L8 4 L0 8 Z" fill="currentColor" />
+    </marker>
+  </defs>
+  <g fill="none" stroke="currentColor" strokeWidth="2">
+    <line x1="70" y1="180" x2="720" y2="180" markerEnd="url(#lead-arrow)" />
+    <line x1="70" y1="195" x2="70" y2="35" markerEnd="url(#lead-arrow)" />
+    <line x1="70" y1="405" x2="720" y2="405" markerEnd="url(#lead-arrow)" />
+    <line x1="70" y1="420" x2="70" y2="235" markerEnd="url(#lead-arrow)" />
+    <line x1="70" y1="120" x2="720" y2="120" strokeDasharray="6 5" opacity="0.5" />
+    <line x1="70" y1="365" x2="720" y2="365" strokeDasharray="6 5" opacity="0.5" />
+    <path d="M90 60 C230 70 330 93 405 120 C500 154 610 173 700 178" stroke="currentColor" strokeDasharray="8 6" opacity="0.65" />
+    <path d="M90 60 C230 70 335 84 455 120 C555 150 630 169 700 177" stroke="var(--ifm-color-primary)" strokeWidth="3" />
+    <path d="M90 265 C250 275 350 310 405 348 C500 387 610 397 700 400" stroke="currentColor" strokeDasharray="8 6" opacity="0.65" />
+    <path d="M90 265 C250 275 350 290 455 323 C550 375 625 394 700 399" stroke="var(--ifm-color-primary)" strokeWidth="3" />
+    <line x1="405" y1="120" x2="405" y2="410" strokeDasharray="4 5" opacity="0.45" />
+    <line x1="455" y1="120" x2="455" y2="410" strokeDasharray="4 5" opacity="0.45" />
+    <line x1="455" y1="323" x2="455" y2="365" stroke="var(--ifm-color-success)" markerEnd="url(#lead-arrow)" />
+  </g>
+  <g fill="currentColor" fontSize="15">
+    <text x="12" y="42">L(ω) / dB</text><text x="650" y="205">lg ω</text>
+    <text x="20" y="243">φ(ω) / °</text><text x="650" y="430">lg ω</text>
+    <text x="45" y="125">0</text><text x="12" y="370">−180°</text>
+    <text x="378" y="435">ωc0</text><text x="438" y="435">ωc′</text>
+    <text x="485" y="92" fill="var(--ifm-color-primary)">校正后</text>
+    <text x="545" y="335">校正前</text>
+    <text x="468" y="349" fill="var(--ifm-color-success)">PM 增大</text>
+  </g>
+</svg>
+
+实线表示校正后曲线：交越频率右移，并在新交越频率附近获得相位抬升。实际曲线形状取决于对象，图仅表达设计逻辑。
+
+## 3. 适用条件与取舍
+
+适合：原系统低频精度基本满足，但相位裕度不足或响应偏慢；希望在不增加积分环节的情况下扩大带宽。
+
+不利之处：高频增益增加，对测量噪声、未建模模态及执行器饱和更敏感。若需要很大的相位提升，单级超前的 $\alpha$ 会过小，宜采用两级较温和的超前网络，并把相位峰分布在目标交越频率附近。
+
+## 视频补充
 
 <VideoPlayer src="//player.bilibili.com/player.html?isOutside=true&aid=811394492&bvid=BV1F34y1h7so&cid=718532563&p=51" />
-<br />
-> 下
 
 <VideoPlayer src="//player.bilibili.com/player.html?isOutside=true&aid=811394492&bvid=BV1F34y1h7so&cid=718540795&p=52" />
-<br />
 
+</WordCount>

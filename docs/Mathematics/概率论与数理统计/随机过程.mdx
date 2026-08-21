@@ -1,0 +1,281 @@
+import WordCount from '../../../src/components/WordCount/WordCount.jsx';
+
+<WordCount>
+
+# 随机过程
+随机变量描述一次随机试验的数值结果；随机过程则描述一个随机系统随时间或空间变化的整条轨迹。
+本篇建立统一语言，并介绍 Poisson 过程与 Wiener 过程。
+后续三篇将依次讨论平稳过程、马尔科夫链和时间序列。
+
+## 1. 从随机变量到随机过程
+
+### 1.1 基本定义
+设 $(\Omega,\mathcal F,\mathbb P)$ 为概率空间，$T$ 为指标集，$(S,\mathcal S)$ 为状态空间。
+若对每个 $t\in T$，映射
+$$
+X_t:\Omega\to S
+$$
+都是随机变量，则称
+$$
+\{X_t:t\in T\}
+$$
+为一个随机过程。
+通常 $T=\{0,1,2,\ldots\}$ 表示离散时间，$T=[0,\infty)$ 表示连续时间。
+本篇主要取 $S=\mathbb R$；计数过程则常取 $S=\{0,1,2,\ldots\}$。
+固定 $t$，$X_t(\cdot)$ 是一个随机变量；固定 $\omega\in\Omega$，
+$$
+t\longmapsto X_t(\omega)
+$$
+是该过程的一条样本路径（或实现）。
+:::tip[两种观察角度]
+“在时刻 $t$ 看所有可能世界”得到随机变量 $X_t$；
+“在一个世界 $\omega$ 中看所有时刻”得到样本路径 $X_\cdot(\omega)$。
+:::
+
+### 1.2 分类
+按照时间与状态是否离散，可得到四类常见模型：
+1. 离散时间、离散状态：天气状态链、排队人数；
+2. 离散时间、连续状态：每日收益率序列；
+3. 连续时间、离散状态：到达计数 $N(t)$；
+4. 连续时间、连续状态：温度曲线、Wiener 过程 $W(t)$。
+随机过程的具体定义不仅包括取值范围，还必须包括联合分布结构。
+只知道每个 $X_t$ 各自服从什么分布，一般不足以确定过程。
+
+## 2. 有限维分布
+
+### 2.1 联合分布族
+任取 $n\ge 1$ 及 $t_1,\ldots,t_n\in T$，随机向量
+$$
+(X_{t_1},\ldots,X_{t_n})
+$$
+的分布称为过程的一个 $n$ 维分布。
+全部有限维分布组成的族称为有限维分布族：
+$$
+F_{t_1,\ldots,t_n}(x_1,\ldots,x_n)
+=\mathbb P(X_{t_1}\le x_1,\ldots,X_{t_n}\le x_n).
+$$
+在适当的一致性条件下，有限维分布族可以确定随机过程的概率规律。
+直观上，它回答了任意有限组时刻“同时取何值”的问题。
+
+### 2.2 一致性要求
+有限维分布不能任意指定，至少应满足：
+1. **置换一致性**：交换时刻顺序时，随机向量的坐标同步交换；
+2. **边缘一致性**：从高维分布对某些坐标边缘化，应得到对应低维分布。
+例如，
+$$
+\lim_{x_2\to\infty}F_{s,t}(x_1,x_2)=F_s(x_1).
+$$
+:::note
+Kolmogorov 扩张定理说明：满足一致性条件的一族有限维分布，可以在合适的乘积空间上构造出相应随机过程。
+样本路径是否连续则是更进一步的问题，不能仅凭一句“存在该过程”自动得到。
+:::
+
+### 2.3 Gaussian 过程的特殊性
+若任意有限维随机向量
+$$
+(X_{t_1},\ldots,X_{t_n})
+$$
+都服从多元正态分布，则称 $\{X_t\}$ 为 Gaussian 过程。
+多元正态分布完全由均值向量和协方差矩阵确定，因此 Gaussian 过程由其均值函数与协方差函数确定。
+:::example[例 1：相同边缘分布不代表相同过程]
+令 $Z,Z_1,Z_2,\ldots$ 独立且都服从 $N(0,1)$。
+过程 $X_n=Z$ 与过程 $Y_n=Z_n$ 在每个时刻都有 $N(0,1)$ 边缘分布。
+但 $X_n$ 的所有时刻完全相同，而 $Y_n$ 各时刻独立；
+二者的二维分布和协方差结构完全不同。
+:::
+
+## 3. 均值、方差与协方差函数
+以下假设相关二阶矩存在，即 $\mathbb E[X_t^2]<\infty$。
+
+### 3.1 均值函数
+均值函数定义为
+$$
+m_X(t)=\mathbb E[X_t].
+$$
+它描述过程在各时刻的平均水平。
+方差函数为
+$$
+\sigma_X^2(t)=\operatorname{Var}(X_t).
+$$
+
+### 3.2 协方差与相关函数
+协方差函数定义为
+$$
+C_X(s,t)
+=\operatorname{Cov}(X_s,X_t)
+=\mathbb E[(X_s-m_X(s))(X_t-m_X(t))].
+$$
+二阶矩函数（也常称自相关函数）为
+$$
+R_X(s,t)=\mathbb E[X_sX_t].
+$$
+二者满足
+$$
+R_X(s,t)=C_X(s,t)+m_X(s)m_X(t).
+$$
+若方差非零，标准化相关系数为
+$$
+\rho_X(s,t)
+=\frac{C_X(s,t)}
+{\sqrt{C_X(s,s)C_X(t,t)}}.
+$$
+协方差函数具有对称性 $C_X(s,t)=C_X(t,s)$，并且是非负定的：
+$$
+\sum_{i=1}^n\sum_{j=1}^n
+a_i a_j C_X(t_i,t_j)\ge 0.
+$$
+这来自随机变量 $\sum_i a_i(X_{t_i}-m_X(t_i))$ 的方差非负。
+:::warning
+零协方差通常不推出独立。
+若过程是 Gaussian 过程，则联合正态性使“不相关”等价于“独立”。
+:::
+:::example[例 2：随机直线]
+设 $X_t=A+Bt$，其中 $\mathbb E[A]=\mathbb E[B]=0$，
+$\operatorname{Var}(A)=\sigma_A^2$、$\operatorname{Var}(B)=\sigma_B^2$，且 $A,B$ 独立。
+则
+$$
+m_X(t)=0,\qquad
+C_X(s,t)=\sigma_A^2+st\sigma_B^2.
+$$
+协方差依赖 $s,t$ 本身，而不仅依赖时间差，预示该过程通常不是宽平稳过程。
+:::
+
+## 4. 增量与独立增量
+
+### 4.1 增量
+对 $s<t$，称
+$$
+X_t-X_s
+$$
+为区间 $(s,t]$ 上的增量。
+若增量的分布只依赖长度 $t-s$，称过程具有平稳增量。
+若任意互不重叠的时间区间
+$$
+(t_0,t_1],(t_1,t_2],\ldots,(t_{n-1},t_n]
+$$
+上的增量
+$$
+X_{t_1}-X_{t_0},\ldots,X_{t_n}-X_{t_{n-1}}
+$$
+相互独立，则称过程具有独立增量。
+“平稳增量”讨论分布是否只看区间长度，“独立增量”讨论不同区间是否相互影响，二者并不等价。
+
+### 4.2 从增量构造协方差
+若 $X_0=0$，过程有独立增量且二阶矩存在，则对 $0\le s\le t$，
+$$
+X_t=X_s+(X_t-X_s).
+$$
+由于 $X_s$ 与 $X_t-X_s$ 独立，
+$$
+\operatorname{Cov}(X_s,X_t)=\operatorname{Var}(X_s).
+$$
+这一关系会在 Wiener 过程中给出 $\min(s,t)$ 型协方差。
+
+## 5. Poisson 过程概览
+
+### 5.1 定义
+计数过程 $\{N(t):t\ge0\}$ 称为速率 $\lambda>0$ 的 Poisson 过程，如果：
+1. $N(0)=0$；
+2. 具有独立增量；
+3. 具有平稳增量；
+4. 对 $0\le s<t$，
+$$
+N(t)-N(s)\sim\operatorname{Poisson}(\lambda(t-s)).
+$$
+因此
+$$
+\mathbb P(N(t)=k)
+=e^{-\lambda t}\frac{(\lambda t)^k}{k!},
+\qquad k=0,1,2,\ldots
+$$
+并有
+$$
+\mathbb E[N(t)]=\operatorname{Var}(N(t))=\lambda t.
+$$
+对 $s,t\ge0$，
+$$
+\operatorname{Cov}(N(s),N(t))=\lambda\min(s,t).
+$$
+
+### 5.2 到达间隔
+记第 $n$ 次事件发生时刻为 $S_n$，相邻到达间隔为
+$$
+T_n=S_n-S_{n-1},\qquad S_0=0.
+$$
+Poisson 过程中，$T_1,T_2,\ldots$ 独立同分布，且
+$$
+T_n\sim\operatorname{Exp}(\lambda).
+$$
+这把“固定时间内的计数”与“相邻事件的等待时间”连接起来。
+:::example[例 3：客服来电]
+若来电构成速率 $\lambda=3$ 次/小时的 Poisson 过程，则两小时内恰有四次来电的概率为
+$$
+\mathbb P(N(2)=4)=e^{-6}\frac{6^4}{4!}.
+$$
+下一次来电等待超过半小时的概率为
+$$
+\mathbb P(T_1>0.5)=e^{-3\times0.5}=e^{-1.5}.
+$$
+:::
+
+## 6. Wiener 过程概览
+
+### 6.1 定义
+过程 $\{W(t):t\ge0\}$ 称为标准 Wiener 过程（标准 Brownian 运动），如果：
+1. $W(0)=0$；
+2. 具有独立增量；
+3. 对 $0\le s<t$，
+$$
+W(t)-W(s)\sim N(0,t-s);
+$$
+4. 样本路径以概率 $1$ 连续。
+它的均值与协方差为
+$$
+\mathbb E[W(t)]=0,\qquad
+\operatorname{Cov}(W(s),W(t))=\min(s,t).
+$$
+Wiener 过程是 Gaussian 过程，但其样本路径几乎处处不可导。
+因此“路径连续”远弱于“路径光滑”。
+
+### 6.2 带漂移和尺度的 Brownian 运动
+令
+$$
+X(t)=\mu t+\sigma W(t),\qquad \sigma>0.
+$$
+则
+$$
+X(t)-X(s)\sim N(\mu(t-s),\sigma^2(t-s)).
+$$
+参数 $\mu$ 控制平均趋势，$\sigma$ 控制随机波动尺度。
+该模型是扩散过程与连续时间金融模型的基础。
+:::example[例 4：区间概率]
+标准 Wiener 过程满足 $W(4)\sim N(0,4)$，故
+$$
+\mathbb P(W(4)\le2)=\Phi\left(\frac{2}{2}\right)=\Phi(1).
+$$
+同时 $W(4)-W(1)\sim N(0,3)$，并且该增量与 $W(1)$ 独立。
+:::
+
+## 7. 两类基本过程的比较
+Poisson 过程和 Wiener 过程都从 $0$ 出发，且同时具有平稳、独立增量。
+区别在于：
+1. Poisson 过程取非负整数值，路径是向上跳跃的阶梯函数；
+2. Wiener 过程取实数值，路径连续但高度粗糙；
+3. Poisson 增量服从 Poisson 分布，Wiener 增量服从正态分布；
+4. 二者通常都不是宽平稳过程，因为方差随 $t$ 增长。
+最后一点尤其重要：**平稳增量不等于过程本身平稳**。
+下一篇将把“平稳”精确化，并说明为什么协方差只依赖时间差时可以转向频域分析。
+
+## 8. 小结
+1. 随机过程是一族定义在同一概率空间上的随机变量；
+2. 有限维分布描述全部有限时刻的联合规律；
+3. 二阶过程可用均值和协方差概括部分依赖结构；
+4. 独立增量和平稳增量是两种不同性质；
+5. Poisson 过程刻画随机到达，Wiener 过程刻画连续随机波动。
+
+## References
+1. Sheldon M. Ross, *Stochastic Processes*, 2nd ed., Wiley, 1996.
+2. J. L. Doob, *Stochastic Processes*, Wiley, 1953.
+3. Geoffrey Grimmett and David Stirzaker, *Probability and Random Processes*, 3rd ed., Oxford University Press, 2001.
+4. Bernt Øksendal, *Stochastic Differential Equations*, 6th ed., Springer, 2003.
+</WordCount>

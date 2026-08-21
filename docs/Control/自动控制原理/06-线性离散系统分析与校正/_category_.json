@@ -1,0 +1,8 @@
+{
+  "label": "线性离散系统分析与校正",
+  "position": 6,
+  "link": {
+    "type": "generated-index",
+    "description": "采样与保持、z 变换、离散系统建模、稳定性、性能分析及数字校正。"
+  }
+}

@@ -1,1 +1,320 @@
-## 
+import WordCount from '../../../src/components/WordCount/WordCount.jsx';
+
+<WordCount>
+
+# 多维随机变量及其分布
+
+一个随机现象往往需要多个数值共同描述。例如研究学生时，可能同时记录身高 $X$ 与体重 $Y$。定义在同一样本空间上的随机变量组
+
+$$
+\boldsymbol X=(X_1,\ldots,X_n)^{\mathsf T}
+$$
+
+称为 $n$ 维随机向量。本章以二维情形为主；高维结论通常只是记号上的推广。
+
+## 1. 联合分布
+
+### 1.1 联合分布函数
+
+二维随机变量 $(X,Y)$ 的联合分布函数定义为
+
+$$
+F(x,y)=P\{X\le x,\ Y\le y\},\qquad x,y\in\mathbb R.
+$$
+
+它具有以下性质：
+
+1. 对每个变量分别单调不减；
+2. 关于每个变量右连续；
+3. $F(-\infty,y)=F(x,-\infty)=0$，且 $F(+\infty,+\infty)=1$；
+4. 对任意 $x_1<x_2,\ y_1<y_2$，
+
+$$
+P\{x_1<X\le x_2,\ y_1<Y\le y_2\}
+=F(x_2,y_2)-F(x_1,y_2)-F(x_2,y_1)+F(x_1,y_1)\ge0.
+$$
+
+最后一个条件称为“矩形增量非负”。直观上，分布函数在一个矩形四角的增量就是随机点落入该矩形的概率。
+
+### 1.2 二维离散型随机变量
+
+若 $(X,Y)$ 只取有限或可列多个值，则联合概率质量函数为
+
+$$
+p_{ij}=P\{X=x_i,Y=y_j\},\qquad p_{ij}\ge0,\qquad
+\sum_i\sum_jp_{ij}=1.
+$$
+
+联合分布函数可由求和得到：
+
+$$
+F(x,y)=\sum_{x_i\le x}\sum_{y_j\le y}p_{ij}.
+$$
+
+:::tip 阅读二维分布表
+表格内部给出 $p_{ij}$，按行求和得到 $X$ 的边缘分布，按列求和得到 $Y$ 的边缘分布。先检查所有元素非负且总和为 $1$。
+:::
+
+## 2. 边缘分布与条件分布
+
+### 2.1 边缘分布
+
+只关心一个分量时，将另一个分量“消去”。由联合分布函数可得
+
+$$
+F_X(x)=F(x,+\infty),\qquad F_Y(y)=F(+\infty,y).
+$$
+
+离散情形下，
+
+$$
+p_X(x_i)=\sum_jp_{ij},\qquad p_Y(y_j)=\sum_ip_{ij}.
+$$
+
+联合分布唯一确定边缘分布，但反之通常不成立：相同的两个边缘分布可以对应不同的依赖关系。
+
+### 2.2 离散型条件分布
+
+当 $P\{Y=y_j\}>0$ 时，
+
+$$
+P\{X=x_i\mid Y=y_j\}
+=\frac{P\{X=x_i,Y=y_j\}}{P\{Y=y_j\}}
+=\frac{p_{ij}}{\sum_kp_{kj}}.
+$$
+
+固定 $y_j$ 后，这些条件概率关于 $i$ 的和为 $1$。条件分布描述“已知一个分量后，另一个分量的不确定性如何改变”。
+
+## 3. 独立性
+
+随机变量 $X,Y$ 相互独立，当且仅当对任意 $x,y$，
+
+$$
+F(x,y)=F_X(x)F_Y(y).
+$$
+
+离散型情形等价于对所有可能的 $x_i,y_j$，
+
+$$
+p_{ij}=p_X(x_i)p_Y(y_j).
+$$
+
+若 $X,Y$ 独立，则对适当的函数 $g,h$，随机变量 $g(X)$ 与 $h(Y)$ 也独立。只要有关期望存在，还有
+
+$$
+E[g(X)h(Y)]=E[g(X)]E[h(Y)].
+$$
+
+:::warning 独立不等于互斥
+互斥描述两个事件不能同时发生；独立描述一个事件是否改变另一个事件的概率。两个概率均为正的互斥事件不可能独立。
+:::
+
+## 4. 二维连续型随机变量
+
+### 4.1 联合密度
+
+若存在非负函数 $f(x,y)$，使
+
+$$
+F(x,y)=\int_{-\infty}^{x}\int_{-\infty}^{y}f(u,v)\,dv\,du,
+$$
+
+则称 $(X,Y)$ 为二维连续型随机变量，$f$ 为联合概率密度。它必须满足
+
+$$
+f(x,y)\ge0,\qquad
+\iint_{\mathbb R^2}f(x,y)\,dx\,dy=1.
+$$
+
+对平面区域 $D$，
+
+$$
+P\{(X,Y)\in D\}=\iint_Df(x,y)\,dx\,dy.
+$$
+
+密度值本身不是概率；连续型变量落在单点或曲线上的概率通常为 $0$。
+
+### 4.2 边缘密度、条件密度与独立
+
+边缘密度为
+
+$$
+f_X(x)=\int_{-\infty}^{+\infty}f(x,y)\,dy,\qquad
+f_Y(y)=\int_{-\infty}^{+\infty}f(x,y)\,dx.
+$$
+
+当 $f_Y(y)>0$ 时，给定 $Y=y$ 的条件密度定义为
+
+$$
+f_{X\mid Y}(x\mid y)=\frac{f(x,y)}{f_Y(y)}.
+$$
+
+这里对零概率事件 $Y=y$ 的“条件”是通过密度严格定义的，不能直接套用初等条件概率的分式。
+
+二维连续型变量独立，当且仅当几乎处处有
+
+$$
+f(x,y)=f_X(x)f_Y(y).
+$$
+
+### 4.3 例题：三角形区域上的均匀分布
+
+设
+
+$$
+f(x,y)=
+\begin{cases}
+c,&0<y<x<1,\\
+0,&\text{其他}.
+\end{cases}
+$$
+
+由归一化条件 $c\cdot(1/2)=1$，得 $c=2$。边缘密度为
+
+$$
+f_X(x)=\int_0^x2\,dy=2x,\quad 0<x<1,
+$$
+
+$$
+f_Y(y)=\int_y^12\,dx=2(1-y),\quad 0<y<1.
+$$
+
+由于联合支持集是三角形而不是两个边缘支持区间的笛卡尔积，$X,Y$ 不独立。进一步，
+
+$$
+f_{X\mid Y}(x\mid y)=\frac1{1-y},\qquad y<x<1.
+$$
+
+即给定 $Y=y$ 后，$X$ 在区间 $(y,1)$ 上均匀分布。
+
+## 5. 随机变量函数的分布
+
+### 5.1 分布函数法
+
+求 $Z=g(X,Y)$ 的分布时，最通用的方法是
+
+$$
+F_Z(z)=P\{g(X,Y)\le z\}
+=\iint_{\{(x,y):g(x,y)\le z\}}f(x,y)\,dx\,dy,
+$$
+
+再在可导处计算 $f_Z(z)=F_Z'(z)$。关键是先画出支持区域，再确定积分边界。
+
+### 5.2 和、最大值与最小值
+
+若 $Z=X+Y$，则
+
+$$
+f_Z(z)=\int_{-\infty}^{+\infty}f(x,z-x)\,dx.
+$$
+
+若 $X,Y$ 独立，上式成为卷积
+
+$$
+f_Z(z)=\int_{-\infty}^{+\infty}f_X(x)f_Y(z-x)\,dx.
+$$
+
+若 $M=\max(X,Y)$，则
+
+$$
+F_M(m)=P\{X\le m,Y\le m\}=F(m,m).
+$$
+
+若 $m_0=\min(X,Y)$，利用补事件更方便：
+
+$$
+P\{m_0>t\}=P\{X>t,Y>t\}.
+$$
+
+独立同分布时，$F_M(t)=F_X(t)^2$，而
+$F_{m_0}(t)=1-[1-F_X(t)]^2$。
+
+### 5.3 二维变量变换
+
+设
+
+$$
+U=g_1(X,Y),\qquad V=g_2(X,Y),
+$$
+
+且变换一一对应、连续可微，逆变换为
+$x=x(u,v),y=y(u,v)$，其雅可比行列式不为零，则
+
+$$
+f_{U,V}(u,v)
+=f_{X,Y}(x(u,v),y(u,v))
+\left|\frac{\partial(x,y)}{\partial(u,v)}\right|.
+$$
+
+必须同时写出 $(u,v)$ 的取值区域；遗漏新支持集是变量变换中最常见的错误。
+
+:::info 例：两个独立指数变量之和
+若 $X,Y$ 独立且均服从参数为 $\lambda>0$ 的指数分布，则卷积给出
+
+$$
+f_{X+Y}(z)=\int_0^z\lambda e^{-\lambda x}\lambda e^{-\lambda(z-x)}\,dx
+=\lambda^2ze^{-\lambda z},\quad z>0.
+$$
+
+这就是形状参数为 $2$、率参数为 $\lambda$ 的 Gamma 分布。
+:::
+
+## 6. 二维正态分布
+
+若 $\sigma_X,\sigma_Y>0$ 且 $|\rho|<1$，二维正态分布的密度为
+
+$$
+\begin{aligned}
+f(x,y)
+=\frac{1}{2\pi\sigma_X\sigma_Y\sqrt{1-\rho^2}}
+\exp\left\{-\frac{1}{2(1-\rho^2)}
+\left[
+\frac{(x-\mu_X)^2}{\sigma_X^2}
+-\frac{2\rho(x-\mu_X)(y-\mu_Y)}{\sigma_X\sigma_Y}
++\frac{(y-\mu_Y)^2}{\sigma_Y^2}
+\right]\right\}.
+\end{aligned}
+$$
+
+记作
+
+$$
+\begin{pmatrix}X\\Y\end{pmatrix}
+\sim N_2\left(
+\begin{pmatrix}\mu_X\\\mu_Y\end{pmatrix},
+\begin{pmatrix}
+\sigma_X^2&\rho\sigma_X\sigma_Y\\
+\rho\sigma_X\sigma_Y&\sigma_Y^2
+\end{pmatrix}
+\right).
+$$
+
+其边缘分布分别为 $X\sim N(\mu_X,\sigma_X^2)$、
+$Y\sim N(\mu_Y,\sigma_Y^2)$；条件分布仍为正态：
+
+$$
+X\mid Y=y\sim N\left(
+\mu_X+\rho\frac{\sigma_X}{\sigma_Y}(y-\mu_Y),
+\ \sigma_X^2(1-\rho^2)
+\right).
+$$
+
+参数 $\rho$ 控制等密度椭圆的倾斜方向和狭长程度。对二维正态变量，
+
+$$
+X\perp Y\quad\Longleftrightarrow\quad \rho=0.
+$$
+
+:::warning 正态性条件不可省略
+一般随机变量“不相关”只表示协方差为 $0$，并不推出独立；联合正态是零相关推出独立的重要特殊情形。
+:::
+
+## References
+
+\[1\]. 盛骤, 谢式千, 潘承毅. 概率论与数理统计[M]. 第4版. 北京: 高等教育出版社, 2008.
+
+\[2\]. 茆诗松, 程依明, 濮晓龙. 概率论与数理统计教程[M]. 第3版. 北京: 高等教育出版社, 2019.
+
+\[3\]. Sheldon M. Ross. A First Course in Probability[M]. 10th ed. Pearson, 2019.
+
+</WordCount>

@@ -1,0 +1,367 @@
+import WordCount from '../../../src/components/WordCount/WordCount.jsx';
+
+<WordCount>
+
+# 时间序列分析
+时间序列是按时间顺序记录的一列观测值。
+前三篇分别提供了随机过程、平稳性和条件动态结构的理论基础；
+本篇把这些概念转化为一套可用于描述、建模、诊断和预测的流程。
+设观测为 $x_1,\ldots,x_n$，对应的随机过程为 $\{X_t:t\in\mathbb Z\}$。
+大写 $X_t$ 表示随机变量，小写 $x_t$ 表示已经观测到的数值。
+
+## 1. 时间序列的组成
+
+### 1.1 加法分解
+经典加法分解写成
+$$
+X_t=T_t+S_t+C_t+E_t,
+$$
+其中：
+1. $T_t$：长期趋势；
+2. $S_t$：周期固定的季节成分；
+3. $C_t$：周期不固定的循环成分；
+4. $E_t$：无法由前三者解释的随机扰动。
+当季节波动幅度大致不随序列水平变化时，加法模型通常合适。
+
+### 1.2 乘法分解
+若波动幅度随序列水平成比例变化，可考虑
+$$
+X_t=T_tS_tC_tE_t.
+$$
+对正值序列取对数后，
+$$
+\log X_t
+=\log T_t+\log S_t+\log C_t+\log E_t,
+$$
+可将乘法关系转化为加法关系。
+:::tip
+分解是理解结构和预处理的工具，不意味着真实数据必然由四个彼此独立的部分机械相加。
+趋势、季节性和误差的定义取决于所选模型与时间尺度。
+:::
+
+## 2. 平稳性与差分
+
+### 2.1 弱平稳假设
+时间序列模型通常使用弱平稳（即宽平稳）：
+$$
+\mathbb E[X_t]=\mu,
+\qquad
+\operatorname{Cov}(X_t,X_{t-k})=\gamma(k).
+$$
+均值与方差不随 $t$ 改变，协方差只依赖滞后 $k$。
+这使过去观察到的依赖关系可以用于未来。
+趋势或季节性常导致非平稳。
+可用回归去趋势、季节调整、变换或差分来处理，但不应为了“看起来平稳”而无目的地过度差分。
+
+### 2.2 差分算子
+定义滞后算子 $B$ 为
+$$
+BX_t=X_{t-1}.
+$$
+一阶差分为
+$$
+\nabla X_t=(1-B)X_t=X_t-X_{t-1}.
+$$
+周期为 $s$ 的季节差分为
+$$
+\nabla_sX_t=(1-B^s)X_t=X_t-X_{t-s}.
+$$
+若 $X_t$ 是随机游走
+$$
+X_t=X_{t-1}+\varepsilon_t,
+$$
+则原序列非平稳，而 $\nabla X_t=\varepsilon_t$ 可为平稳白噪声。
+
+## 3. 白噪声
+若序列 $\{\varepsilon_t\}$ 满足
+$$
+\mathbb E[\varepsilon_t]=0,\qquad
+\operatorname{Var}(\varepsilon_t)=\sigma^2,
+$$
+且
+$$
+\operatorname{Cov}(\varepsilon_t,\varepsilon_s)=0
+\quad(t\ne s),
+$$
+则称其为均值零、方差 $\sigma^2$ 的白噪声，记作
+$$
+\varepsilon_t\sim WN(0,\sigma^2).
+$$
+白噪声只要求不相关，不必独立，也不必服从正态分布。
+若进一步独立同分布且为正态，称为 Gaussian 白噪声。
+其自相关函数为
+$$
+\rho(k)=
+\begin{cases}
+1,&k=0,\\
+0,&k\ne0,
+\end{cases}
+$$
+功率谱在所有频率上为常数，因此称为“白”噪声。
+:::warning
+残差“样本相关不显著”只能说明没有发现明显线性依赖，不能证明残差独立。
+若关心波动聚集，还应检查平方残差或绝对残差的相关性。
+:::
+
+## 4. ACF 与 PACF
+
+### 4.1 自相关函数
+平稳序列的理论自相关函数（ACF）为
+$$
+\rho(k)=\frac{\gamma(k)}{\gamma(0)}.
+$$
+样本均值与样本自协方差可定义为
+$$
+\overline x=\frac1n\sum_{t=1}^n x_t,
+$$
+$$
+\widehat\gamma(k)
+=\frac1n\sum_{t=k+1}^n
+(x_t-\overline x)(x_{t-k}-\overline x),
+$$
+于是样本 ACF 为
+$$
+\widehat\rho(k)
+=\frac{\widehat\gamma(k)}{\widehat\gamma(0)}.
+$$
+ACF 同时包含直接和间接的滞后关联。
+
+### 4.2 偏自相关函数
+滞后 $k$ 的偏自相关（PACF）衡量在控制中间滞后
+$X_{t-1},\ldots,X_{t-k+1}$ 后，$X_t$ 与 $X_{t-k}$ 的线性相关。
+等价地，拟合线性投影
+$$
+X_t=\phi_{k1}X_{t-1}+\cdots+\phi_{kk}X_{t-k}+e_t,
+$$
+则 PACF 在滞后 $k$ 的值为 $\phi_{kk}$。
+对理想模型：
+1. AR($p$) 的 PACF 在 $p$ 阶后截尾，ACF 通常拖尾；
+2. MA($q$) 的 ACF 在 $q$ 阶后截尾，PACF 通常拖尾；
+3. ARMA($p,q$) 的 ACF 与 PACF 通常都拖尾。
+“截尾/拖尾”是模型识别线索，不是有限样本中的绝对判据。
+:::note
+在白噪声近似下，较大样本的非零滞后样本 ACF 常用
+$\pm1.96/\sqrt n$ 作为粗略显著性界限。
+同时查看很多滞后会产生多重比较问题，因此还需结合整体检验。
+:::
+
+## 5. AR 模型
+
+### 5.1 定义
+$p$ 阶自回归模型 AR($p$) 为
+$$
+X_t=c+\phi_1X_{t-1}+\cdots+\phi_pX_{t-p}+\varepsilon_t,
+$$
+其中 $\varepsilon_t\sim WN(0,\sigma^2)$。
+用滞后多项式
+$$
+\phi(B)=1-\phi_1B-\cdots-\phi_pB^p
+$$
+可写成
+$$
+\phi(B)X_t=c+\varepsilon_t.
+$$
+若平稳，则均值满足
+$$
+\mu=\frac{c}{1-\phi_1-\cdots-\phi_p},
+$$
+前提是分母非零。
+
+### 5.2 平稳性
+AR($p$) 具有因果平稳解的条件是方程
+$$
+\phi(z)=1-\phi_1z-\cdots-\phi_pz^p=0
+$$
+的所有根都在单位圆之外，即 $|z|>1$。
+对 AR(1)
+$$
+X_t=c+\phi X_{t-1}+\varepsilon_t,
+$$
+平稳条件为 $|\phi|<1$，且
+$$
+\rho(k)=\phi^{|k|}.
+$$
+:::example[例 1：AR(1) 的长期水平]
+若
+$$
+X_t=2+0.6X_{t-1}+\varepsilon_t,
+\qquad
+\varepsilon_t\sim WN(0,1),
+$$
+则过程平稳，均值为
+$$
+\mu=\frac{2}{1-0.6}=5.
+$$
+$h$ 步条件均值预测逐渐回到 $5$，偏离长期水平的部分按 $0.6^h$ 衰减。
+:::
+
+## 6. MA 模型
+
+### 6.1 定义
+$q$ 阶移动平均模型 MA($q$) 为
+$$
+X_t=\mu+\varepsilon_t
++\theta_1\varepsilon_{t-1}
++\cdots+\theta_q\varepsilon_{t-q}.
+$$
+定义
+$$
+\theta(B)=1+\theta_1B+\cdots+\theta_qB^q,
+$$
+则
+$$
+X_t-\mu=\theta(B)\varepsilon_t.
+$$
+有限阶 MA 模型总是弱平稳，因为它是有限个白噪声项的线性组合。
+
+### 6.2 可逆性
+不同 MA 参数可能产生相同自协方差结构。
+为使白噪声创新能由当前和过去的 $X_t$ 唯一、稳定地表示，通常要求可逆性。
+MA($q$) 可逆的条件是
+$$
+\theta(z)=1+\theta_1z+\cdots+\theta_qz^q=0
+$$
+的所有根都在单位圆之外。
+:::example[例 2：MA(1) 的 ACF]
+设
+$$
+X_t=\varepsilon_t+\theta\varepsilon_{t-1}.
+$$
+则
+$$
+\gamma(0)=\sigma^2(1+\theta^2),\qquad
+\gamma(1)=\sigma^2\theta,
+$$
+而 $|k|>1$ 时 $\gamma(k)=0$。
+因此 ACF 在滞后 $1$ 后截尾；可逆条件为 $|\theta|<1$。
+:::
+
+## 7. ARMA 与 ARIMA
+
+### 7.1 ARMA 模型
+ARMA($p,q$) 将两类动态结构结合：
+$$
+\phi(B)(X_t-\mu)=\theta(B)\varepsilon_t.
+$$
+AR 根在单位圆外保证因果平稳性，MA 根在单位圆外保证可逆性。
+若两多项式含有公共因子，应先约去，否则模型阶数并非最简。
+ARMA 模型可表示较丰富的短期相关结构，同时比高阶纯 AR 或纯 MA 更简洁。
+
+### 7.2 ARIMA 模型
+若序列经过 $d$ 次普通差分后服从 ARMA($p,q$)，则原序列称为 ARIMA($p,d,q$)：
+$$
+\phi(B)(1-B)^dX_t
+=c+\theta(B)\varepsilon_t.
+$$
+$d$ 是积分阶数，不是任意调节参数。
+过度差分会引入不必要的负相关并增大预测方差。
+带季节周期 $s$ 的 SARIMA 模型常写为
+$$
+\operatorname{ARIMA}(p,d,q)\times(P,D,Q)_s,
+$$
+同时包含普通与季节 AR、差分和 MA 因子。
+:::warning[平稳性与可逆性不是一回事]
+平稳性主要约束 AR 部分，使 $X_t$ 能稳定表示为过去创新的函数；
+可逆性主要约束 MA 部分，使创新能稳定表示为当前和过去观测的函数。
+二者分别检查各自多项式的根。
+:::
+
+## 8. 建模流程
+
+### 8.1 探索与预处理
+1. 绘制原序列，识别异常值、缺失值、结构突变和采样间隔；
+2. 根据业务机制判断趋势与季节周期；
+3. 必要时用对数或 Box--Cox 变换稳定方差；
+4. 通过去趋势、季节调整或差分获得近似平稳序列；
+5. 保留时间顺序，不能像横截面数据那样随机打乱训练集与测试集。
+单位根检验可辅助判断差分需求：
+ADF 检验通常以“存在单位根”为原假设，KPSS 检验通常以“平稳”为原假设。
+检验结果应结合图形、领域知识和结构突变共同解释。
+
+### 8.2 识别与估计
+先查看平稳化序列的 ACF 与 PACF，提出少量候选阶数。
+再用极大似然等方法估计参数，并比较 AIC、AICc 或 BIC：
+$$
+\operatorname{AIC}=-2\ell+2k,
+$$
+其中 $\ell$ 为最大对数似然，$k$ 为估计参数个数。
+信息准则只能比较同一数据、同一响应变换下的候选模型。
+参数显著性、模型简洁性和业务可解释性也应纳入选择。
+
+### 8.3 残差诊断
+合格模型的创新残差应近似白噪声。
+至少检查：
+1. 残差时序图是否存在趋势、季节性或异常波动；
+2. 残差 ACF 是否仍有显著结构；
+3. Ljung--Box 检验是否拒绝“前若干阶相关为零”；
+4. 残差直方图或 Q--Q 图是否支持所需的分布假设；
+5. 平方残差 ACF 是否显示条件异方差。
+Ljung--Box 统计量为
+$$
+Q=n(n+2)\sum_{k=1}^{h}
+\frac{\widehat\rho_e(k)^2}{n-k},
+$$
+其中 $\widehat\rho_e(k)$ 是残差在滞后 $k$ 的样本自相关。
+自由度应考虑已经估计的模型参数，具体修正依软件实现而定。
+若诊断不通过，应回到变换、差分或模型识别步骤，而不是直接接受预测。
+
+## 9. 预测与评估
+
+### 9.1 点预测与区间预测
+$h$ 步点预测通常是条件期望
+$$
+\widehat X_{n+h\mid n}
+=\mathbb E[X_{n+h}\mid X_1,\ldots,X_n].
+$$
+未来创新的条件均值取为 $0$。
+随着预测步长增加，可利用的已知创新减少，预测区间通常变宽。
+在 Gaussian 创新假设下，近似 $100(1-\alpha)\%$ 预测区间为
+$$
+\widehat X_{n+h\mid n}
+\pm z_{1-\alpha/2}\,
+\operatorname{se}(\widehat e_{n+h\mid n}).
+$$
+反差分或反变换时要正确恢复趋势、季节性与尺度；
+对数变换后的均值预测还可能需要偏差修正。
+
+### 9.2 时间顺序验证
+预测能力必须在未参与拟合的未来数据上评估。
+常见方式包括：
+1. 固定训练集与末端测试集；
+2. 扩展窗口滚动预测；
+3. 固定长度滑动窗口预测。
+常用误差指标有 MAE、RMSE 与 MASE。
+MAPE 在真实值接近 $0$ 时不稳定，也不适合允许负值的序列。
+:::example[例 3：一个简化工作流]
+对逐月销量序列，可先画图发现年度季节性与随水平增长的波动。
+取对数并做周期 $12$ 的季节差分后，检查 ACF/PACF，拟合若干 SARIMA 候选。
+根据 AICc 缩小范围，再用残差 ACF、Ljung--Box 检验和滚动预测误差选择模型。
+最后同时报告未来销量的点预测与预测区间。
+:::
+
+## 10. 常见误区
+1. 只凭 ACF/PACF 图唯一确定阶数；
+2. 在全量数据上反复选模后，仍把同一数据称为测试集；
+3. 忽略异常值、制度变化与外生变量；
+4. 把残差正态性误当作白噪声的定义；
+5. 只报告点预测，不报告不确定性；
+6. 看到非平稳就不断差分，未检查是否过度差分；
+7. 用样本内拟合优度替代真正的样本外预测评估。
+若响应明显依赖促销、天气等外生信息，可扩展为动态回归或 ARIMAX；
+若方差呈聚集，可考虑 ARCH/GARCH；
+这些模型均建立在本章“明确条件均值、检查剩余结构”的思路上。
+
+## 11. 小结
+1. 分解用于识别趋势、季节性、循环与随机扰动；
+2. 白噪声是建模创新与诊断残差的基准；
+3. ACF/PACF 提供相关结构与候选阶数线索；
+4. AR 关注过去观测，MA 关注过去创新，ARMA 结合二者；
+5. ARIMA 通过差分建模非平稳序列；
+6. 完整分析必须包括预处理、识别、估计、诊断和按时间顺序的预测评估。
+
+## References
+1. Rob J. Hyndman and George Athanasopoulos, *Forecasting: Principles and Practice*, 3rd ed., OTexts, 2021.
+2. George E. P. Box, Gwilym M. Jenkins, Gregory C. Reinsel, and Greta M. Ljung, *Time Series Analysis: Forecasting and Control*, 5th ed., Wiley, 2015.
+3. Peter J. Brockwell and Richard A. Davis, *Introduction to Time Series and Forecasting*, 3rd ed., Springer, 2016.
+4. James D. Hamilton, *Time Series Analysis*, Princeton University Press, 1994.
+</WordCount>

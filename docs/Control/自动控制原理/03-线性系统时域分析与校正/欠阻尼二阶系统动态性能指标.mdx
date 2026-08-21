@@ -6,6 +6,59 @@ sidebar_position: 2
 
 import VideoPlayer from '../../../../src/components/Videoplayer/Videoplayer.jsx';
 
+## 标准欠阻尼二阶系统
+
+$$
+\Phi(s)=\frac{\omega_n^2}{s^2+2\zeta\omega_ns+\omega_n^2},
+\qquad 0<\zeta<1.
+$$
+
+极点为 $-\zeta\omega_n\pm j\omega_d$，其中
+
+$$
+\omega_d=\omega_n\sqrt{1-\zeta^2},\qquad
+\theta=\arccos\zeta.
+$$
+
+单位阶跃响应为
+
+$$
+c(t)=1-\frac{e^{-\zeta\omega_nt}}{\sqrt{1-\zeta^2}}
+\sin(\omega_dt+\theta).
+$$
+
+指数包络决定衰减速度，$\omega_d$ 决定振荡周期。
+
+<svg viewBox="0 0 740 380" role="img" aria-label="欠阻尼二阶单位阶跃响应，标出上升时间 tr、峰值时间 tp、调节时间 ts 和最大超调量" style={{maxWidth:'740px',width:'100%',color:'var(--ifm-font-color-base)'}}>
+  <defs><marker id="so-arrow" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8 Z" fill="currentColor"/></marker></defs>
+  <g stroke="currentColor" strokeWidth="2" fill="none" markerEnd="url(#so-arrow)"><path d="M55 315 H695"/><path d="M55 315 V28"/></g>
+  <g stroke="currentColor" strokeWidth="1" opacity="0.7"><path d="M55 145 H680" strokeDasharray="6 5"/><path d="M55 137 H680" strokeDasharray="3 5"/><path d="M55 153 H680" strokeDasharray="3 5"/></g>
+  <path d="M55 315 C90 310 111 256 143 189 C167 139 191 80 228 77 C272 73 285 150 328 168 C374 187 395 132 433 133 C475 134 486 153 526 151 C575 148 610 145 680 145" fill="none" stroke="var(--ifm-color-primary)" strokeWidth="3"/>
+  <g stroke="var(--ifm-color-danger)" strokeWidth="1.5" fill="none"><path d="M228 77 V145"/><path d="M222 77 H234"/><path d="M222 145 H234"/></g>
+  <g stroke="currentColor" strokeWidth="1.5"><path d="M191 309 V321"/><path d="M228 309 V321"/><path d="M526 309 V321"/><path d="M191 145 V315" strokeDasharray="4 4"/><path d="M228 77 V315" strokeDasharray="4 4"/><path d="M526 151 V315" strokeDasharray="4 4"/></g>
+  <g fill="currentColor" fontSize="15"><text x="700" y="320">t</text><text x="22" y="32">c(t)</text><text x="31" y="150">1</text><text x="167" y="342">tᵣ</text><text x="218" y="342">tₚ</text><text x="516" y="342">tₛ</text><text x="240" y="105">Mₚ</text><text x="570" y="132">±2% 误差带</text></g>
+</svg>
+
+## 动态性能指标
+
+- 上升时间（首次到达终值）：$t_r=(\pi-\theta)/\omega_d$；
+- 峰值时间：$t_p=\pi/\omega_d$；
+- 最大超调量：
+
+$$
+M_p=e^{-\frac{\pi\zeta}{\sqrt{1-\zeta^2}}}\times100\%;
+$$
+
+- 调节时间的常用近似：$2\%$ 误差带下 $t_s\approx4/(\zeta\omega_n)$，$5\%$ 误差带下 $t_s\approx3/(\zeta\omega_n)$。
+
+$t_s$ 公式来自指数包络，是工程近似；接近临界阻尼或定义不同的系统应由实际响应求最后一次进入误差带的时间。
+
+## 参数影响
+
+保持 $\omega_n$ 不变时，增大 $\zeta$ 通常减小超调，但上升会变慢；保持 $\zeta$ 不变时，提高 $\omega_n$ 会按比例压缩时间尺度，而超调量不变。因此阻尼比主要控制形状，自然频率主要控制快慢。
+
+## 配套视频
+
 > 上
 
 <VideoPlayer src="//player.bilibili.com/player.html?isOutside=true&aid=811394492&bvid=BV1F34y1h7so&cid=718417765&p=18" />

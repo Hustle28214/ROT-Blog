@@ -1,17 +1,113 @@
 ---
 sidebar_position: 6
+title: 由闭环频率特性分析系统性能
 ---
 
-
-
 import VideoPlayer from '../../../../src/components/Videoplayer/Videoplayer.jsx';
+import WordCount from '../../../../src/components/WordCount/WordCount';
 
-> 上
+<WordCount>
+
+## 1. 闭环频率特性
+
+单位负反馈系统的闭环传递函数为
+
+$$
+T(s)=\frac{L(s)}{1+L(s)},\qquad
+S(s)=\frac{1}{1+L(s)},\qquad S+T=1.
+$$
+
+$T$ 描述参考输入到输出以及测量噪声影响的重要通道，$S$ 描述跟踪误差、模型摄动和部分扰动通道。频域性能分析不能只看 $T$，还应理解 $S$ 与 $T$ 的互补约束。
+
+## 2. 低、中、高频性能
+
+### 低频：跟踪与抗扰
+
+若低频 $|L|\gg1$，则
+
+$$
+T\approx1,\qquad S\approx\frac1L\ll1.
+$$
+
+系统能够较准确地跟踪缓慢变化的参考输入，并抑制进入灵敏度通道的低频扰动。低频闭环增益 $T(0)$ 若不为 $1$，则幅频图应以 $|T(0)|$ 为基准定义相对带宽。
+
+### 中频：谐振与动态品质
+
+在交越频率附近，$|1+L|$ 可能较小，$T$ 可能出现峰值。峰值越突出，通常意味着阻尼较小、阶跃超调较大且对模型误差更敏感。相位裕度、Nyquist 曲线到 $-1$ 的距离与谐振峰共同刻画这一频段。
+
+### 高频：噪声与未建模动态
+
+若高频 $|L|\ll1$，则 $T\approx L$，高频测量噪声受到衰减。若为追求速度把闭环带宽设得过高，噪声、时延和未建模柔性模态更容易进入闭环，控制输入也可能变得剧烈。
+
+## 3. 谐振峰与谐振频率
+
+闭环幅频特性的谐振峰和谐振频率定义为
+
+$$
+M_r=\max_{\omega\ge0}|T(j\omega)|,\qquad
+\omega_r=\mathop{\arg\max}_{\omega\ge0}|T(j\omega)|.
+$$
+
+对标准二阶闭环系统
+
+$$
+T(s)=\frac{\omega_n^2}{s^2+2\zeta\omega_ns+\omega_n^2},
+$$
+
+当 $0<\zeta<1/\sqrt2$ 时，
+
+$$
+M_r=\frac{1}{2\zeta\sqrt{1-\zeta^2}},\qquad
+\omega_r=\omega_n\sqrt{1-2\zeta^2}.
+$$
+
+当 $\zeta\ge1/\sqrt2$ 时不存在大于直流值的谐振峰。上述公式只对标准二阶形式严格成立，高阶系统只能在主导二阶近似合理时借用。
+
+## 4. 带宽与响应速度
+
+闭环带宽 $\omega_b$ 通常由
+
+$$
+|T(j\omega_b)|=\frac{|T(j0)|}{\sqrt2}
+$$
+
+定义，即相对低频增益下降 $3$ dB。对标准二阶系统，
+
+$$
+\omega_b=\omega_n
+\sqrt{1-2\zeta^2+\sqrt{\,2-4\zeta^2+4\zeta^4\,}}.
+$$
+
+较大带宽通常意味着较短上升时间；工程上常用 $t_r\propto1/\omega_b$ 作数量级估计。但带宽增大也会提高噪声敏感性与控制能量需求，所以“越宽越好”并不成立。
+
+## 5. 闭环幅相曲线的读法
+
+- 低频平台接近 $0$ dB：低频跟踪增益接近 $1$；
+- 峰值 $M_r$ 较大：系统振荡倾向、超调和灵敏度通常较强；
+- $-3$ dB 点给出 $\omega_b$：估计可跟踪信号的有效频率范围；
+- 高频下降越快：噪声衰减通常越强，但也要检查相位和高阶动态；
+- 相频曲线给出各频率的输出相对输入相位滞后，可用于正弦跟踪误差分析。
+
+## 6. 从开环到闭环的精确换算
+
+若 $L(j\omega)=A e^{j\varphi}$，则
+
+$$
+|T(j\omega)|
+=\frac{A}{\sqrt{1+A^2+2A\cos\varphi}},
+$$
+
+$$
+\angle T(j\omega)
+=\varphi-\operatorname{atan2}\!\left(A\sin\varphi,\;1+A\cos\varphi\right).
+$$
+
+这说明闭环幅值不只由开环幅值决定，也与相角有关。等 $M$ 圆和等 $N$ 圆正是把固定闭环幅值、相角映射到开环复平面后的轨迹。
+
+## 视频补充
 
 <VideoPlayer src="//player.bilibili.com/player.html?isOutside=true&aid=811394492&bvid=BV1F34y1h7so&cid=718527807&p=49" />
-<br />
-> 下
 
 <VideoPlayer src="//player.bilibili.com/player.html?isOutside=true&aid=811394492&bvid=BV1F34y1h7so&cid=718534233&p=50" />
-<br />
 
+</WordCount>

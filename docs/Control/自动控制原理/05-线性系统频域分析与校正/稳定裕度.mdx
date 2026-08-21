@@ -1,16 +1,105 @@
 ---
 sidebar_position: 4
+title: 稳定裕度
 ---
 
-
-
 import VideoPlayer from '../../../../src/components/Videoplayer/Videoplayer.jsx';
+import WordCount from '../../../../src/components/WordCount/WordCount';
 
-> 上
+<WordCount>
+
+## 1. 两个交越频率
+
+设负反馈系统开环频率特性为 $L(j\omega)$。
+
+- **增益交越频率** $\omega_c$：满足 $|L(j\omega_c)|=1$，即 $L_{\rm dB}(\omega_c)=0$ dB；
+- **相位交越频率** $\omega_g$：满足 $\angle L(j\omega_g)=-180^\circ$。
+
+下标记法在不同教材中可能互换，做题时应以定义为准。
+
+## 2. 增益裕度与相位裕度
+
+在 $\omega_g$ 处，系统到临界点还允许增加的开环增益倍数为
+
+$$
+GM=\frac{1}{|L(j\omega_g)|},
+\qquad
+GM_{\rm dB}=20\lg GM=-20\lg|L(j\omega_g)|.
+$$
+
+在 $\omega_c$ 处，系统到 $-180^\circ$ 还允许增加的相位滞后量为
+
+$$
+PM=180^\circ+\angle L(j\omega_c).
+$$
+
+对常规的开环稳定、单交越系统，$GM>1$（或 $GM_{\rm dB}>0$）且 $PM>0^\circ$ 通常意味着闭环稳定。裕度越大，模型摄动和纯延迟的容忍度通常越好，但响应往往更保守；工程上常取 $PM\approx30^\circ\sim60^\circ$，$GM_{\rm dB}\gtrsim6\text{ dB}$，具体仍由指标决定。
+
+<svg viewBox="0 0 760 500" width="100%" role="img" aria-label="稳定裕度 Bode 图，横轴为对数角频率，标出增益交越频率 omega c、相位交越频率 omega g、相位裕度 PM 和增益裕度 GM">
+  <defs>
+    <marker id="margin-arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+      <path d="M0 0 L8 4 L0 8 Z" fill="currentColor" />
+    </marker>
+    <marker id="margin-arrow-start" markerWidth="8" markerHeight="8" refX="1" refY="4" orient="auto">
+      <path d="M8 0 L0 4 L8 8 Z" fill="currentColor" />
+    </marker>
+  </defs>
+  <g fill="none" stroke="currentColor" strokeWidth="2">
+    <line x1="75" y1="190" x2="720" y2="190" markerEnd="url(#margin-arrow)" />
+    <line x1="75" y1="205" x2="75" y2="35" markerEnd="url(#margin-arrow)" />
+    <line x1="75" y1="450" x2="720" y2="450" markerEnd="url(#margin-arrow)" />
+    <line x1="75" y1="465" x2="75" y2="265" markerEnd="url(#margin-arrow)" />
+    <line x1="75" y1="125" x2="720" y2="125" strokeDasharray="6 5" opacity="0.55" />
+    <line x1="75" y1="395" x2="720" y2="395" strokeDasharray="6 5" opacity="0.55" />
+    <path d="M90 60 C210 65 315 85 410 125 C500 164 610 180 700 187" stroke="var(--ifm-color-primary)" strokeWidth="3" />
+    <path d="M90 285 C240 292 350 315 430 348 C515 383 600 412 700 430" stroke="var(--ifm-color-warning-dark, currentColor)" strokeWidth="3" />
+    <line x1="410" y1="125" x2="410" y2="455" strokeDasharray="5 5" opacity="0.55" />
+    <line x1="540" y1="169" x2="540" y2="455" strokeDasharray="5 5" opacity="0.55" />
+    <line x1="540" y1="125" x2="540" y2="169" markerStart="url(#margin-arrow-start)" markerEnd="url(#margin-arrow)" stroke="var(--ifm-color-danger)" />
+    <line x1="410" y1="348" x2="410" y2="395" markerStart="url(#margin-arrow-start)" markerEnd="url(#margin-arrow)" stroke="var(--ifm-color-success)" />
+  </g>
+  <g fill="currentColor" fontSize="15">
+    <text x="12" y="42">L(ω) / dB</text><text x="650" y="215">lg ω</text>
+    <text x="22" y="273">φ(ω) / °</text><text x="650" y="475">lg ω</text>
+    <text x="48" y="130">0</text><text x="15" y="400">−180°</text>
+    <text x="392" y="478">ωc</text><text x="522" y="478">ωg</text>
+    <text x="553" y="153" fill="var(--ifm-color-danger)">GM</text>
+    <text x="423" y="376" fill="var(--ifm-color-success)">PM</text>
+    <text x="586" y="91">幅频曲线</text><text x="580" y="365">相频曲线</text>
+  </g>
+</svg>
+
+图中 $\omega_c<\omega_g$，并且在两个交越点均留有正裕度。红色竖线表示把 $\omega_g$ 处幅值提高到 $0$ dB 所需的 $GM_{\rm dB}$；绿色竖线表示 $\omega_c$ 处相角到 $-180^\circ$ 的 $PM$。
+
+## 3. 由 Nyquist 图理解裕度
+
+- $GM$ 对应 Nyquist 曲线在负实轴交点到 $-1$ 的径向余量；
+- $PM$ 对应单位圆交点的相角到 $-180^\circ$ 方向的角度余量；
+- Nyquist 曲线越接近 $-1$，灵敏度峰值通常越大，鲁棒性越弱。
+
+稳定裕度是相对稳定性的指标，不是任意系统的充分必要稳定条件。多次穿越 $0$ dB 或 $-180^\circ$ 时，应检查所有相关交越点并以 Nyquist 环绕数为准。
+
+## 4. 延迟裕度
+
+纯延迟 $e^{-\tau s}$ 不改变幅值，但在频率 $\omega$ 处增加 $-\omega\tau$ 相位。若增益交越频率近似不变，可容许的附加延迟约为
+
+$$
+\tau_{\max}\approx\frac{PM\;(\mathrm{rad})}{\omega_c}.
+$$
+
+这说明在相同 $PM$ 下，带宽越高的系统对延迟越敏感。
+
+## 5. 读图与计算流程
+
+1. 从幅频曲线的 $0$ dB 交点读出 $\omega_c$，代入相频曲线求 $PM$。
+2. 从相频曲线的 $-180^\circ$ 交点读出 $\omega_g$，代入幅频曲线求 $GM_{\rm dB}$。
+3. 若无相位交越点，常记 $GM=\infty$；若无增益交越点，则 $PM$ 可能无定义，不能机械地写成无穷大。
+4. 校正设计后，同时核对裕度、交越频率、低频误差指标和高频噪声抑制，避免只优化一个数字。
+
+## 视频补充
 
 <VideoPlayer src="//player.bilibili.com/player.html?isOutside=true&aid=811394492&bvid=BV1F34y1h7so&cid=718511605&p=45" />
-<br />
-> 下
 
 <VideoPlayer src="//player.bilibili.com/player.html?isOutside=true&aid=811394492&bvid=BV1F34y1h7so&cid=718509589&p=46" />
-<br />
+
+</WordCount>

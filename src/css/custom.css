@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Source+Code+Pro:wght@200..900&display=swap');
+
 @font-face {
   font-family: 'DreamHanSansCN';
   src: url('/DreamHanSansCN-W16.ttf') format('truetype');
@@ -57,6 +59,12 @@
 body {
   background-color: var(--ifm-background-color);
   font-family: 'DreamHanSansCN', 'Mengyuan', system-ui, -apple-system, 'PingFang SC';
+}
+
+/* 仅代码框使用 Source Code Pro，不影响正文、标题和行内代码。 */
+.theme-code-block pre,
+.theme-code-block code {
+  font-family: 'Source Code Pro', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
 
 

@@ -1,0 +1,304 @@
+import WordCount from '../../../src/components/WordCount/WordCount.jsx';
+
+<WordCount>
+
+# 马尔科夫链
+前两篇从一般随机过程出发，讨论了联合分布与平稳性。
+本篇聚焦离散时间、离散状态过程，并加入“给定现在后，未来与过去无关”的条件无记忆结构。
+除特别说明外，设状态空间 $S=\{1,2,\ldots,m\}$ 有限，
+过程记为 $\{X_n:n=0,1,2,\ldots\}$。
+
+## 1. Markov 性
+
+### 1.1 定义
+若对任意 $n\ge0$ 及有正概率的状态序列 $i_0,\ldots,i_n,j$，有
+$$
+\mathbb P(X_{n+1}=j\mid X_n=i_n,\ldots,X_0=i_0)
+=\mathbb P(X_{n+1}=j\mid X_n=i_n),
+$$
+则称 $\{X_n\}$ 为 Markov 链。
+这不是说“未来与过去无关”，而是说：**在已经知道当前状态的条件下**，更早的历史不再为下一步提供额外信息。
+状态的选择必须足以概括与未来有关的历史，否则 Markov 假设可能不成立。
+若条件概率不依赖 $n$，称为时齐 Markov 链，并记
+$$
+p_{ij}=\mathbb P(X_{n+1}=j\mid X_n=i).
+$$
+下文均假设时齐。
+
+### 1.2 初始分布
+初始分布写成行向量
+$$
+\boldsymbol\mu^{(0)}
+=(\mathbb P(X_0=1),\ldots,\mathbb P(X_0=m)).
+$$
+初始分布与转移机制共同决定整条链的有限维分布。
+
+## 2. 转移矩阵
+
+### 2.1 一步转移矩阵
+将 $p_{ij}$ 排列成矩阵
+$$
+P=
+\begin{pmatrix}
+p_{11}&\cdots&p_{1m}\\
+\vdots&\ddots&\vdots\\
+p_{m1}&\cdots&p_{mm}
+\end{pmatrix}.
+$$
+每个元素非负，并且每行之和为 $1$：
+$$
+p_{ij}\ge0,\qquad
+\sum_{j=1}^m p_{ij}=1.
+$$
+采用行向量约定时，时刻 $n$ 的分布为
+$$
+\boldsymbol\mu^{(n)}
+=\boldsymbol\mu^{(0)}P^n.
+$$
+:::tip[先确认向量约定]
+本篇概率分布使用行向量，因此矩阵从右侧相乘。
+若教材使用列向量，则公式会写成
+$\boldsymbol\mu^{(n)}=(P^\mathsf T)^n\boldsymbol\mu^{(0)}$。
+:::
+
+### 2.2 多步转移概率
+定义
+$$
+p_{ij}^{(n)}
+=\mathbb P(X_{r+n}=j\mid X_r=i),
+$$
+时齐性使其与起始时刻 $r$ 无关。
+矩阵形式为
+$$
+P^{(n)}=P^n,\qquad P^{(0)}=I.
+$$
+:::example[例 1：天气模型]
+设状态 $1$ 表示晴天，状态 $2$ 表示雨天，且
+$$
+P=
+\begin{pmatrix}
+0.8&0.2\\
+0.4&0.6
+\end{pmatrix}.
+$$
+若今天晴天，则后天为雨天的概率是
+$$
+p_{12}^{(2)}
+=0.8\times0.2+0.2\times0.6
+=0.28.
+$$
+:::
+
+## 3. Chapman--Kolmogorov 方程
+在从状态 $i$ 经 $n+r$ 步到状态 $j$ 的过程中，对第 $n$ 步所处状态 $k$ 分类，可得
+$$
+p_{ij}^{(n+r)}
+=\sum_{k\in S}p_{ik}^{(n)}p_{kj}^{(r)}.
+$$
+矩阵形式为
+$$
+P^{(n+r)}=P^{(n)}P^{(r)}.
+$$
+这就是 Chapman--Kolmogorov 方程。
+它解释了为什么多步转移矩阵可以通过矩阵幂计算。
+更一般地，一条具体路径的联合概率可分解为
+$$
+\mathbb P(X_0=i_0,\ldots,X_n=i_n)
+=\mu_{i_0}^{(0)}
+\prod_{r=0}^{n-1}p_{i_ri_{r+1}}.
+$$
+
+## 4. 状态的沟通与分类
+
+### 4.1 可达与互通
+若存在 $n\ge0$ 使 $p_{ij}^{(n)}>0$，称 $j$ 可从 $i$ 到达，记作 $i\to j$。
+若 $i\to j$ 且 $j\to i$，称 $i,j$ 互通，记作 $i\leftrightarrow j$。
+互通关系把状态空间划分为若干互通类。
+若所有状态彼此互通，称链不可约。
+集合 $C\subseteq S$ 若满足从 $C$ 内不能转移到 $C$ 外，即
+$$
+p_{ij}=0,\qquad i\in C,\ j\notin C,
+$$
+则称 $C$ 为闭类。
+
+### 4.2 常返与暂态
+令首次回到状态 $i$ 的时刻为
+$$
+T_i^+=\inf\{n\ge1:X_n=i\}.
+$$
+若
+$$
+\mathbb P_i(T_i^+<\infty)=1,
+$$
+则 $i$ 为常返状态；否则为暂态状态。
+这里 $\mathbb P_i$ 表示以 $X_0=i$ 为条件的概率。
+等价判据为
+$$
+i\text{ 常返}
+\quad\Longleftrightarrow\quad
+\sum_{n=0}^{\infty}p_{ii}^{(n)}=\infty.
+$$
+有限不可约链中的所有状态都是正常返的，即平均返回时间有限。
+
+### 4.3 周期
+状态 $i$ 的周期定义为
+$$
+d(i)=\gcd\{n\ge1:p_{ii}^{(n)}>0\}.
+$$
+若 $d(i)=1$，称 $i$ 非周期。
+同一互通类中的状态具有相同周期。
+:::example[例 2：周期为 2 的链]
+对
+$$
+P=
+\begin{pmatrix}
+0&1\\
+1&0
+\end{pmatrix},
+$$
+链在两个状态间交替。
+回到任一状态只能发生在偶数步，所以周期为 $2$。
+尽管平稳分布存在，$P^n$ 却不会收敛。
+:::
+
+## 5. 平稳分布
+
+### 5.1 定义与求法
+概率行向量 $\boldsymbol\pi$ 若满足
+$$
+\boldsymbol\pi P=\boldsymbol\pi,
+\qquad
+\sum_{i\in S}\pi_i=1,\quad \pi_i\ge0,
+$$
+则称为链的平稳分布。
+若 $X_0\sim\boldsymbol\pi$，则对所有 $n$ 都有 $X_n\sim\boldsymbol\pi$。
+求解时可联立线性方程
+$$
+(P^\mathsf T-I)\boldsymbol\pi^\mathsf T=0
+$$
+与归一化条件。
+这些方程中有一个冗余，归一化条件用于确定唯一尺度。
+对有限不可约链，平稳分布存在且唯一，并且每个分量严格为正。
+
+### 5.2 平稳分布与极限分布
+平稳分布是“一步转移后保持不变”的分布；
+极限分布则问任意初始分布经过很久后是否趋于某个分布。
+二者相关但不能混为一谈。
+若有限链不可约且非周期，则
+$$
+\lim_{n\to\infty}p_{ij}^{(n)}=\pi_j
+$$
+对所有 $i,j$ 成立。
+此时长期分布与初始状态无关。
+:::example[例 3：天气链的平稳分布]
+继续使用
+$$
+P=
+\begin{pmatrix}
+0.8&0.2\\
+0.4&0.6
+\end{pmatrix}.
+$$
+由 $\boldsymbol\pi P=\boldsymbol\pi$ 和 $\pi_1+\pi_2=1$ 得
+$$
+0.2\pi_1=0.4\pi_2,
+\qquad
+\boldsymbol\pi=\left(\frac23,\frac13\right).
+$$
+该链不可约且有自环，因而非周期；长期晴天比例趋近 $2/3$。
+:::
+
+## 6. 遍历与长期平均
+“遍历链”在不同教材中定义略有差异。
+本篇用有限状态下常见的条件：不可约、非周期且正常返。
+对有限不可约链，正常返自动成立，因此只需再检查非周期性。
+若链以平稳分布运行，则 $\{X_n\}$ 是一个严格平稳随机过程。
+更重要的是，对遍历链和任意函数 $g:S\to\mathbb R$，
+$$
+\frac1n\sum_{k=0}^{n-1}g(X_k)
+\xrightarrow{\text{a.s.}}
+\sum_{i\in S}\pi_i g(i).
+$$
+取 $g(i)=\mathbf 1_{\{i=j\}}$，可得访问状态 $j$ 的长期频率：
+$$
+\frac1n\sum_{k=0}^{n-1}\mathbf 1_{\{X_k=j\}}
+\xrightarrow{\text{a.s.}}\pi_j.
+$$
+这与上一篇的遍历性思想一致：单条长轨迹的时间平均恢复总体平均。
+:::note
+即使链有周期，某些时间平均仍可收敛到平稳平均；
+非周期性主要保证逐步分布 $P^n(i,\cdot)$ 收敛，而非只保证 Cesàro 平均收敛。
+:::
+
+## 7. 吸收链
+
+### 7.1 吸收状态与标准形
+若
+$$
+p_{ii}=1,
+$$
+则状态 $i$ 为吸收状态。
+若每个状态都能到达某个吸收状态，则称该有限链为吸收链。
+将暂态状态排在前、吸收状态排在后，转移矩阵可写成标准形
+$$
+P=
+\begin{pmatrix}
+Q&R\\
+0&I
+\end{pmatrix}.
+$$
+$Q$ 描述暂态状态之间的转移，$R$ 描述从暂态状态进入吸收状态。
+
+### 7.2 基本矩阵
+吸收链的基本矩阵为
+$$
+N=(I-Q)^{-1}
+=I+Q+Q^2+\cdots.
+$$
+元素 $N_{ij}$ 表示从暂态状态 $i$ 出发，在吸收前访问暂态状态 $j$ 的期望次数。
+从各暂态状态出发到吸收所需的期望步数为
+$$
+\boldsymbol t=N\boldsymbol 1.
+$$
+最终吸收到各吸收状态的概率矩阵为
+$$
+B=NR.
+$$
+其中 $B_{ij}$ 表示从暂态状态 $i$ 出发最终进入吸收状态 $j$ 的概率。
+:::example[例 4：简单赌徒破产]
+资本状态为 $\{0,1,2\}$，$0$ 和 $2$ 为吸收状态。
+从状态 $1$ 出发，以概率 $p$ 到 $2$，以概率 $1-p$ 到 $0$。
+按暂态状态 $1$、吸收状态 $0,2$ 排序，有
+$$
+Q=(0),\qquad R=(1-p,\ p).
+$$
+因此 $N=(1)$，平均一步后吸收，而最终破产与获胜概率分别为 $1-p$ 和 $p$。
+更大的资本上限会产生非平凡的 $Q$ 与基本矩阵。
+:::
+
+## 8. 建模检查清单
+建立 Markov 链时可依次检查：
+1. 状态是否包含预测下一步所需的信息；
+2. 转移概率是否可视为不随时间变化；
+3. 转移矩阵每行是否非负且和为 $1$；
+4. 状态空间有哪些互通类与闭类；
+5. 目标是有限步概率、长期比例，还是吸收概率；
+6. 使用平稳极限前是否验证不可约性和非周期性。
+下一篇研究实值时间序列。
+AR 模型虽也利用有限历史预测未来，但它一般不是有限状态 Markov 链；
+通过扩大状态向量，$p$ 阶 AR 模型可写成一阶向量 Markov 形式。
+
+## 9. 小结
+1. Markov 性是在给定现在后对过去的条件无记忆性；
+2. Chapman--Kolmogorov 方程将多步转移化为矩阵乘法；
+3. 可达、互通、常返与周期刻画状态空间结构；
+4. 平稳分布满足 $\boldsymbol\pi P=\boldsymbol\pi$；
+5. 有限不可约非周期链收敛到唯一平稳分布；
+6. 吸收链可通过基本矩阵计算访问次数、吸收时间与吸收概率。
+
+## References
+1. J. R. Norris, *Markov Chains*, Cambridge University Press, 1997.
+2. Sheldon M. Ross, *Introduction to Probability Models*, 12th ed., Academic Press, 2019.
+3. David A. Levin, Yuval Peres, and Elizabeth L. Wilmer, *Markov Chains and Mixing Times*, 2nd ed., American Mathematical Society, 2017.
+4. James R. Kemeny and J. Laurie Snell, *Finite Markov Chains*, Springer, 1976.
+</WordCount>

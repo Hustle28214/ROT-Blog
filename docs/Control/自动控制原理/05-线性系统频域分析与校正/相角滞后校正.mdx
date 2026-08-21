@@ -1,17 +1,93 @@
 ---
 sidebar_position: 8
+title: 相角滞后校正
 ---
 
-
-
 import VideoPlayer from '../../../../src/components/Videoplayer/Videoplayer.jsx';
+import WordCount from '../../../../src/components/WordCount/WordCount';
 
-> 上
+<WordCount>
+
+## 1. 校正器形式与频率特性
+
+一种便于频域设计的滞后校正器为
+
+$$
+G_c(s)=K_c\frac{1+Ts}{1+\beta Ts},\qquad \beta>1.
+$$
+
+极点频率 $1/(\beta T)$ 低于零点频率 $1/T$，两者之间的幅频斜率为 $-20\,\mathrm{dB/dec}$，高频增益降为低频增益的 $1/\beta$。其相位
+
+$$
+\varphi_c(\omega)=\arctan(\omega T)-\arctan(\beta\omega T)<0
+$$
+
+在
+
+$$
+\omega_m=\frac{1}{T\sqrt\beta}
+$$
+
+附近达到最大滞后，且
+
+$$
+\sin|\varphi_{\min}|=\frac{\beta-1}{\beta+1}.
+$$
+
+滞后网络本身并不“增加相位裕度”。它通过衰减中高频幅值，使系统在更低频率处穿越 $0$ dB；若对象在新交越处相位滞后更小，最终相位裕度才可能提高。
+
+## 2. 典型设计逻辑
+
+滞后校正常用于：保持或提高低频增益以满足稳态误差要求，同时降低交越频率、改善稳定裕度并抑制高频噪声。
+
+1. 按稳态误差系数确定开环低频增益 $K$，画 $L_0(j\omega)$。
+2. 由目标 $PM_{\rm des}$ 选新交越频率 $\omega_c'$，使对象相位满足
+
+   $$
+   180^\circ+\angle L_0(j\omega_c')
+   \approx PM_{\rm des}+\delta,
+   $$
+
+   其中 $\delta$ 常取 $5^\circ\sim12^\circ$，用于抵消滞后网络在该处的负相位。
+3. 令校正器在 $\omega_c'$ 附近提供所需衰减：
+
+   $$
+   \beta\approx|L_0(j\omega_c')|,
+   \qquad
+   20\lg\beta\approx L_{0,\rm dB}(\omega_c').
+   $$
+
+4. 为使校正器在新交越处的附加相位较小，通常把零点放在其下方一十倍频程左右：
+
+   $$
+   \frac1T\approx(0.05\sim0.1)\omega_c',
+   \qquad
+   \frac1{\beta T}<\frac1T.
+   $$
+
+5. 取 $K_c$ 维持所需低频增益，重画精确 Bode 图并核对 $PM$、$GM$、误差系数和带宽。
+
+:::note 参数形式
+也常写成 $G_c(s)=K_c\beta(1+Ts)/(1+\beta Ts)$。此时低频增益为 $K_c\beta$、高频增益为 $K_c$。两种写法等价，但确定 $\beta$ 和增益时必须先看清所用形式。
+:::
+
+## 3. 性能影响
+
+- **低频**：若配合增益选择，可提高低频开环增益，从而减小稳态误差；
+- **中频**：通常使 $\omega_c$ 左移，带宽减小，响应变慢；
+- **高频**：相对低频衰减约 $20\lg\beta$ dB，有利于抑制噪声；
+- **相位**：在极点与零点之间引入负相位，因此转折频率应远离新交越频率。
+
+## 4. 适用与限制
+
+适合稳态精度要求高、速度要求不苛刻、且希望降低高频增益的场合。如果系统主要问题是相位裕度严重不足而又不能降低带宽，单独滞后校正并不合适，应考虑超前或滞后—超前校正。
+
+$\beta$ 过大会使极点靠近原点，增加很慢的暂态分量；虽不一定显著出现在简化的频域指标中，却可能导致调节时间变长。设计后必须检查完整时域响应。
+
+## 视频补充
 
 <VideoPlayer src="//player.bilibili.com/player.html?isOutside=true&aid=811394492&bvid=BV1F34y1h7so&cid=718554250&p=53" />
-<br />
-> 下
 
 <VideoPlayer src="//player.bilibili.com/player.html?isOutside=true&aid=811394492&bvid=BV1F34y1h7so&cid=718546922&p=54" />
-<br />
 
+</WordCount>

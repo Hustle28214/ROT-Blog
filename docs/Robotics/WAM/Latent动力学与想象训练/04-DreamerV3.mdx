@@ -1,0 +1,87 @@
+import WordCount from '../../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+# DreamerV3：一套超参跑 150 个任务，还在 Minecraft 里挖到了钻石
+
+DreamerV3 解决的不是"怎么让 world model 更准"，而是"怎么让 world model 方法别那么爱调参"。同一套配置跑 150 多个任务——Atari、DMControl、ProcGen、Minecraft——不用改学习率、不用改网络大小、不用改 KL 权重。它还成了第一个不用人类演示数据在 Minecraft 里从零挖到钻石的智能体。
+
+论文：[Mastering Diverse Domains through World Models](https://arxiv.org/abs/2301.04104)（2023, Hafner et al.）
+
+## 核心问题
+
+[DreamerV2](./03-DreamerV2.mdx) 在 Atari 和 DMControl 上可以共用一套配置，但换到奖励尺度差几个数量级的任务（Minecraft 里挖钻石的稀疏奖励 vs Atari 的密集得分），或者视觉复杂度完全不同的环境（ProcGen 的随机关卡），原来的 symlog 没有、twohot 没有、free bits 没有的配置就会崩。
+
+DreamerV3 的目标很工程化：找到一组稳健化技巧，让 world model + 想象训练这个范式真正"开箱即用"。
+
+## 关键方法
+
+### Symlog 变换
+
+不同任务的奖励和 value 尺度差太大。Atari 得分可以上万，DMControl 回报在 0-1000，Minecraft 挖钻石可能几百万步才给一个 +1。直接用 MSE 回归 value 和 reward，大尺度的任务 dominate 梯度，小尺度的学不动。
+
+DreamerV3 对 rewards 和 values 做 symlog 压缩再预测：
+
+$$
+\mathrm{symlog}(x) = \mathrm{sign}(x)\ln(1+|x|)
+$$
+
+对应的逆变换 symlog^{-1} 用于把预测值还原。这样不同尺度的目标被拉到相近的范围，同一个 MSE 损失能同时 work。
+
+### Twohot 离散回归
+
+有了 symlog 压缩，value 和 reward 的预测从直接回归变成离散分类：把 symlog 空间的值域划成 $B$ 个 bin，用 twohot 编码——只对相邻两个 bin 赋非零权重，中间线性插值：
+
+$$
+\mathrm{twohot}(x) = (1 - \alpha)\, e_i + \alpha\, e_{i+1}, \qquad \alpha = \frac{x - b_i}{b_{i+1} - b_i}
+$$
+
+预测时用 softmax 输出 bin 概率，解码时取期望值。比直接 MSE 回归更 robust，对 outlier 不敏感，也跟离散 latent 的训练方式统一。
+
+### Free bits
+
+KL 正则的一个经典问题是 posterior collapse：encoder 发现把 $z$ 设成常数也能重建得不错，KL 趋近于零，latent 里没信息，想象 rollout 退化成确定性 RNN。
+
+DreamerV3 给 KL 加 free bits 下界：
+
+$$
+\mathcal{L}_{\mathrm{KL}} = \max\big(\mathrm{KL}[q \| p], \,\lambda_{\mathrm{fb}}\big)
+$$
+
+每个 latent 维度至少保留 $\lambda_{\mathrm{fb}}$ nats 的信息量。先验和后验仍然用 [DreamerV2](./03-DreamerV2.mdx) 的 KL balancing 分开更新。
+
+### 其他稳健化
+
+- 全局 gradient clipping 和 Adam 的 $\epsilon = 10^{-8}$；
+- 网络宽度统一用 512 hidden units，深度按任务复杂度选 small/medium/large 三档，但默认值 medium 在大多数任务上够用；
+- 想象 horizon 固定 15 步，replay ratio 固定 512；
+- 离散动作和连续动作统一处理：连续动作用 tanh-squashed Gaussian，离散用 straight-through one-hot。
+
+这些改动单独看都不惊艳，组合在一起的效果是：150 个任务，一套超参，median score 超过专门调过的 baselines。
+
+## 实验亮点
+
+**Atari 100k + DMControl + ProcGen**：统一配置，DreamerV3 在所有 benchmark 上都达到或超过之前 SOTA，包括专门为此调参的 DreamerV2 变体。
+
+**Minecraft Diamond**：从随机初始化、纯像素输入、键盘鼠标动作，不用任何人类数据，在 100M 环境步内挖到钻石。这是第一个做到这件事的方法。任务链极长——找树、做工具、挖矿、找钻石——奖励极度稀疏，说明 world model 想象训练能支撑非常 long-horizon 的 credit assignment。
+
+论文还报告了 scaling 实验：同样的配置，模型从 12M 参扩到 200M 参，性能单调提升，没有明显的 overfitting 或 instability。这对后续 [DreamerV4](./05-DreamerV4.mdx) 往更大规模走是个积极信号。
+
+## 局限
+
+1. symlog + twohot + free bits 是经验性的稳健化组合，理论解释不够充分。为什么 precisely 这些技巧 work，论文更多是 ablation 而非分析。
+2. 200M 参数在 Minecraft 上才挖到钻石，样本效率比人类还是差很远。World model 的容量和训练数据量仍然是瓶颈。
+3. RSSM 架构本身没变，还是 CNN encoder + GRU + 离散 latent。对需要精细空间推理或长时一致性的 3D 环境，RSSM 的归纳偏置可能不够——V4 换 Transformer 部分就是为此。
+4. 在线交互量需求仍然大。Minecraft 100M 步是很重的预算，离"从少量离线数据学策略"还有距离。
+
+## 与系列内其他工作的关系
+
+DreamerV3 是 [DreamerV2](./03-DreamerV2.mdx) 的工程成熟版：RSSM + 离散 latent + KL balancing + 想象 actor-critic 不变，加的是 cross-task robustness。
+
+跟 [PlaNet](./01-PlaNet.mdx) 和 [Dreamer](./02-Dreamer.mdx) 比，V3 把"从像素学 latent 动力学、在想象里训策略"这条线推向了通用性。PlaNet 只能在 DMControl 上 demo，Dreamer 需要调参，V3 第一次证明这套东西可以 scale 到真正复杂的开放世界任务。
+
+[DreamerV4](./05-DreamerV4.mdx) 在 V3 的想象训练框架上，换了 Transformer world model、shortcut forcing 目标、大规模离线预训练。V3 是在线交互时代的集大成，V4 是离线 + 大规模预训练时代的开端。
+
+我觉得 V3 最值得看的地方不是 Minecraft 挖钻石的 headline，而是它把"world model 方法调参很痛"这个长期印象拆掉了。对做 robotics 的人来说，这意味着 world model RL 作为 baseline 的门槛终于够低了。
+
+</WordCount>

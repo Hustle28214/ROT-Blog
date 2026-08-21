@@ -1,0 +1,128 @@
+import WordCount from '../../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+论文：[Cosmos Policy: Fine-Tuning Video Models for Visuomotor Control and Planning](https://arxiv.org/abs/2601.16163)，NVIDIA + Stanford，2026 年 1 月。代码和模型在 [research.nvidia.com/labs/dir/cosmos-policy](https://research.nvidia.com/labs/dir/cosmos-policy/)。
+
+## 1. 先说结论
+
+Cosmos Policy 走了一条跟 [DiT4DiT](./01-DiT4DiT.mdx) 完全不同的路：**不改视频模型架构，把 action、future state、value 全部编码成 latent frame，塞进同一个 video diffusion 序列里一起生成**。
+
+单阶段 post-training，LIBERO 98.5%，RoboCasa 67.1%，ALOHA 2 四个真机双手任务平均 93.6%。还能用 rollout 数据继续 refine world model 和 value，做 test-time best-of-N planning。
+
+但代价也明确：[MotionWAM](./03-MotionWAM.mdx) 论文里直接拿它做对照——同参数量级（2.0B）只有 **0.7 Hz**，MotionWAM 4.9 Hz，因为 Cosmos Policy 必须迭代 denoise 未来视频才能出动作，而 [DiT4DiT](./01-DiT4DiT.mdx) / MotionWAM 只读中间特征、一次前向。
+
+时间上 Cosmos Policy 发表最早（2026 年 1 月），DiT4DiT（3 月）和 MotionWAM（6 月）可以看作对它的 **回应和分化**——不是继承关系，而是同一问题下的两条技术路线。
+
+## 2. 核心思路：action 也是一帧
+
+现有工作把 video model 适配成 robot policy，往往需要多阶段 post-training 和额外的 action 生成模块。Cosmos Policy 的做法很朴素：
+
+> 既然 Cosmos-Predict2 本来就会生成 latent video，那把 robot action、proprioceptive state、value 也 encode 成 latent frame，跟 future image frame 排成一条序列，用同一个 diffusion objective 联合建模。
+
+输入：多视角 RGB + 语言指令 + 当前 proprio。
+输出三条并行的 latent 序列：
+
+1. **Action chunk**：未来 $H$ 步关节/夹爪命令；
+2. **Future state**：未来时刻的 proprio + 图像观测；
+3. **Value**：未来状态的 expected cumulative reward（Monte Carlo return）。
+
+三条都是 Wan2.1 VAE latent 空间里的"帧"——把 proprio、action、value 归一化到 $[-1,1]$ 后 **复制填满** $H' \times W' \times 16$ 的 latent volume，再 interleave 进图像 latent 序列。没有新模块，没有 separate action head，就是 video diffusion 本身。
+
+## 3. Latent Frame Injection 细节
+
+以一个典型三相机 ALOHA 配置为例，latent 序列一共 11 帧：
+
+| 序号 | 内容 | 类型 |
+| --- | --- | --- |
+| 1 | blank placeholder | VAE 时序压缩实现细节 |
+| 2 | 当前 proprio | 新模态 |
+| 3–5 | 腕部 + 两个第三视角图像 | 多视角 |
+| 6 | action chunk | 新模态 |
+| 7–10 | 未来 proprio + 未来三视角图像 | future state |
+| 11 | value | 新模态 |
+
+序列语义上是 $(s, a, s', V(s'))$，支持从左到右 autoregressive decode，也支持 parallel decode（direct policy 模式用 parallel，更快）。
+
+Cosmos-Predict2 原本只支持单视角 short video；latent injection 把 robot setup 的差异（相机数量、proprio 维度）全部吸收进 **序列编排**，而不是改 DiT 结构。这对工程落地很友好——换机器人主要是改 latent 序列模板。
+
+## 4. 两种用法：直接策略 vs 规划
+
+**Direct policy**：给定观测和语言，parallel denoise 出 action chunk，执行整个 chunk 后重新推理（ALOHA 上 chunk size 50，2 秒）。标准 receding horizon，但没有额外 planning 开销。
+
+**Model-based planning**：需要两个 checkpoint——
+
+- **Policy model**：出 action proposal；
+- **Planning model**：在 rollout 数据上 fine-tune 过，future state 和 value 更准。
+
+Test-time best-of-N 流程：
+
+1. 从 policy 采样 $N$ 个 action 候选；
+2. planning model 对每个候选预测 future state 和 value；
+3. 每个 action 做 3×5=15 次 ensemble（world model 3 次 × value 5 次）；
+4. **majority mean** 聚合：先看多数预测 success/fail，再在多数组内平均 value；
+5. 选最高 value 的 action 执行。
+
+Rollout 数据收集：policy 在各种初始条件下部署，记录轨迹和成败。Fine-tune 时 90% batch 给 world model + value，10% 给 policy——让 planning model 见到 on-policy 分布，而不是只有 demonstration 里的成功轨迹。
+
+Planning 在 ALOHA 难任务上平均再涨 **12.5%** completion rate。qualitative 上，base checkpoint 的 world model 会"幻想"成功（比如 ziploc bag 没抓稳也预测成功），rollout fine-tune 后能预测真实 failure mode。
+
+## 5. 实验
+
+**LIBERO**（6000 trials，3 seeds）：
+
+| 方法 | Spatial | Object | Goal | Long | 平均 |
+| --- | --- | --- | --- | --- | --- |
+| $\pi_{0.5}$ | 98.8 | 98.2 | 98.0 | 92.4 | 96.9 |
+| CogVLA | 98.6 | 98.8 | 96.6 | 95.4 | 97.4 |
+| Cosmos Policy | 98.1 | **100.0** | 98.2 | 97.6 | **98.5** |
+
+**RoboCasa**（3600 trials，只用 50 human demos/task，无 MimicGen 合成数据）：
+
+| 方法 | Demos/task | 平均 SR |
+| --- | --- | --- |
+| GR00T-N1.5 | 300 | 64.1% |
+| Video Policy | 300 | 66.0% |
+| FLARE | 300 | 66.4% |
+| Cosmos Policy | **50** | **67.1%** |
+
+RoboCasa 评估全是 unseen object instance，5 个 scene 里 2 个是训练没见过的 style——Cosmos 在这个 OOD setting 上仍然 SOTA，而且数据量远少于 GR00T 系列。
+
+**真机 ALOHA 2**（101 trials，四任务）：平均 93.6%，超过 Diffusion Policy、$\pi_0$、$\pi_{0.5}$、OpenVLA-OFT+。$\pi_{0.5}$ 在前三个任务很强，但在"candies in bowl"（高 action 多模态）和"candy in ziploc bag"（毫米级精度）上崩——L1 regression 对多模态分布建模差。Cosmos 的 diffusion 原生建模在这两类任务上更稳。
+
+**Ablation**（LIBERO）：
+
+| 变体 | 平均 SR | 说明 |
+| --- | --- | --- |
+| 完整 Cosmos Policy | 98.5% | — |
+| 去掉 auxiliary loss | 97.0% | 不再联合预测 $s', V(s')$ |
+| 随机初始化 | 94.6% | 无 video pretrain prior |
+
+Auxiliary supervision 和 video pretrain 各贡献约 1.5–3.9 个百分点。from-scratch 在 ALOHA "fold shirt" 上掉 18.7 分，动作还变得 jerkier。
+
+## 6. 跟 DiT4DiT / MotionWAM 的对照
+
+| | Cosmos Policy | DiT4DiT / MotionWAM |
+| --- | --- | --- |
+| 架构改动 | 无，action 当 latent frame | 加 Action/Motion DiT |
+| 训练阶段 | 单阶段（+ 可选 planning fine-tune） | DiT4DiT 联合训练；MotionWAM 三阶段 |
+| 推理 | 完整 video denoise | 一次前向截 hidden state |
+| 频率 | 0.7 Hz（2B, A100） | DiT4DiT 6 Hz；MotionWAM 4.9 Hz |
+| 额外能力 | future state + value + planning | 主要靠 action 分支 |
+| 真机验证 | ALOHA 2 桌面双手 | DiT4DiT G1 操作；MotionWAM G1 全身 |
+
+[DiT4DiT](./01-DiT4DiT.mdx) 在 related work 里把 Cosmos Policy 列为"explicit unification"的代表——把 action 编进 video latent 序列。DiT4DiT 的回应是：联合训练 + hook 中间特征，用频率换架构简洁性。
+
+[MotionWAM](./03-MotionWAM.mdx) 进一步说明：对人形 loco-manipulation，0.7 Hz 不是"慢一点能接受"的问题，是根本跑不起来——动态平衡需要 chunk 级 4–5 Hz 以上的闭环。Cosmos 的 planning 能力（value + future state）是 DiT4DiT 系列目前没有的，但如果连 closed-loop 都进不去，planning 再优雅也是仿真 luxury。
+
+## 7. 局限和我的判断
+
+**频率**：0.7 Hz 意味着每个 action chunk 之间隔 1.4 秒，靠 chunk 内部插值撑闭环。桌面 pick-and-place 也许还行，动态交互任务会很吃力。
+
+**Planning 可靠性**：value 和 future state 的质量完全绑定在 video denoise 质量上。video 模型幻觉会直接传到 planning 打分——best-of-N 选出来的"最优" action 可能只是 video 模型觉得最好看的那个，不一定是物理上最稳的那个。
+
+**模态编码的粗糙性**：proprio 和 action 被复制填满 spatial latent grid，spatial inductive bias 全浪费了。DiT4DiT 的 Action DiT 至少是为 control 专门设计的。
+
+我的判断：固定基座 manipulation 如果不在乎 0.7 Hz，Cosmos Policy 的统一建模 + planning 很优雅，RoboCasa 67.1% 也说明了完整 denoise 在 kitchen 场景上的优势。人形 loco-manipulation 这种需要实时闭环的场景，[DiT4DiT](./01-DiT4DiT.mdx) → [MotionWAM](./03-MotionWAM.mdx) 的 hook 特征路线目前是唯一能用的。
+
+</WordCount>

@@ -1,0 +1,86 @@
+import WordCount from '../../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+# Dreamer：别每步搜索了，在想象里训 actor-critic
+
+Dreamer 做的事其实就一句话：把 [PlaNet](./01-PlaNet.mdx) 的在线 CEM 规划，换成在 world model 生成的想象轨迹上训练 actor 和 critic。策略梯度能解析地穿过学到的动力学回传——这是它相对 model-free 最本质的便宜。
+
+论文：[Dream to Control: Learning Behaviors by Latent Imagination](https://arxiv.org/abs/1912.01603)（2020, Hafner et al.）
+
+## 核心问题
+
+PlaNet 每步 CEM 搜索，算力贵、延迟高，Atari 这种离散动作空间基本没法用。能不能训一个策略网络，让它主要在模型"想象"出来的数据上学，真实环境只用来收集经验、更新模型？
+
+Dreamer 的答案是：可以，而且样本效率依然很高。关键前提是 RSSM 足够准，至少在未来十几步内准。
+
+## 方法：latent 想象 + actor-critic
+
+整体还是 [PlaNet](./01-PlaNet.mdx) 的 RSSM，确定性 $h_t$ 和随机 $z_t$ 的拆分不变。世界模型训练目标也类似：重建观测和奖励，KL 正则。
+
+策略学习的流程：
+
+1. 从 replay buffer 采一段真实轨迹，编码出后验状态序列 $(h_t, z_t)$；
+2. 从某个时刻 $t$ 的后验状态出发，用先验 $p(z_{t+k} \mid h_{t+k})$ 往前想象 $H$ 步（通常 15 步），动作由 actor $\pi(a \mid h, z)$ 给出；
+3. 想象全程不解码图像，只在 latent 空间里滚；
+4. 用 $\lambda$-return 算 advantage，更新 actor 和 critic。
+
+$\lambda$-return 的定义：
+
+$$
+V^\lambda_t = r_t + \gamma\big[(1-\lambda)v(h_{t+1}, z_{t+1}) + \lambda V^\lambda_{t+1}\big]
+$$
+
+actor 最大化 imagined return，critic 拟合 $V^\lambda$。因为 $z_t$ 是重参数化采样的，想象轨迹对 actor 参数可微，梯度可以穿过 RSSM 的动力学直接回传到策略网络——不需要 REINFORCE 那种高方差采样估计。
+
+这一点很重要。Model-free 方法（PPO、SAC）的策略梯度要靠 rollout 采样，方差大、样本效率低。Dreamer 在模型准的区域内拿到了真正的解析梯度，同样 500 episode 预算在 DMControl 上能跟 PlaNet 打平甚至更好，而且推理时只需要前向一次 actor，不用 CEM 搜索。
+
+## 训练细节
+
+Dreamer 交替做两件事：
+
+- 用新收集的真实数据更新 world model（RSSM + 观测/奖励解码器）；
+- 用更新后的模型生成想象轨迹，训练 actor 和 critic。
+
+Actor 和 critic 都是 MLP，输入 $(h, z)$ 的拼接。Action 在连续任务里是 tanh-Gaussian，在离散任务里还没在这版里重点做——那是 [DreamerV2](./03-DreamerV2.mdx) 的事。
+
+想象 horizon $H$ 的选择是个 trade-off：$H$ 越大，策略能看到更远的后果，但模型误差也会累积；$H$ 太小，策略短视。15 步是论文里经验上比较稳的选择，后面几版基本沿用。
+
+World model 的损失函数跟 [PlaNet](./01-PlaNet.mdx) 一样，ELBO 重建观测和奖励：
+
+$$
+\mathcal{L}_{\mathrm{model}} = \sum_t \Big[ -\ln p(x_t \mid h_t, z_t) - \ln p(r_t \mid h_t, z_t) + \beta\,\mathrm{KL}[q(z_t \mid h_t, x_t) \| p(z_t \mid h_t)] \Big]
+$$
+
+Actor 损失是 imagined return 的负值，加上 entropy bonus 鼓励探索：
+
+$$
+\mathcal{L}_{\mathrm{actor}} = -\sum_{k=0}^{H-1} V^\lambda_{t+k} - \eta\,\mathcal{H}[\pi(\cdot \mid h_{t+k}, z_{t+k})]
+$$
+
+Critic 用 MSE 拟合 $V^\lambda$。三个网络分开优化，world model 用 Adam，actor 和 critic 也用 Adam 但学习率独立。
+
+## 实验亮点
+
+DeepMind Control Suite 六个任务，500 episode，Dreamer 在样本效率和最终回报上都达到了当时 SOTA，跟 PlaNet 同量级但推理快得多。
+
+论文还做了一个 ablation：把解析梯度换成 REINFORCE 采样梯度，性能明显下降。说明"可微想象"不是锦上添花，是核心。
+
+另外展示了想象轨迹和真实轨迹在 latent 空间里的对齐：前几步 imagined state 跟 posterior state 很接近，往后 gradually 漂移——这直接决定了能想象多远。
+
+## 局限
+
+1. 梯度只在模型准的地方有意义。模型一旦在某区域不准，解析梯度会把策略往错误方向推，而且比 model-free 更难察觉，因为想象轨迹看起来"自洽"。
+2. 高斯 latent 的表达力问题还在，Atari 这种强多模态环境这版搞不定。
+3. 超参敏感：$\beta$（KL 权重）、想象 horizon、replay ratio 都要调。这个问题到 [DreamerV3](./04-DreamerV3.mdx) 才系统性地解决。
+4. 仍然需要在线交互来更新模型。纯离线设定不是这版的目标。
+
+## 与系列内其他工作的关系
+
+Dreamer 是 PlaNet 的直接延伸：RSSM 不变，规划方式从 CEM 换成 actor-critic 想象训练。
+
+[DreamerV2](./03-DreamerV2.mdx) 在同一框架上换了离散 latent 和 KL balancing，第一次让这条线在 Atari 上超过 model-free。[DreamerV3](./04-DreamerV3.mdx) 加了 symlog、twohot、free bits，把"跨任务不用调参"做出来了。[DreamerV4](./05-DreamerV4.mdx) 则换了 Transformer 骨干和 shortcut forcing，走向大规模离线数据和实时交互。
+
+如果只想理解"想象训练"这个核心机制，Dreamer 这一篇就够了。V2/V3 的改动都是在世界模型表示和训练稳定性上叠补丁，想象训练的基本 loop 没变。
+
+</WordCount>

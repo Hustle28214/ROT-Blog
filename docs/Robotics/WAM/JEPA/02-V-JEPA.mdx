@@ -1,0 +1,81 @@
+import WordCount from '../../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+# V-JEPA：把 JEPA 搬进视频
+
+论文：[Revisiting Feature Prediction for Learning Visual Representations from Video](https://arxiv.org/abs/2404.08471)（Meta FAIR，2024）。结论先行：**V-JEPA 不是 I-JEPA 的简单 3D 扩展，masking 策略针对视频的时空冗余做了重新设计**——学到的是运动、遮挡、物体持续性的抽象结构，ImageNet 上 frozen 表征的质量甚至超过在 ImageNet 上专门预训练的 I-JEPA。
+
+## 1. 从 2D block 到 spatio-temporal tube
+
+[I-JEPA](./01-I-JEPA.mdx) 在图像上遮 rectangle；视频如果逐帧 random patch masking，predictor 可以偷看相邻帧的同一位置来填洞，任务退化成"帧间复制"，学不到真正的时空推理。
+
+V-JEPA 的做法是 **tube masking**：先在空间上采样若干连续矩形，然后把每个矩形沿**整个时间轴**延伸，形成 spatio-temporal tube。同一个空间位置在所有帧里同时被遮住，相邻帧的捷径被封死。
+
+默认两套 mask 组合：
+
+- **Short-range**：8 个小 tube，每个约占单帧 15%。
+- **Long-range**：2 个大 tube，每个约占单帧 70%。
+
+两组 union 之后，平均 masking ratio 大约 90%。predictor 每次只看到约 10% 的 spatio-temporal token，要从极稀疏的 context 去推断被遮 tube 的 latent——任务难度跟 I-JEPA 的大块 semantic masking 是同一哲学。
+
+## 2. 训练目标与架构
+
+损失形式跟 I-JEPA 一样，在 latent 空间做 L2：
+
+$$
+\mathcal{L} = \left\| g_\theta(x_{\text{visible}}) - \mathrm{sg}(f_\phi(x_{\text{masked}})) \right\|_2^2
+$$
+
+Encoder 是 ViT，输入是 3D tubelet patch（例如 16 帧 × 224×224 压成 1568 个 token）。Context encoder 只看 visible tube，predictor 是窄 ViT，用 mask token + 位置编码去 query target tube 的表征。Target encoder 同样是 EMA，stop-gradient。
+
+训练数据是 **VideoMix2M**（约 200 万条互联网视频），没有任何动作标签、没有 caption、没有负样本。纯被动观看视频，学 visual dynamics 的抽象 embedding。
+
+Clip 长度默认 16 帧，空间分辨率 224×224，tubelet size 2×16×16（时间×高×宽），一个 clip 大约 1568 个 token。这个 token 密度跟 VideoMAE 类似，但 supervision 在 feature space 而不是 pixel space，所以同样算力下 encoder 的有效 batch 更大、训练更稳。
+
+## 3. 表征质量：frozen backbone 的表现
+
+V-JEPA 的核心卖点不是生成画面，而是 **frozen 表征在下游任务上的泛化**。几个数字：
+
+- **K400 动作识别**：Attentive probe 87.7% top-1（ViT-g/16），超过在 K400 上 supervised 预训练的 VideoMAE。
+- **ImageNet 线性分类**：frozen V-JEPA 在 ImageNet 上 probe 到 77.3% top-1，超过 frozen I-JEPA（74.6%）——在视频上预训练，静态图像表征反而更好，说明学到的是跨模态通用的视觉结构。
+- **Epic-Kitchens 动作预测**：anticipation 任务上 recall@5 达到 30.6%，当时 task-specific SOTA 水平。
+
+Attentive probe 的做法是：在 frozen feature map 上加 cross-attention pooling + linear head，只训 probe 参数。这比 linear probe 更强，但仍然不动 backbone——说明 V-JEPA 的 patch-level embedding 已经编码了足够的 temporal structure，不需要 finetune 就能做 action understanding。
+
+我自己觉得最值得注意的不是某个 benchmark 分数，而是 **Attentive probe 的设定**：backbone 完全 frozen，只在上面加一层轻量 probe。这说明 V-JEPA 的 latent 不是"辅助 loss 副产品"，而是可以直接当通用视觉 foundation 用的。
+
+## 4. Latent rollout 与可视化
+
+V-JEPA 不做 pixel reconstruction，但 Meta 后来训了一个 **conditional diffusion decoder**：输入是 predictor 对被遮区域的 latent 预测，输出是可读像素。关键约束是 decoder **看不到 unmasked 区域**，只能凭 predicted latent 自己编——这样可以检验 latent prediction 是否真的 grounded。
+
+Rollout 效果表明：predictor 在 latent 里滚多步，预测的运动轨迹、遮挡关系跟真实视频在语义上是一致的，虽然像素细节不如生成式世界模型精确。对机器人来说，这暗示 **latent rollout 可能已经足够做规划**，不必为了"看清楚未来"而去完整 denoise 视频——后面 [V-JEPA 2-AC](./04-V-JEPA2-AC.mdx) 就是在这个假设上建 MPC 的。
+
+## 5. Masking ablation 告诉我们什么
+
+论文对比了几种 masking 策略：
+
+| 策略 | 问题 |
+| --- | --- |
+| Random-tube（随机比例 tube） | 太简单或太难都不稳定 |
+| Causal multi-block（只看前 p 帧） | 偏向短期预测，长期 motion 学不好 |
+| **Multi-block tube（默认）** | 短程 + 长程 tube 组合，平衡局部 motion 和全局结构 |
+
+Tube 结构 > 随机 patch，multi-block > 单一尺度——这跟 I-JEPA "大块 semantic mask 才有效" 的结论一脉相承。
+
+## 6. 跟 VideoMAE / 对比学习比
+
+VideoMAE 重建被遮住的 pixel tube，V-JEPA 预测被遮住的 feature tube——表面相似，优化目标完全不同：
+
+- VideoMAE 的 decoder 必须恢复纹理，encoder 被迫编码 low-level detail。
+- V-JEPA 没有 decoder，predictor 只需要在 latent 里"填洞"，encoder 可以专注 semantic + dynamics。
+
+ImageNet probe 上 V-JEPA frozen 77.3% vs I-JEPA frozen 74.6%，说明 **视频上学到的 motion structure 反哺了静态表征**。这跟 "video pretrain > image pretrain for transfer" 的直觉一致，但 V-JEPA 是第一个在 controlled setting 里用同一架构证明这件事的工作。
+
+## 7. 局限
+
+V-JEPA 仍然是 **action-free** 的：它理解视频里发生了什么，但不知道"如果我推一下会怎样"。Latent 不可解释的问题比 I-JEPA 更严重——视频里运动错了，没有 pixel decoder 帮你肉眼看出来。另外训练规模（200 万视频）对普通 lab 来说门槛不低，开源代码和 checkpoint 主要服务 research eval，不是拿来直接部署的。
+
+但 V-JEPA 第一次证明：**纯视频自监督的 latent prediction 可以同时服务理解和预测**，为 [V-JEPA 2](./03-V-JEPA2.mdx) 把规模推到 foundation model 级别、再接到机器人规划，提供了完整的架构模板。下一篇：[V-JEPA 2](./03-V-JEPA2.mdx)。
+
+</WordCount>

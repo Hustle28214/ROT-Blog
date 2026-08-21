@@ -1,0 +1,8 @@
+{
+  "label": "决策等价世界模型",
+  "position": 2,
+  "link": {
+    "type": "generated-index",
+    "description": "MuZero 与 TD-MPC 系列：不重建观测，只学对决策充分的 latent 动力学。"
+  }
+}

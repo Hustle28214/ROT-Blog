@@ -1,0 +1,104 @@
+import WordCount from '../../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+# TD-MPC2：一套超参、一个模型、80 多个任务
+
+我的结论：TD-MPC2 不是算法革新，是工程 scaling。它把 [TD-MPC](./02-TD-MPC.mdx) 的 latent 规划框架用 SimNorm、Q 集成和统一超参推到了 80 多个连续控制任务上——单个 317M 参数的模型同时管多种具身和不同动作维度。如果你关心 WAM 怎么从"一个 demo 一个模型"走到"通用控制器"，这篇是最接近的参考。
+
+[MuZero](./01-MuZero.mdx) 开了 value equivalence 的头，[TD-MPC](./02-TD-MPC.mdx) 把它变成可部署的短视野 MPC。TD-MPC2 回答的问题是：这套东西能不能 scale？
+
+## 1. 它要解决什么问题
+
+TD-MPC 能 work，但有三个 scaling 瓶颈：
+
+1. **Latent 表示不稳定**。不同任务的奖励尺度、状态维度、动态特性差很多，同一个 MLP encoder 训下来 latent 空间容易崩——某些维度爆炸，某些塌缩。
+2. **Q 过估计**。单头 Q 网络在连续控制里系统性偏高，MPC 基于虚高的 Q 做规划，选出来的动作在真实环境里表现差。
+3. **Per-task 调参**。TD-MPC 原版每个任务或任务组需要单独调 learning rate、planning horizon、MPPI 采样数等。80 个任务就要调 80 遍，不现实。
+
+TD-MPC2 的目标：一套超参、一个模型、多种具身，不能每个任务重新来。
+
+## 2. 相对 TD-MPC 的三个关键改动
+
+### SimNorm：把 latent 锁在有界单纯形上
+
+普通 LayerNorm 或 BatchNorm 不保证 latent 各维度的有界性。TD-MPC2 把 latent 向量切成 $G$ 组，每组做 softmax：
+
+$$
+\mathrm{SimNorm}(z)_i = \frac{\exp(z_i / \tau)}{\sum_{j \in \mathrm{group}(i)} \exp(z_j / \tau)}
+$$
+
+每组输出是一个概率单纯形，所有维度非负且组和为 1。效果：latent 天然有界，不同任务的 encoder 不会把某些维度推到极端值。论文报告这是训练稳定性提升最大的单项改动。
+
+### Q 集成 + dropout
+
+不再用单个 $Q_\theta$，而是训 $M$ 个 Q 网络（默认 $M=5$），规划时取 min：
+
+$$
+Q_{\mathrm{ensemble}}(z, a) = \min_{m=1,\ldots,M} Q_{\theta_m}(z, a)
+$$
+
+训练时每个 Q 网络独立做 TD 更新，加 dropout 正则。取 min 是标准的 pessimistic Q 估计，直接压过估计——MPC 基于保守的价值做规划，选出的动作更可靠。
+
+### 统一动作空间
+
+不同任务动作维度不同（从 2 维到 24 维）。TD-MPC2 把所有动作 pad 到统一的最大维度 $A_{\max}$，用一个共享的 dynamics 和 Q 网络处理。无效维度在 loss 和规划中 mask 掉。这让单个模型能跨不同具身。
+
+## 3. 规划和训练：跟 TD-MPC 同框架
+
+规划目标不变，还是 $H=3$ 步 latent MPC + 终端 Q：
+
+$$
+\max_{a_{t:t+H-1}} \; \mathbb{E}\Big[\sum_{k=0}^{H-1}\gamma^k \hat R(\tilde z_{t+k}, a_{t+k}) + \gamma^H Q_{\mathrm{ensemble}}(\tilde z_{t+H}, \pi_\psi(\tilde z_{t+H}))\Big]
+$$
+
+优化仍用 MPPI + 策略先验初始化。训练四损失（reward、Q TD、consistency、policy）结构跟 [TD-MPC](./02-TD-MPC.mdx) 一致，改动的都是表示和 Q 估计的细节。
+
+## 4. 实验结果
+
+Hansen 等 2024 年（[arXiv:2310.16828](https://arxiv.org/abs/2310.16828)）的 scaling 实验：
+
+| 设置 | 结果 |
+|------|------|
+| DMControl 33 任务，单模型 | 全部达到或超过 SAC 最终回报，样本效率 5–10× |
+| Meta-World 50 任务，单模型 | 多任务成功率超 TD-MPC 单任务版 |
+| 80+ 任务混合训练，317M 参数 | 一个模型覆盖 humanoid、dog、quadruped、manipulator 等 |
+| 不同动作维度（2D–24D） | 统一模型无 per-task 微调 |
+
+消融实验里 SimNorm vs LayerNorm 的差距最明显：去掉 SimNorm，大约 1/3 的任务训练发散或性能大幅退化。Q 集成次之：单 Q 在复杂任务上 MPC 选的轨迹明显偏乐观。
+
+还有一个值得注意的发现：317M 模型不是越大越好——小模型（~20M）在简单任务上性价比更高，317M 的优势主要在需要跨具身泛化的复杂任务上。
+
+## 5. 局限
+
+1. **短视野没解决**。$H=3$ 仍是默认值，长期推理靠 Q 兜底的问题原封不动。TD-MPC2 用 scaling 掩盖了这个问题，没消除它。
+2. **Still no decoder**。跟 [MuZero](./01-MuZero.mdx) 和 TD-MPC 一样，不重建观测。317M 参数的 latent 空间仍然不可解释——你没法看这个模型"想象"的机器人未来长什么样。
+3. **Sim-to-real 仍有限**。论文里的真机实验比 TD-MPC 原版少，主要在仿真 benchmark 上证明 scaling。从 80 个仿真任务到一个新真机，gap 还在。
+4. **MPPI 开销随模型增大**。317M 参数的 dynamics 和 Q 每次前向比 TD-MPC 的小网络慢很多，控制频率上限在下降。论文没报告真机控制频率，但按模型大小估算，50 Hz 以上会比较紧。
+5. **统一动作空间的浪费**。pad 到 $A_{\max}$ 意味着低维任务的 dynamics 网络大量参数在处理无效维度。更优雅的做法（比如 per-dimension 共享权重）还没被探索。
+
+## 6. 跟 WAM 的关系
+
+TD-MPC2 是目前离"通用机器人世界模型"最近的 non-generative 方案。跟 WAM 的对比，我觉得有四个层面：
+
+**Scaling 路径可参考。** WAM 现在基本是"一个任务训一个模型"。TD-MPC2 用 SimNorm + 统一动作空间 + 共享 dynamics 实现了单模型多具身——WAM 如果要走通用路线，latent 表示的稳定性和跨维度共享是必须解决的，SimNorm 的思路值得试。
+
+**短视野 + 终端价值的结构在 WAM 里缺失。** TD-MPC2 用 $Q_{\mathrm{ensemble}}$ 兜长期，WAM 用 action chunk 兜短期。两种设计回答同一个问题——"模型预测不准之后怎么办"——但 WAM 目前没有对应的终端价值机制。chunk 耗尽的 re-planning 完全依赖重新生成，没有累积的价值估计。
+
+**闭环频率 vs 模型大小。** TD-MPC2 的 317M 模型已经让 MPPI 吃力；WAM 的视频扩散模型动辄 1B+，实时部署的妥协（[MotionWAM](../Video-Action Model/03-MotionWAM.mdx) 的不完整去噪）只会更激进。TD-MPC2 的经验是：控制频率是硬约束，模型大小必须为这个约束服务，不是反过来。
+
+**Value equivalence 的最终提醒。** TD-MPC2 在 80 个任务上都不重建观测，靠 consistency loss 和 TD 目标训 latent。WAM 如果坚持生成路线，需要回答：生成的像素里，哪些信息是决策必需的，哪些是"看起来合理但对控制无用"的？FVD 不能回答这个问题，但 value equivalence 框架可以——看动作分支到底用了多少生成信息。
+
+## 7. 系列小结
+
+三篇合起来是"决策等价世界模型"的完整故事：
+
+- [MuZero](./01-MuZero.mdx)：提出 value equivalence，MCTS 在 latent 里搜树，不重建观测；
+- [TD-MPC](./02-TD-MPC.mdx)：换成短视野 MPC + MPPI，连续控制可用；
+- TD-MPC2：SimNorm + Q 集成 + 统一超参，单模型覆盖 80+ 任务。
+
+它们跟 [Dreamer 系列](../Latent动力学与想象训练/02-Dreamer.mdx) 的分野很清楚：Dreamer 重建观测，这条线不重建。它们跟 [可交互生成环境](../可交互生成环境/01-IRIS.mdx) 的分野也一样：那边要的是人能操作的生成式环境，这边要的是策略能用的 latent 动力学。
+
+回到 [WAM 总览](../00-世界模型的起点与前沿.mdx)——如果你做机器人控制，我会建议把这条线当作"不生成但决策充分"的 baseline，跟 video WAM 的生成路线对照着看。两条路不互斥，但 trade-off 要想清楚。
+
+</WordCount>

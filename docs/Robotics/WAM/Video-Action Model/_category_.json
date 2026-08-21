@@ -1,0 +1,8 @@
+{
+  "label": "Video-Action Model",
+  "position": 5,
+  "link": {
+    "type": "generated-index",
+    "description": "DiT4DiT、Cosmos Policy、MotionWAM：把视频世界模型的 dynamics prior 接到机器人动作上。"
+  }
+}

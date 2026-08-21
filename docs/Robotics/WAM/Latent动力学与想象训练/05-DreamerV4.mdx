@@ -1,0 +1,91 @@
+import WordCount from '../../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+# DreamerV4：可扩展的世界模型，纯离线挖钻石
+
+DreamerV4 把 world model 从 RSSM 时代推进到了 Transformer + 大规模预训练时代。它能在单张 GPU 上实时交互式推理，从大量无动作标签的视频里学通用动力学，再用少量带动作的数据学控制——并且是第一篇纯离线数据就在 Minecraft 里挖到钻石的工作。
+
+论文：[Training Agents Inside of Scalable World Models](https://arxiv.org/abs/2509.24527)（2025, Hafner, Yan, Lillicrap）
+
+## 核心问题
+
+[DreamerV3](./04-DreamerV3.mdx) 把在线想象训练做到了 150+ 任务，但三个瓶颈还在：
+
+1. RSSM 的容量和归纳偏置限制了复杂环境（Minecraft 里的物体交互、合成配方）的建模精度；
+2. 模型必须在自己的任务数据上从零学，没法利用互联网规模的无标签视频；
+3. 想象 rollout 慢，没法实时交互，也没法在模型里高效地训长 horizon 策略。
+
+DreamerV4 要同时解决这三个：更大的模型、离线预训练、实时推理。
+
+## 方法
+
+### Tokenizer + Transformer World Model
+
+RSSM 被替换成两阶段架构：
+
+1. **Tokenizer**：把每帧图像编码成离散 token 序列（类似 VQ-VAE 或 VQ-GAN），压缩空间冗余；
+2. **Dynamics Transformer**：在 token 序列上做自回归预测，给定历史 token 和动作，预测下一帧 token、奖励、终止信号。
+
+所有模态（图像 token、动作、奖励、任务嵌入）被统一表示成 token 序列，喂给同一个 Transformer。Multi-modal 输出用不同的 head，loss 各项用 running RMS 归一化后加权求和，避免某个模态 dominate 训练。
+
+### Shortcut Forcing
+
+标准自回归生成每步只预测一个 token，rollout 慢。DreamerV4 用 shortcut forcing 目标：训练模型在少步数内（甚至一步）完成多步去噪/生成，类似 consistency model 或 shortcut diffusion 的思路。
+
+具体地，模型学的是：给定 noisy 的中间状态和 conditioning，直接预测 clean 的目标 token。推理时可以跳步，在单 GPU 上达到实时交互帧率（Minecraft 里约 20 FPS 量级），同时保持足够的生成质量。
+
+这解决了 world model 方法的老大难问题——想象 rollout 太慢，没法在模型里训长序列策略。V4 的想象训练可以在实时速度下滚几千步。
+
+### 三阶段训练
+
+Algorithm 1 概括了完整流程：
+
+1. **预训练**：在大规模无动作标签视频上训 tokenizer 和 dynamics Transformer，学通用的视觉动力学；
+2. **微调**：在少量带动作标签的数据上，把 action conditioning 和 reward prediction 接入 world model，同时训 reward model；
+3. **想象训练**：在学到的 world model 里用 actor-critic 训策略，跟 [DreamerV3](./04-DreamerV3.mdx) 的 loop 类似，但 horizon 可以开得很长。
+
+关键设计：action conditioning 只需要少量有标签数据。大部分世界知识从无标签视频来，action 控制是后接的小模块。这跟 robotics 的场景很贴——互联网视频没有机器人动作标签，但包含了丰富的物理和交互先验。
+
+### 想象训练
+
+Policy 和 value 网络仍然是在 world model 的 latent/token 空间里操作。从 model 生成的想象轨迹上算 return，更新 actor-critic。因为 shortcut forcing 让 rollout 足够快，策略可以学超过 20,000 步的长序列——Minecraft 挖钻石需要的量级。
+
+## 实验亮点
+
+**Minecraft 离线挖钻石**：从标准离线数据集（VPT 风格的人类游戏视频 + 少量 action 标签），零在线环境交互，DreamerV4 是第一个纯离线挖到钻石的智能体。任务需要 20,000+ 步的键鼠操作序列，从找树到合成工具到挖矿。
+
+**World model 质量**：在物体交互、合成配方、物理效果（重力、碰撞）的预测上，大幅超过之前的 RSSM-based world model（包括 V3）和 DIAMOND 等扩散 world model。语义级别的交互——比如"用工作台合成铁镐"——也能在想象中正确展开。
+
+**数据效率**：比 VPT（之前的 SOTA Minecraft agent）用 100 倍少的数据达到更好的性能。
+
+**实时交互**：单 GPU 上人类可以实时操作 world model 生成的 Minecraft 环境，帧率和视觉质量都 usable。这之前的 world model 方法基本做不到。
+
+**无标签视频预训练**：Tokenizer 和 dynamics 的大部分知识来自 diverse 无标签游戏视频，action conditioning 只用 ~100 小时有标签数据。说明 world model 的通用知识和 task-specific 控制可以 decouple。
+
+## 局限
+
+1. 仍然是在 Minecraft 这一个复杂环境里深度验证的。Transformer world model + shortcut forcing 在真实机器人视觉、连续物理上的泛化还没测。
+2. 预训练数据是游戏视频，跟真实世界的 domain gap 仍然存在。Tokenizer 对真实图像的重建质量未知。
+3. Shortcut forcing 的生成质量 vs 速度的 trade-off 需要仔细调。少步数下细节（小物体、文字 UI）可能丢。
+4. 整体 pipeline 复杂：tokenizer 预训练 → dynamics 预训练 → action 微调 → reward 微调 → 想象训练。工程量大，复现门槛比 V3 高很多。
+5. 离线设定虽然避免了 unsafe exploration，但离线数据的 coverage 决定了策略上限。数据里没有的行为模式，模型想象不出来，策略也学不到。
+
+## 与系列内其他工作的关系
+
+DreamerV4 是整条 PlaNet → Dreamer → V2 → V3 线的规模化延续，但架构上是一次大换血：
+
+| | PlaNet / Dreamer / V2 / V3 | DreamerV4 |
+|---|---|---|
+| 动力学模型 | RSSM (GRU + 离散 latent) | Transformer on tokens |
+| 训练数据 | 在线交互 | 大规模离线视频 + 少量 action 标签 |
+| 推理速度 | 慢（逐步 latent rollout） | 快（shortcut forcing, 实时） |
+| 想象 horizon | ~15 步 | 20,000+ 步 |
+
+[PlaNet](./01-PlaNet.mdx) 贡献了 RSSM 骨架，[Dreamer](./02-Dreamer.mdx) 贡献了想象 actor-critic，[DreamerV2](./03-DreamerV2.mdx) 贡献了离散 latent 和 KL balancing，[DreamerV3](./04-DreamerV3.mdx) 贡献了 cross-task 稳健化。V4 保留了"在想象里训策略"这个核心 loop，但 world model 本身已经变成了另一个物种。
+
+放到 WAM 的语境里，DreamerV4 跟 [Genie](../可交互生成环境/01-IRIS.mdx) 代表的方向有交集：都是从大规模视频预训练出发，学可交互的环境模型。区别是 Genie 的 latent action 是无标签推断出来的，V4 的 action 是真实键鼠输入；Genie 主要展示生成能力，V4 要的是在生成环境里训出能完成长 horizon 任务的策略。
+
+对 robotics 的启示很直接：如果 world model 足够准、足够快，策略可以几乎完全在想象里学，真实交互只用来采集数据和修模型。DreamerV4 在 Minecraft 里验证了这条路的可行性，下一步是把它搬到真实世界——那又是另一个量级的问题了。
+
+</WordCount>

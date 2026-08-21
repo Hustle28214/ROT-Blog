@@ -1,0 +1,80 @@
+import WordCount from '../../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+# IRIS：把世界模型当成语言模型来训
+
+论文：[Transformers are Sample-Efficient World Models](https://arxiv.org/abs/2209.00588)（Micheli et al.，ICLR 2023，arXiv 2022）。我的结论很直接：**离散 token + 自回归 Transformer 这条路在 Atari 100k 上走得通**——只给相当于两小时的真实游戏经验，IRIS 就能在想象环境里训出超过人类平均分的策略，而且不需要 lookahead search。它证明的不是"Transformer 万能"，而是"把动力学写成序列预测，样本效率可以非常夸张"。
+
+这是 [可交互生成环境](../可交互生成环境/01-IRIS.mdx) 系列的第一篇。下一篇 [DIAMOND](./02-DIAMOND.mdx) 会用扩散模型正面挑战 IRIS 的离散量化假设；再往后 [Genie](./03-Genie.mdx) 系列则把问题从"有动作标签的 RL"推向"无标签互联网视频"。
+
+## 1. 核心思路：Inner Speech 式的想象训练
+
+IRIS 全名 Imagination with auto-Regression over an Inner Speech。名字有点玄学，但结构很清晰：先用离散自编码器把每帧图像压成 $K$ 个 token，再用 GPT 式 Transformer 在 token 序列上自回归地预测下一帧、奖励和终止信号：
+
+$$
+p_\theta(x_{t+1}^{1:K}, r_t, d_t \mid x_{\le t}^{1:K}, a_{\le t})
+$$
+
+策略完全在这个"想象出来的 token 世界"里用 actor-critic 训练——真实环境只用来收集初始 100k 帧经验，之后几百万步 rollout 全在模型里完成。这跟 Dreamer 的 latent 想象是同一条哲学：**真实交互贵，想象交互便宜**；区别是 IRIS 的想象空间是离散的、可像语言一样逐 token 生成的。
+
+## 2. 两个模块怎么拼
+
+**离散自编码器（VQ-VAE 风格）**。每帧 $64 \times 64$ 的 Atari 观测被编码成 $K=16$ 个离散 token（$4 \times 4$ 的空间网格，每格一个 codebook index）。训练目标是重建原图，codebook 大小 512。这一步把连续像素变成"图像语言"的字母表。
+
+**自回归 Transformer（minGPT 骨架）**。输入是交错排列的历史帧 token 和动作 token。每个时间步：先预测下一帧的 $K$ 个 token（逐 token 自回归），再预测标量奖励和 done 标志。架构跟 GPT-2 block 一致——self-attention + FFN + residual + layer norm。动作通过 embedding table 注入，帧 token 有独立的 embedding table。上下文窗口覆盖最近 $L$ 帧，attention 可以直接 attend 到任意历史 token——这是它比 RSSM 固定维 hidden state 更适合长 horizon 想象的关键原因。
+
+推理时 rollout 就是标准的 autoregressive sampling：给定历史和动作，一帧一帧往后滚。策略网络在想象轨迹上更新 actor-critic；真实 Atari 环境只在最初 100k 帧收集阶段出现，之后所有 policy gradient 都来自模型内部的 rollout。
+
+## 3. Atari 100k 上的成绩
+
+Atari 100k 是这条线的标准考场：每个游戏只允许 100,000 帧交互（约两小时人类游戏时间），然后看智能体最终能玩多好。
+
+IRIS 的成绩：
+
+- **Mean human normalized score (HNS) = 1.046**，当时无 search 方法里的 SOTA；
+- **26 个游戏里 10 个超过人类**；
+- 作为对比，SimPLe、DreamerV2 等同预算方法大多在 0.5–0.9 区间。
+
+这个分数说明 token 化的信息损失在 Atari 尺度上还没成为瓶颈——至少对 actor-critic 来说，想象轨迹足够逼真，能支撑策略收敛。
+
+## 4. 为什么离散 token 能 work
+
+我觉得有三个原因叠在一起：
+
+1. **Atari 视觉本身低分辨率**。$64 \times 64$、色块分明，VQ 量化不容易丢决定性细节——至少不如后面 DIAMOND 论证的那么严重。
+2. **Transformer 的长程记忆比 GRU 强**。RSSM 的 $h_t$ 是固定维向量，十几步以后就开始糊；IRIS 用 attention 直接 attend 到任意历史 token，想象 horizon 可以拉更长。
+3. **自回归框架成熟**。训练稳定、实现简单、scaling recipe 清晰——跟 LLM 时代的基础设施是同一套。
+
+## 5. 离散化的代价
+
+IRIS 的成功不等于 token 化没有代价。论文和后续 [DIAMOND](./02-DIAMOND.mdx) 都指出的问题：
+
+- **块状伪影（blocky artifacts）**。VQ 重建会在物体边缘产生格子感，fast-moving 的小物体（子弹、敌人）尤其容易被糊掉或错位。
+- **策略 exploit 伪影**。想象环境里的量化噪声如果模式固定，策略可能学会"利用块状特征"而不是学真实动力学——这在 demo 里看不出来，换 seed 或稍微改渲染就崩。
+- **采样速度**。逐 token 自回归比单步 latent transition 慢，但比扩散模型快得多——这是 IRIS 相对 DIAMOND 的实际优势。
+
+## 6. 跟 Dreamer / MuZero 怎么定位
+
+| | IRIS | DreamerV3 | MuZero |
+| --- | --- | --- | --- |
+| 世界模型形式 | 离散 token 自回归 | RSSM latent | latent 动力学（无重建） |
+| 训练信号 | 重建 + RL in imagination | ELBO + RL in imagination | value equivalence + MCTS |
+| 需要真实交互 | 100k 帧收集 + 想象 | 同 | 在线交互 + 搜索 |
+| 生成质量 | 中等（块状） | 不生成像素 | 不生成像素 |
+
+IRIS 的独特位置是：**它既生成像素（通过 token 解码），又真的用生成质量影响策略性能**。Dreamer 的 latent 不给人看；MuZero 根本不重建观测。这是把 IRIS 跟 [Genie](./03-Genie.mdx) 放一条线上的原因——它们都在乎"生成出来的世界能不能交互"。
+
+## 7. 局限与后续
+
+IRIS 只在 Atari 上验证过，没有推广到 3D 游戏、机器人或互联网视频。动作空间是离散且已知的——跟 Genie 要解决的"无动作标签"问题是正交的。想象 horizon 虽然比 RSSM 长，但滚几十帧后 token 预测误差照样累积，长期一致性没有保证。另外，逐 token 自回归的 wall-clock 成本随 $K$ 线性涨——换高分辨率或 3D 观测时，这条路的推理预算会成为硬瓶颈。
+
+代码和预训练权重开源在 [github.com/eloialonso/iris](https://github.com/eloialonso/iris)，想复现想象训练流程这是个很好的起点。同一作者团队后来把 IRIS 的 tokenizer 换成扩散模型，就是 [DIAMOND](./02-DIAMOND.mdx)——两篇论文几乎构成一条完整的 controlled ablation。
+
+## 8. 我怎么看 IRIS 的历史位置
+
+放到 [WAM](../00-世界模型的起点与前沿.mdx) 的大图里，IRIS 是"生成式环境"线的奠基作：它第一个认真回答了"Transformer 能不能当世界模型"。答案是可以，但保真度上限在哪——[DIAMOND](./02-DIAMOND.mdx) 接棒回答了这个问题。再往后 [Genie](./03-Genie.mdx) 把 action 也 unsupervised 了，[Genie 2/3](./04-Genie2与Genie3.mdx) 则往 3D 实时推。
+
+如果你只想读一篇入门，[系列总览](../可交互生成环境/01-IRIS.mdx) 用四页篇幅压缩了整条线；想深入 token 化与想象训练的细节，IRIS 原文和开源代码都值得过一遍。下一篇：[DIAMOND](./02-DIAMOND.mdx)。
+
+</WordCount>

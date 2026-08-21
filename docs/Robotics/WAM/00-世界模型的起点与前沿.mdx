@@ -123,7 +123,7 @@ $$
 - [V-JEPA 2-AC](https://ai.meta.com/research/publications/v-jepa-2-self-supervised-video-models-enable-understanding-prediction-and-planning/)（2025）：以 action-conditioned latent world model 做目标条件规划，代表非像素生成路线。
 - [DreamZero](https://arxiv.org/abs/2602.15922)（2026）：在 14B 视频扩散骨干上联合建模视频和动作，以 7 Hz 做闭环控制，并展示视频数据的跨具身迁移。
 - [Cosmos 3](https://arxiv.org/abs/2606.02800)（NVIDIA，2026）：统一语言、图像、视频、音频和动作的 omnimodal world model，可按输入输出配置执行 forward dynamics、inverse dynamics 或 policy generation。
-- [MotionWAM](./01-MotionWAM.mdx)（2026）：不等待未来视频完整去噪，而是读取 Video DiT 的中间特征生成全身 motion latent，把人形机器人控制推进到 4.9 Hz。详见 [DiT4DiT](./06-DiT4DiT.mdx)（前身）和 [Cosmos Policy](./07-CosmosPolicy.mdx)（完整 denoise 对照）。
+- [MotionWAM](./Video-Action%20Model/03-MotionWAM.mdx)（2026）：不等待未来视频完整去噪，而是读取 Video DiT 的中间特征生成全身 motion latent，把人形机器人控制推进到 4.9 Hz。详见 [DiT4DiT](./Video-Action%20Model/01-DiT4DiT.mdx)（前身）和 [Cosmos Policy](./Video-Action%20Model/02-CosmosPolicy.mdx)（完整 denoise 对照）。
 
 这里“热门”指公开论文、代码或工业投入形成了密集进展，不代表这些方法已经解决开放世界机器人控制。尤其要检查三个容易被宣传掩盖的问题：
 
@@ -154,13 +154,26 @@ $$
 - **泛化**：新物体、新场景、新动作组合和新具身；
 - **安全**：不确定性是否校准，失败能否被检测和接管。
 
-## 7. 建议阅读顺序
+## 7. 栏目结构与阅读顺序
+
+本目录按五条主线拆成子栏目，每篇工作单独成文：
+
+| 栏目 | 包含工作 |
+| --- | --- |
+| [Latent 动力学与想象训练](./Latent动力学与想象训练/01-PlaNet.mdx) | PlaNet → Dreamer → DreamerV2 → DreamerV3 → DreamerV4 |
+| [决策等价世界模型](./决策等价世界模型/01-MuZero.mdx) | MuZero → TD-MPC → TD-MPC2 |
+| [可交互生成环境](./可交互生成环境/01-IRIS.mdx) | IRIS → DIAMOND → Genie → Genie 2/3 |
+| [JEPA](./JEPA/01-I-JEPA.mdx) | I-JEPA → V-JEPA → V-JEPA 2 → V-JEPA 2-AC |
+| [Video-Action Model](./Video-Action%20Model/01-DiT4DiT.mdx) | DiT4DiT → Cosmos Policy → MotionWAM |
+
+建议阅读顺序：
 
 1. **思想与基本范式**：Schmidhuber 1990 → Dyna → World Models；
-2. **latent model-based RL**：[PlaNet → Dreamer](./02-Dreamer系列.mdx) → [MuZero → TD-MPC2](./03-MuZero与TD-MPC2.mdx)；
-3. **可交互生成环境**：[IRIS → DIAMOND → Genie 系列](./04-可交互生成环境.mdx)；
-4. **抽象预测**：[I-JEPA → V-JEPA → V-JEPA 2-AC](./05-JEPA.mdx)；
-5. **机器人 WAM**：[DiT4DiT](./06-DiT4DiT.mdx) → [Cosmos Policy](./07-CosmosPolicy.mdx) → [MotionWAM](./01-MotionWAM.mdx)。
+2. **latent model-based RL**：[PlaNet](./Latent动力学与想象训练/01-PlaNet.mdx) → [DreamerV4](./Latent动力学与想象训练/05-DreamerV4.mdx)；
+3. **决策等价模型**：[MuZero](./决策等价世界模型/01-MuZero.mdx) → [TD-MPC2](./决策等价世界模型/03-TD-MPC2.mdx)；
+4. **可交互生成环境**：[IRIS](./可交互生成环境/01-IRIS.mdx) → [Genie 2/3](./可交互生成环境/04-Genie2与Genie3.mdx)；
+5. **抽象预测**：[I-JEPA](./JEPA/01-I-JEPA.mdx) → [V-JEPA 2-AC](./JEPA/04-V-JEPA2-AC.mdx)；
+6. **机器人 WAM**：[DiT4DiT](./Video-Action%20Model/01-DiT4DiT.mdx) → [Cosmos Policy](./Video-Action%20Model/02-CosmosPolicy.mdx) → [MotionWAM](./Video-Action%20Model/03-MotionWAM.mdx)。
 
 后续凡是以**学习环境动力学、动作条件未来、latent rollout、视频世界模拟或预测—动作联合建模**为核心的文章，都归入本 WAM 目录；纯 VLA、纯视频生成或传统控制工作只有在世界模型直接参与训练、规划或动作生成时才收入。
 

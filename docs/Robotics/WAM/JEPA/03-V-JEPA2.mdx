@@ -1,0 +1,81 @@
+import WordCount from '../../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+# V-JEPA 2：百万小时视频上的 foundation world model
+
+论文：[V-JEPA 2: Self-Supervised Video Models Enable Understanding, Prediction and Planning](https://arxiv.org/abs/2506.09985)（Meta，2025）。我的结论：**V-JEPA 2 把 [V-JEPA](./02-V-JEPA.mdx) 从"好用的 frozen backbone"推到了 foundation model 量级——理解、预测、LLM 对齐三条线同时 SOTA，并且 latent rollout 已经可以直接当世界模型用**，为后面的 action-conditioned 版本打了底。
+
+## 1. 规模变了，哲学没变
+
+Pre-training 数据：**超过 100 万小时**互联网视频 + 图像，依然是无动作标签、无 caption 的自监督。架构上还是 JEPA 三板斧：context encoder、窄 predictor、EMA target encoder，在 latent 空间做 masked prediction。
+
+跟 [V-JEPA](./02-V-JEPA.mdx) 比，变化主要在 scale 和 task breadth，不在范式：
+
+- 更大的 ViT backbone（ViT-g 量级）和更长的训练。
+- 同样的 spatio-temporal tube masking，multi-block 策略。
+- 新增 **LLM 对齐**和 **physical reasoning benchmark**，把"世界模型"从视觉表征学习推到可对话、可评测的层面。
+
+Scale 带来的不只是 benchmark 分数：百万小时数据让 latent 里出现了更稳定的 object permanence 和 contact dynamics 表征——Physics-IQ 上 V-JEPA 2 相对 V-JEPA 1 的 jump 主要来自这里，不是改 loss 改出来的。
+
+## 2. 理解：motion + anticipation SOTA
+
+几个代表性数字：
+
+- **Something-Something v2**（motion understanding）：77.3% top-1，超过 prior task-specific 方法。
+- **Epic-Kitchens-100**（human action anticipation）：recall@5 39.7%，新 SOTA。
+- **8B 参数 + LLM 对齐后**的 video QA：PerceptionTest 84.0、TempCompass 76.9，同量级最优。
+
+这些任务测的不是"重建像素像不像"，而是 **模型是否理解运动和因果**——物体怎么动、动作还没发生之前世界是什么状态。V-JEPA 2 在 frozen 设定下就能做到这个水平，说明百万小时 latent prediction 确实压出了 physical dynamics 的结构化知识。
+
+## 3. 预测：latent rollout 作为世界模型
+
+V-JEPA 2 的 predictor 可以在 latent 里自回归 rollout：给定当前可见帧的 embedding，预测未来若干步的 latent 轨迹。跟生成式世界模型（Dreamer、Cosmos）比：
+
+| | 生成式 WAM | V-JEPA 2 |
+| --- | --- | --- |
+| 预测对象 | 像素 / video latent | abstract embedding |
+| 推理成本 | 高（多步 denoise） | 低（一次前向 / 自回归 latent） |
+| 可视化 | 直接看未来帧 | 需要额外 decoder |
+| 物理细节 | 可能保留在像素里 | 可能在抽象过程中丢失 |
+
+我自己会把 V-JEPA 2 看成 **"能 roll 但看不见"的世界模型**：它 internal 地模拟了未来，但你不能直接 inspect 模拟画面。对 debug 是坏事，对实时规划是好事——后面 [V-JEPA 2-AC](./04-V-JEPA2-AC.mdx) 的 MPC 就是吃这个低推理成本。
+
+Meta 还发布了 **Physics-IQ** 等 physical reasoning benchmark，专门测 world model 在重力、碰撞、液体等场景下的预测一致性。V-JEPA 2 在这些 benchmark 上相对 prior 有显著提升，但离"真物理引擎"还有距离——更多是在统计意义上模仿物理，不是硬约束。
+
+一个值得单独说的点是 **anticipation vs prediction** 的区分：prediction 是"下一帧是什么"，anticipation 是"动作发生之前世界处于什么状态"。Epic-Kitchens recall@5 39.7% 说明 V-JEPA 2 的 latent 里编码了 action affordance 级别的信息——这对后面 V-JEPA 2-AC 用 goal image 做 planning 是必要的 precondition，虽然 Stage 1 本身还不接收 action。
+
+## 4. LLM 对齐：从 latent 到语言
+
+V-JEPA 2 有一个 8B 参数版本跟 LLM 做了 alignment：video encoder 的表征接到 LLM 上，做 video QA 和 reasoning。这说明 JEPA latent 不只服务 low-level control，也携带足够语义给 high-level 任务。
+
+对机器人 pipeline 的 implication 是：**同一个 pre-trained encoder 可能同时喂给语言 planner 和 motion planner**，不需要为理解和控制各训一套 backbone。当然，这跟 end-to-end 全身控制还差很远——V-JEPA 2-AC 目前只管固定基座机械臂。
+
+## 5. 两阶段训练路线图
+
+V-JEPA 2 论文明确画了分两阶段：
+
+1. **Stage 1（action-free）**：百万小时视频 pre-train，学 general physical understanding + latent dynamics。就是本篇讲的 V-JEPA 2 本体。
+2. **Stage 2（action-conditioned）**：冻结 Stage 1 的 encoder，用少量机器人数据训 action-conditioned predictor → [V-JEPA 2-AC](./04-V-JEPA2-AC.mdx)。
+
+这个 split 很关键：**大规模无动作视频负责学"世界怎么动"，少量有动作数据负责学"我推一下世界怎么变"**。跟 Dreamer 从 scratch 学 dynamics 比，样本效率高一个数量级——但 Stage 2 仍然需要 robot data，不能完全 zero-shot 出控制。
+
+Stage 1 encoder 冻结这个决定也值得关注：robot data 只有 62 小时，如果 end-to-end finetune 百万参数 encoder，很容易 catastrophic forgetting，把 internet video 上学到的 general physics 冲掉。冻结 encoder、只训 300M predictor，是在 **保留 general prior** 和 **适配 action causality** 之间的务实折中。
+
+## 6. 开源与复现
+
+Meta 开源了 V-JEPA 2 的 pre-trained checkpoint 和 eval 代码（`facebookresearch/vjepa2`）。Research 侧 reproducing understanding benchmark 相对直接；但要复现 Stage 2 的 robot planning，还需要自己接 MPC loop 和 low-level controller——论文给了 pipeline 描述，但没有 release 完整的 Franka 部署 stack。
+
+对我这种更关心 robotics 的人来说，V-JEPA 2 的价值在于 **提供了一个 frozen encoder 可以直接接 action head**，而不是从头训 video world model。62 小时 DROID 后训练就能出 planner，这个 ratio 在生成式 WAM 里很难复制。
+
+另一个 open question 是 LLM 对齐版本能不能直接输出 subgoal 序列——如果 language model 能根据指令生成 goal image 或 subgoal chain，V-JEPA 2-AC 的 visual goal interface 可以跟 VLA 的 language interface 互补，而不是二选一。Meta 还没有系统评测这条 pipeline。
+
+## 7. 还没解决的问题
+
+Latent 不可解释依旧是最硬的痛点：rollout 偏了你看不出来，真机上这是实打实的安全风险。另外 V-JEPA 2 的主战场还是 **understanding + short-horizon prediction**，长时 rollout 的 drift 有多大、对 MPC 的影响是什么，论文里的 closed-loop 评测还不够充分。
+
+跟 [生成式 WAM](../JEPA/01-I-JEPA.mdx) 的关系：V-JEPA 2 适合"我要快、我要 latent 规划、我不需要给人看模拟画面"；如果你需要 dynamics prior 直接参与 **动作生成**而且愿意付 denoise 成本，[DiT4DiT](../Video-Action Model/01-DiT4DiT.mdx) 和 [MotionWAM](../Video-Action%20Model/03-MotionWAM.mdx) 在走另一条路。两条路目前缺少同 benchmark、同 robot 平台的 head-to-head closed-loop 对比。
+
+下一篇进入机器人：**[V-JEPA 2-AC](./04-V-JEPA2-AC.mdx)**——62 小时 DROID 数据怎么够做零样本机械臂规划。
+
+</WordCount>

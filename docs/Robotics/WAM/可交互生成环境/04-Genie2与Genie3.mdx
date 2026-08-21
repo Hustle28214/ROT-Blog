@@ -1,0 +1,106 @@
+import WordCount from '../../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+# Genie 2 与 Genie 3：从 2D 平台到实时 3D 世界
+
+没有正式论文，只有 DeepMind 博客：[Genie 2](https://deepmind.google/discover/blog/genie-2-a-large-scale-foundation-world-model/)（2024 年 12 月）、[Genie 3](https://deepmind.google/discover/blog/genie-3-a-new-frontier-for-world-models/)（2025 年 8 月）。我的结论：**Genie 1 证明了"从视频学控制"可行，Genie 2/3 在拼的是另一个维度——3D、实时、长 horizon 一致性能不能同时成立吗？** 博客 demo 非常震撼，但缺少 ablation 和 benchmark，我会分开介绍两者进展，也会单独列评测时要小心的地方。
+
+前情：[Genie 1](./03-Genie.mdx) 用 8 个 latent action 从 2D 平台游戏视频里学出可控环境；[IRIS](./01-IRIS.mdx)/[DIAMOND](./02-DIAMOND.mdx) 在已知 action 的设定下把生成质量跟策略性能挂钩。Genie 2/3 试图把这些能力推到 foundation model 级别——但技术细节基本靠猜。
+
+## 1. Genie 2：单张图生成可操作的 3D 世界
+
+2024 年 12 月发布。相对 Genie 1 的核心 jump：
+
+**从 2D 到 3D**。Genie 1 的训练数据全是 side-scroller；Genie 2 在"大规模视频数据集"上训练（博客没给具体小时数），能生成第一人称、第三人称、等距视角等多样 3D 风格环境。
+
+**Prompt 方式**。输入从 Genie 1 的单帧图像扩展到 Imagen 3 文生图 → 选一张 → 进入世界。文本描述世界 → 生成图像 → 生成可交互 3D 环境，三步流水线。
+
+**动作接口**。键盘 + 鼠标，比 Genie 1 的 8 离散 action 丰富得多。模型需要自己 figure out 哪个键控制角色、哪个控制视角——博客 demo 里机器人、人类、载具都能正确响应。
+
+### 1.1 架构（博客披露的部分）
+
+Genie 2 是 **autoregressive latent diffusion model**：
+
+- 视频帧过 autoencoder 压到 latent space；
+- Latent frame 序列喂给大型 Transformer dynamics model（causal mask，跟 LLM 一样）；
+- 推理时逐帧 autoregressive：给 action + 历史 latent → 采样下一帧 latent → decode 回像素；
+- 用 classifier-free guidance 增强 action controllability。
+
+这跟 [DIAMOND](./02-DIAMOND.mdx) 的"像素扩散 + 自回归 rollout"是同一 family，但 scale 大得多，而且 latent diffusion 比纯像素扩散快——博客提到有 distilled 版本可以 real-time 运行，质量有所下降。
+
+### 1.2 博客展示的 emergent 能力
+
+Genie 2 没有 benchmark 数字，靠 demo 说话：action controllability（按键真控制角色而非沿常见轨迹外推）、counterfactual generation（同一起帧不同 action → 不同轨迹）、long-horizon memory（物体出视野再回来外观一致，最长 ~1 分钟但 demo 多在 10–20 秒）、3D 结构/NPC/物理效果（门能开、水有流体——"看起来对"不等于物理引擎保证）、OOD prompt（真实照片也能变可操作环境）。
+
+### 1.3 跟 SIMA agent 的闭环
+
+Genie 2 博客里最硬的一个实验：用 Genie 2 生成 SIMA agent 没见过的 3D 环境（两扇门一红一蓝），给自然语言指令 "Open the blue door"，SIMA 在 Genie 2 生成的世界里执行。
+
+这说明 DeepMind 想走的是 **Genie 生成环境 → SIMA 在里面训练/评估** 的 pipeline。但目前是 research demo，不是 product——SIMA 的控制粒度和 Genie 2 的生成稳定性都还有明显 gap。
+
+## 2. Genie 3：实时 720p，分钟级一致
+
+2025 年 8 月发布。Genie 2 解决了"能不能生成 3D 可交互世界"，Genie 3 解决的是"能不能 **实时** 交互、**长时间** 保持一致"：
+
+| 能力 | Genie 2 | Genie 3 |
+| --- | --- | --- |
+| 分辨率 | 未明确（估计 480p 量级） | **720p** |
+| 帧率 | 非实时（base model）；distilled 版可实时但质量降 | **24 FPS 实时** |
+| 一致性 horizon | 10–20 秒为主，最长 ~1 分钟 | **数分钟**，视觉记忆回溯 ~1 分钟前 |
+| Prompt 方式 | 单张图（通常来自 Imagen 3） | **文本直接生成** |
+| 新能力 | — | **Promptable world events** |
+
+### 2.1 实时交互的技术挑战
+
+Genie 3 博客专门写了一节。核心矛盾：autoregressive 每帧生成时，模型要 attend 到全部历史 trajectory——历史随时间线性增长，计算量也线性涨。要 24 FPS 意味着每帧预算 ~40ms，包括用户 action 到达、模型推理、帧解码。
+
+Genie 3 的解决方案博客没展开（没有论文），只说是 "significant technical breakthroughs"。从 demo 看确实做到了实时——但不知道 compute budget 多大、能不能在消费级 GPU 上跑。
+
+### 2.2 Promptable world events
+
+Genie 3 的新交互维度：除了 navigational action（走、看、跳），还可以用 **文本 prompt 改变世界的规则**——
+
+- "开始下雨"、"在前方生成一堵墙"；
+- 改变天气、引入新角色、修改物理规则。
+
+这本质上是在运行时做 conditional generation 的 mid-trajectory intervention。对 agent training 的价值：可以程序化地生成 counterfactual scenario（"如果突然下雨 agent 怎么办"），不用重新生成整个世界。
+
+### 2.3 一致性：Genie 3 最强调的卖点
+
+博客 demo 里粉刷过的墙、传送门两侧的沙漠、雅典神庙的柱子，移出视野再回来都保持一致。Genie 3 说 consistency 是 **emergent capability**——不靠 NeRF / Gaussian Splatting 式显式 3D 表示，而是 frame-by-frame 生成时模型自己维持世界状态。horizon 从 Genie 2 的 10–20 秒推到数分钟，是真实的进步。
+
+### 2.4 与 SIMA 2 的配合
+
+Genie 3 博客展示了 SIMA agent 在 Genie 3 生成的世界里执行更长、更复杂的目标序列——找路、进传送门、探索建筑内部。一致性提升直接解锁了更长的 agent episode。
+
+## 3. 博客没告诉你的：局限
+
+Genie 3 自己列了 limitations，我补充一些从 demo 里读出来的：
+
+Genie 2：demo 多在 10–20 秒（1 分钟是上限），base model 非实时，无公开 benchmark，3D 一致性无 guarantee。Genie 3 自己承认：action space 仍有限（promptable events 是环境级干预，不是 agent 精细 motor control）、multi-agent 交互弱、真实地理不准、文本渲染差、交互 ~几分钟而非小时级，且只是 limited research preview——大部分研究者没法独立复现。
+
+## 4. 怎么评测这类 demo
+
+这条线的 demo 特别有说服力，也特别容易过度解读。我会分开看四件事（跟 [系列总览](../可交互生成环境/01-IRIS.mdx) 一致）：可控性（同一起帧不同 action 输出是否真不同）、物体永久性（出视野再回来是否同一物体）、长时一致性（几分钟后几何/光照是否漂移）、物理守恒（违反物理的"顺眼画面"对 agent training 比随机噪声更有害）。
+
+## 5. 三代 Genie 放一起
+
+| | Genie 1 | Genie 2 | Genie 3 |
+| --- | --- | --- | --- |
+| 发布 | 2024.02 论文 | 2024.12 博客 | 2025.08 博客 |
+| 维度 | 2D 平台 | 3D 多样视角 | 3D + 实时 |
+| 动作 | 8 latent actions | 键鼠 | 键鼠 + 文本事件 |
+| Prompt | 单帧图像 | Imagen 3 文生图 | 文本 |
+| 一致性 | 未系统评测 | 10–20s | 数分钟 |
+| 技术细节 | 论文完整 | 博客 partial | 博客 partial |
+
+## 6. 在 WAM 大图里的位置
+
+Genie 2/3 跟 [IRIS](./01-IRIS.mdx)/[DIAMOND](./02-DIAMOND.mdx)/[Genie 1](./03-Genie.mdx) 的关系：前者要的是 **策略性能**（HNS 数字说话），后者要的是 **环境生成能力**（demo 说话）。两条线在 DeepMind 的 vision 里最终汇合——Genie 生成世界，SIMA 在里面训练——但目前还没有一个实验同时报告"Genie 生成的环境"和"在该环境中训出的 agent 性能"。
+
+放到 [WAM](../00-世界模型的起点与前沿.mdx) 语境里，Genie 2/3 代表"生成式环境"线的最前沿，但跟 [DiT4DiT](../Video-Action Model/01-DiT4DiT.mdx) 和 [MotionWAM](../Video-Action Model/03-MotionWAM.mdx) 形成对比——后两者为了实时控制 **不生成视频**，Genie 3 反过来用 24 FPS 生成换可控性。哪条路更适合机器人，2025 年还没有定论。
+
+系列回顾：[IRIS](./01-IRIS.mdx) → [DIAMOND](./02-DIAMOND.mdx) → [Genie](./03-Genie.mdx) → **Genie 2/3**（本篇）。
+
+</WordCount>

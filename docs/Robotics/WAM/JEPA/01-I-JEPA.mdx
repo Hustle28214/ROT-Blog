@@ -1,0 +1,82 @@
+import WordCount from '../../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+# I-JEPA：图像上的联合嵌入预测
+
+论文：[Self-Supervised Learning from Images with a Joint-Embedding Predictive Architecture](https://arxiv.org/abs/2301.08243)（Meta FAIR，CVPR 2023）。我的结论很直接：**JEPA 这条线的起点不是"画像素"，而是在表征空间里做预测**——I-JEPA 把这件事在 ImageNet 上跑通了，而且比 MAE 更省算力、表征更语义化。
+
+## 1. 它到底在预测什么
+
+给定一张图，随机切出一块大的 context 区域和若干 target 区域。context encoder 只看可见块，predictor 从 context 的 latent 去预测 target 块的表征；target 的 ground truth 来自另一个 encoder 分支，权重是 context encoder 的 EMA，不回传梯度：
+
+$$
+\hat{z}_{\text{target}} = g_\theta(x_{\text{context}}), \qquad
+\mathcal{L} = \left\|\hat{z}_{\text{target}} - \mathrm{sg}(f_\phi(x_{\text{target}})\right\|_2^2
+$$
+
+没有 pixel decoder，没有对比学习的负样本对，也没有 hand-crafted augmentation 当核心 inductive bias。predictor 被迫学"从已知推断未知"，而不是走捷径去复制输入纹理。
+
+跟 MAE 的关键区别在这里：MAE 重建的是被遮住的**像素 patch**；I-JEPA 重建的是被遮住的**语义 patch 的 embedding**。像素重建会把大量容量花在纹理细节上，而控制、检测、分类真正需要的往往是物体部件、空间关系这类抽象结构。
+
+## 2. Masking 才是灵魂
+
+I-JEPA 能不能学到语义表征，几乎完全取决于 masking 策略。论文里有两条硬规则：
+
+1. **target block 要够大**——默认 4 个 target，每个占图像 15%–20%，aspect ratio 在 0.75–1.5 之间随机。遮小块的话 predictor 可以靠邻域插值糊弄过去，学不到物体级结构。
+2. **context block 要够信息**——默认 1 个 context，占 85%–100%，正方形；并且把跟 target 重叠的区域从 context 里抠掉，保证预测任务非平凡。
+
+还有一个容易忽略的实现细节：target 是在 **target-encoder 的输出上**做 mask，不是在输入像素上。ablation 表明这样做 prediction target 更语义化，linear probe 也更好。
+
+## 3. 架构与训练
+
+三块网络：
+
+- **Context encoder**：标准 ViT，只处理可见 context patch。
+- **Predictor**：更窄的 ViT（深度大约只有 encoder 一半），接收 context token + 带位置编码的 mask token，输出 target 位置的预测 embedding。
+- **Target encoder**：跟 context encoder 同架构，权重用 EMA 缓慢跟踪 context encoder，全程 stop-gradient。
+
+Target encoder 用 EMA 而不是 stop-gradient 的 copy，是为了让 prediction target 在训练过程中缓慢移动，避免 representation collapse——这跟 BYOL、MoCo v3 一脉相承，但 I-JEPA 不需要 negative pairs。
+
+训练细节跟 MAE 类似：LARS optimizer、16384 batch size、ImageNet-1K 300 epoch pretrain。ViT-Huge/14 在 16 张 A100 上训不到 72 小时，linear probe 72.9% top-1。同算力下 MAE ViT-H/14 大约 67.8%，I-JEPA 表征质量更高且训练更稳。
+
+更关键的是下游泛化：object counting、depth prediction、semantic segmentation 这些需要空间理解的任务，I-JEPA 比同规模 MAE 和 SimCLR 都稳。论文 argument 是——预测大块 semantic region 的 embedding，比重建 pixel patch 更强迫模型学 object-part 和 spatial layout。
+
+我自己复现时的体感是：predictor 故意做窄这件事很重要。它容量不够大，就没法把 context 表征原样搬运到 target 位置，必须真正做推断。一旦把 predictor 加宽到跟 encoder 一样，linear probe 会掉几个点。
+
+## 4. 跟 contemporaries 怎么比
+
+| | I-JEPA | MAE | SimCLR / DINO |
+| --- | --- | --- | --- |
+| 预测对象 | target patch embedding | 像素 patch | 全局/局部对比 |
+| 负样本 | 不需要 | 不需要 | 需要大量负样本 |
+| Augmentation | 不依赖 | 不依赖 | 强依赖 |
+| 算力 | 低（无 decoder） | 中（pixel decoder） | 高（大 batch 对比） |
+
+I-JEPA 证明了一件事：**自监督不一定非要生成像素，也不一定非要对比学习**。在 joint-embedding 空间里做 block-level 预测，照样能学出可迁移的视觉 backbone。
+
+论文还做了 scaling law 分析：ViT-S/B/L/H 四个规模，I-JEPA 的 linear probe 随模型大小稳定上升，没有 contrastive 方法常见的 collapse 问题。对工业界来说，这意味着 JEPA 训练 pipeline 相对 "好调"——不需要精心 tune temperature、negative queue size 这些超参。
+
+## 5. 为什么不用 pixel decoder
+
+LeCun 反复强调 JEPA 的立场：**世界模型应该预测"世界的状态抽象"，而不是预测每一个感官输入**。对机器人控制来说，你关心的是"杯子还在不在桌上、会不会倒"，不是"下一帧里杯子高光怎么反射"。
+
+生成式方法（MAE、VideoMAE、扩散世界模型）把 capacity 花在重建纹理上，这些细节对 downstream 常常是 nuisance factor。I-JEPA 用 block-level embedding prediction 把 supervision signal 聚焦到 semantic structure——实验上，同样的 ViT backbone，I-JEPA 在 depth estimation 和 object counting 上 consistently 优于 MAE。
+
+当然，不重建像素也意味着你失去了最直接的 debug 手段：MAE 重建糊了至少能看到，I-JEPA latent 预测偏了完全无感。对 robotics 来说，这个 trade-off 到 [V-JEPA 2-AC](./04-V-JEPA2-AC.mdx) 会变成真机上的硬问题——MPC 在错的 latent rollout 上 confidently 优化，失败模式很难从外部观测诊断。
+
+## 6. 局限与对后续的影响
+
+I-JEPA 是静态图像方法，学不到运动、遮挡、物体持续性——这些对视频和机器人控制是硬需求。另外它假设 target block 跟 context block 来自**同一张图**，没有 cross-view 或 temporal 结构，表征里没有时间维度。
+
+从 LeCun 的架构图看，I-JEPA 是 JEPA 家族里"最干净"的原型：没有 action、没有时间、没有 decoder。理解它，后面三篇的增量（tube mask → million-hour scale → action conditioning）就都很清晰。
+
+但它给 [V-JEPA](./02-V-JEPA.mdx) 铺好了整套 recipe：EMA target encoder、窄 predictor、大块 masking、latent-space loss。视频版 essentially 就是把 2D rectangle mask 换成 3D spatio-temporal tube mask，其余骨架不动。Yann LeCun 从 I-JEPA 开始推的 "world model = abstract prediction" 叙事，到 V-JEPA 2-AC 才算真正碰到机器人控制。
+
+放到 [WAM](../JEPA/01-I-JEPA.mdx) 的语境里，I-JEPA 回答的是"抽象预测作为表征学习是否可行"；真正跟世界模型、机器人规划接上的，要从 V-JEPA 系列才开始。
+
+官方实现见 [facebookresearch/jepa](https://github.com/facebookresearch/jepa)，I-JEPA 和 V-JEPA 的 pretrain / eval 代码都在里面。
+
+下一篇把 masking 从 2D 升级到 spatio-temporal tube：[V-JEPA](./02-V-JEPA.mdx)。
+
+</WordCount>

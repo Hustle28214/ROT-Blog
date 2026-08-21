@@ -1,0 +1,8 @@
+{
+  "label": "可交互生成环境",
+  "position": 3,
+  "link": {
+    "type": "generated-index",
+    "description": "IRIS、DIAMOND、Genie 系列：用神经网络生成可操作的交互式环境。"
+  }
+}

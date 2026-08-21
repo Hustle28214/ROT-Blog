@@ -1,0 +1,278 @@
+import WordCount from '../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+# NeRF：从新视角合成到稠密神经 SLAM
+
+NeRF（Neural Radiance Fields，神经辐射场）用一个可微函数表示场景，并通过体渲染把三维场映射为图像。它最初解决的是**已知相机内参和位姿时的新视角合成**，而不是定位；NeRF-SLAM 则把相机位姿也作为待估变量，使渲染误差同时服务于 tracking 与 mapping。
+
+## 1. 它表示的不是点、体素或三角形
+
+| 表示 | 存储内容 | 查询与渲染 | 对 SLAM 的典型意义 |
+| --- | --- | --- | --- |
+| 点云 | 离散三维点，可附颜色/法向 | 投影、splatting；点间为空 | 配准直接，几何显式，但表面不连续 |
+| TSDF | 体素到最近表面的截断有符号距离 | 零水平集 ray casting | 易融合深度、提取 mesh，但分辨率受体素限制 |
+| Mesh | 顶点、边、三角面及材质 | 光栅化 | 表面与拓扑显式，适合碰撞和规划 |
+| NeRF | 连续坐标上的密度与视角相关颜色 | 沿射线积分 | 表达连续、可微、照片级；几何是隐式的 |
+
+NeRF 的“密度” $\sigma$ 不是占据概率，也不是 SDF。高密度区域会终止光线，因此其等密度面常能近似表面，但把 NeRF 直接当作精确几何地图并不稳妥。若任务需要可碰撞表面、可度量距离或网格拓扑，SDF/TSDF 或显式 mesh 往往更自然；NeRF 的强项是外观建模和可微渲染。
+
+## 2. 辐射场与相机射线
+
+经典 NeRF 是一个由参数 $\theta$ 控制的连续函数：
+
+$$
+F_\theta:(\mathbf{x},\mathbf{d})\mapsto
+\bigl(\sigma(\mathbf{x}),\mathbf{c}(\mathbf{x},\mathbf{d})\bigr),
+$$
+
+其中 $\mathbf{x}\in\mathbb{R}^3$ 是世界坐标，单位方向 $\mathbf{d}\in\mathbb{S}^2$ 表示观察方向，$\sigma\ge 0$ 是体密度，$\mathbf{c}\in[0,1]^3$ 是 RGB 辐射度。通常令 $\sigma$ 只依赖位置，而颜色还依赖方向，以表达镜面反射等视角相关效应。
+
+给定像素齐次坐标 $\tilde{\mathbf{p}}=(u,v,1)^\mathsf{T}$、内参 $K$ 和相机到世界变换 $T_{wc}=[R_{wc}\mid\mathbf{t}_{wc}]$，世界系射线为
+
+$$
+\mathbf{r}(t)=\mathbf{o}+t\mathbf{d},\qquad
+\mathbf{o}=\mathbf{t}_{wc},\qquad
+\mathbf{d}=
+\frac{R_{wc}K^{-1}\tilde{\mathbf{p}}}{\left\|R_{wc}K^{-1}\tilde{\mathbf{p}}\right\|_2},
+\quad t\in[t_n,t_f].
+$$
+
+$t_n,t_f$ 是近、远采样边界；实现中必须与坐标系、深度单位和位姿方向约定一致。
+
+<svg
+  viewBox="0 0 900 430"
+  role="img"
+  aria-label="NeRF 相机射线从相机中心穿过像素，在近远平面之间采样，并以前向透射率进行 alpha 合成"
+  style={{ width: '100%', height: 'auto', color: 'var(--ifm-font-color-base)', background: 'var(--ifm-background-surface-color)', borderRadius: '10px' }}
+>
+  <defs>
+    <marker id="nerf-ray-arrow-20260821" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="currentColor" />
+    </marker>
+  </defs>
+
+  <g fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="M75 190 L135 155 L135 225 Z" />
+    <circle cx="75" cy="190" r="6" fill="currentColor" />
+    <line x1="75" y1="190" x2="760" y2="105" markerEnd="url(#nerf-ray-arrow-20260821)" />
+    <line x1="250" y1="100" x2="250" y2="265" strokeDasharray="7 6" />
+    <line x1="705" y1="45" x2="705" y2="210" strokeDasharray="7 6" />
+    <line x1="135" y1="155" x2="135" y2="225" strokeWidth="5" opacity="0.55" />
+  </g>
+
+  <g fill="currentColor" fontSize="15" fontFamily="system-ui, sans-serif">
+    <text x="34" y="224">相机中心 o</text>
+    <text x="103" y="145">像平面</text>
+    <text x="140" y="185">像素 p</text>
+    <text x="218" y="88">近平面 tₙ</text>
+    <text x="675" y="34">远平面 t_f</text>
+    <text x="500" y="82">r(t) = o + td</text>
+  </g>
+
+  <g stroke="currentColor" strokeWidth="2">
+    <circle cx="290" cy="163" r="7" fill="#4c9aff" />
+    <circle cx="385" cy="151" r="10" fill="#36b37e" />
+    <circle cx="485" cy="139" r="14" fill="#ffab00" />
+    <circle cx="590" cy="126" r="19" fill="#ff5630" />
+    <circle cx="670" cy="116" r="8" fill="#6554c0" />
+  </g>
+
+  <g fill="currentColor" fontSize="14" fontFamily="system-ui, sans-serif">
+    <text x="278" y="190">t₁</text>
+    <text x="374" y="181">t₂</text>
+    <text x="474" y="177">t₃</text>
+    <text x="579" y="172">t₄</text>
+    <text x="659" y="145">t₅</text>
+    <text x="54" y="314">前向合成：</text>
+  </g>
+
+  <g fontFamily="system-ui, sans-serif" fontSize="14" textAnchor="middle">
+    <rect x="165" y="282" width="105" height="48" rx="7" fill="#4c9aff" opacity="0.9" />
+    <rect x="310" y="282" width="105" height="48" rx="7" fill="#36b37e" opacity="0.9" />
+    <rect x="455" y="282" width="105" height="48" rx="7" fill="#ffab00" opacity="0.9" />
+    <rect x="600" y="282" width="105" height="48" rx="7" fill="#ff5630" opacity="0.9" />
+    <g fill="#111827">
+      <text x="217" y="311">T₁ α₁ c₁</text>
+      <text x="362" y="311">T₂ α₂ c₂</text>
+      <text x="507" y="311">T₃ α₃ c₃</text>
+      <text x="652" y="311">T₄ α₄ c₄</text>
+    </g>
+  </g>
+
+  <g fill="none" stroke="currentColor" strokeWidth="2" markerEnd="url(#nerf-ray-arrow-20260821)">
+    <line x1="270" y1="306" x2="300" y2="306" />
+    <line x1="415" y1="306" x2="445" y2="306" />
+    <line x1="560" y1="306" x2="590" y2="306" />
+    <line x1="705" y1="306" x2="770" y2="306" />
+  </g>
+  <text x="785" y="312" fill="currentColor" fontSize="15" fontFamily="system-ui, sans-serif">Ĉ(r)</text>
+  <text x="165" y="370" fill="currentColor" fontSize="15" fontFamily="system-ui, sans-serif">
+    采样点越不透明，α 越大；后续样本的透射率 T 越小。
+  </text>
+</svg>
+
+## 3. 连续体渲染与离散 alpha 合成
+
+射线在 $t$ 之前未被吸收的透射率为
+
+$$
+T(t)=\exp\left(-\int_{t_n}^{t}\sigma(\mathbf{r}(s))\,ds\right).
+$$
+
+像素的期望颜色是连续体渲染积分：
+
+$$
+\hat{\mathbf{C}}(\mathbf{r})
+=\int_{t_n}^{t_f}
+T(t)\,\sigma(\mathbf{r}(t))\,
+\mathbf{c}(\mathbf{r}(t),\mathbf{d})\,dt.
+$$
+
+实际计算在有序样本 $t_1<\cdots<t_N$ 上离散化。令 $\delta_i=t_{i+1}-t_i$，
+
+$$
+\alpha_i=1-\exp(-\sigma_i\delta_i),\qquad
+T_i=\prod_{j=1}^{i-1}(1-\alpha_j)
+=\exp\left(-\sum_{j<i}\sigma_j\delta_j\right),
+$$
+
+则
+
+$$
+\hat{\mathbf{C}}(\mathbf{r})
+=\sum_{i=1}^{N}w_i\mathbf{c}_i,\qquad
+w_i=T_i\alpha_i.
+$$
+
+若使用背景色 $\mathbf{c}_{bg}$，还应加上
+$T_{N+1}\mathbf{c}_{bg}$。同一组权重也可给出期望深度
+$\hat D(\mathbf{r})=\sum_iw_it_i$，但在多峰密度或透明区域中，期望深度不一定对应真实表面。
+
+## 4. 位置编码、MLP 与分层采样
+
+普通 MLP 有低频偏置，难以拟合纹理和锐利边界。原始 NeRF 先对坐标做多频正弦位置编码：
+
+$$
+\gamma(\mathbf{x})=
+\left[
+\mathbf{x},
+\sin(2^0\pi\mathbf{x}),\cos(2^0\pi\mathbf{x}),
+\ldots,
+\sin(2^{L-1}\pi\mathbf{x}),\cos(2^{L-1}\pi\mathbf{x})
+\right].
+$$
+
+网络先由 $\gamma(\mathbf{x})$ 预测 $\sigma$ 和几何特征，再结合 $\gamma(\mathbf{d})$ 预测颜色。这种分支结构避免观察方向改变几何密度。高频越多并非越好：位姿噪声、运动模糊或稀疏观测会被一并拟合，SLAM 中常采用由低到高启用频带、正则化或几何先验。
+
+原始 NeRF 使用两级网络进行**分层采样**：
+
+1. coarse 网络在 $[t_n,t_f]$ 的分段区间内做抖动均匀采样；
+2. 将 coarse 权重 $w_i$ 归一化为分段 PDF；
+3. 对其 CDF 做逆变换采样，在可能有表面的区域增加样本；
+4. 合并样本并排序，由 fine 网络渲染最终颜色。
+
+这不是简单地选取最大权重点：保留随机采样可覆盖多个潜在表面并提供较低偏差的训练信号。占据网格、空空间跳过等加速方法可进一步避免在空区域反复查询网络。
+
+## 5. 训练目标与原始 NeRF 的位姿限制
+
+最基本的光度损失为
+
+$$
+\mathcal{L}_{rgb}
+=\sum_{\mathbf{r}\in\mathcal{R}}
+\left\|\hat{\mathbf{C}}(\mathbf{r})-\mathbf{C}(\mathbf{r})\right\|_2^2.
+$$
+
+原始 NeRF 对 coarse 与 fine 输出都计算该损失。深度可用时，还可加入
+$\mathcal{L}_{depth}$；SLAM 系统也常加入 SDF/自由空间约束、密度稀疏性、相邻帧一致性、位姿平滑或不确定性加权。光度损失隐含亮度恒常假设，曝光变化、滚动快门、动态物体和非朗伯反射都会产生系统误差。
+
+关键限制是：**原始 NeRF 假设训练图像的相机内参和外参已知**，常由 COLMAP 等 SfM 工具预先估计。错误位姿会把同一表面投到互相冲突的位置，网络可能用模糊几何或视角相关颜色“解释”误差。因此，直接训练一个 NeRF 并不自动完成 SLAM。
+
+## 6. NeRF-SLAM：tracking 与 mapping
+
+NeRF-SLAM 通常交替优化两类变量：
+
+- **Tracking**：固定当前地图参数 $\theta$，对当前帧位姿 $\boldsymbol{\xi}_t\in\mathfrak{se}(3)$ 最小化渲染的 RGB、深度或特征残差；
+- **Mapping**：从关键帧采样射线，固定或小幅调整位姿，更新辐射场参数；
+- **联合优化**：在局部窗口内同时更新 $\theta$ 与若干关键帧位姿，作用类似局部 bundle adjustment；
+- **关键帧管理**：按视差、覆盖率、时间间隔或跟踪质量插入关键帧，并通过重采样旧关键帧抑制遗忘。
+
+一个典型闭环是：
+
+```text
+输入 RGB(/D)
+    ↓
+用当前地图渲染预测 ──→ 优化当前位姿（tracking）
+    ↑                              ↓
+地图参数更新 ← 关键帧射线重放 ← 判断并插入关键帧
+    └──── 局部联合优化 / 回环位姿修正后再优化地图 ────┘
+```
+
+位姿与地图之间存在“鸡生蛋”问题：差地图导致错误 tracking，错误位姿又污染地图。工程上需要良好初始化、粗到细优化、鲁棒损失、有效像素筛选，并在跟踪失败时重定位。单目系统还存在全局尺度不可观测性；RGB-D、双目、IMU 或已知尺度先验可约束尺度。
+
+### 代表性思路
+
+- **iMAP**：较早展示了在线联合优化隐式场景网络和相机位姿；通过主动选择像素与关键帧降低计算量，但单一全局 MLP 的容量和扩展性有限。
+- **NICE-SLAM**：采用分层特征网格，将 coarse/mid/fine 几何与颜色解码分开，并利用 RGB-D 监督改善大场景几何和局部更新。
+- **Co-SLAM**：结合坐标编码与稀疏参数化，强调几何—颜色联合表示、全局一致性和更高效的在线优化。
+
+这些方法代表不同设计轴，而非固定的性能排名；输入模态、场景尺度、硬件、评测协议和是否允许离线优化都会改变结论。后续系统还广泛探索 SDF 辐射场、张量/平面分解、局部子地图、语义特征与回环融合。
+
+## 7. Instant-NGP 与多分辨率哈希编码
+
+Instant-NGP 用多分辨率哈希网格替代固定的正弦位置编码。对每个层级，将 $\mathbf{x}$ 落入网格单元，查询八个顶点的可学习特征并三线性插值；顶点索引经哈希映射到有限大小的表，再拼接各层特征交给小型 MLP。低分辨率层表达整体结构，高分辨率层表达细节。
+
+它显著减少大 MLP 的计算并加快训练/渲染，但“instant”不等于任何 NeRF-SLAM 都能实时：哈希冲突、显存带宽、每射线采样数、位姿优化迭代和关键帧回放仍有成本。哈希特征也可能快速吸收错误位姿或动态观测，必须配合地图更新策略和正则化。
+
+## 8. 与 3D Gaussian Splatting 的客观比较
+
+3D Gaussian Splatting（3DGS）以带位置、协方差、不透明度和颜色/球谐系数的显式高斯基元表示场景，并将其投影后排序合成。二者都支持可微的新视角渲染，但权衡不同：
+
+- **渲染**：3DGS 通常利用光栅化获得更高的实时渲染吞吐；NeRF 需要沿每条射线多次查询，虽可借助占据网格、哈希编码等加速。
+- **表示**：NeRF 是连续函数参数化，内存与网络/网格规模相关；3DGS 是显式基元集合，编辑、裁剪和可视化较直接，但基元数可能增长并占用较多显存。
+- **几何**：标准 NeRF 的密度与标准 3DGS 的高斯中心都不天然等于精确表面。要获得高质量 mesh，二者通常都需要深度、法向、SDF 或表面正则。
+- **SLAM 优化**：二者都能从渲染残差求位姿梯度。3DGS 的快速渲染有利于 tracking；NeRF/SDF 混合表示则常提供更平滑的连续查询或更明确的几何约束。实际稳定性取决于初始化、可见性、地图增删策略和传感器，而不只取决于表示名称。
+
+因此应按任务选择：照片级在线重建与快速显示可能偏向 3DGS；需要连续场查询、紧凑隐式先验或与 SDF 结合时，NeRF 系方法仍有优势。
+
+## 9. 现实限制
+
+1. **动态场景**：静态辐射场会把运动物体烘焙成重影或浮游密度，并干扰位姿。可用语义/运动掩码剔除动态射线，或显式建模时间与物体级场，但参数和可观测性更复杂。
+2. **灾难性遗忘**：在线仅训练最新帧会覆盖旧区域。关键帧经验回放、覆盖均衡采样、局部子地图和参数冻结可以缓解，不能保证彻底消除。
+3. **尺度与无界场景**：全局 MLP 或固定网格难随场景无限扩展；单目尺度还有规范自由度。常见对策是坐标收缩、分块地图、层次结构及多传感器尺度约束。
+4. **实时性**：tracking 需要低延迟，而 mapping、回环和全局一致性优化计算密集。系统宣称“实时”时应检查硬件、分辨率、帧率、是否异步、是否包含建图和回环，而不能只看渲染 FPS。
+5. **鲁棒性**：低纹理、重复纹理、曝光突变、快速运动和窄视场都会让纯光度优化退化。特征、深度、IMU 与传统前端仍很有价值。
+
+## 10. 如何评测
+
+渲染质量与定位质量回答不同问题，不能互相替代。
+
+### 新视角合成
+
+- **PSNR**：由像素 MSE 得到，越高越好；易计算，但对轻微错位敏感，也不完全符合感知质量。
+- **SSIM**：比较局部亮度、对比度和结构，越高越好；比 PSNR 更关注结构，但仍是局部统计指标。
+- **LPIPS**：比较深度网络特征距离，通常越低越好；较接近感知差异，但受所用骨干网络和实现影响。
+
+应在未参与优化的测试视角上评测，并统一曝光、掩码、图像尺寸和颜色空间。只在训练视角上取得高 PSNR 可能只是过拟合。
+
+### 轨迹
+
+- **ATE（Absolute Trajectory Error）**：将估计轨迹与真值按 SE(3) 或 Sim(3) 对齐后，衡量全局位姿/位置误差，反映累计漂移与全局一致性。单目方法常需 Sim(3) 对齐，报告时必须注明。
+- **RPE（Relative Pose Error）**：比较固定时间或距离间隔内的相对运动误差，分别考察平移与旋转，更能反映局部里程计漂移。
+
+SLAM 评测至少应同时报告轨迹指标、跟踪失败率与运行速度；若声称稠密重建能力，还应增加深度误差、完整度/准确度或 mesh 指标。渲染漂亮不代表相机轨迹准确，ATE 很低也不保证未观测视角的外观可信。
+
+## 11. 实践检查清单
+
+- 先确认 $T_{cw}$/$T_{wc}$、右乘/左乘扰动、深度轴方向和长度单位；
+- 为每帧设置可信的近远平面，RGB-D 可围绕测得深度窄带采样；
+- tracking 阶段冻结地图并使用鲁棒损失，避免一边追帧一边移动目标；
+- mapping 对新旧关键帧做覆盖均衡采样，不只重放最近帧；
+- 可视化每射线的 $w_i=T_i\alpha_i$、深度残差和有效射线比例，排查“颜色正确、几何错误”；
+- 分开记录 tracking、mapping 和渲染耗时，并在相同硬件与输入分辨率下比较；
+- 回环修正位姿后，要让地图重新适配新坐标，或使用可变形/子地图机制吸收修正。
+
+NeRF 为 SLAM 提供的核心价值不是“用网络替代地图”，而是一个**可微、连续、同时建模几何线索与外观的渲染地图**。要把它变成可靠 SLAM 系统，仍需处理可观测性、初始化、关键帧、鲁棒估计、回环、动态物体和计算预算。
+
+</WordCount>

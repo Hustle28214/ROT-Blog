@@ -1,0 +1,112 @@
+---
+sidebar_position: 1
+---
+
+import WordCount from '../../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+rospy是ROS 1的Python客户端库，源码在ros_comm仓库的`clients/rospy/src/rospy/`。
+
+它和roscpp用的是同一套线上协议，XMLRPC做发现和协商，TCPROS传数据，所以两边能无缝互通。但进程内部是完全独立的一套纯Python实现，线程模型跟roscpp基本没有共同点。
+
+本文先把包的骨架和`init_node`的启动过程理清楚。
+
+## 包的骨架
+
+顶层模块面向用户，`impl/`子包放实现。顶层这些：
+
+- `__init__.py`，把散在各模块里的类和函数汇总成公开API，也就是我们`import rospy`之后能直接点出来的那层
+- `client.py`，用户入口，init_node、get_param/set_param、spin都在这
+- `core.py`，全局状态和生命周期，is_shutdown、signal_shutdown、日志封装、节点URI和caller id
+- `topics.py`，话题层的全部实现
+- `service.py`，服务的用户侧抽象
+- `msg.py`，消息的序列化反序列化，带4字节长度前缀的帧处理
+- `names.py`，名字解析、命名空间、remapping
+- `rostime.py`，Time和Duration的封装，以及当前ROS时间的维护
+- `timer.py`，Rate和Timer
+- `exceptions.py`，ROSException、ROSInterruptException这些
+- `numpy_msg.py`，把消息的数组字段映射成numpy数组
+- `msproxy.py`，MasterProxy，把对master的XMLRPC调用包成Python对象
+
+`impl/`里是真正干活的：
+
+- `init.py`，start_node，把XMLRPC从节点、TCPROS、注册管理器串起来
+- `masterslave.py`，从节点的XMLRPC处理器ROSHandler
+- `master.py`，对master的调用封装
+- `registration.py`，RegManager，以及话题、服务管理器向master注册需要的接口
+- `tcpros.py`、`tcpros_base.py`、`tcpros_pubsub.py`、`tcpros_service.py`，TCPROS协议栈，分别是协议注册入口、传输与握手基类、发布订阅方向、服务方向
+- `udpros.py`，UDPROS，支持有限
+- `transport.py`，传输层抽象基类和统计字段
+- `paramserver.py`，ParamServerCache
+- `rosout.py`，把Python日志接到`/rosout`
+- `simtime.py`，仿真时间，订阅`/clock`
+- `statistics.py`，话题统计
+- `validators.py`，XMLRPC接口的参数校验装饰器
+
+:::tip
+名字解析规则和master API的协议细节并不在rospy里重复实现，而是复用tools/rosgraph包。所以读rospy源码遇到名字规范化或者master通信的细节，往往得跳到rosgraph去看。
+:::
+
+## init_node做了什么
+
+`rospy.init_node`在client.py里，是整个节点生命周期的起点。撇开细枝末节，它的顺序大致是：
+
+1. 处理anonymous。为真就在节点名后面拼一段uuid后缀，保证同一个脚本能并发跑多份而不互相顶掉
+2. 处理log_level和disable_signals。后者决定rospy装不装自己的信号处理器，在非主线程里调init_node、或者宿主程序自己管信号的时候必须置真
+3. 从命令行参数里加载remapping，也就是那些`名字:=新名字`的实参，交给names.py建映射表
+4. 配置日志
+5. 记下这次初始化用的参数。rospy允许重复调init_node，但只有参数完全一致才容忍，不一致直接报错
+6. 调`rospy.impl.init.start_node`，真正把节点跑起来
+
+第6步是重点。start_node创建一个XmlRpcNode，请求处理器是`masterslave.ROSHandler`，也就是从节点API的实现，对外暴露getPid、getBusInfo、getBusStats、getMasterUri、getSubscriptions、getPublications、paramUpdate、publisherUpdate、requestTopic、shutdown这些方法。入参校验由validators.py的装饰器统一做掉，所以处理器函数体本身都很短。
+
+平时用的`rosnode info`、`rostopic info`，拿到的就是这些接口返回的数据；master通知订阅者"话题有新发布者了"，走的是publisherUpdate。
+
+## 三个后台设施
+
+start_node返回之前会把三样东西准备好，后面所有通信行为都由它们决定。
+
+XMLRPC从节点服务跑在自己的线程里，监听一个随机端口，节点URI就是这个地址。它既服务于master的回调（publisherUpdate、paramUpdate、shutdown），也服务于别的订阅者节点发来的requestTopic。
+
+TCPROS这边，start_node会注册TCPROSHandler并启动TCPROS的服务端socket。这一个socket同时承担话题数据连接和服务调用连接，具体走哪条路由客户端发来的握手头决定。
+
+RegManager线程负责注册。注册不是同步阻塞在init_node里完成的，而是交给`impl/registration.py`的RegManager，它在独立线程里向master发registerPublisher、registerSubscriber、registerService，并且串行处理后续的publisherUpdate事件。
+
+:::warning
+所以init_node返回的时候注册未必已经完成，连接更是几乎肯定还没建立。这就是"发布者刚创建就publish，第一条消息丢了"的根本原因：这时候订阅端连接还没握手成功，`_PublisherImpl`的连接列表可能还是空的。
+
+可靠的做法是等`get_num_connections()`大于零，配置类话题干脆用`latch=True`。
+:::
+
+## rosout和私有参数
+
+节点起来之后，`impl/rosout.py`会往Python的logging体系上挂一个处理器，让`rospy.loginfo`在打到终端的同时也发布到`/rosout`。所以`/rosout`本身就是个普通话题，只不过发布者是客户端库自动建的。
+
+init_node还会处理节点的私有参数，就是`~`开头那些，包括从remapping参数里解析出来的私有参数赋值。`rospy.get_param('~rate')`能拿到launch文件里写在节点标签内部的`<param>`值，就是因为它们最终都落在`/节点名/rate`这个全局键上，由names.py的解析规则完成映射。
+
+## 压缩一下调用顺序
+
+下面这段不是源码原文，只是把调用顺序压成能一眼看完的形状：
+
+```python
+# 简化示意，非逐行原文
+def init_node(name, anonymous=False, log_level=None, disable_signals=False, ...):
+    if anonymous:
+        name = "%s_%s" % (name, uuid_suffix())
+    mappings = load_command_line_mappings(sys.argv)
+    configure_logging(name, level=log_level)
+    remember_init_args(...)          # 重复调用需参数一致
+    start_node(mappings, name, ...)  # rospy.impl.init
+
+def start_node(environ, resolved_name, ...):
+    handler = ROSHandler(resolved_name, master_uri)
+    node = XmlRpcNode(port, handler)
+    node.start()                     # 独立线程
+    init_tcpros()                    # 注册 TCPROSHandler + 监听 socket
+    handler._start_registration_manager()  # RegManager 线程
+    load_rosout_handler()
+    return node
+```
+
+</WordCount>

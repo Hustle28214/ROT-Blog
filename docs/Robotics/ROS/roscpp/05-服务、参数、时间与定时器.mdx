@@ -1,0 +1,89 @@
+---
+sidebar_position: 5
+---
+
+import WordCount from '../../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+话题之外，roscpp还有服务、参数、时间和定时器。这几块代码量都不大，但每块都有一个不看源码想不通的行为：非持久服务为什么慢、getCached为什么能不查master、仿真时间下Rate为什么会跳、定时器为什么会被慢回调拖住。
+
+## 服务的三个链路对象
+
+ServiceManager管服务侧的全部状态，涉及三类对象：
+
+- ServicePublication，一个已经advertise的服务，持有回调和连接列表
+- ServiceClientLink，服务端视角下的一条客户端连接
+- ServiceServerLink，客户端视角下的一条到服务端的连接
+
+服务的连接头字段跟话题不一样，是service、md5sum、callerid、persistent、probe。persistent声明这条连接要不要复用；probe用于只想探测服务存不存在、不真正调用的场景，`ros::service::exists`走的就是这条路。
+
+响应的线格式有个话题里没有的细节：先发1字节的成功标志，再发长度和数据。失败时这一字节是0，后面跟的是错误字符串。`client.call()`返回false的时候能在日志里看到服务端的错误信息，就是因为它。
+
+## 非持久服务为什么慢
+
+ServiceClient支持persistent模式，连接建好之后一直留着，后续调用直接复用。默认的非持久模式则是每次调用都重走一遍lookupService、TCP三次握手、连接头交换。
+
+:::warning
+服务调用的延迟大头在这，不在服务回调本身的执行时间。高频调用的场景下，比如控制循环里每周期查一次状态，非持久客户端的开销可能是回调耗时的几倍到几十倍。
+
+改成持久客户端能明显降延迟，但要自己处理连接失效：服务端重启之后持久连接就废了，而且不会自动重连，得检查`client.isValid()`并在必要时重建。
+:::
+
+我自己的经验法则是：调用频率低于1Hz、服务端还可能重启，就用非持久；调用频率高、服务端生命周期稳定，就用持久并且做好失效重建。
+
+## master、names、this_node
+
+这三个小模块撑起了所有名字和寻址：
+
+- `master::execute`封装了对`ROS_MASTER_URI`的XMLRPC调用，还能等master可用。registerPublisher、registerSubscriber、lookupService都从这出去
+- names负责resolve（相对名到全局名）、remap（应用命令行和句柄级重映射）、validate（名字合法性）。命名空间的所有细节都在这
+- this_node提供getName和getNamespace
+
+## param和getCached
+
+param命名空间提供get、set、has、del，以及带默认值的模板形式：
+
+```cpp
+// 简化示意
+int rate;
+nh.param<int>("loop_rate", rate, 50);   // 取不到就用 50
+```
+
+这些调用每次都会访问master，所以别放在循环里。
+
+有意思的是`getCached`：它通过master的subscribeParam订阅这个参数，之后参数一变，master就通过从节点的paramUpdate回调推过来，roscpp在本地维护一份缓存。所以getCached第一次慢，之后几乎免费，而且能感知到外部修改。代价是每个缓存参数都在master上留了一条订阅记录。
+
+## 真实时间和仿真时间
+
+`ros::Time::now()`的行为取决于`/use_sim_time`：为假返回墙上时间，为真返回由`/clock`回调写入的仿真时间。`ros::start()`在启动阶段就检查了这个参数并决定要不要订阅`/clock`。
+
+由此有个必须知道的推论：仿真时间下如果没有节点在发`/clock`，`ros::Time::now()`会一直是0，所有基于时间的逻辑（TF查询、超时判断）全都不对。
+
+`ros::Rate`的思路是记住期望的结束时刻，而不是"睡固定时长"，所以它能自动补偿回调耗时。它还能检测时间回跳（仿真重置、bag循环播放）并重置基准，不然一次回跳能让sleep挂很久。WallRate始终用墙上时间，不受仿真时间影响，需要限制真实频率（比如控制打印速率）的时候应该用它。
+
+:::tip
+仿真时间出问题，按这个顺序查：`/use_sim_time`是不是true、有没有节点在发`/clock`、自己循环里用的是Rate还是WallRate。绝大多数"仿真里节点行为诡异"都能被这三条解释掉。
+:::
+
+## 定时器为什么会被拖慢
+
+定时器由模板TimerManager实现，在timer_manager.h里。`ros::Timer`、`ros::WallTimer`、`ros::SteadyTimer`是它在三种时间基上的特化，分别对应ROS时间（可能是仿真时间）、墙上时间、单调时间。
+
+它的工作方式是：一个后台线程维护一个按下次触发时间排序的等待队列，睡到最近的到期时刻；到期之后并不直接执行用户回调，而是构造一个TimerQueueCallback投递进对应的回调队列。
+
+:::warning
+所以Timer回调和订阅回调是在同一个spin线程里排队执行的。一个耗时200ms的订阅回调，会让同队列上10ms周期的定时器直接错过好几次触发。
+
+隔离手段跟订阅回调一样：给这个NodeHandle换一个独立的CallbackQueue，再配一个AsyncSpinner。
+:::
+
+还有一个推论：没有spin就没有定时器回调。后台线程照常把回调投进队列，但没人消费，队列只会一直堆。这跟"忘了spin导致订阅回调不执行"是同一个病。
+
+## 小结
+
+五篇串起来看，roscpp的结构其实挺一致的：控制面用XMLRPC做发现和协商，数据面用自定义二进制协议搬字节，一个poll线程负责所有I/O，所有用户代码都被收进回调队列，由spinner线程执行。
+
+抓住"谁在哪个线程上跑"这条主线，大部分疑难问题都能很快定位。
+
+</WordCount>

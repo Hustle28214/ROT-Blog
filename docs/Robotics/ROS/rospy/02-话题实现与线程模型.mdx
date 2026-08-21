@@ -1,0 +1,116 @@
+---
+sidebar_position: 2
+---
+
+import WordCount from '../../../../src/components/WordCount/WordCount';
+import Mermaid from '@theme/Mermaid';
+
+<WordCount>
+
+先说结论，rospy没有回调队列这种东西。回调就在各自连接的接收线程里直接跑，`rospy.spin()`只是拦住主线程不让脚本退出，它不派发任何回调。
+
+这一条想通了，rospy里大半"玄学"现象都有解释。本文把topics.py的对象层次、连接怎么建立、回调到底在哪个线程上执行讲清楚。
+
+## topics.py的对象层次
+
+我们拿到的Publisher和Subscriber是薄壳，真正的状态在实现对象里，大致三层。
+
+Topic基类保存话题名、data_class（消息类）、类型字符串和md5sum。构造的时候它不直接持有连接，而是通过全局的`_TopicManager`调`acquire_impl`，按话题名拿到或者创建一个共享的实现对象，析构或者unregister的时候调`release_impl`。这是个引用计数，同一个话题名在同一进程里建多个Publisher，共享同一个底层实现和同一组TCP连接，最后一个释放才真正注销。
+
+`_TopicImpl`持有connections列表、保护它的锁，以及dead_connections的清理逻辑。连接断开的时候不会在遍历过程中就地删掉（那会破坏正在进行的迭代），而是先标记，之后统一清理。
+
+`_PublisherImpl`和`_SubscriberImpl`分别实现发布和接收方向的具体行为。
+
+## 发布：序列化一次，写多次
+
+`_PublisherImpl.publish`的流程可以概括成：先用msg.py的`serialize_message`把消息序列化进内部缓冲，缓冲里已经带上4字节长度前缀了；然后在锁的保护下遍历connections，对每个连接调`write_data`把同一份字节写出去。
+
+两个点值得记。一是序列化只做一次，多个订阅者共享这份字节，所以订阅者数量对CPU的影响远小于消息大小。二是同一进程内的发布订阅也要完整走一遍序列化和socket，rospy没有roscpp那种同进程指针直传的路径。
+
+latch的实现很朴素：发布时把最后一条消息记下来，新连接接入时单独补发一次。所以latch话题的"历史"深度永远是1，而且补发发生在连接建立那一刻，不是我们调`Subscriber()`那一刻。
+
+queue_size由`tcpros_pubsub.py`的QueuedConnection实现，它把普通连接包一层，内部是一个有界deque加一个专属发送线程。publish只负责把字节塞进deque就返回，实际写socket交给那个线程做，队列满了丢最老的。
+
+:::warning
+`queue_size=None`（或者旧代码里干脆不传）意味着不套QueuedConnection，publish会直接在调用者线程里写socket。这时候只要有一个订阅者读得慢、把TCP发送缓冲填满，publish就会把整个发布循环阻塞住。
+
+这是rospy里最常见的"莫名卡顿"来源，给queue_size一个明确的正整数几乎总是更好。
+:::
+
+## 接收：回调在接收线程里跑
+
+`_SubscriberImpl.receive_callback`拿到反序列化后的消息之后，直接在当前线程里遍历已注册的回调逐个调用。这个"当前线程"就是该连接receive_loop所在的线程。
+
+由此推出几个后果：
+
+- 回调是并发的。两个不同话题的订阅者，回调跑在两个不同线程里，可以同时执行，访问共享状态得自己加锁
+- 同一话题也可能并发。一个话题有多个发布者节点的话，每个发布者对应一条独立连接、一个独立接收线程，同一个回调函数会被并发重入
+- 慢回调只堵一条连接。回调里做重计算，阻塞的是这条连接的receive_loop，对端TCP缓冲逐渐填满，最终反压到那个发布者，其它话题不受影响
+- spin()可以不调。只要有别的办法让主线程不退出，比如自己写`while not rospy.is_shutdown(): rospy.sleep(1)`，订阅照样工作。这跟roscpp里"不spin就收不到消息"完全相反
+
+另外SubscribeListener提供peer_subscribe和peer_unsubscribe两个钩子，有订阅者接入或断开时被调用，常用来做"等有人订阅了再开始干活"，或者在新订阅者接入时补发一次初始状态。
+
+## 连接是怎么建立的
+
+订阅端的连接建立由RegManager驱动，是一条横跨XMLRPC和TCPROS的链路。
+
+RegManager在自己的线程里向master注册，并且串行处理publisherUpdate事件。发现一个之前不认识的发布者URI时，它为这个URI起一个线程，向该发布者的XMLRPC接口调requestTopic，拿回协议参数。这些参数交给`TCPROSHandler.create_transport`，它构造出TCPROSSub协议对象和TCPROSTransport，再交给`tcpros_pubsub.py`的`robust_connect_subscriber`，由后者在新线程里带重试地完成建连和握手，成功之后进receive_loop。
+
+robust的地方就在重试上：发布者可能刚被master通知但服务端还没准备好，或者网络短暂抖动，它会退避重连而不是一次失败就放弃。发布节点重启之后订阅端通常能自动恢复，靠的就是这个。
+
+## 一个节点里到底有多少线程
+
+把前面这些拼起来，一个普通rospy节点稳态运行时是这样：
+
+<Mermaid
+value={`flowchart TB
+    MT["主线程 rospy.spin 轮询 is_shutdown"]
+    X["XMLRPC 从节点服务线程"]
+    RM["RegManager 注册线程"]
+    ACC["TCPROS accept 线程"]
+    subgraph SUBS ["每个订阅连接一个线程"]
+      R1["receive_loop 直接跑用户回调 A"]
+      R2["receive_loop 直接跑用户回调 B"]
+    end
+    subgraph PUBS ["每个 QueuedConnection 一个线程"]
+      Q1["发送线程 有界 deque"]
+    end
+    subgraph TMR ["每个 rospy.Timer 一个线程"]
+      T1["Timer 线程 直接跑定时回调"]
+    end
+    MT -.- X
+    X -.- RM
+    RM -.- SUBS
+    ACC -.- SUBS
+    PUBS -.- TMR
+`}
+/>
+
+XMLRPC服务线程、RegManager线程、TCPROS accept线程各一个，再加上每条订阅连接一个接收线程、每个带queue_size的发布连接一个发送线程、每个`rospy.Timer`一个线程。一个中等规模的节点轻松十几个线程，而且它们全都受GIL约束——线程多不代表能并行算，只代表I/O可以重叠。
+
+## 压缩一下
+
+```python
+# 简化示意，非逐行原文
+class _PublisherImpl(_TopicImpl):
+    def publish(self, message):
+        serialize_message(self.buff, self.seq, message)   # 含 4 字节长度前缀
+        data = self.buff.getvalue()
+        if self.is_latch:
+            self.latch = message
+        with self.c_lock:
+            conns = self.connections[:]
+        for c in conns:
+            try:
+                c.write_data(data)        # QueuedConnection 只是入队
+            except TransportTerminated:
+                self.remove_connection(c) # 实际是先标记进 dead_connections
+
+class _SubscriberImpl(_TopicImpl):
+    def receive_callback(self, msgs, connection):
+        for msg in msgs:
+            for cb, args in self.callbacks:   # 就在接收线程里同步执行
+                cb(msg) if args is None else cb(msg, args)
+```
+
+</WordCount>

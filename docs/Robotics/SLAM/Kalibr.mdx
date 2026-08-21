@@ -1,0 +1,457 @@
+import WordCount from '../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+# Kalibr：相机与 IMU 联合标定
+
+Kalibr 是一套面向视觉与视觉惯性系统的离线标定工具。它可以估计：
+
+- 单目或多目相机的内参与畸变；
+- 多相机之间的刚体变换；
+- IMU 到各相机的空间外参；
+- 相机与 IMU 的常量时间偏移。
+
+它解决的是传感器模型辨识问题，不会修复滚动快门、曝光延迟抖动、松动支架或错误时间戳。标定结果也不是“跑出一个 YAML 就结束”，而应结合残差、重复实验和物理测量进行验证。
+
+> 下文采用 Kalibr 常见版本的命令与 YAML 字段。不同 ROS/Kalibr 分支可能调整可执行文件入口、参数名或输出字段，应以所安装版本的 `--help` 和官方示例为准。
+
+## 坐标系与变换方向
+
+本文用齐次变换
+
+$$
+{}^{A}\mathbf p
+=
+\mathbf T_{AB}\,{}^{B}\mathbf p,\qquad
+\mathbf T_{AB}
+=
+\begin{bmatrix}
+\mathbf R_{AB} & \mathbf t_{AB}\\
+\mathbf 0^\mathsf T & 1
+\end{bmatrix}
+$$
+
+表示“把在坐标系 $B$ 中表达的点转换为在坐标系 $A$ 中表达”。相机通常采用计算机视觉坐标系：$x$ 向右、$y$ 向下、$z$ 向前；IMU 轴向必须以器件数据手册和驱动实际输出为准，不能仅凭外壳箭头猜测。
+
+<svg
+  viewBox="0 0 900 340"
+  width="100%"
+  role="img"
+  aria-label="世界或标定板、IMU 与相机坐标系，以及从世界到 IMU、从 IMU 到相机的变换链"
+  style={{ color: 'var(--ifm-font-color-base, currentColor)' }}
+>
+  <defs>
+    <marker
+      id="kalibr-transform-arrow-20260821"
+      markerWidth="10"
+      markerHeight="10"
+      refX="9"
+      refY="3"
+      orient="auto"
+      markerUnits="strokeWidth"
+    >
+      <path d="M0,0 L0,6 L9,3 z" fill="currentColor" />
+    </marker>
+  </defs>
+
+  <rect
+    x="1"
+    y="1"
+    width="898"
+    height="338"
+    rx="14"
+    fill="var(--ifm-background-surface-color, transparent)"
+    stroke="currentColor"
+    strokeOpacity="0.25"
+  />
+
+  <g fill="none" stroke="currentColor" strokeWidth="2.2">
+    <path d="M130 238 L195 238" stroke="#d33" markerEnd="url(#kalibr-transform-arrow-20260821)" />
+    <path d="M130 238 L130 173" stroke="#2a9d55" markerEnd="url(#kalibr-transform-arrow-20260821)" />
+    <path d="M130 238 L91 274" stroke="#2878d0" markerEnd="url(#kalibr-transform-arrow-20260821)" />
+
+    <path d="M450 238 L515 238" stroke="#d33" markerEnd="url(#kalibr-transform-arrow-20260821)" />
+    <path d="M450 238 L450 173" stroke="#2a9d55" markerEnd="url(#kalibr-transform-arrow-20260821)" />
+    <path d="M450 238 L411 274" stroke="#2878d0" markerEnd="url(#kalibr-transform-arrow-20260821)" />
+
+    <path d="M770 238 L835 238" stroke="#d33" markerEnd="url(#kalibr-transform-arrow-20260821)" />
+    <path d="M770 238 L770 173" stroke="#2a9d55" markerEnd="url(#kalibr-transform-arrow-20260821)" />
+    <path d="M770 238 L731 274" stroke="#2878d0" markerEnd="url(#kalibr-transform-arrow-20260821)" />
+
+    <path d="M220 115 C285 70 345 70 410 115" markerEnd="url(#kalibr-transform-arrow-20260821)" />
+    <path d="M540 115 C605 70 665 70 730 115" markerEnd="url(#kalibr-transform-arrow-20260821)" />
+  </g>
+
+  <g fill="currentColor" fontFamily="sans-serif" fontSize="16">
+    <text x="72" y="315">世界 / AprilGrid：W</text>
+    <text x="414" y="315">IMU：I</text>
+    <text x="730" y="315">相机：C</text>
+
+    <text x="198" y="243" fill="#d33">x</text>
+    <text x="135" y="170" fill="#2a9d55">y</text>
+    <text x="71" y="287" fill="#2878d0">z</text>
+    <text x="518" y="243" fill="#d33">x</text>
+    <text x="455" y="170" fill="#2a9d55">y</text>
+    <text x="391" y="287" fill="#2878d0">z</text>
+    <text x="838" y="243" fill="#d33">x</text>
+    <text x="775" y="170" fill="#2a9d55">y</text>
+    <text x="711" y="287" fill="#2878d0">z</text>
+
+    <text x="270" y="72">T_IW：W → I</text>
+    <text x="590" y="72">T_CI：I → C</text>
+  </g>
+</svg>
+
+### `T_CI` 必须这样理解
+
+Kalibr 输出字段 `T_cam_imu` 对应本文的 $\mathbf T_{CI}$，即 **IMU 坐标到相机坐标的变换**：
+
+$$
+{}^{C}\mathbf p
+=
+\mathbf T_{CI}\,{}^{I}\mathbf p
+=
+\mathbf R_{CI}\,{}^{I}\mathbf p+\mathbf t_{CI}.
+$$
+
+因此，$\mathbf t_{CI}$ 是 **IMU 原点在相机坐标系中的坐标**，不是“相机在 IMU 中的位置”。若下游程序需要相机到 IMU 的变换，必须取逆：
+
+$$
+\mathbf T_{IC}
+=
+\mathbf T_{CI}^{-1}
+=
+\begin{bmatrix}
+\mathbf R_{CI}^{\mathsf T} &
+-\mathbf R_{CI}^{\mathsf T}\mathbf t_{CI}\\
+\mathbf 0^\mathsf T & 1
+\end{bmatrix}.
+$$
+
+不要根据变量名中的先后顺序猜方向；应检查下游系统定义的是“坐标变换”还是“位姿”，并用一个已知轴向的测试点验证。
+
+## 相机模型与畸变
+
+### 针孔模型
+
+对相机坐标中的点 $\mathbf p_C=(X,Y,Z)^\mathsf T$，先归一化：
+
+$$
+x=X/Z,\qquad y=Y/Z.
+$$
+
+无畸变投影为
+
+$$
+u=f_xx+c_x,\qquad v=f_yy+c_y,
+$$
+
+对应 Kalibr `pinhole` 内参顺序：
+
+```yaml
+camera_model: pinhole
+intrinsics: [fx, fy, cx, cy]
+```
+
+### `radtan`：径向—切向畸变
+
+令 $r^2=x^2+y^2$，常见四参数形式为
+
+$$
+\begin{aligned}
+x_d &= x(1+k_1r^2+k_2r^4)+2p_1xy+p_2(r^2+2x^2),\\
+y_d &= y(1+k_1r^2+k_2r^4)+p_1(r^2+2y^2)+2p_2xy.
+\end{aligned}
+$$
+
+Kalibr 通常写作：
+
+```yaml
+distortion_model: radtan
+distortion_coeffs: [k1, k2, p1, p2]
+```
+
+它适合普通透视镜头，但是否合适应由视场角、边缘残差结构和镜头设计共同判断。
+
+### `equidistant`：等距鱼眼畸变
+
+令 $r=\sqrt{x^2+y^2}$、$\theta=\arctan r$，则
+
+$$
+\theta_d
+=
+\theta\left(1+k_1\theta^2+k_2\theta^4+k_3\theta^6+k_4\theta^8\right),
+$$
+
+并以 $x_d=(\theta_d/r)x,\ y_d=(\theta_d/r)y$ 投影；$r\to0$ 时取连续极限。配置通常为：
+
+```yaml
+distortion_model: equidistant
+distortion_coeffs: [k1, k2, k3, k4]
+```
+
+它常用于大视场鱼眼，但“鱼眼”不自动等于 `equidistant`。模型选错时，均方重投影误差可能尚可，而图像边缘仍出现有方向性的系统残差。
+
+## 相机内参与多相机链
+
+单目标定估计每个相机的焦距、主点和畸变。多相机标定还建立有序相机链。典型 `camchain.yaml` 的关键字段如下：
+
+```yaml
+cam0:
+  camera_model: pinhole
+  intrinsics: [fx0, fy0, cx0, cy0]
+  distortion_model: radtan
+  distortion_coeffs: [k10, k20, p10, p20]
+  resolution: [width0, height0]
+  rostopic: /camera0/image_raw
+
+cam1:
+  camera_model: pinhole
+  intrinsics: [fx1, fy1, cx1, cy1]
+  distortion_model: equidistant
+  distortion_coeffs: [k11, k21, k31, k41]
+  resolution: [width1, height1]
+  rostopic: /camera1/image_raw
+  T_cn_cnm1:
+    - [r00, r01, r02, tx]
+    - [r10, r11, r12, ty]
+    - [r20, r21, r22, tz]
+    - [0.0, 0.0, 0.0, 1.0]
+```
+
+对 `cam1`，`T_cn_cnm1` 是 $\mathbf T_{C_1C_0}$，把 `cam0` 坐标转换到 `cam1` 坐标；后续相机同理，相对于链中的前一相机。各相机不必使用相同畸变模型，但必须与真实光学系统及下游算法兼容。
+
+相机间需要足够多的同步共同观测。若两相机视场几乎不重叠，普通 AprilGrid 联合标定难以直接约束相对位姿，需改变采集方式或引入可靠的中间相机链。
+
+## IMU 噪声与随机游走
+
+常用连续时间测量模型为
+
+$$
+\begin{aligned}
+\tilde{\boldsymbol\omega}(t)
+&=\boldsymbol\omega(t)+\mathbf b_g(t)+\mathbf n_g(t),\\
+\tilde{\mathbf a}(t)
+&=\mathbf R_{IW}(t)(\mathbf a_W(t)-\mathbf g_W)
++\mathbf b_a(t)+\mathbf n_a(t),
+\end{aligned}
+$$
+
+偏置随机游走可写为
+
+$$
+\dot{\mathbf b}_g=\mathbf n_{wg},\qquad
+\dot{\mathbf b}_a=\mathbf n_{wa}.
+$$
+
+Kalibr `imu.yaml` 的关键字段通常为：
+
+```yaml
+imu0:
+  rostopic: /imu/data_raw
+  update_rate: 200.0
+  gyroscope_noise_density: 0.0001
+  gyroscope_random_walk: 0.00001
+  accelerometer_noise_density: 0.001
+  accelerometer_random_walk: 0.0001
+```
+
+- `*_noise_density` 描述测量白噪声密度，常见单位分别为 $\mathrm{rad/s/\sqrt{Hz}}$ 与 $\mathrm{m/s^2/\sqrt{Hz}}$；
+- `*_random_walk` 描述偏置驱动噪声，单位约定应按当前 Kalibr 文档确认；
+- `update_rate` 应对应实际输出频率，而不是传感器数据手册中的最高内部采样率。
+
+不要把逐样本标准差直接填进噪声密度字段。优先对足够长的静止原始数据做 Allan 方差分析，并确认驱动是否已缩放单位、去偏或滤波。过度乐观的噪声参数会让优化器错误地信任 IMU，过大的参数又会削弱惯性约束。
+
+## 相机—IMU 时间偏移
+
+Kalibr 常用约定为
+
+$$
+t_{\mathrm{imu}}
+=
+t_{\mathrm{cam}}+\Delta t,
+$$
+
+输出 `timeshift_cam_imu` 即 $\Delta t$。正值表示同一物理事件对应的 IMU 时间戳数值比相机时间戳大。把结果移植到定义为 $t_{\mathrm{cam}}-t_{\mathrm{imu}}$ 的系统时必须改符号。
+
+该模型只估计一个常量偏移，不能描述：
+
+- 两时钟频率不同造成的线性漂移；
+- 图像驱动偶发排队或丢帧造成的抖动；
+- 自动曝光变化引起的曝光中心偏移；
+- 滚动快门逐行读出；
+- IMU 批量传输却被赋予同一到达时间。
+
+硬件同步仍是首选。联合估计时间偏移时，应包含明显且不重复的角运动与平移运动，使视觉角速度和 IMU 角速度能够对齐。
+
+## 可观测性与充分激励
+
+标定参数能否估计，首先取决于运动是否让它们可观测。仅在桌面上平移、绕单一轴旋转或以近似恒速缓慢摆动，都可能得到数值收敛但不可信的外参。
+
+建议手持刚性传感器组件，在 AprilGrid 始终清晰可见的前提下：
+
+1. 分别绕 $x/y/z$ 三轴做正反向旋转，角速度有快有慢；
+2. 沿 $x/y/z$ 三轴改变位置，并改变与标定板的距离；
+3. 组合旋转与平移，让板覆盖图像中心、四角和边缘；
+4. 改变相机对标定板的俯仰、偏航与滚转，避免始终正视；
+5. 保证六自由度运动都有足够幅度，同时避免剧烈运动导致模糊、AprilTag 漏检或 IMU 饱和。
+
+“充分激励”没有与设备无关的固定角速度或时长阈值。应同时观察目标覆盖、检测数量、运动频谱、IMU 量程以及重复标定的一致性。
+
+## AprilGrid 配置
+
+AprilGrid 比单张棋盘对部分遮挡更稳健，也能为每个角点提供唯一身份。示例 `aprilgrid.yaml`：
+
+```yaml
+target_type: aprilgrid
+tagCols: 6
+tagRows: 6
+tagSize: 0.088
+tagSpacing: 0.3
+```
+
+其中：
+
+- `tagCols`、`tagRows` 是标签列数和行数；
+- `tagSize` 是黑色标签方块的实际边长，通常以米为单位；
+- `tagSpacing` 是相邻标签黑色边界间距与 `tagSize` 的比值，而非以米表示的绝对间距。
+
+必须用实际打印成品测量 `tagSize`。打印机“适合页面”、PDF 查看器缩放和覆膜都可能改变尺寸。标定板应平整、刚性、无反光；行列数和间距比例必须与实物一致。
+
+## ROS bag 数据准备
+
+建议录制原始、未去畸变图像和原始 IMU：
+
+```bash
+rosbag record \
+  /camera0/image_raw \
+  /camera1/image_raw \
+  /imu/data_raw \
+  -O /path/to/dataset/calibration.bag
+```
+
+采集前逐项检查：
+
+- 图像分辨率、编码和 topic 与 YAML 一致；
+- 多相机尽可能硬件同步，帧率稳定且无大量丢帧；
+- IMU 使用 $\mathrm{rad/s}$ 和 $\mathrm{m/s^2}$，轴向与消息定义一致；
+- 时间戳来自采样时刻而非消息到达时刻，所有时间戳位于可比较的时基；
+- 自动曝光不过长，AprilGrid 在完整运动范围内仍清晰；
+- 相机与 IMU 固连，采集期间线缆拉力不会使支架变形；
+- bag 起止处留少量静止段便于排查，但主体必须有充分六自由度激励。
+
+可先用 `rosbag info /path/to/dataset/calibration.bag` 检查 topic、消息数、频率和时长，再回放抽查图像与 IMU 曲线。压缩图像、降采样和重写时间戳都可能改变标定质量。
+
+## 标定流程与示例命令
+
+### 1. 相机内参与多相机外参
+
+```bash
+kalibr_calibrate_cameras \
+  --bag /path/to/dataset/calibration.bag \
+  --topics /camera0/image_raw /camera1/image_raw \
+  --models pinhole-radtan pinhole-equidistant \
+  --target /path/to/config/aprilgrid.yaml
+```
+
+`--topics` 与 `--models` 的顺序一一对应。单目时各保留一个条目。命令通常生成相机链 YAML、文本结果和 PDF 报告；先接受并验证这一阶段结果，再进行相机—IMU联合标定。
+
+### 2. 相机—IMU 外参与时间偏移
+
+```bash
+kalibr_calibrate_imu_camera \
+  --bag /path/to/dataset/calibration.bag \
+  --cam /path/to/config/camchain.yaml \
+  --imu /path/to/config/imu.yaml \
+  --target /path/to/config/aprilgrid.yaml
+```
+
+某些版本还提供 bag 时间裁剪、bag 频率控制或关闭时间标定等选项。不要从其他版本的博客直接复制参数；运行：
+
+```bash
+kalibr_calibrate_cameras --help
+kalibr_calibrate_imu_camera --help
+```
+
+确认当前安装版本支持的选项。
+
+联合标定后的相机链常增加：
+
+```yaml
+cam0:
+  # camera_model、intrinsics、distortion_model 等字段略
+  T_cam_imu:
+    - [r00, r01, r02, tx]
+    - [r10, r11, r12, ty]
+    - [r20, r21, r22, tz]
+    - [0.0, 0.0, 0.0, 1.0]
+  timeshift_cam_imu: 0.0012
+```
+
+再次强调：这里的 `T_cam_imu` 是 IMU $\rightarrow$ 相机，`timeshift_cam_imu` 满足 $t_{\mathrm{imu}}=t_{\mathrm{cam}}+\Delta t$。
+
+## 如何验证结果
+
+### 重投影误差
+
+查看报告中的像素重投影残差分布，而不只看均值：
+
+- 残差应大致以零为中心，不应随图像位置形成明显旋涡、径向或切向结构；
+- 图像边缘显著变差，常提示畸变模型不匹配、边缘观测不足或标定板不平；
+- 少数大离群点可能来自运动模糊、错误检测、反光或时间不同步；
+- 多相机分别检查，不能用一台相机的良好结果代表整条链。
+
+不存在适用于所有分辨率、镜头和检测精度的统一“合格像素阈值”。应与角点定位精度、图像尺度、镜头视场和下游任务敏感度一起判断。
+
+### 时间偏差
+
+时间偏移应在同一硬件与驱动配置下重复采集后保持一致。若不同片段估计值明显漂移，应检查时钟域、驱动时间戳、曝光中心、消息排队与时钟漂移，而不是简单取平均。
+
+还可将视觉估计的角运动与 IMU 角速度按估计偏移对齐：正确符号应使主要峰谷同步。若取反后反而更对齐，通常是移植时混淆了时间约定。
+
+### 外参
+
+至少进行三类交叉验证：
+
+1. **量尺检查**：由 $\mathbf T_{CI}^{-1}$ 或统一约定后的平移向量计算相机与 IMU 原点距离，与机械尺寸比较；
+2. **轴向检查**：把 IMU 的单位轴通过 $\mathbf R_{CI}$ 旋转到相机系，确认与真实安装方向一致，且 $\det(\mathbf R)\approx1$、$\mathbf R^\mathsf T\mathbf R\approx\mathbf I$；
+3. **重复标定**：使用独立采集、不同运动顺序的数据，比较旋转、平移和时间偏移，而不只是优化器报告的协方差。
+
+最终还应在下游 VIO 中检查：静止时重力方向是否合理、旋转时视觉和惯性预测是否同向、初始化是否稳定。若下游需要 $\mathbf T_{IC}$，先严格取逆，不能只转置旋转而保留原平移。
+
+## 常见失败模式
+
+- **AprilGrid 检测很少或时断时续**：多由模糊、反光、曝光过长或目标配置错误造成。回放逐帧检查，并核对行列、尺寸和间距比例。
+- **优化不收敛或结果随初值变化**：常见于运动退化、共同视场不足或离群观测过多。增加六自由度激励和多目共同观测，必要时重采数据。
+- **焦距或畸变异常**：可能是模型选错、输入图像已经去畸变或边缘覆盖不足。改用原始图像，并比较 `radtan` 与 `equidistant` 的残差空间结构。
+- **外参平移与机械尺寸不符**：检查是否理解反了变换方向、标定板尺寸是否正确、支架是否移动；用点变换公式而非变量名核对。
+- **旋转看似差约 $90^\circ$ 或 $180^\circ$**：通常与 IMU 轴定义、相机光学坐标或驱动轴映射有关。查阅数据手册与驱动源码，并逐轴施加已知旋转。
+- **时间偏移很大或重复性差**：排查非同源时钟、到达时间戳、曝光延迟和 USB 排队；优先使用采样时间戳或硬件同步。
+- **IMU 残差与模型不符**：核对单位、`update_rate`，确认没有把样本标准差填作噪声密度，并重新进行 Allan 方差分析。
+- **某些方向外参不稳定**：若采集时只绕单轴、只平移或始终正视标定板，应重新设计覆盖三轴旋转和平移的轨迹。
+- **报告残差尚可但 VIO 发散**：常见原因是外参方向、时间符号、重力或 IMU 单位移植错误。用已知点和已知旋转做端到端约定测试。
+
+## 实用检查清单
+
+标定前：
+
+- 确认镜头模型、原始分辨率、topic、IMU 单位与轴向；
+- 实测 AprilGrid，关闭打印缩放；
+- 固紧所有传感器并预热到稳定工作状态；
+- 估计 IMU 噪声参数，优先使用同一驱动与采样配置的数据。
+
+采集时：
+
+- 保持 AprilGrid 清晰且覆盖全画面；
+- 提供三轴旋转、三轴平移和距离变化；
+- 避免饱和、严重模糊、松动与大量丢帧；
+- 保留原始时间戳和原始传感器数据。
+
+标定后：
+
+- 检查残差分布而非只看单个数值；
+- 明确记录 $\mathbf T_{CI}$ 和时间偏移的方向约定；
+- 与机械尺寸、轴向和独立数据集交叉验证；
+- 将结果放入目标 VIO 前，核对其坐标系、时间和单位定义。
+
+</WordCount>

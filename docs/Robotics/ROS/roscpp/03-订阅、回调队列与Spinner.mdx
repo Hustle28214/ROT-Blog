@@ -1,0 +1,113 @@
+---
+sidebar_position: 3
+---
+
+import WordCount from '../../../../src/components/WordCount/WordCount';
+import Mermaid from '@theme/Mermaid';
+
+<WordCount>
+
+订阅是roscpp里最容易踩坑的部分，因为它把"消息到达"和"回调执行"彻底拆开了：字节到达是poll线程干的，回调执行是spin线程干的，中间隔着一个CallbackQueue。
+
+这条流水线想明白了，"回调不执行""回调乱序""一个回调把整个节点卡住"这几类问题基本就都能解释。
+
+## subscribe这一步
+
+`NodeHandle::subscribe`也是模板函数，生成两样东西：
+
+- SubscribeOptions，话题名、队列长度、md5sum、datatype这些
+- SubscriptionCallbackHelperT，一个类型擦除的辅助对象，把"怎么从字节反序列化成M、再调用户回调"这段跟类型相关的逻辑包起来，让下层只操作基类指针
+
+这是roscpp处理"上层是模板、下层得是运行时多态"的常规手法。整条订阅链路里只有这个helper知道消息的真实类型。
+
+接着`TopicManager::subscribe`：
+
+1. 解析话题名
+2. 找有没有同话题的Subscription，有就把新回调挂上去，没有才新建。所以同一进程订阅同一话题多次，只有一条网络连接
+3. 调master的registerSubscriber，返回值是当前该话题所有发布者的URI列表
+4. 把列表交给`Subscription::pubUpdate`，由它去逐个协商连接
+
+之后master发现发布者集合变了，会通过从节点的publisherUpdate接口推新列表过来，同样进pubUpdate。所以pubUpdate是订阅方感知拓扑变化的唯一入口。
+
+## 反序列化被推迟了
+
+消息字节到齐之后`Subscription::handleMessage`被调用，它干的事挺有意思：对每个已注册的回调创建一个MessageDeserializer压进SubscriptionQueue，然后把这个队列本身当成一个CallbackInterface，投递到对应的CallbackQueue。
+
+```cpp
+// 简化示意，表达关系而非原文
+for (auto& info : callbacks_) {
+  auto deserializer = std::make_shared<MessageDeserializer>(
+      info->helper_, serialized_msg, connection_header);
+  info->subscription_queue_->push(info->helper_, deserializer, ...);
+  info->callback_queue_->addCallback(info->subscription_queue_, info->id_);
+}
+```
+
+两个点值得记：
+
+一是反序列化被推到`SubscriptionQueue::call`里执行，也就是在spin线程里，不在网络线程里，这样poll线程能保持轻量。
+
+二是同一个md5sum的多个回调共享同一次反序列化结果。一个进程里对同一话题注册5个相同类型的回调，消息只会被反序列化一次；类型不同（比如有的用ShapeShifter）才会各自来一遍。
+
+<Mermaid
+value={`flowchart TB
+    NET["poll 线程收到完整消息帧"] --> HM["Subscription::handleMessage"]
+    HM --> MD["为每个回调创建 MessageDeserializer"]
+    MD --> SQ["压入 SubscriptionQueue"]
+    SQ --> CQ["队列本身投递到 CallbackQueue"]
+    CQ --> SPIN["spin 线程取出并调用"]
+    SPIN --> DES["此时才真正反序列化"]
+    DES --> USER["执行用户回调"]
+`}
+/>
+
+顺便解释了一个困惑：为什么用gdb断在回调里，栈里看不到任何socket相关的帧？因为回调的调用者是spinner，网络线程几微秒前就已经回去poll了。
+
+## CallbackQueue能干的事
+
+它比"一个队列"复杂一些：
+
+- `callOne`和`callAvailable`，分别执行一个和执行当前全部可用的，都能带超时
+- 按ID移除。订阅者析构的时候把它排队中的回调清掉，免得调到已经销毁的对象
+- TryAgain重排。回调返回TryAgain就不算完成，放回队列稍后重试，SubscriptionQueue被禁用或者暂时处理不了的时候就靠这个
+- 用线程局部存储支持重入，允许在回调里再调一次callAvailable
+
+还有个`allow_concurrent_callbacks`，决定同一个回调能不能被多个线程同时执行。默认是false，意味着就算用了多线程spinner，同一个订阅者的回调还是串行的。很多人用了MultiThreadedSpinner发现没有并行效果，原因就在这。
+
+## 四种spin
+
+- `ros::spin()`，用SingleThreadedSpinner，阻塞循环处理全局队列
+- `ros::spinOnce()`，等价于对全局回调队列执行`callAvailable(WallDuration())`，立即返回
+- MultiThreadedSpinner，阻塞，内部多线程处理同一个队列
+- AsyncSpinner，自带线程组，start和stop，不阻塞调用者
+
+:::warning
+"回调不执行"按这个顺序排查：
+
+1. 有没有spin？只publish不spin的循环里，订阅回调永远不会被调用，消息只是在队列里堆着然后被丢掉
+2. spinOnce的频率够不够？它只处理"当前可用"的，循环体里有耗时操作队列就会溢出
+3. Subscriber对象是不是已经析构了？`nh.subscribe(...)`的返回值必须存住，否则订阅立刻失效，而且编译器不会给任何警告
+:::
+
+## 自定义CallbackQueue
+
+每个NodeHandle都可以用`setCallbackQueue`绑一个自己的CallbackQueue。这是把某些回调隔离到独立线程的标准做法，也基本是唯一的做法。
+
+```cpp
+// 简化示意
+ros::NodeHandle nh_fast;
+ros::CallbackQueue fast_queue;
+nh_fast.setCallbackQueue(&fast_queue);
+ros::Subscriber s = nh_fast.subscribe("imu", 100, imuCb);
+
+ros::AsyncSpinner fast_spinner(1, &fast_queue);
+fast_spinner.start();
+
+ros::spin();  // 主线程继续处理全局队列
+```
+
+典型用法就是把高频传感器回调、或者某个已知会阻塞的服务回调从主队列里摘出去，别让它拖慢别人。
+
+还要提醒一句，`ros::Timer`的回调也走回调队列。所以一个阻塞的订阅回调会连带把同队列上的定时器拖慢，表现出来就是"定时器周期不准"。定时器不准的时候，第一嫌疑人是同队列上的慢回调，不是定时器本身。
+
+</WordCount>

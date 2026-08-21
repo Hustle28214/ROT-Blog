@@ -1,0 +1,92 @@
+---
+sidebar_position: 3
+---
+
+import WordCount from '../../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+XMLRPC只负责让两个节点找到彼此，真正的数据走TCPROS。rospy的TCPROS实现分在四个文件里：`impl/tcpros_base.py`是传输和握手基类，`impl/tcpros_pubsub.py`是话题方向，`impl/tcpros_service.py`是服务方向，`impl/tcpros.py`是协议注册入口。
+
+本文看字节层面发生了什么。
+
+## 连接头的格式
+
+TCPROS连接建立之后第一件事是交换连接头，格式很简单：
+
+- 最外层4字节小端整数，表示整个头部的总长度
+- 头部内部是若干个字段，每个字段又是4字节小端长度前缀，后面跟一段`key=value`形式的字节串
+- 字段之间没有分隔符，全靠长度前缀切
+
+rospy里读写这个结构的是`read_ros_handshake_header`和`write_ros_handshake_header`这一对。它们不关心字段语义，只管编解码，含义由调用方去解释。
+
+话题连接的头通常有topic、type、md5sum、callerid、latching、tcp_nodelay；服务连接则是service、md5sum、callerid、persistent、probe。
+
+握手完了之后，消息帧的格式跟头部字段的编码方式一致：4字节小端长度，后面跟序列化的消息体。所以在socket上看到的就是一串长度分隔的数据块，没有魔数也没有校验和。
+
+:::tip
+"同一个端口既能接话题又能接服务"的秘密就在这。TCPROSServer接受一个连接后为它起一个线程，先把连接头读出来，看里面出现的是topic还是service，再把这条连接分派给话题处理器或者服务处理器。协议本身没有独立的端口划分。
+:::
+
+## TCPROSTransport的三个职责
+
+`tcpros_base.py`里的TCPROSTransport是所有TCPROS连接的载体，不分方向。它持有一个socket和读写缓冲，主要干三件事。
+
+connect负责建立TCP连接，设置TCP_NODELAY（禁用Nagle，避免小消息被攒着延迟发出），然后写出自己的连接头，再读对端的连接头。校验就在这一步：对端返回的md5sum跟本地消息类型的md5对不上，连接直接被拒。
+
+receive_loop循环recv，把收到的字节交给msg.py的`deserialize_messages`按长度前缀切分并反序列化。一次recv可能拿到半条消息，也可能拿到三条半，所以切分逻辑要维护跨次调用的残留缓冲。切出来的消息交给上层的receive_callback，也就是上一篇说的"就在这条线程上跑用户回调"。它同时负责识别对端关闭和异常，退出时把自己从话题实现的连接列表里摘掉。
+
+write_data把字节写进socket，用锁保证并发安全。多个线程同时向同一个订阅者写的时候（比如主线程publish和一个Timer线程publish），锁保证消息帧不会交错撕裂。
+
+## md5sum校验能挡住什么
+
+md5sum是消息定义结构的指纹，由消息文件的字段类型和名字递归算出来，握手阶段比对，不匹配就断连。
+
+这解释了一个常见的现场问题：改了`.msg`之后只重新编译了一半的包，或者两台机器上装的消息包版本不一致，节点看着都活着、`rostopic list`也能看到话题，但订阅端就是收不到数据。日志里通常有一条md5sum不匹配的错误，不过日志级别调过或者被刷屏淹掉的话很容易漏。
+
+:::warning
+md5sum只覆盖结构，不覆盖语义。把`float64 x`的含义从"米"改成"毫米"，md5sum不会变，握手照样通过，问题只在数值上体现。协议层能帮我们挡的只有结构性的不兼容。
+:::
+
+顺带一提，`rostopic echo`能订阅任意话题，靠的是运行时从连接头里拿到type和message_definition动态构造消息类，而不是提前知道类型。
+
+## 服务端的接入路径
+
+TCPROSServer的工作方式前面提过一半：监听、accept、为每个客户端起线程、读握手头、分派。这里补两点。
+
+为每个连接起线程的代价是真实存在的。对话题来说没问题，连接数等于订阅者数量，通常是个位数，而且连接长期活着。但对非持久服务来说，每次调用都是一次完整的建连、起线程、握手、传数据、关闭，线程创建和TCP三次握手的开销可能远超服务逻辑本身，高频调用时特别明显。
+
+probe字段是个小细节。`rosservice info`这类工具需要知道服务的类型但不想真的调它，于是握手时带上`probe=1`，服务端回完连接头就断开，不等请求数据。
+
+## 关于UDPROS
+
+`impl/udpros.py`是有的，但支持相当有限，实践中几乎所有rospy通信都走TCPROS。UDPROS的设计目标是高丢包容忍场景，比如无线链路上传图像，代价是要自己处理分片和丢包，而且rospy这边的完整度不如roscpp。真需要UDP语义的话，通常在C++侧实现，或者干脆绕开ROS传输层自己开socket。
+
+## 压缩一下
+
+```python
+# 简化示意，非逐行原文
+def write_ros_handshake_header(sock, header_dict):
+    fields = b''.join(
+        struct.pack('<I', len(kv)) + kv
+        for kv in (("%s=%s" % (k, v)).encode() for k, v in header_dict.items())
+    )
+    sock.sendall(struct.pack('<I', len(fields)) + fields)
+
+class TCPROSTransport(Transport):
+    def receive_loop(self, msgs_callback):
+        while not is_shutdown():
+            data = self.socket.recv(self.buff_size)
+            if not data:
+                break                       # 对端关闭
+            self.read_buff.write(data)
+            msgs = deserialize_messages(self.read_buff, self.protocol.data_class, ...)
+            if msgs:
+                msgs_callback(msgs, self)   # 用户回调就在这条线程上执行
+
+    def write_data(self, data):
+        with self.write_lock:
+            self.socket.sendall(data)
+```
+
+</WordCount>

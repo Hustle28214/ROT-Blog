@@ -1,0 +1,8 @@
+{
+  "label": "JEPA",
+  "position": 4,
+  "link": {
+    "type": "generated-index",
+    "description": "Joint-Embedding Predictive Architecture：在表征空间预测，不生成像素。"
+  }
+}

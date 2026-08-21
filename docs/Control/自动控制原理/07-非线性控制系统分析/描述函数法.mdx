@@ -4,6 +4,91 @@ sidebar_position: 2
 
 import VideoPlayer from '../../../../src/components/Videoplayer/Videoplayer.jsx';
 
+# 描述函数法
+
+非线性系统不满足叠加原理，可能出现与初值有关的多平衡点、有限逃逸、跳跃、次谐波及稳定极限环。描述函数法用非线性环节对正弦输入的**基波等效增益**近似分析自振。
+
+## 定义与适用假设
+
+设非线性环节输入 $e(t)=A\sin\omega t$，稳态输出的基波为
+
+$$
+y_1(t)=a_1\cos\omega t+b_1\sin\omega t,
+$$
+
+$$
+a_1=\frac{1}{\pi}\int_{-\pi}^{\pi}y(\theta)\cos\theta\,\mathrm d\theta,\qquad
+b_1=\frac{1}{\pi}\int_{-\pi}^{\pi}y(\theta)\sin\theta\,\mathrm d\theta.
+$$
+
+描述函数定义为
+
+$$
+N(A,\omega)=\frac{b_1+ja_1}{A}.
+$$
+
+对无记忆、单值、奇对称非线性，$a_1=0$，且 $N$ 通常只与振幅 $A$ 有关。该方法适用时通常假设：
+
+1. 系统仅有一个主要非线性环节；
+2. 线性部分具有较强低通特性，足以衰减高次谐波；
+3. 响应近似单频正弦，关注基波极限环；
+4. 非线性可由稳态周期输入表征。
+
+因此它是近似频域法，不能可靠预测强高次谐波、次谐波、混沌或明显非正弦运动。
+
+## 常见描述函数
+
+- 理想继电器 $y=M\,\operatorname{sgn}(e)$：
+
+$$
+N(A)=\frac{4M}{\pi A}.
+$$
+
+- 带滞环继电器（切换阈值 $\pm h$，$A>h$）：
+
+$$
+N(A)=\frac{4M}{\pi A}
+\left(\sqrt{1-\frac{h^2}{A^2}}-j\frac{h}{A}\right).
+$$
+
+- 对称饱和，线性段斜率 $K$、饱和输出 $\pm M$，令 $\alpha=M/(KA)<1$：
+
+$$
+N(A)=\frac{2K}{\pi}
+\left[\arcsin\alpha+\alpha\sqrt{1-\alpha^2}\right].
+$$
+
+当 $A\le M/K$ 时，$N(A)=K$。
+
+## 自振判定
+
+将系统化为负反馈结构，线性部分为 $G(s)$，则近似特征条件为
+
+$$
+1+N(A,\omega)G(j\omega)=0,
+$$
+
+即
+
+$$
+G(j\omega)=-\frac{1}{N(A,\omega)}.
+$$
+
+在同一复平面绘制 $G(j\omega)$ 轨迹与 $-1/N(A,\omega)$ 轨迹。交点给出候选自振频率 $\omega_0$ 与振幅 $A_0$；无交点只表示该近似下未预测到单频极限环，不构成全局稳定证明。
+
+<svg viewBox="0 0 650 350" role="img" aria-label="描述函数法中线性部分 Nyquist 轨迹与负倒描述函数轨迹的交点" style={{maxWidth:'100%',color:'var(--ifm-font-color-base)'}}>
+  <defs><marker id="arrow-df" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="currentColor"/></marker></defs>
+  <g fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M35 175H620" markerEnd="url(#arrow-df)"/><path d="M430 325V25" markerEnd="url(#arrow-df)"/></g>
+  <path d="M585 175 C520 170 470 140 415 102 C350 57 220 65 168 143 C130 202 225 278 323 245 C378 227 389 198 430 175" fill="none" stroke="var(--ifm-color-primary)" strokeWidth="2.5" markerEnd="url(#arrow-df)"/>
+  <path d="M100 175 C185 175 260 175 395 175" fill="none" stroke="currentColor" strokeWidth="2.5" strokeDasharray="7 5" markerEnd="url(#arrow-df)"/>
+  <circle cx="430" cy="175" r="4" fill="currentColor"/><circle cx="214" cy="175" r="6" fill="var(--ifm-color-danger)"/>
+  <g fill="currentColor" fontSize="14"><text x="624" y="180">Re</text><text x="438" y="28">Im</text><text x="438" y="195">0</text><text x="205" y="198">(A₀, ω₀)</text><text x="108" y="162">−1/N(A)</text><text x="250" y="82">G(jω)</text><text x="500" y="156">ω=0</text></g>
+</svg>
+
+交点的稳定性需考察振幅在 $A_0$ 两侧微扰后，等效闭环趋势是否把振幅推回 $A_0$；应结合 $-1/N$ 轨迹参数方向与 Nyquist 相对位置判断。若低通假设较弱，最终必须用时域仿真或相平面验证。
+
+## 配套视频
+
 > 上
 
 <VideoPlayer src="//player.bilibili.com/player.html?isOutside=true&aid=811394492&bvid=BV1F34y1h7so&cid=718650410&p=75" />

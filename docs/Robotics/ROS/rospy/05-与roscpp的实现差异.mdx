@@ -1,0 +1,115 @@
+---
+sidebar_position: 5
+---
+
+import WordCount from '../../../../src/components/WordCount/WordCount';
+import Mermaid from '@theme/Mermaid';
+
+<WordCount>
+
+rospy和roscpp在网络协议上完全一致，同样的XMLRPC发现流程、同样的TCPROS握手和消息帧，所以两边能无缝互通。但进程内部的组织方式几乎没有共同点。
+
+本文把差异摊开对照一下，最后给点选型上的建议。
+
+## 差异的源头：回调怎么派发
+
+roscpp的模型是，网络线程收到消息之后不执行回调，而是把一个callback对象塞进CallbackQueue；用户线程通过spinner（`ros::spin`、`spinOnce`、AsyncSpinner、MultiThreadedSpinner）从队列里取出来执行。回调在哪个线程跑、几个线程跑，由我们选哪种spinner决定。
+
+rospy的模型是没有队列。每条连接的接收线程收到消息、反序列化完，就地遍历回调列表逐个调用。回调跑在哪个线程不由我们选，就是那条连接的接收线程。
+
+<Mermaid
+value={`flowchart TB
+    subgraph CPP ["roscpp"]
+      N1["poll 线程 epoll"] --> Q["CallbackQueue"]
+      Q --> SP1["Spinner 线程 1"]
+      Q --> SP2["Spinner 线程 2"]
+      SP1 --> CB1["用户回调"]
+      SP2 --> CB2["用户回调"]
+    end
+    subgraph PY ["rospy"]
+      R1["连接 A 接收线程"] --> UB1["用户回调 A"]
+      R2["连接 B 接收线程"] --> UB2["用户回调 B"]
+      R3["连接 C 接收线程"] --> UB3["用户回调 C"]
+    end
+`}
+/>
+
+spin()的语义也就跟着不一样了。roscpp的`ros::spin()`是真正的工作循环，不调就没人处理回调；rospy的`rospy.spin()`只是循环检查is_shutdown再wallsleep，纯粹用来拦住主线程，把它换成任何别的阻塞方式，订阅照样工作。
+
+roscpp里`spinOnce()`提供的"我控制回调什么时候执行"这个能力，rospy根本没有对等物。想要类似效果只能自己在回调里把数据丢进`queue.Queue`，再在主循环里取——等于手工重建一个CallbackQueue。
+
+## 线程数量和GIL
+
+roscpp稳态下线程很少：一个poll线程负责所有socket的I/O，加上我们指定数量的spinner线程，再加少量辅助线程。连接数涨了线程数不涨。
+
+rospy的线程数则随规模线性增长：XMLRPC服务线程、RegManager线程、TCPROS accept线程，加上每条订阅连接一个接收线程、每个QueuedConnection一个发送线程、每个Timer一个线程。订阅十个话题、每个话题两个发布者，光接收线程就二十个。
+
+而且这些线程全都受GIL约束。多线程在rospy里的价值是让阻塞I/O重叠，不是让计算并行。回调里的纯Python计算，开多少线程都只能用一个核。
+
+整体对照一下：
+
+| 维度 | roscpp | rospy |
+| --- | --- | --- |
+| 回调派发 | CallbackQueue加Spinner | 每连接接收线程直接调用 |
+| spin语义 | 真正的工作循环 | 只是防止退出的轮询 |
+| I/O模型 | 单poll线程加epoll | 阻塞recv，每连接一线程 |
+| 线程数 | 与连接数无关 | 随连接、Timer数线性增长 |
+| 并行能力 | 真多核并行 | 受GIL限制 |
+| 同进程零拷贝 | 支持nocopy和nodelet | 没有 |
+| 参数缓存 | 显式getCached | 无对等公开接口 |
+| 定时器 | 走CallbackQueue | 每个Timer一个线程 |
+
+## 零拷贝和序列化成本
+
+roscpp在同一进程内、消息类型匹配的时候可以走nocopy，发布者直接把消息的智能指针交给订阅者，完全跳过序列化和socket。nodelet那套生态就是建立在这个能力上的：把多个原本独立的节点加载进同一个进程，图像、点云这类大消息在它们之间传递的成本几乎降到零。
+
+rospy没有任何对应机制。哪怕发布者和订阅者在同一个Python进程里，消息也要完整序列化成字节、通过本地TCP连接发出去、再反序列化回来。而Python的序列化本身就比C++慢一个数量级以上。
+
+两件事叠一块，大消息高频话题在rospy里的表现就可想而知了：一个1080p图像话题跑30Hz，roscpp里是小事，rospy里可能光序列化就吃掉一个核。
+
+## 队列和丢包语义
+
+两边都有queue_size，但含义不完全一样。
+
+roscpp的发布队列和订阅队列都由库统一管理，队列满了丢最老的，行为一致而且跟spinner解耦。
+
+rospy发布侧的queue_size是QueuedConnection的有界deque，满了丢最老的；订阅侧的queue_size控制接收路径上的缓冲深度。更关键的是前面反复说的那条：rospy发布侧不给queue_size就根本没有队列，publish直接写socket，慢订阅者会把发布者一起拖住。roscpp里不会出现"publish把整个循环阻塞住"这种情况。
+
+## 可预测性和调试
+
+roscpp的行为好推理：回调什么时候执行、在哪个线程执行，由spinner配置明确决定，用单线程spinner就能保证回调串行，不用加锁。
+
+rospy的并发是隐式的。我们没有声明任何线程，但回调已经在多个线程里并发跑了。典型的坑有三个：
+
+- 两个订阅回调同时改同一个成员变量，没加锁，偶发出现不一致状态
+- 同一个话题有多个发布者节点时，同一个回调函数被并发重入，而代码是按"串行执行"写的
+- 回调里做重计算把这条连接堵住，反压到对应的发布者，其它话题一切正常，现象看起来毫无规律
+
+调试手段上，`rosnode info`、`rostopic hz`、`rostopic delay`、从节点的getBusInfo和getBusStats两边都能用。rospy这边额外能用Python自带的东西：`threading.enumerate()`看当前有哪些线程，`faulthandler`在卡死时dump所有线程栈，排查"到底哪个回调堵住了"的时候特别好用。
+
+## 怎么选
+
+优先上C++的情况：大消息高频话题（图像、点云、激光原始数据）；有实时性或者抖动要求的控制回路；需要nodelet零拷贝的感知流水线；回调里有重计算而且必须并行。
+
+用Python完全合适的情况：上层状态机、任务调度、行为树；低频的配置和监控节点；跟外部系统（数据库、Web服务、机器学习框架）打交道的胶水层；原型验证和一次性脚本。
+
+混合系统的原则是把重活放在roscpp侧，Python只订阅降采样过或者已经处理好的结果。别让Python节点站在数据流的关键路径上做转发，它既没有零拷贝，又要付两次序列化的钱。
+
+## 常见的坑
+
+:::warning
+按我踩坑的频率从高到低排：
+
+1. 在Python回调里做重计算。阻塞的是该连接的接收线程，直接反压到对端发布者。重活应该丢进独立的工作线程或进程，回调只负责入队
+2. 发布侧不设queue_size。慢订阅者会让publish阻塞，进而拖垮整个发布循环
+3. 用rospy中转大消息。订阅再发布等于一次反序列化加一次序列化，纯浪费
+4. 高频调用非持久服务。每次都建连、握手、起线程。要么改persistent，要么干脆改用话题
+5. 假设回调是串行的。多发布者、多话题场景下回调并发重入，共享状态必须加锁
+6. 仿真时间下不检查`/clock`。时间为零时的时间差计算、`/clock`停了之后sleep永久等待，都会表现成"卡死"
+7. init_node之后立刻publish。连接还没建立，消息静默丢掉。等`get_num_connections()`或者用`latch=True`
+8. Timer开太多。每个都是一个真实线程，几十个Timer在GIL下互相抢锁，实际频率会偏离设定值
+:::
+
+理解了rospy"每连接一线程、回调就地执行、没有统一队列"这个核心模型，上面这些现象就不是零散的经验了，都是同一个设计推出来的。
+
+</WordCount>

@@ -1,0 +1,83 @@
+import WordCount from '../../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+# PlaNet：从像素学 latent 动力学，在 latent 里规划
+
+我的结论先说：PlaNet 证明了从原始像素学一个够用的 latent 动力学模型，然后在 latent 空间里做 MPC，这条路走得通。它还没有 actor-critic，每一步都要在线搜动作，但 RSSM 这个骨架一直活到了 [DreamerV3](./04-DreamerV3.mdx)。
+
+论文：[Learning Latent Dynamics for Planning from Pixels](https://arxiv.org/abs/1811.04551)（2019, Hafner et al.）
+
+## 核心问题
+
+Model-based RL 的老问题是：从像素建动力学太贵，建出来的模型又容易不准，规划出来的动作一落地就翻车。PlaNet 要回答的是：能不能不学显式物理，而是学一个 compact 的 latent 表示，让规划在 latent 里做，同时样本效率还比 model-free 高？
+
+它的设定是连续控制、图像观测、已知奖励函数。策略不是学出来的，是每步用 CEM 在模型里搜出来的。
+
+## RSSM：确定性记忆 + 随机隐变量
+
+PlaNet 的核心是 Recurrent State-Space Model（RSSM）。隐状态拆成两半：
+
+- 确定性部分 $h_t$：GRU 递推，负责长期记忆，梯度能顺着它往回传；
+- 随机部分 $z_t$：表达当前时刻不可预测、多模态的东西。
+
+递推关系：
+
+$$
+h_t = f_\theta(h_{t-1}, z_{t-1}, a_{t-1})
+$$
+
+训练时有两个分布。先验 $p_\theta(z_t \mid h_t)$ 只看历史，后验 $q_\phi(z_t \mid h_t, x_t)$ 还能看到当前观测 $x_t$。推理时用先验往前滚，训练时用后验对齐真实数据。
+
+观测、奖励的解码：
+
+$$
+p_\theta(x_t \mid h_t, z_t), \qquad p_\theta(r_t \mid h_t, z_t)
+$$
+
+损失是变分 ELBO，重建观测和奖励，同时 KL 把后验往先验拉：
+
+$$
+\mathcal{L} = \sum_t \Big[ -\ln p(x_t \mid h_t, z_t) - \ln p(r_t \mid h_t, z_t) + \beta\,\mathrm{KL}\big[q_\phi(z_t \mid h_t, x_t) \,\|\, p_\theta(z_t \mid h_t)\big] \Big]
+$$
+
+为什么要拆 $h$ 和 $z$？纯随机状态空间模型（比如 VRNN）很难可靠地记住多步以前的信息；纯确定性 RNN 又没法表达"这一步可能有几种不同的未来"。RSSM 这个拆法是为了同时要长期记忆和多模态表达。后面 [Dreamer](./02-Dreamer.mdx) 系列一直沿用这个结构，只是换了 latent 的分布形式和训练细节。
+
+## 在 latent 里做 MPC
+
+PlaNet 没有策略网络。每一步的流程是：
+
+1. 用真实观测编码出当前后验 $(h_t, z_t)$；
+2. 在 latent 里用 CEM 搜一段长度为 $H$ 的动作序列；
+3. 只执行第一个动作，拿到新观测，重新规划。
+
+CEM 在 latent 轨迹上评估候选动作序列的期望回报。回报来自模型预测的奖励序列，加上终端状态的 value 估计。因为全程在 latent 里滚，不需要解码图像，规划比直接在像素空间快得多。
+
+但 CEM 每步要采样上千条轨迹、迭代好几轮，算力开销还是大。DeepMind Control 上能跑，Atari 这种离散高维动作空间就不太现实了。这也是 [Dreamer](./02-Dreamer.mdx) 要把在线规划换成想象里训 actor 的直接动机。
+
+## 实验亮点
+
+PlaNet 在 DeepMind Control Suite 的六个任务上，从像素输入、500 episode 预算，达到了当时 SOTA 的样本效率。几个任务上比 SAC 这种 model-free 方法少用了大约一个数量级的环境交互。
+
+视觉重建质量不是完美，但够规划用。论文里也展示了 latent 空间里的轨迹可视化：不同动作序列确实会滚向不同的 latent 区域，说明模型学到了跟控制相关的结构，而不只是模糊地复制像素。
+
+对比之前的 World Models（2018）和 SVG 等工作，PlaNet 的关键进步是 RSSM 的表示能力和 ELBO 训练的稳定性，以及 CEM 规划跟 learned model 的配合。
+
+## 局限
+
+我自己觉得 PlaNet 有几处硬伤：
+
+1. 规划成本。CEM 每步在线搜索，延迟和算力都高，很难部署到需要实时控制的场景。
+2. 短视规划。$H$ 一般只有十几步，长期任务靠终端 value 估计补，但 value 也是从短轨迹学的，误差会叠。
+3. 高斯 latent 的表达力。单峰高斯对强多模态的环境（比如 Atari 里一个按钮两种结局）不够，[DreamerV2](./03-DreamerV2.mdx) 后来用离散 latent 部分解决了这个问题。
+4. 模型误差会被规划器 exploit。CEM 会找到"模型以为好但真实环境里很糟"的动作序列，跟 Dyna 里的 classic 问题一样。
+
+## 在系列里的位置
+
+PlaNet 是 Dreamer 全系列的起点。它贡献的是 RSSM 骨架和"latent 动力学 + 想象"这个范式，但没有解决"怎么高效地利用模型来学策略"。
+
+[Dreamer](./02-Dreamer.mdx) 保留了 RSSM，把 CEM 换成 actor-critic 想象训练，梯度可以直接穿过动力学回传。[DreamerV2](./03-DreamerV2.mdx) 改 latent 分布和 KL 训练。[DreamerV3](./04-DreamerV3.mdx) 和 [DreamerV4](./05-DreamerV4.mdx) 则分别解决跨任务鲁棒性和规模化。
+
+放到 WAM 的语境里，PlaNet 代表"自己从零学一个小模型"那条路。今天的 WAM 用预训练视频模型当时序先验，规模大得多，但"在模型里滚未来、据此产生动作"这个骨架没变。区别见 [Dreamer](./02-Dreamer.mdx) 和 [DreamerV3](./04-DreamerV3.mdx) 的演进。
+
+</WordCount>

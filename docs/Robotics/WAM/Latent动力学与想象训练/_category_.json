@@ -1,0 +1,8 @@
+{
+  "label": "Latent 动力学与想象训练",
+  "position": 1,
+  "link": {
+    "type": "generated-index",
+    "description": "从 PlaNet 到 Dreamer 系列：在 latent 空间学动力学，在想象中训练策略。"
+  }
+}

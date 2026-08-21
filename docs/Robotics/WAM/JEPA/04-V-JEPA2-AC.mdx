@@ -1,0 +1,89 @@
+import WordCount from '../../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+# V-JEPA 2-AC：latent 里的目标条件机器人规划
+
+论文：[V-JEPA 2](https://arxiv.org/abs/2506.09985) 第二阶段的 action-conditioned 版本（Meta，2025）。结论先行：**V-JEPA 2-AC 是我目前见过样本效率最夸张的 latent world model 机器人方案——只用 62 小时无标签 DROID 数据后训练，就能在新环境、新物体上做零样本 pick-and-place 规划**，但规划发生在 latent 里，最后还要一层控制器把 plan 转成关节命令，不是端到端。
+
+## 1. 两阶段怎么接
+
+Stage 1 是 [V-JEPA 2](./03-V-JEPA2.mdx)：百万小时视频 pre-train，encoder 已经理解物体、运动、接触的基本结构。Stage 2 **冻结 encoder**，在它上面训一个 action-conditioned predictor：
+
+- 输入：当前帧 embedding + 7D end-effector 状态（位置、朝向、夹爪）+ 动作（帧间 EE 增量）。
+- 输出：下一帧的 latent feature map（16×16×1408）。
+- 架构：300M 参数 Transformer，24 层 16 头，block-causal attention + 3D RoPE。
+
+训练数据：**DROID** 里约 62 小时 Franka Panda 遥操作视频，256×256、4 fps、4 秒 clip（16 帧）。没有 task label，没有 reward，没有 success 标注——纯视频 + proprio + action。
+
+Loss 是 teacher-forcing + rollout 的组合：单步预测保证局部准确，多步 rollout 保证 MPC 时 latent 轨迹不 rapidly drift。
+
+Action 定义是帧间 7D end-effector delta（$\Delta x, \Delta y, \Delta z, \Delta q_x, \Delta q_y, \Delta q_z, \Delta \text{gripper}$），不是 joint torque。这意味着 predictor 学的是 **operational space dynamics 在 latent 里的投影**，跟 joint-space 控制器之间天然有一层 gap——部署时必须假设 low-level tracking 足够准。
+
+## 2. 规划：goal-conditioned energy minimization
+
+部署时不生成像素，而是在 latent 里做 **model-predictive control**：
+
+1. 用 frozen encoder 把当前观测和目标图像（goal image）编成 embedding。
+2. 在每个 time step，采样一批 candidate action sequence（固定 horizon）。
+3. 用 action-conditioned predictor 在 latent 里 roll out 每条 candidate 的后果。
+4. 用 goal-conditioned energy（预测 latent 跟 goal embedding 的距离）给 candidate 打分，执行 top-1 action。
+5. 下一步重新观测、重新规划（receding horizon）。
+
+整个 loop 不需要 reward model，不需要 value function，不需要 policy gradient——纯 **latent space shooting** 加 energy minimization。这跟 [TD-MPC2](../决策等价世界模型/03-TD-MPC2.mdx) 在 latent 里做 MPC 的思路很像，但 V-JEPA 2-AC 的 latent 来自 million-hour video pretrain，TD-MPC2 的 latent 来自 task-specific RL interaction。
+
+任务指定方式是 **visual goal**：给一张目标状态的照片，机器人自己规划怎么过去。长 horizon 任务（比如 pick-and-place）拆成一系列 visual subgoal，逐步达成——类似人类 imitation learning 里的 subgoal decomposition。
+
+## 3. 零样本数字与设定
+
+Meta 在两个不同 lab 的 Franka 上做了 zero-shot 部署——**训练数据里没有任何来自这两个 lab 的样本**：
+
+- 短 horizon（reach、grasp）：成功率可观。
+- Pick-and-place 新物体、新背景：**65%–80%** 成功率。
+
+62 小时 vs 百万小时的比例很夸张，但要看清前提：
+
+1. 重活是 Stage 1 的 internet-scale pre-training 干的，62 小时只是教 predictor "动作怎么改 latent"。
+2. 场景限定在 **固定基座、单臂、桌面 manipulation**，不是 loco-manipulation。
+3. 中间有一层 **low-level controller** 把 planned EE delta 转成关节命令，不是 latent 直接出 torque。
+4. Goal 是 image，不是 language——跟 VLA 的接口不一样。
+
+## 4. 跟 JEPA 线和生成式 WAM 怎么选
+
+| | V-JEPA 2-AC | 生成式 WAM（Cosmos / MotionWAM） |
+| --- | --- | --- |
+| 动力学模型 | latent prediction，一次前向 | video denoise / flow matching |
+| 机器人数据 | ~62h 无标签 | 通常更多 + 有时要 task label |
+| 任务接口 | goal image + subgoals | 多种（latent、language、motion token） |
+| 全身 loco-manip | 未涉及 | MotionWAM 已上 G1 真机 |
+| Debug | latent 不可视化 | 能看生成帧（但慢） |
+
+V-JEPA 2-AC 适合 **"我有 goal image、固定臂、要快、数据少"** 的 tabletop planning。如果你要的是 **全身人形 loco-manipulation、第一视角、实时闭环**，latent MPC 这条路还没被验证——[MotionWAM](../Video-Action%20Model/03-MotionWAM.mdx) 选择了不同的取舍：保留 video 模型的 dynamics prior，但不完整生成视频，直接从中间层激活里抠 prior 出动作，4.9 Hz 跑 G1 真机。
+
+## 5. 我看到的优点和风险
+
+**优点**
+
+- 样本效率：无标签 robot video 就够，不需要 success/demo curation。
+- 推理快：latent rollout 比 diffusion world model 便宜几个数量级。
+- Zero-shot 泛化：新环境、新物体有一定鲁棒性，说明 Stage 1 的 physical prior 真的 transfer 了。
+
+**风险**
+
+- Latent 错了看不出来——MPC 在错的 rollout 上优化，可能 confidently 失败。
+- Block-causal predictor 的 horizon 有限，长任务靠 subgoal 分解，subgoal 怎么给、给错了怎么办，论文没深入讨论。
+- 跟 low-level controller 的接口不是学出来的，误差会在两层之间累积。
+- 目前只有 Franka tabletop 的系统评测，离 [MuZero 系](../决策等价世界模型/03-TD-MPC2.mdx) 的通用 MPC 和 [MotionWAM](../Video-Action%20Model/03-MotionWAM.mdx) 的全身闭环都还有距离。
+
+## 6. 系列小结
+
+JEPA 线四篇的逻辑链：
+
+1. [I-JEPA](./01-I-JEPA.mdx)：图像上证明 latent prediction 可以学语义表征。
+2. [V-JEPA](./02-V-JEPA.mdx)：tube masking 解决视频时空冗余，frozen 表征 SOTA。
+3. [V-JEPA 2](./03-V-JEPA2.mdx)：百万小时 scale → foundation world model。
+4. **V-JEPA 2-AC（本篇）**：少量 robot data → latent MPC 规划。
+
+跟 [WAM 总览](../JEPA/01-I-JEPA.mdx) 的对照：JEPA 适合快、抽象、不生成像素；生成式 WAM 适合要 dynamics prior 直接参与动作生成、愿意付推理成本。第三条路——**不完全生成视频，但利用 video model 中间层**——是 [MotionWAM](../Video-Action%20Model/03-MotionWAM.mdx) 在走的方向，值得跟 V-JEPA 2-AC 的 latent MPC 放在一起比较 closed-loop 表现，而不是只看各自的 demo。
+
+</WordCount>

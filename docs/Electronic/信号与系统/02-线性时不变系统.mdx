@@ -133,12 +133,229 @@ $$
 
 </details>
 
-## 2.2 连续时间线性时不变系统： 卷积积分
+## 2.2 连续时间线性时不变系统：卷积积分
+
+连续时间信号可以看成无穷多个移位冲激的叠加：
+
+$$
+x(t)=\int_{-\infty}^{+\infty}x(\tau)\delta(t-\tau)\,\mathrm d\tau.
+\tag{2.1}
+$$
+
+若 LTI 系统对 $\delta(t)$ 的响应为 $h(t)$，则由时不变性，
+$\delta(t-\tau)\rightarrow h(t-\tau)$；再由线性得到
+
+$$
+y(t)=\int_{-\infty}^{+\infty}x(\tau)h(t-\tau)\,\mathrm d\tau
+=x(t)*h(t).
+\tag{2.2}
+$$
+
+### 2.2.1 卷积的图解步骤
+
+计算某个固定时刻 $t$ 的卷积时，把积分变量看作 $\tau$，依次进行：
+
+1. **反折**：$h(\tau)\rightarrow h(-\tau)$；
+2. **平移**：$h(-\tau)\rightarrow h(t-\tau)$；
+3. **相乘**：求 $x(\tau)h(t-\tau)$；
+4. **积分**：计算乘积曲线与横轴之间的有符号面积。
+
+下面以 $x(t)=u(t)-u(t-2)$、$h(t)=u(t)-u(t-1)$ 为例。两矩形重叠部分的长度就是卷积值：
+
+<div style={{ textAlign: 'center', margin: '1.5rem 0' }}>
+  <svg width="720" height="245" viewBox="0 0 720 245" role="img" aria-label="两个矩形脉冲卷积的坐标图" style={{ color: 'var(--ifm-font-color-base)', maxWidth: '100%' }}>
+    <defs>
+      <marker id="conv-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+        <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor" />
+      </marker>
+      <pattern id="conv-hatch" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+        <line x1="0" y1="0" x2="0" y2="7" stroke="#8b5cf6" strokeWidth="2" opacity="0.55" />
+      </pattern>
+    </defs>
+    <line x1="35" y1="185" x2="685" y2="185" stroke="currentColor" markerEnd="url(#conv-arrow)" />
+    <line x1="250" y1="210" x2="250" y2="25" stroke="currentColor" markerEnd="url(#conv-arrow)" />
+    <path d="M70 185 H250 V80 H510 V185 H650" fill="none" stroke="#2563eb" strokeWidth="3" />
+    <path d="M70 185 H330 V110 H470 V185 H650" fill="none" stroke="#ef4444" strokeWidth="3" strokeDasharray="7 5" />
+    <rect x="330" y="110" width="140" height="75" fill="url(#conv-hatch)" />
+    <text x="515" y="72" fill="#2563eb" fontSize="15">x(τ)</text>
+    <text x="475" y="105" fill="#ef4444" fontSize="15">h(t−τ)</text>
+    <text x="400" y="145" fill="currentColor" fontSize="14" textAnchor="middle">重叠区</text>
+    <text x="680" y="207" fill="currentColor" fontSize="14">τ</text>
+    <text x="262" y="35" fill="currentColor" fontSize="14">幅值</text>
+    <text x="250" y="205" fill="currentColor" fontSize="13" textAnchor="middle">0</text>
+    <text x="330" y="205" fill="currentColor" fontSize="13" textAnchor="middle">t−1</text>
+    <text x="470" y="205" fill="currentColor" fontSize="13" textAnchor="middle">t</text>
+  </svg>
+</div>
+
+设两个脉冲的幅值均为 1，则
+
+$$
+y(t)=
+\begin{cases}
+0,&t<0,\\
+t,&0\le t<1,\\
+1,&1\le t<2,\\
+3-t,&2\le t<3,\\
+0,&t\ge 3.
+\end{cases}
+\tag{2.3}
+$$
+
+<div style={{ textAlign: 'center', margin: '1.5rem 0' }}>
+  <svg width="520" height="230" viewBox="0 0 520 230" role="img" aria-label="矩形脉冲卷积得到的梯形波" style={{ color: 'var(--ifm-font-color-base)', maxWidth: '100%' }}>
+    <defs>
+      <marker id="conv-result-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+        <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor" />
+      </marker>
+    </defs>
+    <line x1="35" y1="185" x2="490" y2="185" stroke="currentColor" markerEnd="url(#conv-result-arrow)" />
+    <line x1="80" y1="205" x2="80" y2="25" stroke="currentColor" markerEnd="url(#conv-result-arrow)" />
+    <path d="M45 185 H80 L200 65 H320 L440 185 H475" fill="none" stroke="#8b5cf6" strokeWidth="3" />
+    <line x1="80" y1="65" x2="320" y2="65" stroke="currentColor" strokeDasharray="4 4" opacity="0.45" />
+    <text x="485" y="205" fill="currentColor" fontSize="14">t</text>
+    <text x="92" y="35" fill="currentColor" fontSize="14">y(t)</text>
+    <text x="68" y="70" fill="currentColor" fontSize="13" textAnchor="end">1</text>
+    <text x="200" y="205" fill="currentColor" fontSize="13" textAnchor="middle">1</text>
+    <text x="320" y="205" fill="currentColor" fontSize="13" textAnchor="middle">2</text>
+    <text x="440" y="205" fill="currentColor" fontSize="13" textAnchor="middle">3</text>
+  </svg>
+</div>
+
+:::tip
+两个有限时宽信号的卷积，其支撑区间端点相加。若 $x(t)$ 支撑于
+$[a,b]$，$h(t)$ 支撑于 $[c,d]$，则 $x*h$ 支撑于 $[a+c,b+d]$。
+:::
 
 ## 2.3 线性时不变系统的性质
 
-## 2.4 用微分方程和差分方程描述的因果线性时不变系统
+### 2.3.1 卷积的代数性质
+
+$$
+\begin{aligned}
+x*h&=h*x &&\text{交换律},\\
+(x*h_1)*h_2&=x*(h_1*h_2) &&\text{结合律},\\
+x*(h_1+h_2)&=x*h_1+x*h_2 &&\text{分配律}.
+\end{aligned}
+\tag{2.4}
+$$
+
+因此，若多个 LTI 系统级联，其先后次序不影响总响应；级联系统的总冲激响应为
+$h_{\mathrm{eq}}=h_1*h_2*\cdots*h_N$。并联系统则有
+$h_{\mathrm{eq}}=h_1+h_2+\cdots+h_N$。
+
+### 2.3.2 无记忆性、因果性与稳定性
+
+- **无记忆**：连续时间 LTI 系统无记忆，当且仅当
+  $h(t)=K\delta(t)$；离散时间对应 $h[n]=K\delta[n]$。
+- **因果**：系统在当前时刻不能依赖未来输入。因果 LTI 系统满足
+  $h(t)=0\ (t<0)$ 或 $h[n]=0\ (n<0)$。
+- **BIBO 稳定**：任意有界输入产生有界输出。当且仅当
+
+$$
+\int_{-\infty}^{+\infty}|h(t)|\,\mathrm dt<\infty,
+\qquad
+\sum_{n=-\infty}^{+\infty}|h[n]|<\infty.
+\tag{2.5}
+$$
+
+例如 $h(t)=e^{-at}u(t)$ 在 $a>0$ 时既因果又稳定；若 $a\le 0$，其绝对积分发散，因而不稳定。
+
+### 2.3.3 可逆性
+
+若存在逆系统 $h_{\mathrm{inv}}$ 使
+
+$$
+h*h_{\mathrm{inv}}=\delta,
+\tag{2.6}
+$$
+
+则串联后输出等于原输入。需要注意：逆系统在数学上存在，并不保证它同时满足因果和稳定。
+
+## 2.4 用微分方程和差分方程描述因果 LTI 系统
+
+### 2.4.1 连续时间系统
+
+常系数线性微分方程的一般形式为
+
+$$
+\sum_{k=0}^{N}a_k\frac{\mathrm d^k y(t)}{\mathrm dt^k}
+=
+\sum_{k=0}^{M}b_k\frac{\mathrm d^k x(t)}{\mathrm dt^k}.
+\tag{2.7}
+$$
+
+只有在**初始静止**条件下，这个输入输出关系才描述 LTI 系统的零状态响应。以一阶系统
+
+$$
+\frac{\mathrm dy(t)}{\mathrm dt}+ay(t)=x(t),\qquad a>0
+$$
+
+为例，令 $x(t)=\delta(t)$，可得
+
+$$
+h(t)=e^{-at}u(t),\qquad
+y(t)=\int_{-\infty}^{t}x(\tau)e^{-a(t-\tau)}\,\mathrm d\tau.
+\tag{2.8}
+$$
+
+### 2.4.2 离散时间系统
+
+常系数线性差分方程为
+
+$$
+\sum_{k=0}^{N}a_k y[n-k]
+=
+\sum_{k=0}^{M}b_k x[n-k].
+\tag{2.9}
+$$
+
+例如
+
+$$
+y[n]-ay[n-1]=x[n],\qquad |a|<1
+$$
+
+对应的因果冲激响应为 $h[n]=a^n u[n]$。它的绝对和为
+$\sum_{n=0}^{\infty}|a|^n=1/(1-|a|)$，所以系统稳定。
 
 ## 2.5 奇异函数
+
+### 2.5.1 单位冲激及筛选性质
+
+连续时间冲激不是普通函数，而是由积分意义定义的广义函数：
+
+$$
+\delta(t)=0\ (t\ne0),\qquad
+\int_{-\infty}^{+\infty}\delta(t)\,\mathrm dt=1.
+$$
+
+它最重要的性质是
+
+$$
+\int_{-\infty}^{+\infty}x(t)\delta(t-t_0)\,\mathrm dt=x(t_0),
+\qquad
+x(t)*\delta(t-t_0)=x(t-t_0).
+\tag{2.10}
+$$
+
+### 2.5.2 阶跃、冲激与冲激偶
+
+$$
+\frac{\mathrm d u(t)}{\mathrm dt}=\delta(t),\qquad
+\int_{-\infty}^{t}\delta(\tau)\,\mathrm d\tau=u(t).
+\tag{2.11}
+$$
+
+冲激的导数 $\delta'(t)$ 称为**冲激偶**，满足
+
+$$
+\int_{-\infty}^{+\infty}x(t)\delta'(t-t_0)\,\mathrm dt=-x'(t_0),
+\qquad
+x(t)*\delta'(t)=x'(t).
+\tag{2.12}
+$$
+
+这些关系把“微分”转化为“与奇异函数卷积”，是分析含跳变信号和理想系统的重要工具。
 
 </WordCount>

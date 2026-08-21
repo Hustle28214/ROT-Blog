@@ -12,7 +12,349 @@ import Mermaid from '@theme/Mermaid';
 3. 红色节点的子节点为黑色
 4. 从根节点到NIL节点的每条路径上的黑色节点数量相同
 
-> 红黑树其实是2-3-4树的变体。
+合法红黑树：
+
+![](https://github.com/user-attachments/assets/b1bdc24d-2286-4059-a342-ebe0148fc8b8)
+
+
+这么多建树规则看着头疼，说穿了红黑树就是实现了恰到好处的“懒”。使得它成为用来维护**“有序动态集合”**的基石。
+
+红黑树在插入时最多旋转 **2 次**，删除时最多旋转 **3 次**。这种“松散平衡”让它在动态变化剧烈的场景下，把性能损耗降到了最低。
+
+增删改查极为频繁的场景下，红黑树的性能表现极为出色。事实上，现代互联网工业的绝大多数场景都要面对这一难题。凭借优越的性能，它已经用到了STL库/Linux内核公平调度器/Redis 的有序集合/SQL的Buffer Pool等重要场景中。
+
+
+## 红黑树实现模板
+
+首先我们来看一下红黑树的实现逻辑。
+
+要搞清楚建树逻辑，我们需要先盘清楚平衡树的操作逻辑。
+
+和其他平衡树一样，红黑树可以执行旋转/插入等操作，还要维护平衡。对于插入这个操作来讲和BST大差不差，新插入的节点必定是红色，然后进行修复操作。
+
+### 旋转：唯一改变树形状的操作
+
+染色只动颜色不动指针，真正能改变树高的只有旋转。旋转的关键性质是**保持中序遍历不变**，也就是说转完之后它仍然是一棵合法的 BST，只是形状变了：
+
+```text
+    p                      c
+   / \                    / \
+  a   c      左旋 p      p   z
+     / \     ========>  / \
+    b   z              a   b
+
+中序遍历：a p b c z          中序遍历：a p b c z
+```
+
+左旋 `p` 就是把它的右孩子 `c` 提上来、`p` 自己降到左边，原本夹在中间的子树 `b` 改挂到 `p` 的右边。右旋是完全对称的操作。
+
+模板里把两者合并成了一个函数 `rotate(p, dir)`，`dir = 0` 表示左旋、`dir = 1` 表示右旋，节点的孩子也用 `ch[2]` 数组而不是 `left/right` 两个字段来存：
+
+```cpp
+pointer child = p->ch[!dir];   // dir=0 时取右孩子，dir=1 时取左孩子
+p->ch[!dir] = child->ch[dir];  // 把中间那棵子树转挂过来
+child->ch[dir] = p;            // p 降下去
+```
+
+这样一来，左右两套镜像代码就压成了一套。下面讲修复情况时也会用同一个套路：先算出"父节点在祖父的哪一侧"，后面所有方向都用 `dir` 和 `!dir` 表示，于是六种情况只要写三种。这是这份模板最值得抄的地方。
+
+旋转还会改变子树大小，所以 `rotate` 结尾要对 `p` 和 `child` 依次调用 `pull` 重算 `sz`（顺序不能反，因为 `p` 已经变成 `child` 的孩子了）。
+
+### 插入：先当普通 BST 插，再修复
+
+为什么新插入的节点必定是红色？关键在于两种颜色破坏的性质，修复难度完全不同。
+
+如果插成**黑色**，那么经过它的每条路径黑色节点数都会 +1，立刻破坏性质 4。而黑高是一个全局量，要补救就得调整其他所有分支，代价极大。
+
+如果插成**红色**，性质 4 天然不受影响（红节点不计入黑高）。此时唯一可能被破坏的是性质 3：万一父节点也是红色，就出现"红红相邻"。而这只是一个**局部冲突**，可以就地化解，或者沿着树往上挪。
+
+所以插入红色是显然更优的选择。顺带一提，如果新节点的父亲本来就是黑色，那插入到此结束，什么都不用做——这也是最常见的情况。
+
+### 修复：三种情况
+
+只有父节点 `P` 为红时才需要修复，此时祖父 `G` 必为黑（否则插入前就已经违规了）。记当前节点为 `X`，叔叔节点 `U` 为 `G` 的另一个孩子。分情况的依据是**叔叔的颜色**。
+
+下面统一按 `P` 是 `G` 左孩子（即代码里 `dir = 0`）来画，另一侧完全镜像。
+
+**情况 1：叔叔是红色。** 不需要旋转，把父亲和叔叔染黑、祖父染红即可：
+
+```text
+      G(黑)                    G(红)  ← X 上移到这里，继续检查
+     /     \                  /     \
+   P(红)   U(红)   ======>  P(黑)   U(黑)
+   /                        /
+ X(红)                    X(红)
+```
+
+这一步黑高没有变化：原来 `G` 贡献的那一个黑色，现在由 `P` 和 `U` 分别贡献。但 `G` 变红了，它可能和自己的父亲再次红红相邻，所以要把 `X` 指向 `G` 继续往上检查。注意这里 `X` 挂在 `P` 的哪一侧无所谓，染色对两侧都成立。
+
+**情况 2：叔叔是黑色，且 X 在内侧。** 内侧指的是 `P` 是左孩子而 `X` 是右孩子（或者整个反过来）。这种折线形状没法一次转平，先左旋 `P` 把它掰直：
+
+```text
+      G(黑)                     G(黑)
+     /     \                   /     \
+   P(红)   U(黑)   ======>   X(红)   U(黑)
+     \                       /
+     X(红)                 P(红)
+```
+
+转完之后 `X` 升上去、`P` 降下来，变成了祖孙三代同在一侧的直线形状，也就是情况 3。此时代码把指针 `z` 指向降下来的那个节点（原来的 `P`），接着往下走。所以情况 2 从来不单独出现，它只是情况 3 的预处理。
+
+**情况 3：叔叔是黑色，且 X 在外侧。** 父亲染黑、祖父染红，然后右旋祖父：
+
+```text
+      G(黑)                      P(黑)
+     /     \                    /     \
+   P(红)   U(黑)   ======>    X(红)   G(红)
+   /                                    \
+ X(红)                                  U(黑)
+```
+
+转完之后子树的根变回黑色，红红冲突消失，而且各条路径的黑高和修复前完全一致——原先 `G` 贡献的那一个黑色，现在由 `P` 贡献。因为子树根是黑的，不可能再和上面冲突，所以修复到此**直接结束**。
+
+三种情况可以这样对照：
+
+| 情况 | 叔叔颜色 | X 的位置 | 操作 | 之后 |
+|---|---|---|---|---|
+| 1 | 红 | 无所谓 | 染色 | 冲突上移两层，继续循环 |
+| 2 | 黑 | 内侧 | 旋转父亲 | 转成情况 3 |
+| 3 | 黑 | 外侧 | 染色 + 旋转祖父 | 结束 |
+
+### 为什么插入最多旋转 2 次
+
+现在可以回答前面提到的那个结论了。情况 1 只染色、不旋转，它把冲突每次上移两层，最多重复 $O(\log n)$ 次；而一旦进入情况 2 或 3，最多再转两次（情况 2 一次 + 情况 3 一次）就彻底结束。所以**整个插入过程的旋转次数不超过 2 次**，剩下的开销都是廉价的染色。
+
+这正是红黑树"松散平衡"的来源：它不像 AVL 树那样追求严格的高度差，而是允许一定程度的不平衡，换来极少的结构调整。
+
+最后，循环退出后还要无条件执行 `root->red = false`。因为情况 1 有可能一路把根节点染成红色，这一步把它改回黑色。这个操作是安全的：它让**每一条**路径的黑色节点数同时 +1，性质 4 依然成立。
+
+:::note 关于"根节点为黑"
+文章开头列的四条性质里没有这一条，但多数教材会把它单列为第 5 条性质。它并不是保证 $O(\log n)$ 所必需的，只是能让上面的情况分析更干净（保证 `P` 为红时祖父一定存在），所以实现中通常都会维护。
+:::
+
+下面是完整的实现模板，插入修复部分对应上面的三种情况：
+
+
+```cpp
+#include <functional> // for std::less
+#include <utility>    // for std::exchange, std::move
+
+/**
+ * An RBTree-based set implementation (with subtree size for order statistics)
+ *
+ * @tparam key_t key type
+ * @tparam compare_t comparison functor
+ */
+template <typename key_t, typename compare_t = std::less<key_t>>
+struct rb_tree {
+    // ==================== Node Definition ====================
+    struct node_t {
+        node_t *fa{nullptr};
+        node_t *ch[2]{nullptr, nullptr}; // ch[0]: left, ch[1]: right
+        key_t data;
+        size_t sz{1};   // Subtree size (including self)
+        bool red{true}; // New node is red by default
+
+        explicit node_t(const key_t& k) : data(k) {}
+
+        // Safe child direction. Returns false if this is root (fa == nullptr)
+        bool child_dir() const noexcept {
+            return fa != nullptr && this == fa->ch[1];
+        }
+    };
+
+    using pointer = node_t*;
+    using const_pointer = const node_t*;
+
+    // ==================== RAII & Rule of Five ====================
+    compare_t compare;
+    pointer root{nullptr};
+
+    rb_tree() = default;
+
+    // Copy constructor (deep copy)
+    rb_tree(const rb_tree& other) : compare(other.compare) {
+        root = clone(other.root, nullptr);
+    }
+
+    // Move constructor
+    rb_tree(rb_tree&& other) noexcept 
+        : compare(std::move(other.compare)), root(std::exchange(other.root, nullptr)) {}
+
+    // Copy assignment
+    rb_tree& operator=(const rb_tree& other) {
+        if (this != &other) {
+            clear(root);
+            compare = other.compare;
+            root = clone(other.root, nullptr);
+        }
+        return *this;
+    }
+
+    // Move assignment
+    rb_tree& operator=(rb_tree&& other) noexcept {
+        if (this != &other) {
+            clear(root);
+            compare = std::move(other.compare);
+            root = std::exchange(other.root, nullptr);
+        }
+        return *this;
+    }
+
+    // Destructor
+    ~rb_tree() {
+        clear(root);
+    }
+
+    // ==================== Public Interface ====================
+    void insert(const key_t& key) {
+        pointer parent = nullptr;
+        pointer cur = root;
+        while (cur) {
+            parent = cur;
+            cur = (compare(key, cur->data)) ? cur->ch[0] : cur->ch[1];
+        }
+
+        pointer new_node = new node_t(key);
+        new_node->fa = parent;
+
+        if (!parent) {
+            root = new_node;
+        } else if (compare(key, parent->data)) {
+            parent->ch[0] = new_node;
+        } else {
+            parent->ch[1] = new_node;
+        }
+
+        // Update subtree sizes along the path
+        for (pointer p = parent; p; p = p->fa) pull(p);
+
+        insert_fixup(new_node);
+    }
+
+    void erase(const key_t& key) {
+        // ... (Standard BST deletion + erase_fixup, omitted for brevity)
+        // Remember to call pull(parent) after rotations/deletion.
+    }
+
+    pointer find(const key_t& key) const {
+        pointer cur = root;
+        while (cur) {
+            if (compare(key, cur->data)) cur = cur->ch[0];
+            else if (compare(cur->data, key)) cur = cur->ch[1];
+            else return cur;
+        }
+        return nullptr;
+    }
+
+    // Order statistic: select k-th smallest (0-indexed)
+    pointer select(size_t k) const {
+        pointer cur = root;
+        while (cur) {
+            size_t left_sz = size(cur->ch[0]);
+            if (k < left_sz) cur = cur->ch[0];
+            else if (k == left_sz) return cur;
+            else { k -= left_sz + 1; cur = cur->ch[1]; }
+        }
+        return nullptr;
+    }
+
+private:
+    // ==================== Helpers (Safe for nullptr) ====================
+    static size_t size(pointer p) noexcept { return p ? p->sz : 0; }
+    static bool is_red(pointer p) noexcept { return p && p->red; }
+    static bool is_black(pointer p) noexcept { return !p || !p->red; } // nullptr is black
+
+    void pull(pointer p) noexcept {
+        if (p) p->sz = 1 + size(p->ch[0]) + size(p->ch[1]);
+    }
+
+    void clear(pointer p) noexcept {
+        if (!p) return;
+        clear(p->ch[0]);
+        clear(p->ch[1]);
+        delete p;
+    }
+
+    pointer clone(pointer p, pointer parent) {
+        if (!p) return nullptr;
+        pointer new_node = new node_t(p->data);
+        new_node->red = p->red;
+        new_node->fa = parent;
+        new_node->ch[0] = clone(p->ch[0], new_node);
+        new_node->ch[1] = clone(p->ch[1], new_node);
+        pull(new_node); // Maintain sz during clone
+        return new_node;
+    }
+
+    // ==================== Rotations (Unified via direction) ====================
+    void rotate(pointer p, bool dir) {
+        // dir = 0 -> left rotate, dir = 1 -> right rotate
+        pointer child = p->ch[!dir];
+        if (!child) return;
+
+        p->ch[!dir] = child->ch[dir];
+        if (child->ch[dir]) child->ch[dir]->fa = p;
+
+        child->fa = p->fa;
+        if (!p->fa) {
+            root = child;
+        } else {
+            p->fa->ch[p->child_dir()] = child;
+        }
+
+        child->ch[dir] = p;
+        p->fa = child;
+
+        // Maintain sizes: p becomes child, so pull p first, then child
+        pull(p);
+        pull(child);
+    }
+
+    // ==================== Insertion Fixup ====================
+    void insert_fixup(pointer z) {
+        while (is_red(z->fa)) {
+            pointer fa = z->fa;
+            bool dir = fa->child_dir(); // direction of father relative to grandparent
+            pointer uncle = fa->fa->ch[!dir];
+
+            if (is_red(uncle)) {
+                // Case 1: Uncle is red -> recolor
+                fa->red = false;
+                uncle->red = false;
+                fa->fa->red = true;
+                z = fa->fa;
+            } else {
+                // Case 2 & 3: Uncle is black
+                if (z == fa->ch[!dir]) {
+                    // Case 2: z is inner child -> rotate father to make it outer
+                    z = fa;
+                    rotate(z, dir); // dir == 0 -> left, etc.
+                }
+                // Case 3: z is outer child -> rotate grandparent
+                fa = z->fa; // update fa after potential rotation
+                fa->red = false;
+                fa->fa->red = true;
+                rotate(fa->fa, !dir);
+                // Note: We need to carefully update pointer references here.
+                // The standard algorithm requires careful pointer tracking.
+                // For brevity, this shows the logical structure.
+                break;
+            }
+        }
+        root->red = false;
+        // Since rotations changed structure, we need to pull ancestors.
+        // In a full implementation, rotate() already pulls local nodes.
+        // A full recursive pull from z->fa upwards is safer here.
+        for (pointer p = z->fa; p; p = p->fa) pull(p);
+    }
+
+    // erase_fixup would follow similar CLRS logic with nullptr checks.
+};
+
+```
+
+
 
 
 </WordCount>

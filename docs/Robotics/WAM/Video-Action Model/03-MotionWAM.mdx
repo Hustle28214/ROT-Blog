@@ -1,0 +1,123 @@
+import WordCount from '../../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+论文：[MotionWAM: Towards Foundation World Action Models for Real-Time Humanoid Loco-Manipulation](https://arxiv.org/abs/2606.09215)，Mondo Robotics + HKUST(GZ)/HKUST，2026 年 6 月。项目页在 [dit4dit.github.io/MotionWAM](https://dit4dit.github.io/MotionWAM/)。
+
+## 1. 先说结论
+
+这是我见到的第一个能在人形真机上闭环跑起来的全身 loco-manipulation World Action Model。它直接站在 [DiT4DiT](./01-DiT4DiT.mdx) 的肩膀上——同一套 dual-DiT + flow matching 联合训练，但把 action 空间从桌面臂 joint chunk 换成了 SONIC 全身 motion token，并补了三阶段 egocentric-to-embodiment 训练。
+
+Unitree G1 九个真机任务，成功率 76.1%，最强的 VLA baseline（GR00T-N1.7）是 43.9%。同参数量级的 [Cosmos Policy](./02-CosmosPolicy.mdx) 只能跑 0.7 Hz，它能跑 4.9 Hz。腿终于不只是用来保持平衡了，可以去踩踏板、踢球。
+
+## 2. 从 DiT4DiT 继承了什么、改了什么
+
+MotionWAM 论文自己写得很清楚：flow-matching 联合目标 **inspired by DiT4DiT**。继承的部分：
+
+| 组件 | DiT4DiT | MotionWAM |
+| --- | --- | --- |
+| Video DiT 初始化 | Cosmos-Predict2.5-2B | 同左 |
+| 特征提取 | forward hook @ 固定 $\tau_f$ | 同左，但 $\tau_f \approx 1$（one-shot imagination） |
+| Action 分支 | Action DiT (GR00T-N1 改) | Motion DiT |
+| 联合损失 | $\mathcal{L}_{\text{action}} + \lambda \mathcal{L}_{\text{video}}$ | Stage 2/3 同结构 |
+| Tri-timestep | $\tau_v$ uniform + $\tau_f$ fixed + $\tau_a$ Beta | 沿用 |
+
+改动的部分才是 MotionWAM 的核心贡献：
+
+1. **动作空间**：joint/gripper chunk → SONIC motion token $(\mathbf{m}_t^{\text{cont}}, \mathbf{k}_t)$，64 维 FSQ 离散向量 + 连续夹爪通道；
+2. **视角**：第三视角 tabletop → 第一视角 egocentric（Stage 1，2136 小时预训练）；
+3. **训练配方**：DiT4DiT 的 end-to-end 联合训练 → 三阶段渐进特化（video 先、action 后、全身微调最后）；
+4. **推理模式**：DiT4DiT 的 $\tau_f$ 在中间 denoise 阶段 → MotionWAM 推到纯噪声端，Video DiT 只做一次"想象"前向。
+
+跟 [Cosmos Policy](./02-CosmosPolicy.mdx) 没有继承关系，但 MotionWAM 拿它做 frequency 对照——说明 hook 路线在全身控制场景下的必要性。
+
+## 3. 它想解决的两个问题
+
+**分层范式的问题**。现在几乎所有自主人形 loco-manipulation 都是"高层操作策略 + 底层运动控制器"：上半身细粒度关节目标，下半身只有速度、躯干高度、朝向。上下两半身处在不一致的动作空间里，腿被限制成只做平衡保持，踩踏板、踢东西这类由任务驱动的足部动作根本表达不出来。
+
+**WAM 本身太慢**。[Cosmos Policy](./02-CosmosPolicy.mdx) 靠完整 video denoise 出 action，2B 参数只有 0.7 Hz。DiT4DiT 用 hook 特征推到 6 Hz，但 action 空间还是桌面臂——没法驱动需要动态平衡的人形。
+
+MotionWAM 的解法是二合一：继承 DiT4DiT 的"中间特征一次前向"，同时用 SONIC motion token 统一全身动作空间。
+
+## 4. 统一的全身 motion latent
+
+$\mathbf{m}_t = (\mathbf{m}_t^{\text{cont}}, \mathbf{k}_t)$，建在 SONIC 通用全身控制器上面。
+
+SONIC 的共享 latent 被 Finite Scalar Quantization 卡了个瓶颈（2 个 token、每个 32 档），所以 $\mathbf{k}_t$ 是一个 64 维离散向量，取值落在 $\{-1, -\frac{15}{16}, \ldots, 1\}$ 上，概括移动、躯干、高度、足部交互这些意图。$\mathbf{m}_t^{\text{cont}}$ 收 SONIC 管不到的灵巧通道——左右夹爪或灵巧手指令。
+
+Stage 3 的实现细节：没有单独开分类头预测离散 token index，而是把 index 当成连续标量 $\tilde{k}_t$ 塞进 $\mathbf{m}_t$，整个 latent 用同一个 flow matching 目标回归，推理时再 round 取回整数：
+
+$$
+\mathbf{m}_t = (\mathbf{m}_t^{\text{cont}}, \tilde{k}_t) \longrightarrow \hat{\mathbf{m}}_t \xrightarrow{\hat{k}_t = \mathrm{round}(\hat{\tilde{k}}_t)} (\hat{\mathbf{m}}_t^{\text{cont}}, \hat{k}_t) \xrightarrow{\text{SONIC}} \mathbf{a}_t
+$$
+
+## 5. 架构：一次前向就够了
+
+整体是 dual-DiT。Video DiT 从 Cosmos-Predict2.5-2B 初始化，第一视角条件帧和未来帧压成 latent。
+
+关键在特征提取方式——跟 DiT4DiT 一样挂 forward hook，但 $\tau_f$ 固定在纯噪声端（$\tau_f \approx 1$）：
+
+$$
+\mathbf{h}_t^{\tau_f} = \mathcal{H}\!\left[v_\theta^{\text{video}}\right]\!\left(\mathbf{z}_{t+1}^{\tau_f}, \tau_f \mid \mathbf{z}_t^0, l\right), \quad \mathbf{z}_{t+1}^{\tau_f}\big|_{\tau_f \to 1} \sim \mathcal{N}(0, I)
+$$
+
+Video DiT 跑在"一次性想象"模式：干净条件 latent + 未来帧高斯噪声，**一次前向**出来的激活就编码了"场景接下来要往哪走"，未来帧压根没被 denoise 过。这就是 4.9 Hz 的来源——比 DiT4DiT 的 6 Hz 略慢（参数 2.5B vs 2.2B，motion latent 维度更高），但比 Cosmos 快七倍。
+
+Motion DiT 吃 $\mathbf{h}_t^{\tau_f}$，交错 self/cross-attention 结合本体状态 $p_t$ 和带噪 motion token，输出速度场。多具身预训练时 per-embodiment 投影层包共享 trunk，部署只留 G1 投影。
+
+## 6. 三阶段训练
+
+VAE 和 text encoder 全程冻结，两个分支轮流特化：
+
+- **Stage 1**：只更新 Video DiT，$\mathcal{L}_{\text{video}}$ 在 ~2136 小时 egocentric 人类视频 + 人形机器人视频上训未来帧生成。瓶颈是第一视角视觉动力学，不是动作多样性——先用便宜无动作视频把 trunk 喂饱。
+- **Stage 2**：挂上 Motion DiT，跨具身 G1 数据联合训练。保留 video loss 当表征正则：$\mathcal{L}_{\text{Stage 2}} = \mathcal{L}_{\text{motion}} + \mathcal{L}_{\text{video}}$，防止 action 信号冲掉 dynamics prior。
+- **Stage 3**：九个任务各 200 条 PICO VR 三点追踪遥操作数据，SMPL-24 重定向到 G1，输出切成统一 motion token。
+
+DiT4DiT 是 end-to-end 联合训练一步到位；MotionWAM 发现对人形来说 **分阶段特化** 更必要——Stage 1 的 egocentric prior 和 Stage 2 的跨具身 action grounding 缺一不可。
+
+## 7. 实验数据
+
+所有方法在同一批 Stage 3 数据上微调，都通过 SONIC 接口出动作。唯一变量：策略条件是 video world model 中间 denoise 特征，还是 VLM 图文特征。
+
+**九任务平均**：43.9%（GR00T-N1.7）→ **76.1%**（MotionWAM），+32.2%。差距最大的都是需要全身协同的：
+
+| 任务 | MotionWAM | GR00T-N1.7 | 差距 |
+| --- | --- | --- | --- |
+| Kick Soccer | 高 | 低 | +40% |
+| Load Cart | 高 | 低 | +40% |
+| Wipe Board | 高 | 低 | +45% |
+| Do Laundry | 高 | 低 | +30% |
+
+Qwen3DiT（Qwen3-VL 2B + Motion DiT，参数量匹配）在所有 locomotion 重任务上基本归零——跟 DiT4DiT 论文里 Qwen3DiT 对照的结论一致：**语义先验 ≠ 物理动力学先验**。
+
+**三阶段消融**（五个代表任务，真机 20 次/trial）：
+
+| 变体 | Stage 1 | Stage 2 | 平均成功率 |
+| --- | --- | --- | --- |
+| w/o Stage 2 | ✓ | – | 42.0% |
+| w/o Stage 1 | – | ✓ | 59.0% |
+| 完整 | ✓ | ✓ | 70.0% |
+
+去掉 Stage 1 掉 11%，去掉 Stage 2 掉 28%。Stage 2 的跨具身 action grounding 比 Stage 1 的 egocentric prior 更 critical——但没有 Stage 1，hidden state 里的 motion 预测明显发飘。
+
+**部署频率（单 A100/4090，chunk 级）**：
+
+| 模型 | 可训练参数 | 频率 |
+| --- | --- | --- |
+| GR00T-N1.7 | 1.6B | 6.5 Hz |
+| Qwen3DiT | 2.3B | 9.0 Hz |
+| [Cosmos Policy](./02-CosmosPolicy.mdx) | 2.0B | 0.7 Hz |
+| [DiT4DiT](./01-DiT4DiT.mdx) | 2.2B | 6.0 Hz |
+| MotionWAM | 2.5B | 4.9 Hz |
+
+Qwen3DiT 频率最高但任务表现最差——再次说明 frequency 和 capability 不是一回事。Cosmos 有 planning 能力（value + future state），但 0.7 Hz 进不了人形闭环。
+
+## 8. 局限和我的想法
+
+论文自己承认的：Stage 3 只在 G1 上验证，三阶段配方能不能跨硬件迁移还不知道；没有严格的新物体泛化实验；单第一视角相机，物体出视野就丢锚定。
+
+我比较在意 SONIC 依赖——motion token 表达能力上限就是 SONIC 的上限，SONIC 不支持的行为 WAM 也变不出来。4.9 Hz 是 chunk 级频率，踢球这种快速反应靠 chunk 内部插值撑着，更强的动态交互还是紧。
+
+不过"从中间 denoise 特征里读 prior，而不是等它 denoise 完"——这条路由 [DiT4DiT](./01-DiT4DiT.mdx) 开创、MotionWAM 推到全身真机——我觉得是 WAM 领域目前最有工程价值的方向。本质上是把 video world model 当 **特征提取器** 而不是生成器用，一下就把最贵的部分绕掉了。如果未来有人能把 Cosmos 的 value planning 嫁接到 hook 特征路线上，可能会是一条很有意思的 hybrid。
+
+</WordCount>

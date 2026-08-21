@@ -2,102 +2,328 @@
 sidebar_position: 6
 ---
 
-
-
+import WordCount from '../../../src/components/WordCount/WordCount';
 import VideoPlayer from '../../../src/components/Videoplayer/Videoplayer.jsx';
 
-## 5.1 线性反馈控制系统的基本结构及其特性（上）
+<WordCount>
+
+# 线性定常系统的综合
+
+“分析”由已知系统求性质，“综合”则根据性能要求反求控制器。考虑
+
+$$
+\dot x=Ax+Bu,\qquad y=Cx+Du.
+$$
+
+本章依次完成状态反馈、极点配置、镇定、参考跟踪、解耦、状态观测器以及基于观测器的反馈设计。贯穿算例采用
+
+$$
+A=\begin{bmatrix}0&1\\-2&-3\end{bmatrix},\quad
+B=\begin{bmatrix}0\\1\end{bmatrix},\quad
+C=\begin{bmatrix}1&0\end{bmatrix},\quad D=0.
+$$
+
+## 6.1 状态反馈与闭环特征多项式
+
+取控制律
+
+$$
+u=-Kx+Nr,\qquad K=\begin{bmatrix}k_1&k_2\end{bmatrix}.
+$$
+
+闭环系统为
+
+$$
+\dot x=(A-BK)x+BNr,\qquad y=Cx.
+$$
+
+因此状态反馈改变的是 $A-BK$ 的特征值；它通常不改变系统阶数，也不会自动保证单位稳态增益。贯穿算例中
+
+$$
+A-BK=\begin{bmatrix}0&1\\-2-k_1&-3-k_2\end{bmatrix},
+$$
+
+故闭环特征多项式为
+
+$$
+\det(sI-A+BK)=s^2+(3+k_2)s+(2+k_1).
+$$
+
+<svg viewBox="0 0 760 230" role="img" aria-label="参考输入经过前置增益和状态反馈形成闭环的结构框图" style={{maxWidth:'760px',width:'100%',color:'var(--ifm-font-color-base)'}}>
+  <defs><marker id="arrow-06a" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="currentColor" /></marker></defs>
+  <g fill="none" stroke="currentColor" strokeWidth="2">
+    <rect x="90" y="55" width="75" height="45" rx="5" /><circle cx="235" cy="78" r="20" />
+    <rect x="310" y="45" width="145" height="65" rx="5" /><rect x="345" y="160" width="75" height="42" rx="5" />
+    <line x1="25" y1="78" x2="88" y2="78" markerEnd="url(#arrow-06a)" />
+    <line x1="165" y1="78" x2="213" y2="78" markerEnd="url(#arrow-06a)" />
+    <line x1="255" y1="78" x2="308" y2="78" markerEnd="url(#arrow-06a)" />
+    <line x1="455" y1="78" x2="700" y2="78" markerEnd="url(#arrow-06a)" />
+    <path d="M525 78 L525 181 L422 181" markerEnd="url(#arrow-06a)" />
+    <path d="M345 181 L235 181 L235 100" markerEnd="url(#arrow-06a)" />
+  </g>
+  <g fill="currentColor" textAnchor="middle"><text x="52" y="68">r</text><text x="128" y="83">N</text><text x="235" y="84">Σ</text>
+    <text x="382" y="74">被控对象</text><text x="382" y="95">ẋ=Ax+Bu</text><text x="715" y="68">y</text>
+    <text x="382" y="187">K</text><text x="250" y="125">−</text><text x="510" y="103">状态 x</text></g>
+</svg>
+
+### 极点配置的前提
+
+可控性矩阵
+
+$$
+\mathcal C=\begin{bmatrix}B&AB&\cdots&A^{n-1}B\end{bmatrix}
+$$
+
+满秩，即 $\operatorname{rank}\mathcal C=n$，是任意配置全部闭环极点的充要条件。多输入系统也满足此结论，但 $K$ 往往不唯一。连续时间实系统的非实极点必须成共轭对。
+
+若希望贯穿算例的闭环极点为 $-4,-5$，目标多项式为
+
+$$
+\phi_d(s)=(s+4)(s+5)=s^2+9s+20.
+$$
+
+比较系数得到 $3+k_2=9,\ 2+k_1=20$，于是
+
+$$
+K=\begin{bmatrix}18&6\end{bmatrix}.
+$$
+
+代回即得 $A-BK=\begin{bmatrix}0&1\\-20&-9\end{bmatrix}$，迹为 $-9$、行列式为 $20$，核对无误。
+
+### Ackermann 公式
+
+对单输入可控系统，设
+
+$$
+\phi_d(A)=A^n+\alpha_{n-1}A^{n-1}+\cdots+\alpha_1A+\alpha_0I,
+$$
+
+则
+
+$$
+K=\begin{bmatrix}0&\cdots&0&1\end{bmatrix}\mathcal C^{-1}\phi_d(A).
+$$
+
+公式中的系数来自**目标**特征多项式；符号与本章 $u=-Kx$ 的约定绑定。高阶系统直接求逆数值条件可能很差，工程计算宜使用可靠的极点配置算法。
 
 <VideoPlayer src="//player.bilibili.com/player.html?isOutside=true&aid=625409284&bvid=BV1Qt4y127ja&cid=184230756&p=44" />
-
-<br />
-
-## 5.2 线性反馈控制系统的基本结构及其特性（下）
-
 <VideoPlayer src="//player.bilibili.com/player.html?isOutside=true&aid=625409284&bvid=BV1Qt4y127ja&cid=184249830&p=45" />
-
-<br />
-## 5.3 极点配置问题（上）
-
 <VideoPlayer src="//player.bilibili.com/player.html?isOutside=true&aid=625409284&bvid=BV1Qt4y127ja&cid=184256837&p=46" />
-
-<br />
-## 5.4 极点配置问题（下）
-
 <VideoPlayer src="//player.bilibili.com/player.html?isOutside=true&aid=625409284&bvid=BV1Qt4y127ja&cid=184260305&p=47" />
 
+## 6.2 镇定性：不能任意配置时还能否稳定
 
-<br />
-## 5.5 系统镇定问题（上）
+“可控”要求所有模态都能被输入影响；“可镇定”只要求所有不稳定模态可控。连续系统中，$(A,B)$ 可镇定的 PBH 判据为
+
+$$
+\operatorname{rank}\begin{bmatrix}\lambda I-A&B\end{bmatrix}=n
+\quad\text{for every }\operatorname{Re}(\lambda)\geq0.
+$$
+
+若且唯若 $(A,B)$ 可镇定，才存在 $K$ 使 $A-BK$ 为 Hurwitz 矩阵。不可控但本来稳定的模态可以保留，所以可镇定严格弱于可控。离散时间将“不稳定区域”改为 $|\lambda|\geq1$。
+
+极点选得很靠左虽可加快理想模型响应，却会提高控制增益，放大噪声、激发未建模动态并导致执行器饱和；极点配置不是“越快越好”。
 
 <VideoPlayer src="//player.bilibili.com/player.html?isOutside=true&aid=625409284&bvid=BV1Qt4y127ja&cid=184263087&p=48" />
-
-<br />
-## 5.6 系统镇定问题（中）
-
 <VideoPlayer src="//player.bilibili.com/player.html?isOutside=true&aid=625409284&bvid=BV1Qt4y127ja&cid=184266882&p=49" />
-
-<br />
-## 5.7 系统镇定问题（下）
-
 <VideoPlayer src="//player.bilibili.com/player.html?isOutside=true&aid=625409284&bvid=BV1Qt4y127ja&cid=184268164&p=50" />
 
-<br />
+## 6.3 参考输入、前置补偿与积分器
 
-## 5.8 系统解耦问题
+### 常值参考的前置增益
+
+当 $D=0$、$A-BK$ 可逆且参考为常值时，稳态满足
+
+$$
+0=(A-BK)x_{\rm ss}+BNr,\qquad y_{\rm ss}=Cx_{\rm ss}.
+$$
+
+令 $y_{\rm ss}=r$，得到
+
+$$
+N=-\frac{1}{C(A-BK)^{-1}B}
+$$
+
+（SISO 情形且分母非零）。贯穿算例用 $K=[18\ 6]$，有
+$C(A-BK)^{-1}B=-1/20$，所以 $N=20$。该前置补偿依赖模型准确性，不能自动消除参数误差或恒值扰动造成的稳态误差。
+
+### 加入误差积分器
+
+定义
+
+$$
+\dot \xi=r-y,\qquad u=-Kx+k_I\xi.
+$$
+
+忽略参考的齐次增广系统为
+
+$$
+\begin{bmatrix}\dot x\\\dot\xi\end{bmatrix}
+=
+\begin{bmatrix}A-BK&Bk_I\\-C&0\end{bmatrix}
+\begin{bmatrix}x\\\xi\end{bmatrix}.
+$$
+
+设计前必须检查增广对的可控性；若系统在原点有阻断零点，常值跟踪的积分增广可能不可控。实际系统还应考虑积分饱和保护。
+
+## 6.4 状态反馈解耦
+
+对方阵多输入多输出系统，目标是让每个输入通道主要影响对应输出。若各输出的相对阶为 $r_i$，定义解耦矩阵
+
+$$
+E=
+\begin{bmatrix}
+c_1A^{r_1-1}B\\
+\vdots\\
+c_mA^{r_m-1}B
+\end{bmatrix}.
+$$
+
+当 $E$ 非奇异时，可通过静态状态反馈 $u=Fx+Gv$ 令高阶输出导数中的输入通道解耦，常取 $G=E^{-1}$，并用 $F$ 指定相应动态。基本限制是：
+
+- 输入数与需独立控制的输出数应匹配，且 $E$ 必须满秩；
+- 解耦只描述输入输出通道，不等于内部状态稳定；
+- 系统零动态若不稳定，精确解耦可能产生内部不稳定；
+- 参数摄动会破坏精确抵消，非最小相位零点不能用稳定因果控制器随意消去。
+
+所以“传递矩阵变成对角阵”并不足以证明整个闭环可用。
 
 <VideoPlayer src="//player.bilibili.com/player.html?isOutside=true&aid=625409284&bvid=BV1Qt4y127ja&cid=184274678&p=51" />
 
-<br />
-## 5.9 状态观测器定义与存在性
+## 6.5 全维状态观测器
+
+状态不可全部测量时，用模型和输出校正构造 Luenberger 观测器：
+
+$$
+\dot{\hat x}=A\hat x+Bu+L(y-C\hat x).
+$$
+
+令估计误差 $e=x-\hat x$，则
+
+$$
+\dot e=(A-LC)e.
+$$
+
+因此观测器设计与状态反馈对偶：$(A,C)$ 可观，等价于 $(A^\mathsf{T},C^\mathsf{T})$ 可控，此时可任意配置 $A-LC$ 的极点。Ackermann 公式可用于对偶系统，先算出行向量，再转置得到 $L$。
+
+贯穿算例的可观性矩阵为
+
+$$
+\mathcal O=\begin{bmatrix}C\\CA\end{bmatrix}
+=\begin{bmatrix}1&0\\0&1\end{bmatrix},
+$$
+
+故系统可观。令 $L=[l_1\ l_2]^\mathsf{T}$，则
+
+$$
+\det(sI-A+LC)=s^2+(l_1+3)s+(3l_1+l_2+2).
+$$
+
+取观测器极点为 $-10,-11$，目标多项式为 $s^2+21s+110$。比较系数得
+
+$$
+L=\begin{bmatrix}18\\54\end{bmatrix}.
+$$
+
+观测器极点通常比控制极点快若干倍，但过快会使 $L$ 过大并放大测量噪声。
 
 <VideoPlayer src="//player.bilibili.com/player.html?isOutside=true&aid=625409284&bvid=BV1Qt4y127ja&cid=184282173&p=52" />
-
-<br />
-## 5.10 状态观测器的实现
-
 <VideoPlayer src="//player.bilibili.com/player.html?isOutside=true&aid=625409284&bvid=BV1Qt4y127ja&cid=184286097&p=53" />
-
-
-<br />
-## 5.11 反馈矩阵G的设计（上）
-
 <VideoPlayer src="//player.bilibili.com/player.html?isOutside=true&aid=625409284&bvid=BV1Qt4y127ja&cid=184231335&p=54" />
-
-
-<br />
-## 5.12 反馈矩阵G的设计（下）
-
 <VideoPlayer src="//player.bilibili.com/player.html?isOutside=true&aid=625409284&bvid=BV1Qt4y127ja&cid=184286218&p=55" />
 
+## 6.6 降维观测器
 
+若 $y=Cx$ 已直接给出 $p$ 个独立状态组合，就没有必要再估计它们。经可逆坐标变换可写成
 
-<br />
+$$
+\begin{aligned}
+\dot x_m&=A_{11}x_m+A_{12}x_u+B_1u,\\
+\dot x_u&=A_{21}x_m+A_{22}x_u+B_2u,\qquad y=x_m,
+\end{aligned}
+$$
 
-## 5.13 降维观测器（上）
+其中 $x_m$ 可测、$x_u$ 不可测。一个避免直接使用 $\dot y$ 的降维观测器可令
+
+$$
+z=\hat x_u-L_r y
+$$
+
+并构造
+
+$$
+\dot z=(A_{22}-L_rA_{12})z+
+\left(A_{21}-L_rA_{11}+(A_{22}-L_rA_{12})L_r\right)y+
+(B_2-L_rB_1)u,
+$$
+
+最后由 $\hat x_u=z+L_ry$ 恢复估计。误差矩阵为 $A_{22}-L_rA_{12}$，降维观测器阶数为 $n-p$。其优点是阶数低且不重复估计已测信息；代价是坐标分解与实现更复杂，对测量噪声仍需谨慎。
 
 <VideoPlayer src="//player.bilibili.com/player.html?isOutside=true&aid=625409284&bvid=BV1Qt4y127ja&cid=184287265&p=56" />
-
-<br />
-## 5.14 降维观测器（下）
-
 <VideoPlayer src="//player.bilibili.com/player.html?isOutside=true&aid=625409284&bvid=BV1Qt4y127ja&cid=184287800&p=57" />
 
-<br />
-## 5.15 利用状态观测器实现状态反馈的系统（上）
+## 6.7 基于观测器的状态反馈与分离原理
+
+实际控制律使用估计状态：
+
+$$
+u=-K\hat x+Nr.
+$$
+
+以 $x$ 和 $e=x-\hat x$ 为状态，忽略参考时
+
+$$
+\begin{bmatrix}\dot x\\\dot e\end{bmatrix}
+=
+\begin{bmatrix}
+A-BK&BK\\
+0&A-LC
+\end{bmatrix}
+\begin{bmatrix}x\\e\end{bmatrix}.
+$$
+
+矩阵为块上三角，因此闭环极点恰是 $A-BK$ 与 $A-LC$ 的特征值并集。这就是**分离原理**：在线性定常、模型匹配的条件下，控制器增益 $K$ 与观测器增益 $L$ 可分别设计。贯穿算例最终极点为
+
+$$
+\{-4,-5\}\cup\{-10,-11\}.
+$$
+
+分离原理保证内部渐近稳定，不保证噪声抑制、鲁棒裕度、输入不饱和或瞬态峰值满足要求。
+
+<svg viewBox="0 0 800 300" role="img" aria-label="基于全维状态观测器的输出反馈闭环结构" style={{maxWidth:'800px',width:'100%',color:'var(--ifm-font-color-base)'}}>
+  <defs><marker id="arrow-06b" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="currentColor" /></marker></defs>
+  <g fill="none" stroke="currentColor" strokeWidth="2">
+    <circle cx="205" cy="75" r="20" /><rect x="290" y="42" width="150" height="66" rx="5" />
+    <rect x="290" y="190" width="150" height="70" rx="5" /><rect x="85" y="205" width="70" height="42" rx="5" />
+    <line x1="25" y1="75" x2="183" y2="75" markerEnd="url(#arrow-06b)" />
+    <line x1="225" y1="75" x2="288" y2="75" markerEnd="url(#arrow-06b)" />
+    <line x1="440" y1="75" x2="750" y2="75" markerEnd="url(#arrow-06b)" />
+    <path d="M260 75 L260 225 L288 225" markerEnd="url(#arrow-06b)" />
+    <path d="M575 75 L575 225 L442 225" markerEnd="url(#arrow-06b)" />
+    <line x1="290" y1="225" x2="157" y2="225" markerEnd="url(#arrow-06b)" />
+    <path d="M85 225 L50 225 L50 75 L183 75" markerEnd="url(#arrow-06b)" />
+  </g>
+  <g fill="currentColor" textAnchor="middle"><text x="50" y="65">Nr</text><text x="205" y="81">Σ</text><text x="365" y="70">被控对象</text>
+    <text x="365" y="92">A, B, C</text><text x="765" y="65">y</text><text x="365" y="220">观测器</text>
+    <text x="365" y="242">A, B, C, L</text><text x="120" y="232">K</text><text x="205" y="105">−</text>
+    <text x="245" y="218">u</text><text x="520" y="218">y</text><text x="230" y="247">x̂</text></g>
+</svg>
 
 <VideoPlayer src="//player.bilibili.com/player.html?isOutside=true&aid=625409284&bvid=BV1Qt4y127ja&cid=184288257&p=58" />
-
-
-<br />
-## 5.16 利用状态观测器实现状态反馈的系统（中）
-
 <VideoPlayer src="//player.bilibili.com/player.html?isOutside=true&aid=625409284&bvid=BV1Qt4y127ja&cid=184297560&p=59" />
+<VideoPlayer src="//player.bilibili.com/player.html?isOutside=true&aid=625409284&bvid=BV1Qt4y127ja&cid=187218731&p=60" />
 
+## 6.8 常见误区与复习流程
 
-<br />
-## 5.17 利用状态观测器实现状态反馈的系统（下）
+1. **先配极点、后查可控性**：顺序应相反；不可控系统不能任意配置。
+2. **混淆可控与可镇定**：不可控的稳定模态不妨碍镇定。
+3. **漏掉负号约定**：$u=-Kx$ 与 $u=Kx$ 对应不同公式，代回 $A-BK$ 最可靠。
+4. **把前置增益当积分器**：$N$ 只校正标称模型的静态增益；积分器才提供对常值误差的内模。
+5. **观测器直接写成开环模型**：必须有创新项 $L(y-C\hat x)$ 才能修正初值误差。
+6. **观测器极点无限快**：大增益会放大噪声并带来 peaking。
+7. **误解分离原理**：它给出极点并集和稳定性，不自动给出鲁棒性与良好瞬态。
+8. **只看解耦后的传递关系**：还要检查零动态、内部稳定性和模型不确定性。
 
-<VideoPlayer src="/player.bilibili.com/player.html?isOutside=true&aid=625409284&bvid=BV1Qt4y127ja&cid=187218731&p=60" />
+考试设计题可按“可控/可观检查 → 目标多项式 → 求 $K/L$ → 代回核对特征多项式 → 求 $N$ 或增广积分器 → 说明稳定性与限制”的顺序作答。
 
-
+</WordCount>

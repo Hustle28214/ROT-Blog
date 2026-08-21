@@ -4,6 +4,87 @@ sidebar_position: 5
 
 import VideoPlayer from '../../../../src/components/Videoplayer/Videoplayer.jsx';
 
+# 离散系统的稳态误差与动态性能
+
+## 稳态误差
+
+单位负反馈系统开环脉冲传递函数为 $G(z)$ 时，
+
+$$
+E(z)=\frac{R(z)}{1+G(z)},\qquad
+e_{\mathrm{ss}}=\lim_{k\to\infty}e[k]
+=\lim_{z\to1}(z-1)E(z).
+$$
+
+使用终值定理前，必须确认 $(z-1)E(z)$ 的极点全部严格位于单位圆内。常用输入为
+
+$$
+\begin{aligned}
+r[k]=1&:\quad R(z)=\frac{z}{z-1},\\
+r[k]=kT&:\quad R(z)=\frac{Tz}{(z-1)^2},\\
+r[k]=\frac{(kT)^2}{2}&:\quad R(z)=\frac{T^2z(z+1)}{2(z-1)^3}.
+\end{aligned}
+$$
+
+定义离散静态误差系数
+
+$$
+K_p=\lim_{z\to1}G(z),\quad
+K_v=\lim_{z\to1}\frac{z-1}{T}G(z),\quad
+K_a=\lim_{z\to1}\frac{(z-1)^2}{T^2}G(z),
+$$
+
+则在闭环稳定且相应极限存在时，
+
+$$
+e_{\mathrm{ss,step}}=\frac{1}{1+K_p},\quad
+e_{\mathrm{ss,ramp}}=\frac{1}{K_v},\quad
+e_{\mathrm{ss,parabolic}}=\frac{1}{K_a}.
+$$
+
+系统型别由 $G(z)$ 在 $z=1$ 处的开环极点个数决定，而不是看 $z=0$ 的极点。
+
+## 动态性能
+
+离散响应只在 $t=kT$ 处有定义。上升时间、峰值时间、调节时间应由样值序列判定，例如
+
+$$
+t_p=k_pT,\qquad t_s=k_sT.
+$$
+
+百分超调量仍可由样值峰值计算：
+
+$$
+M_p=\frac{y_{\max}-y_\infty}{y_\infty}\times100\%.
+$$
+
+由于真实连续输出在采样间隔内可能出现更大峰值，仅检查样点可能漏掉“采样间峰值”。若执行器经 ZOH 驱动，应结合连续对象或高分辨率仿真检查。
+
+主导极点 $z=re^{\pm j\theta}$ 对应包络与振荡频率
+
+$$
+\sigma=\frac{\ln r}{T},\qquad
+\omega_d=\frac{\theta}{T}.
+$$
+
+其等效连续参数可写为
+
+$$
+\omega_n=\sqrt{\sigma^2+\omega_d^2},\qquad
+\zeta=-\frac{\sigma}{\omega_n}.
+$$
+
+当高阶系统其余极点衰减显著更快时，才可用主导二阶近似。每周期幅值衰减为 $r$；相同 z 极点在不同 $T$ 下对应的实际时间性能并不相同。
+
+## 分析清单
+
+1. 先确认闭环极点均在单位圆内。
+2. 用终值定理求稳态值与误差，并核对适用条件。
+3. 由序列直接找 $k_p,k_s,M_p$，再乘 $T$ 换算时间。
+4. 检查采样间行为、控制量饱和及量化误差。
+
+## 配套视频
+
 > 上
 
 <VideoPlayer src="//player.bilibili.com/player.html?isOutside=true&aid=811394492&bvid=BV1F34y1h7so&cid=718618727&p=67" />

@@ -1,0 +1,110 @@
+---
+sidebar_position: 4
+---
+
+import WordCount from '../../../../src/components/WordCount/WordCount';
+import Mermaid from '@theme/Mermaid';
+
+<WordCount>
+
+上一篇留了个口子：`Subscription::pubUpdate`拿到一串发布者URI之后，怎么变成一条真能收消息的TCP连接？本文补上这一段，顺便讲清楚控制面（XMLRPC）和数据面（TCPROS、UDPROS）是怎么分工的。
+
+## XMLRPCManager是控制面
+
+每个roscpp节点启动的时候XMLRPCManager会监听一个随机端口，`rosnode info`里那个`http://host:PORT/`就是它。上面bind了一组从节点API：
+
+- requestTopic，订阅方来问"我要订阅这个话题，用什么协议、连哪"
+- publisherUpdate，master推送某话题的发布者列表变化
+- paramUpdate，参数缓存更新通知
+- getPid、getPublications、getSubscriptions、getBusInfo，内省接口，rosnode那一套工具就靠它们
+- shutdown，远程关节点
+
+出站方向的异步调用用PendingConnection表示，XMLRPC服务线程会轮询这些挂起的调用，完成之后触发回调。所以"向别人发XMLRPC请求"不会阻塞任何业务线程。
+
+:::tip
+控制面走XMLRPC，慢但通用；数据面走自己定的二进制协议，快。这么划分，节点发现机制才能跨语言实现，rospy和roscpp才能互通。代价是节点一多master就成瓶颈。
+:::
+
+## requestTopic的时序
+
+`Subscription::negotiateConnection`是订阅方的动作。它向发布方的XMLRPC端点调requestTopic，参数里带上候选协议列表：默认有TCPROS，如果用户通过TransportHints要了unreliable，列表里还会带上UDPROS和它的参数。
+
+发布方从候选里挑一个自己支持的，返回形如`["TCPROS", host, port]`的三元组。订阅方据此用TransportTCP建连，再由TransportPublisherLink写出连接头。
+
+<Mermaid
+value={`sequenceDiagram
+    participant S as 订阅节点
+    participant M as Master
+    participant P as 发布节点 XMLRPC
+    participant T as 发布节点 TCPROS 端口
+    S->>M: registerSubscriber
+    M-->>S: 发布者 URI 列表
+    S->>S: pubUpdate 触发 negotiateConnection
+    S->>P: requestTopic 带候选协议
+    P-->>S: ['TCPROS', host, port]
+    S->>T: TCP 建连
+    S->>T: 写连接头 topic md5sum callerid type
+    T-->>S: 回写连接头
+    S->>S: 校验对端 md5sum
+    Note over S,T: 校验通过后进入消息流，Master 不再参与
+`}
+/>
+
+连接头里的字段各有用处：topic让发布方知道挂到哪个Publication；md5sum用来做类型校验；callerid给内省显示；type和message_definition让rostopic这类通用工具在不知道消息类型的情况下也能解析；tcp_nodelay请求关掉Nagle；latching标记这条连接是不是latch发布。
+
+:::warning
+md5sum不匹配的表现是连接建立之后立刻断开，日志里有类型不匹配的错误，但话题名和`rostopic list`看起来完全正常，很有迷惑性。
+
+最常见的原因是两边链接到了不同版本的消息定义，比如改了`.msg`只重编译了一侧，或者两台机器上装的消息包版本不一样。清理重编译两边，再用`rostopic info`对一下双方的类型。
+:::
+
+## TCPROS的线格式
+
+TCPROS简单到可以自己手写解析器：
+
+- 消息帧是4字节小端长度前缀加序列化后的消息体
+- 连接头也是4字节长度前缀，内容是若干个`key=value`字段，每个字段自身还带一个长度前缀
+
+没有校验和，没有消息ID，没有版本号。因为TCP已经保证了有序可靠，roscpp只需要标出消息边界就够了。反过来说，长度字段一旦被误解，整条流就再也同步不回来，所以roscpp在长度异常时直接断连。
+
+## 一个端口同时接话题和服务
+
+ConnectionManager持有TCP和UDP的服务端transport，负责接受入站连接。读到连接头之后，它看头里出现的是topic还是service来分派：
+
+- 有topic字段，创建TransportSubscriberLink，挂到对应的Publication
+- 有service字段，创建ServiceClientLink，挂到对应的ServicePublication
+
+所以一个进程只用一个TCPROS监听端口就同时服务了话题和服务，全靠连接头区分。roscpp端口占用这么省就是这个原因。
+
+## 单poll线程
+
+PollManager只跑一个poll线程，驱动一个PollSet。PollSet在Linux上优先用epoll（封装在io.cpp里），并且用一个自管道在需要的时候唤醒阻塞中的poll，比如新增了一个要监听的socket。
+
+这就是roscpp单线程能扛成百上千条连接的原因：所有socket的就绪事件由epoll一次性返回，线程只做"搬字节加入队"，从不执行用户代码。
+
+:::warning
+poll线程是全进程共享的单点。它本身不跑用户回调，所以正常情况下不会被业务代码堵住，真正的风险是间接的：回调队列长期没人消费，队列满了就丢消息；某个回调里做同步服务调用而对端也在等你，就可能形成跨节点的等待环。
+
+另外，任何在网络线程上下文里执行的自定义逻辑都必须保持非阻塞，否则拖慢的是整个进程的所有连接。
+:::
+
+## UDPROS和TransportHints
+
+UDPROS由TransportUDP实现，必须指定max_datagram_size，因为大消息要切成多个数据报，而UDP不保证可靠，丢一个分片整条消息就废了。所以它只适合"宁可丢帧也不要延迟"的数据，比如高频图像预览或者遥测。
+
+TransportHints是我们控制这一层的入口：
+
+```cpp
+// 简化示意
+ros::TransportHints hints;
+hints.tcpNoDelay(true);        // 关掉 Nagle，降低小消息延迟
+hints.unreliable();            // 允许 UDPROS
+hints.reliable();              // 强制 TCPROS
+hints.maxDatagramSize(1500);   // UDPROS 数据报上限
+
+nh.subscribe("image", 1, cb, hints);
+```
+
+实际用下来最有价值的是`tcpNoDelay(true)`。控制指令这种又小又频繁的消息，Nagle会把它们攒起来一起发，白白多出几十毫秒延迟。`unreliable()`则要小心，它只是把UDPROS加进候选，最后用不用还得看发布方接不接受。
+
+</WordCount>

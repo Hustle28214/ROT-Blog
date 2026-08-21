@@ -6,6 +6,61 @@ sidebar_position: 1
 
 import VideoPlayer from '../../../../src/components/Videoplayer/Videoplayer.jsx';
 
+## 一阶系统
+
+标准一阶系统为
+
+$$
+\Phi(s)=\frac{1}{Ts+1},\qquad T>0.
+$$
+
+单位阶跃响应及其导数为
+
+$$
+c(t)=1-e^{-t/T},\qquad \dot c(t)=\frac1T e^{-t/T}.
+$$
+
+响应单调、无超调。$t=T$ 时达到终值的 $63.2\%$；采用 $2\%$ 误差带时 $t_s\approx4T$，采用 $5\%$ 误差带时 $t_s\approx3T$。初始切线与终值线交于 $t=T$。
+
+## 过阻尼二阶系统
+
+当标准二阶系统
+
+$$
+\Phi(s)=\frac{\omega_n^2}
+{s^2+2\zeta\omega_ns+\omega_n^2}
+$$
+
+满足 $\zeta>1$ 时，有两个不同负实极点。令
+
+$$
+p_{1,2}=-\omega_n\left(\zeta\mp\sqrt{\zeta^2-1}\right),
+$$
+
+单位阶跃响应是两个衰减指数项的组合，通常单调趋于终值。离虚轴最近的极点衰减最慢，决定主要调节时间。
+
+<svg viewBox="0 0 700 330" role="img" aria-label="一阶系统和过阻尼二阶系统的单位阶跃响应坐标图" style={{maxWidth:'700px',width:'100%',color:'var(--ifm-font-color-base)'}}>
+  <defs><marker id="fo-arrow" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8 Z" fill="currentColor"/></marker></defs>
+  <g stroke="currentColor" strokeWidth="2" fill="none" markerEnd="url(#fo-arrow)"><path d="M58 275 H655"/><path d="M58 275 V30"/></g>
+  <g stroke="currentColor" strokeWidth="1" opacity="0.65"><path d="M58 75 H640" strokeDasharray="6 5"/><path d="M190 269 V281"/><path d="M322 269 V281"/><path d="M454 269 V281"/></g>
+  <path d="M58 275 C103 207 153 137 214 103 C289 62 416 76 630 75" fill="none" stroke="var(--ifm-color-primary)" strokeWidth="3"/>
+  <path d="M58 275 C130 272 171 225 224 164 C292 86 393 74 630 75" fill="none" stroke="var(--ifm-color-warning)" strokeWidth="3"/>
+  <path d="M58 275 L190 75" fill="none" stroke="currentColor" strokeDasharray="5 5"/>
+  <g fill="currentColor" fontSize="15"><text x="660" y="280">t</text><text x="28" y="34">c(t)</text><text x="34" y="80">1</text><text x="181" y="302">T</text><text x="312" y="302">2T</text><text x="444" y="302">3T</text><text x="477" y="104">一阶</text><text x="416" y="151">过阻尼二阶</text><text x="165" y="67">初始切线</text></g>
+</svg>
+
+## 临界阻尼与比较
+
+$\zeta=1$ 时有二重极点 $-\omega_n$，单位阶跃响应为
+
+$$
+c(t)=1-(1+\omega_nt)e^{-\omega_nt}.
+$$
+
+在无超调的二阶系统中，临界阻尼通常比过阻尼更快。判断动态快慢不能只比较系统阶次，应比较主导极点到虚轴的距离。
+
+## 配套视频
+
 > 上
 
 <VideoPlayer src="//player.bilibili.com/player.html?isOutside=true&aid=811394492&bvid=BV1F34y1h7so&cid=718407693&p=16" />

@@ -3,16 +3,366 @@ import WordCount from '../../../src/components/WordCount/WordCount.jsx';
 
 <WordCount>
 
-## 参数估计
+# 参数估计
 
 参数估计是统计推断中的一个核心过程，其目的是利用从总体（Population）中抽取的样本数据来推断总体未知参数（Population Parameters）的数值或范围。
 
-例如，我们可能想知道一个大型人群的平均身高（总体均值 μ），或者一台机器生产的零件的不合格率（总体比例 p），但我们无法测量整个总体。因此，我们抽取一个代表性样本，并基于样本数据来估计这些未知参数。
+例如，我们可能想知道一个大型人群的平均身高（总体均值 $\mu$），或者一台机器生产的零件的不合格率（总体比例 $p$），但无法测量整个总体。因此，我们抽取一个代表性样本，并基于样本数据估计这些未知参数。
 
+参数估计分为**点估计**与**区间估计**：前者给出一个数，后者给出包含未知参数的随机区间及其置信水平。
 
-## 点估计
+## 1. 点估计的基本概念
 
+设总体分布为 $F(x;\theta)$，其中 $\theta\in\Theta$ 未知，$X_1,\ldots,X_n$ 是简单随机样本。用统计量
 
+$$
+\hat\theta=\hat\theta(X_1,\ldots,X_n)
+$$
 
+估计 $\theta$，称 $\hat\theta$ 为**估计量**；代入样本值所得的数称为**估计值**。
+
+点估计问题包含三个部分：选择统计量、研究其抽样分布、评价其在重复抽样中的表现。单次样本中“看起来接近”并不能证明估计量优良。
+
+## 2. 矩估计
+
+### 2.1 方法原理
+
+若总体前 $k$ 阶原点矩
+
+$$
+\mu_j'=\operatorname E_\theta(X^j),\qquad j=1,\ldots,k
+$$
+
+存在，且分布含 $k$ 个未知参数 $\theta_1,\ldots,\theta_k$，令总体矩等于对应样本矩：
+
+$$
+\operatorname E_\theta(X^j)=A_j
+=\frac1n\sum_{i=1}^nX_i^j,\qquad j=1,\ldots,k.
+$$
+
+解该方程组得到的参数函数称为**矩估计量**。矩估计通常计算简单，但不一定充分利用分布信息，也不保证无偏或最有效。
+
+### 2.2 例题：均匀分布
+
+设 $X_1,\ldots,X_n$ 来自 $U(0,\theta)$，$\theta>0$。因为
+
+$$
+\operatorname E(X)=\frac{\theta}{2},
+$$
+
+令 $\bar X=\theta/2$，得
+
+$$
+\hat\theta_M=2\bar X.
+$$
+
+该估计是无偏的，但它没有直接利用“所有观测都不超过 $\theta$”这一边界信息。
+
+## 3. 最大似然估计
+
+### 3.1 似然函数
+
+对观测值 $x_1,\ldots,x_n$，联合密度或联合概率质量函数视为参数的函数：
+
+$$
+L(\theta;x_1,\ldots,x_n)
+=\prod_{i=1}^nf(x_i;\theta),
+$$
+
+称为**似然函数**。使 $L(\theta)$ 取得最大值的参数称为最大似然估计（MLE）：
+
+$$
+\hat\theta_{\mathrm{MLE}}
+=\arg\max_{\theta\in\Theta}L(\theta).
+$$
+
+当 $L(\theta)>0$ 时，常最大化对数似然
+
+$$
+\ell(\theta)=\log L(\theta)
+=\sum_{i=1}^n\log f(x_i;\theta).
+$$
+
+若最大值位于参数空间内部且函数可微，可解似然方程 $\ell'(\theta)=0$，再检查二阶条件、边界和参数约束。
+
+:::warning
+“令导数为零”只是寻找内部候选点，不是 MLE 的定义。支持集依赖参数时，最大值经常出现在边界；还应检查最大值是否存在、是否唯一。
+:::
+
+### 3.2 例题：伯努利总体
+
+设 $X_i\sim B(1,p)$ 相互独立，$x_i\in\{0,1\}$。令 $\sum x_i=m$，则
+
+$$
+L(p)=p^m(1-p)^{n-m},\qquad 0\le p\le1.
+$$
+
+当 $0<m<n$ 时，
+
+$$
+\ell'(p)=\frac{m}{p}-\frac{n-m}{1-p}=0,
+$$
+
+故
+
+$$
+\hat p_{\mathrm{MLE}}=\frac mn=\bar X.
+$$
+
+$m=0$ 或 $m=n$ 时最大值分别在边界 $p=0$ 或 $p=1$，结论仍是 $\hat p=\bar X$。
+
+### 3.3 例题：均匀分布的边界
+
+若样本来自 $U(0,\theta)$，则
+
+$$
+L(\theta)=\theta^{-n}\mathbf 1_{\{\theta\ge X_{(n)}\}}.
+$$
+
+在允许范围 $\theta\ge X_{(n)}$ 上，$\theta^{-n}$ 单调递减，因此
+
+$$
+\hat\theta_{\mathrm{MLE}}=X_{(n)}.
+$$
+
+这里不能通过通常的似然方程得到答案。
+
+### 3.4 不变性
+
+若 $\hat\theta$ 是 $\theta$ 的 MLE，则在适当条件下，$g(\theta)$ 的 MLE 为 $g(\hat\theta)$。例如正态总体中 $\hat\sigma^2_{\mathrm{MLE}}$ 得到后，标准差的 MLE 是其平方根。
+
+## 4. 估计量的评价标准
+
+### 4.1 无偏性
+
+若对所有 $\theta\in\Theta$，
+
+$$
+\operatorname E_\theta(\hat\theta)=\theta,
+$$
+
+则称 $\hat\theta$ 是 $\theta$ 的无偏估计。偏差为
+
+$$
+\operatorname{Bias}_\theta(\hat\theta)
+=\operatorname E_\theta(\hat\theta)-\theta.
+$$
+
+正态总体下，$\bar X$ 是 $\mu$ 的无偏估计，而
+
+$$
+\hat\sigma^2_{\mathrm{MLE}}
+=\frac1n\sum_{i=1}^n(X_i-\bar X)^2
+$$
+
+有偏；修正后的
+
+$$
+S^2=\frac1{n-1}\sum_{i=1}^n(X_i-\bar X)^2
+$$
+
+才是 $\sigma^2$ 的无偏估计。
+
+### 4.2 有效性与均方误差
+
+在同一参数的无偏估计量中，方差较小者更有效。更一般地，用均方误差
+
+$$
+\operatorname{MSE}(\hat\theta)
+=\operatorname E[(\hat\theta-\theta)^2]
+=\operatorname{Var}(\hat\theta)+\operatorname{Bias}^2(\hat\theta)
+$$
+
+评价估计精度。一个略有偏的估计量可能因方差显著更小而具有更小的 MSE。
+
+在正则条件下，无偏估计量满足 Cramér--Rao 下界
+
+$$
+\operatorname{Var}(\hat\theta)\ge\frac1{nI_1(\theta)},
+$$
+
+其中 $I_1(\theta)$ 是单个观测的 Fisher 信息。达到下界的无偏估计量称为有效估计量。
+
+### 4.3 一致性
+
+若样本量增大时
+
+$$
+\hat\theta_n\xrightarrow{P}\theta,
+$$
+
+则称 $\hat\theta_n$ 是 $\theta$ 的一致估计。由大数定律，若 $\operatorname E|X|<\infty$，则 $\bar X$ 是总体均值的一致估计。
+
+一致性是大样本性质，并不保证小样本表现；无偏性也不自动推出一致性。
+
+### 4.4 充分性
+
+若给定统计量 $T$ 后，样本的条件分布不再依赖 $\theta$，则 $T$ 是关于 $\theta$ 的**充分统计量**，即它保留了样本中关于参数的全部信息。
+
+因子分解定理给出常用判据：若联合密度可写为
+
+$$
+f(\boldsymbol x;\theta)=g(T(\boldsymbol x),\theta)h(\boldsymbol x),
+$$
+
+其中 $h$ 与 $\theta$ 无关，则 $T$ 充分。例如伯努利样本中 $\sum X_i$ 是 $p$ 的充分统计量。
+
+## 5. 区间估计与枢轴量
+
+### 5.1 置信区间
+
+若由样本构造的随机区间 $[L(\boldsymbol X),U(\boldsymbol X)]$ 满足
+
+$$
+P_\theta\{L(\boldsymbol X)\le\theta\le U(\boldsymbol X)\}
+=1-\alpha,
+$$
+
+则称其为 $\theta$ 的置信水平为 $1-\alpha$ 的置信区间。
+
+频率学派解释是：重复抽样并按同一方法构造区间，长期约有 $100(1-\alpha)\%$ 的区间覆盖固定参数。样本观测后，参数不是随机变量，不能说“该已实现区间以 $95\%$ 概率包含参数”。
+
+构造区间的常用步骤是：
+
+1. 找到含 $\theta$、但分布不依赖未知参数的枢轴量；
+2. 取其中概率为 $1-\alpha$ 的区域；
+3. 解不等式，化为关于 $\theta$ 的区间。
+
+## 6. 正态总体参数的置信区间
+
+设 $X_1,\ldots,X_n$ 是来自 $N(\mu,\sigma^2)$ 的简单随机样本。
+
+### 6.1 均值区间：方差已知
+
+因为
+
+$$
+\frac{\bar X-\mu}{\sigma/\sqrt n}\sim N(0,1),
+$$
+
+$\mu$ 的双侧 $1-\alpha$ 置信区间为
+
+$$
+\left[
+\bar X-z_{\alpha/2}\frac{\sigma}{\sqrt n},
+\ \bar X+z_{\alpha/2}\frac{\sigma}{\sqrt n}
+\right],
+$$
+
+其中 $P(Z>z_{\alpha/2})=\alpha/2$。
+
+### 6.2 均值区间：方差未知
+
+利用
+
+$$
+\frac{\bar X-\mu}{S/\sqrt n}\sim t(n-1),
+$$
+
+可得
+
+$$
+\left[
+\bar X-t_{\alpha/2}(n-1)\frac S{\sqrt n},
+\ \bar X+t_{\alpha/2}(n-1)\frac S{\sqrt n}
+\right].
+$$
+
+这是正态总体下的精确区间。总体明显偏离正态且样本很小时，不能仅因 $\sigma$ 未知便直接套用。
+
+### 6.3 方差区间
+
+由
+
+$$
+\frac{(n-1)S^2}{\sigma^2}\sim\chi^2(n-1),
+$$
+
+并采用右尾分位点约定 $P(\chi^2_\nu>\chi^2_\gamma(\nu))=\gamma$，有
+
+$$
+\left[
+\frac{(n-1)S^2}{\chi^2_{\alpha/2}(n-1)},
+\ \frac{(n-1)S^2}{\chi^2_{1-\alpha/2}(n-1)}
+\right]
+$$
+
+是 $\sigma^2$ 的 $1-\alpha$ 置信区间。标准差区间只需对两个端点开平方。
+
+:::warning
+方差区间对正态性较敏感；卡方分位点分母的次序也容易写反。先写概率不等式再取倒数，能减少错误。
+:::
+
+## 7. 总体比例的置信区间
+
+设 $X\sim B(n,p)$，样本比例为 $\hat p=X/n$。当 $n$ 足够大且 $np$、$n(1-p)$ 均不太小时，
+
+$$
+\frac{\hat p-p}{\sqrt{p(1-p)/n}}\approx N(0,1).
+$$
+
+直接以 $\hat p$ 代替标准误中的 $p$，得到 Wald 区间
+
+$$
+\hat p\pm z_{\alpha/2}
+\sqrt{\frac{\hat p(1-\hat p)}n}.
+$$
+
+Wald 区间在小样本或 $\hat p$ 接近 $0,1$ 时覆盖率很差，甚至越出 $[0,1]$。实践中更推荐 Wilson 区间：
+
+$$
+\frac{
+\hat p+\dfrac{z^2}{2n}
+\pm z\sqrt{\dfrac{\hat p(1-\hat p)}n+\dfrac{z^2}{4n^2}}
+}{
+1+\dfrac{z^2}{n}
+},\qquad z=z_{\alpha/2}.
+$$
+
+极小样本可使用基于二项分布尾概率反演的 Clopper--Pearson 精确区间，但它通常较保守。
+
+## 8. 例题
+
+### 例 1：正态均值区间
+
+某材料强度可视为正态总体，抽取 $n=16$ 个样品，得到 $\bar x=52.0$、$s=4.0$。求 $\mu$ 的 $95\%$ 置信区间。
+
+方差未知，使用自由度 $15$ 的 $t$ 区间。取 $t_{0.025}(15)\approx2.131$，
+
+$$
+52.0\pm2.131\frac4{\sqrt{16}}
+=52.0\pm2.131,
+$$
+
+故区间约为 $[49.87,54.13]$。成立条件是样本独立且总体近似正态。
+
+### 例 2：样本量设计
+
+若总体标准差已知为 $\sigma$，希望均值的双侧 $1-\alpha$ 区间半宽不超过 $E$，则
+
+$$
+z_{\alpha/2}\frac{\sigma}{\sqrt n}\le E
+\quad\Longrightarrow\quad
+n\ge\left(\frac{z_{\alpha/2}\sigma}{E}\right)^2.
+$$
+
+最终样本量应向上取整。若 $\sigma$ 未知，可用先导样本估计并预留余量。
+
+## 9. 方法选择与易错点
+
+- 先确认参数、总体模型、独立性以及样本设计，再选择公式；
+- 矩估计靠矩方程，MLE 靠联合似然，二者可能相同也可能不同；
+- 无偏、有效、一致是不同性质，不能相互替代；
+- 正态均值区间中，$\sigma$ 已知用 $z$，未知且总体正态用 $t$；
+- 正态方差区间用卡方分布，并核对尾概率定义；
+- 比例区间在小样本和边界附近不宜使用简单 Wald 公式；
+- 置信水平描述的是构造方法的长期覆盖率，而非固定参数的后验概率。
+
+## References
+
+1. 盛骤，谢式千，潘承毅：《概率论与数理统计》，高等教育出版社。
+2. 茆诗松，程依明，濮晓龙：《概率论与数理统计教程》，高等教育出版社。
+3. Casella, G. and Berger, R. L., *Statistical Inference*, Cengage Learning.
+4. Agresti, A., *An Introduction to Categorical Data Analysis*, Wiley.
 
 </WordCount>

@@ -4,6 +4,70 @@ sidebar_position: 2
 
 import VideoPlayer from '../../../../src/components/Videoplayer/Videoplayer.jsx';
 
+# z 变换
+
+对序列 $x[k]$，双边 z 变换定义为
+
+$$
+X(z)=\mathcal Z\{x[k]\}=\sum_{k=-\infty}^{\infty}x[k]z^{-k}.
+$$
+
+单边变换从 $k=0$ 求和，适合含初始条件的差分方程；传递函数通常按零初始条件使用双边变换。**表达式与收敛域（ROC）共同决定序列**。例如 $z/(z-a)$ 在 $|z|>|a|$ 对应 $a^ku[k]$，在 $|z|<|a|$ 对应左边序列。
+
+## 常用变换
+
+| 序列（$k\ge0$） | z 变换 | ROC |
+|---|---|---|
+| $\delta[k]$ | $1$ | 全平面 |
+| $u[k]$ | $\dfrac{z}{z-1}$ | $|z|>1$ |
+| $a^ku[k]$ | $\dfrac{z}{z-a}$ | $|z|>|a|$ |
+| $k a^ku[k]$ | $\dfrac{az}{(z-a)^2}$ | $|z|>|a|$ |
+| $\sin(\Omega k)u[k]$ | $\dfrac{z\sin\Omega}{z^2-2z\cos\Omega+1}$ | $|z|>1$ |
+
+## 基本性质
+
+设 $\mathcal Z\{x[k]\}=X(z)$：
+
+$$
+\begin{aligned}
+\mathcal Z\{x[k-m]\}&=z^{-m}X(z),\\
+\mathcal Z\{a^kx[k]\}&=X(z/a),\\
+\mathcal Z\{k\,x[k]\}&=-z\frac{\mathrm dX}{\mathrm dz},\\
+\mathcal Z\{x[k]*y[k]\}&=X(z)Y(z).
+\end{aligned}
+$$
+
+单边移位会带入初值，例如
+
+$$
+\mathcal Z_1\{x[k+1]\}=z\bigl[X(z)-x[0]\bigr].
+$$
+
+初值与终值定理分别为
+
+$$
+x[0]=\lim_{z\to\infty}X(z),\qquad
+\lim_{k\to\infty}x[k]=\lim_{z\to1}(z-1)X(z).
+$$
+
+终值定理要求 $(z-1)X(z)$ 的全部极点严格位于单位圆内；若单位圆上还有极点或存在圆外极点，则不能使用。
+
+## 反变换与 s、z 平面映射
+
+反变换常用长除法、部分分式或留数法。因果有理系统通常先写成 $z^{-1}$ 的形式，再查表或展开。
+
+采样映射为
+
+$$
+z=e^{sT},\qquad s=\sigma+j\omega
+\quad\Rightarrow\quad
+|z|=e^{\sigma T},\ \arg z=\omega T\pmod{2\pi}.
+$$
+
+所以连续左半平面映到单位圆内，虚轴映到单位圆；不同的连续频率若相差整数倍 $\omega_s$，会映到同一 z 点，这正是频率混叠的复平面表现。
+
+## 配套视频
+
 > 上
 
 <VideoPlayer src="//player.bilibili.com/player.html?isOutside=true&aid=811394492&bvid=BV1F34y1h7so&cid=718579840&p=61" />

@@ -1,81 +1,252 @@
 ---
-sidebar_position: 4
+sidebar_position: 5
 ---
 
-
-
 import WordCount from '../../../src/components/WordCount/WordCount';
-
-
 import VideoPlayer from '../../../src/components/Videoplayer/Videoplayer.jsx';
-
 
 <WordCount>
 
+# 稳定性与李雅普诺夫方法
 
-李雅普诺夫方法，简单来说，就是判断一个系统是否会稳定下来的一种工具。
+李雅普诺夫方法可以先用“小球找谷底”来理解：碗底是希望保持的平衡点，球受到小扰动后若不跑远，称为稳定；若还会回到底部，称为渐近稳定；若以指数速度回去，则是指数稳定。倒扣的碗不稳定，完全水平的桌面则说明“留在附近”与“回到原处”并不是一回事。
 
-我们可以把它比作一个“小球找谷底”的过程。
+严格分析时不能只凭图像。第一方法（间接法）在平衡点附近线性化；第二方法（直接法）寻找类似能量的标量函数，不必显式求出状态轨迹。下文把直觉、定义和可计算判据连起来。
 
+## 5.1 平衡点与稳定性的严格定义
 
-想象你有一个碗，碗里放了一个小球：
+考虑自治系统
 
-1. 情况一（稳定）： 碗口朝上。你把小球放在碗边的任意位置，一松手，小球会滚来滚去，但最终会停在碗底那个最低点。我们说这个系统是稳定的。
+$$
+\dot{x}=f(x),\qquad x\in\mathbb{R}^n,\qquad f(0)=0.
+$$
 
-2. 情况二（不稳定）： 碗口朝下（像一个倒扣的碗）。你把小球放在顶端，稍微一碰，小球就会滚下去再也回不来。这是不稳定的。
+满足 $f(x_e)=0$ 的 $x_e$ 称为**平衡点**。通过坐标平移 $z=x-x_e$，总可把所研究的平衡点移到原点。以下定义均针对原点，$\|\cdot\|$ 可取任意等价范数。
 
-3. 情况三（临界）： 碗放在一个绝对平整的桌面上。你把小球放在任何地方，它都会停在原地不动，既不会回去也不会跑远。这是临界稳定。
+- **Lyapunov 稳定**：对任意 $\varepsilon>0$，存在 $\delta(\varepsilon)>0$，使得
+  $\|x(0)\|<\delta$ 时，对所有 $t\geq 0$ 都有 $\|x(t)\|<\varepsilon$。
+- **渐近稳定**：原点 Lyapunov 稳定，并且存在 $r>0$，使 $\|x(0)\|<r$ 时有
+  $\lim_{t\to\infty}x(t)=0$。
+- **指数稳定**：存在 $c>0,\lambda>0,r>0$，使 $\|x(0)\|<r$ 时
+  $\|x(t)\|\leq c e^{-\lambda t}\|x(0)\|$。指数稳定蕴含渐近稳定。
+- **全局渐近稳定**：上述稳定性和收敛性对任意初值成立。若指数估计对所有初值成立，则称全局指数稳定。
 
+“稳定”只保证不离开，“吸引”只保证最终趋近；渐近稳定要求两者同时成立。“全局稳定”若未说明吸引性，通常只指定义域为全空间的 Lyapunov 稳定，考试中应写明“全局渐近稳定”以免歧义。
 
-在数学和控制理论中，我们没法真的拿个碗去试，只能通过公式去分析。李雅普诺夫发明了一种聪明的办法，不需要真的去求解复杂的方程，就能判断这个“小球”最终会不会掉进“谷底”。
-
-这个方法主要是“找能量”：
-
-
-构造一个“能量函数”（李雅普诺夫函数）：这个函数就像描述“小球高度”的公式。在碗底（我们想要的目标状态），能量最低（比如是0）；在其它地方，能量都是正的。
-
-看能量的变化趋势：我们分析这个“能量”随着时间的推进是变大还是变小。如果能量越来越小（就像小球高度越来越低，往谷底滚），说明系统在趋向稳定，这就是李雅普诺夫稳定性。如果能量越来越大或忽大忽小乱跳，说明系统不稳定。
-
-
-李雅普诺夫提供了两种视角：
-
-第一方法（间接法）：把复杂的系统在小范围内“拉直”看（线性化）。就像看小球在谷底附近是怎么动的，如果谷底附近是斜向下的，那它就会滑回去。
-
-第二方法（直接法）：不管系统多复杂，直接盯着那个“能量函数”看。只要发现能量一直在消耗、一直在减少，那么系统最终必然会停下来。这是最精髓、最常用的方法。
-
-## 4.1 李雅普诺夫关于稳定性的定义
+<svg viewBox="0 0 620 300" role="img" aria-label="李雅普诺夫稳定性的 epsilon-delta 邻域几何图" style={{maxWidth:'620px',width:'100%',color:'var(--ifm-font-color-base)'}}>
+  <defs>
+    <marker id="axis-arrow-05a" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="currentColor" /></marker>
+    <marker id="flow-arrow-05a" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#2e9d63" /></marker>
+  </defs>
+  <line x1="55" y1="250" x2="585" y2="250" stroke="currentColor" markerEnd="url(#axis-arrow-05a)" />
+  <line x1="310" y1="275" x2="310" y2="25" stroke="currentColor" markerEnd="url(#axis-arrow-05a)" />
+  <text x="590" y="270" fill="currentColor">x₁</text><text x="320" y="28" fill="currentColor">x₂</text>
+  <circle cx="310" cy="150" r="105" fill="none" stroke="#d97706" strokeWidth="3" strokeDasharray="8 6" />
+  <circle cx="310" cy="150" r="48" fill="none" stroke="#3b82f6" strokeWidth="3" />
+  <circle cx="310" cy="150" r="5" fill="currentColor" />
+  <path d="M346 125 C385 102,405 135,390 168 C375 202,330 210,288 185 C250 162,270 125,298 116" fill="none" stroke="#2e9d63" strokeWidth="3" markerEnd="url(#flow-arrow-05a)" />
+  <text x="402" y="74" fill="#d97706">ε 邻域：轨迹始终不越界</text>
+  <text x="344" y="219" fill="#3b82f6">δ 邻域：允许的初值</text>
+  <text x="320" y="145" fill="currentColor">平衡点</text>
+</svg>
 
 <VideoPlayer src="//player.bilibili.com/player.html?isOutside=true&aid=625409284&bvid=BV1Qt4y127ja&cid=184230578&p=38" />
 
-<br />
+## 5.2 第一方法：线性化间接法
 
-## 4.2 李雅普诺夫第一法
+设 $f$ 在原点附近连续可微，其 Jacobian 为
 
+$$
+A=\left.\frac{\partial f}{\partial x}\right|_{x=0},\qquad
+\dot{x}=Ax+g(x),\qquad
+\lim_{\|x\|\to 0}\frac{\|g(x)\|}{\|x\|}=0.
+$$
 
+间接法的结论是：
+
+1. 若 $A$ 的全部特征值实部严格小于零，则非线性系统原点局部渐近稳定（事实上局部指数稳定）。
+2. 若 $A$ 至少有一个特征值实部严格大于零，则原点不稳定。
+3. 若没有正实部特征值、但存在零实部特征值，线性化**不能下结论**；高阶项可能使系统稳定，也可能不稳定。例如 $\dot{x}=-x^3$ 渐近稳定，而 $\dot{x}=x^3$ 不稳定，两者线性化均为 $\dot{x}=0$。
+
+因此“线性化系统临界稳定，所以原非线性系统也稳定”是错误推理。
 
 <VideoPlayer src="//player.bilibili.com/player.html?isOutside=true&aid=625409284&bvid=BV1Qt4y127ja&cid=184230536&p=39" />
 
-<br />
+## 5.3 正定性与二次型判别
 
+连续函数 $V(x)$ 若满足 $V(0)=0$，并在某邻域内对 $x\neq0$ 有 $V(x)>0$，称为正定；若仅有 $V(x)\geq0$，称半正定。负定、半负定分别对 $-V$ 定义。
 
-<br />
-## 4.3 李雅普诺夫第二法（直接法）
+对实对称二次型 $V=x^\mathsf{T}Px$：
 
-### 4.3.1 基本知识
+- $P>0$ 当且仅当所有特征值为正；
+- 也可用 Sylvester 判据：$P$ 的各阶顺序主子式均为正；
+- 若特征值有正有负，则二次型不定；
+- 非对称矩阵只需取对称部分，因为
+  $x^\mathsf{T}Px=x^\mathsf{T}(P+P^\mathsf{T})x/2$。
+
+例如
+
+$$
+P=\begin{bmatrix}2&1\\1&2\end{bmatrix},\qquad
+\Delta_1=2>0,\quad \Delta_2=3>0,
+$$
+
+所以 $V=2x_1^2+2x_1x_2+2x_2^2$ 正定。
 
 <VideoPlayer src="//player.bilibili.com/player.html?isOutside=true&aid=625409284&bvid=BV1Qt4y127ja&cid=184230560&p=40" />
 
-### 4.3.2 二次线标量函数
-
 <VideoPlayer src="//player.bilibili.com/player.html?isOutside=true&aid=625409284&bvid=BV1Qt4y127ja&cid=184230589&p=41" />
 
-### 4.3.3 稳定性判据
+## 5.4 第二方法：直接法
+
+沿系统轨迹，$V$ 的导数为
+
+$$
+\dot{V}(x)=\nabla V(x)^\mathsf{T}f(x).
+$$
+
+在原点某邻域内：
+
+- 若 $V$ 正定且 $\dot V\leq0$，则原点 Lyapunov 稳定；
+- 若 $V$ 正定且 $\dot V<0$，则原点局部渐近稳定；
+- 若还有常数 $c_1,c_2,c_3>0$ 使
+  $c_1\|x\|^2\leq V(x)\leq c_2\|x\|^2$、$\dot V\leq-c_3\|x\|^2$，则局部指数稳定；
+- 若这些条件在全空间成立，且 $V(x)\to\infty$ 当 $\|x\|\to\infty$（径向无界），则相应结论为全局结论。
+
+注意 $\dot V<0$ 是充分条件而非必要条件；一次猜测失败不代表系统不稳定。
+
+### LaSalle 不变性原理
+
+当只能得到 $\dot V\leq0$ 时，不能直接声称渐近稳定。设紧集 $\Omega$ 正不变，$V$ 在 $\Omega$ 上连续可微且 $\dot V\leq0$。令
+
+$$
+E=\{x\in\Omega:\dot V(x)=0\}.
+$$
+
+则 $\Omega$ 中每条轨迹都趋向 $E$ 内的最大不变集 $M$。若 $M=\{0\}$，便可推出原点渐近稳定。关键不是解方程 $\dot V=0$ 后只看到原点，而是检查在该集合上能否一直运动。
+
+<svg viewBox="0 0 620 330" role="img" aria-label="李雅普诺夫函数等值线与收敛相轨迹" style={{maxWidth:'620px',width:'100%',color:'var(--ifm-font-color-base)'}}>
+  <defs>
+    <marker id="axis-arrow-05b" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="currentColor" /></marker>
+    <marker id="flow-arrow-05b" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#a855f7" /></marker>
+  </defs>
+  <line x1="45" y1="165" x2="585" y2="165" stroke="currentColor" markerEnd="url(#axis-arrow-05b)" />
+  <line x1="310" y1="300" x2="310" y2="25" stroke="currentColor" markerEnd="url(#axis-arrow-05b)" />
+  <text x="590" y="185" fill="currentColor">x₁</text><text x="320" y="30" fill="currentColor">x₂</text>
+  <ellipse cx="310" cy="165" rx="210" ry="112" fill="none" stroke="#64748b" strokeWidth="2" />
+  <ellipse cx="310" cy="165" rx="145" ry="77" fill="none" stroke="#0ea5e9" strokeWidth="2" />
+  <ellipse cx="310" cy="165" rx="78" ry="42" fill="none" stroke="#22c55e" strokeWidth="2" />
+  <path d="M500 105 C430 235,380 70,330 130 C295 172,280 178,310 165" fill="none" stroke="#a855f7" strokeWidth="4" markerEnd="url(#flow-arrow-05b)" />
+  <circle cx="310" cy="165" r="5" fill="currentColor" />
+  <text x="470" y="82" fill="#64748b">V 较大</text><text x="375" y="130" fill="#22c55e">V 较小</text>
+  <text x="330" y="255" fill="#a855f7">轨迹穿越等值线，V 单调下降</text>
+</svg>
 
 <VideoPlayer src="//player.bilibili.com/player.html?isOutside=true&aid=625409284&bvid=BV1Qt4y127ja&cid=184246764&p=42" />
 
-## 4.4 李雅普诺夫方法在线性系统中的应用
+## 5.5 Lyapunov 函数怎样构造
 
+没有万能公式，常用策略包括：
+
+1. **物理能量**：机械系统取动能加势能，电路取电容与电感储能。
+2. **二次型**：在线性系统或局部线性化附近试 $V=x^\mathsf{T}Px$。
+3. **消交叉项**：从 $x_1^2+x_2^2$ 出发，根据 $\dot V$ 中的混合项调整权重或加入 $x_1x_2$。
+4. **积分构造**：标量系统 $\dot x=-\phi(x)$ 可试
+   $V(x)=\int_0^x\phi(s)\,ds$。
+5. **反推法**：先指定希望得到的负定 $\dot V$，再匹配 $V$ 的系数。
+
+### 完整例题：非线性系统与 LaSalle
+
+判断
+
+$$
+\dot x_1=x_2,\qquad
+\dot x_2=-x_1-x_2^3
+$$
+
+的原点稳定性。取总能量
+
+$$
+V(x)=\frac{1}{2}x_1^2+\frac{1}{2}x_2^2.
+$$
+
+$V$ 正定且径向无界，并且
+
+$$
+\dot V=x_1x_2+x_2(-x_1-x_2^3)=-x_2^4\leq0.
+$$
+
+此时 $\dot V$ 只是半负定。集合 $E=\{x:x_2=0\}$ 上有
+$\dot x_2=-x_1$；除原点外，轨迹会立即离开 $E$，故 $E$ 中最大不变集只有 $\{0\}$。由 LaSalle 原理，原点**全局渐近稳定**。这里不能由 $\dot V\leq0$ 直接得到渐近稳定，LaSalle 的不变集检查是不可省略的一步。
+
+## 5.6 线性系统的 Lyapunov 方程
+
+对 $\dot x=Ax$ 取 $V=x^\mathsf{T}Px$，则
+
+$$
+\dot V=x^\mathsf{T}(A^\mathsf{T}P+PA)x.
+$$
+
+连续时间 Lyapunov 定理：$A$ 为 Hurwitz 矩阵，当且仅当对任意给定 $Q=Q^\mathsf{T}>0$，方程
+
+$$
+A^\mathsf{T}P+PA=-Q
+$$
+
+存在唯一对称正定解 $P$。因此通常先选简单的 $Q$（如单位阵），再解线性方程得到 $P$，而不是盲猜 $P$。
+
+### 可核算例题
+
+设
+
+$$
+A=\begin{bmatrix}0&1\\-2&-3\end{bmatrix},\qquad Q=I,\qquad
+P=\begin{bmatrix}p_{11}&p_{12}\\p_{12}&p_{22}\end{bmatrix}.
+$$
+
+代入方程并比较元素得
+
+$$
+-4p_{12}=-1,\qquad
+p_{11}-3p_{12}-2p_{22}=0,\qquad
+2p_{12}-6p_{22}=-1.
+$$
+
+解得
+
+$$
+P=\begin{bmatrix}5/4&1/4\\1/4&1/4\end{bmatrix}.
+$$
+
+其顺序主子式为 $5/4>0$ 与 $1/4>0$，故 $P>0$；又有
+$\dot V=-x^\mathsf{T}x<0$，所以原点全局指数稳定。
 
 <VideoPlayer src="//player.bilibili.com/player.html?isOutside=true&aid=625409284&bvid=BV1Qt4y127ja&cid=184230746&p=43" />
+
+## 5.7 离散时间情形
+
+对 $x_{k+1}=f(x_k)$，用差分代替导数：
+
+$$
+\Delta V(x_k)=V(x_{k+1})-V(x_k).
+$$
+
+$V>0,\Delta V\leq0$ 给出稳定性；$V>0,\Delta V<0$ 给出渐近稳定性。对线性系统 $x_{k+1}=Ax_k$，
+
+$$
+A^\mathsf{T}PA-P=-Q.
+$$
+
+$A$ 为 Schur 矩阵（全部特征值满足 $|\lambda_i|<1$）当且仅当对任意 $Q>0$，上式存在唯一 $P>0$。连续系统看特征值实部，离散系统看单位圆，二者不可混用。
+
+## 5.8 复习清单与常见误区
+
+- 先求平衡点，再说明讨论的是局部还是全局性质。
+- 稳定、吸引、渐近稳定、指数稳定不是同义词。
+- $\dot V\leq0$ 一般只能推出稳定；要收敛需负定性或 LaSalle。
+- 全局结论通常需要条件在全空间成立，并检查 $V$ 径向无界。
+- 线性化出现零实部特征值时结论未定。
+- $V$ 必须对状态正定；“随时间为正”不是正定性的定义。
+- 离散系统使用 $\Delta V$ 和 Schur 条件，不使用连续时间的 Hurwitz 判据。
 
 </WordCount>

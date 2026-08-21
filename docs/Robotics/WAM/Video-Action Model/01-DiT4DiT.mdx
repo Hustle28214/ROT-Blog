@@ -1,0 +1,126 @@
+import WordCount from '../../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+论文：[DiT4DiT: Jointly Modeling Video Dynamics and Actions for Generalizable Robot Control](https://arxiv.org/abs/2603.10448)，Mondo Robotics + HKUST(GZ)/HKUST，2026 年 3 月。代码和项目页在 [dit4dit.github.io](https://dit4dit.github.io/)。
+
+## 1. 先说结论
+
+DiT4DiT 是 Video-Action Model 这条线的起点，也是 [MotionWAM](./03-MotionWAM.mdx) 的直接技术前身——同一批作者，同一套 dual-DiT + tri-timestep 骨架。它第一次系统性地证明了：**视频 DiT 中间层的 denoise 特征，可以当作比 VLM 图文特征更好的策略条件**。
+
+LIBERO 平均 98.6%，RoboCasa GR1 50.8%，训练数据比很多 baseline 少一截。Unitree G1 真机上零样本泛化也更强。样本效率提升 10 倍以上，收敛快 7 倍。单卡 A100 上 6 Hz、2.2B 参数，比 GR00T-N1.5（2.7B，13 Hz）小但任务表现更好。
+
+跟 [Cosmos Policy](./02-CosmosPolicy.mdx) 比，DiT4DiT 走的是另一条路：不迭代 denoise 完整未来视频，只读中间 hidden state。频率差一个数量级（6 Hz vs 0.7 Hz），但 RoboCasa 数字略低——两边 setting 不完全一样，不能简单下结论说 hook 一定更差。
+
+## 2. 问题表述：先预测视频动力学，再反推动作
+
+VLA 学的是直接映射 $\pi_\theta(\mathbf{a}_t \mid \mathbf{o}_t, l)$。DiT4DiT 换成 predict-then-invert：
+
+$$
+\mathbf{o}_{t+1} \sim p_v(\cdot \mid \mathbf{o}_t, l), \qquad
+\mathbf{a}_t \sim p_a\!\left(\cdot \mid \mathbf{o}_t, \mathcal{H}(\mathbf{o}_{t+1}^{\tau_v})\right)
+$$
+
+$\mathcal{H}$ 从 Video DiT 的 velocity network 里截 hidden state，$\mathbf{o}_{t+1}^{\tau_v}$ 是未来帧在 flow 步 $\tau_v$ 的中间状态。训练目标是联合分布 $p_{va}(\mathbf{o}_{t+1}, \mathbf{a}_t \mid \mathbf{o}_t, l)$。
+
+VLA 的表征来自静态 image-text 预训练，物理动力学全靠有限的 action 数据硬学。视频生成模型反过来，已经在互联网规模数据里编码了时空结构和隐式物理。DiT4DiT 要做的就是把这个 prior 接到动作预测上，而且是 **end-to-end 联合训练**，不是多阶段先训 video 再训 action head。
+
+## 3. 视频生成是 scaling proxy 吗？
+
+在搭完整框架之前，作者先做了一个 proxy objective 对照实验，我觉得这一步很关键。在 RoboCasa-GR1 的 24 个 tabletop 任务上，用同样 2B 规模的 backbone，比较三种自监督预训练信号：
+
+| Proxy 任务 | Backbone | 核心思路 |
+| --- | --- | --- |
+| Grounding | Qwen3-2B | 物体检测辅助头，学"什么在哪" |
+| FLARE-style | Qwen3-2B | VLM query 对齐未来帧 latent |
+| Video generation | Cosmos-Predict2.5-2B | 直接学未来帧 flow matching |
+
+三种 setting 都是：预训练 backbone 冻结，只训 action expert。结果是 video generation 收敛最快（最高 7 倍）、样本效率最高（最高 10 倍），最终成功率也最好。Grounding 和 FLARE 那种语义对齐路线，在连续像素级物理动力学上明显吃亏。
+
+这个实验给我的直觉是：robot policy scaling 的瓶颈不一定是 action 标注量，而是 **visual dynamics 有没有被预训练喂饱**。DiT4DiT 后面的架构设计，基本就是在这个结论上长出来的。
+
+## 4. Dual-DiT 架构
+
+**Video DiT**：Cosmos-Predict2.5-2B 初始化（causal video VAE + flow-matching DiT，语言条件来自 Cosmos-Reason1）。观测 $\mathbf{o}_t$ 和未来帧 $\mathbf{o}_{t+1}$ 经 VAE 压成 $\mathbf{z}_t^0, \mathbf{z}_{t+1}^0$。
+
+不在推理时使用完全 denoise 好的未来帧，而是在某个 transformer block 上挂 forward hook，在固定 flow 步 $\tau_f$ 截激活：
+
+$$
+\mathbf{h}_t^{\tau_f} = \mathcal{H}\big[v_\theta^{\text{video}}\big]\big(\mathbf{z}_{t+1}^{\tau_f}, \tau_f \mid \mathbf{z}_t^0, l\big)
+$$
+
+论文附录做了层数 ablation：从指定 deep block 提取通常优于全层平均。early diffusion stage 偏全局结构，late stage 偏细节；固定 $\tau_f$ 就是选一个稳定的"操作点"。
+
+**Action DiT**：从 GR00T-N1 改来。AdaLN 注入 diffusion timestep，cross-attention 吃 $\mathbf{h}_t^{\tau_f}$，输入还有本体状态 embedding、带噪 action chunk、以及一组 learnable future tokens（压缩 motion planning query）。输出 action 速度场，推理时 4 步 Euler 积分出 chunk。
+
+VAE 和 text encoder 全程冻结，只更新两个 DiT。Action loss 带 per-embodiment mask，适配不同机器人的 action 维度。
+
+## 5. Tri-timestep：三个时间步各干各的
+
+这是 DiT4DiT 训练里我觉得最精巧的设计。视频生成、特征提取、动作推理对 diffusion timestep 的要求是冲突的，所以拆成三个：
+
+- $\tau_v \sim \mathcal{U}[0,1]$：Video DiT 训练用，均匀采样，学完整 denoise 轨迹；
+- $\tau_f$ 固定：提 hidden state 用，保证 Action DiT 每次看到的视觉条件稳定；
+- $\tau_a \sim \text{Beta}(\alpha, \beta)$：Action DiT 训练用，$\tau_a = 1 - \sigma$，偏向 flow 轨迹的关键阶段。
+
+联合损失：
+
+$$
+\mathcal{L}^{\text{total}} = \mathcal{L}_{\text{action}} + \lambda \mathcal{L}_{\text{video}}
+$$
+
+跟 mimic-video 这类"partially denoised latent 条件 policy"的工作比，DiT4DiT 的区别在于 **video 和 action 联合优化**——Action DiT 学会从不同 denoise 阶段提取有效特征，而不是挂在一个固定的中间态上。
+
+## 6. 实验里值得记住的数字
+
+**仿真**：
+
+| Benchmark | DiT4DiT | 对照 |
+| --- | --- | --- |
+| LIBERO 四套件平均 | 98.6% | 超过 $\pi_{0.5}$（96.9%）、CogVLA（97.4%） |
+| RoboCasa GR1 24 任务 | 50.8% | 超过 GR00T-N1.5（49.6%），但低于 [Cosmos Policy](./02-CosmosPolicy.mdx)（67.1%） |
+
+LIBERO-Long 上 extended-horizon 能力尤其强。RoboCasa 用的是较少训练数据（跟 Cosmos 的 50 demos/task setting 接近），但 Cosmos 在 kitchen 场景上仍然更高——可能跟完整 denoise 保留了更多细粒度视觉细节有关，也可能跟任务分布差异有关。
+
+**真机 G1**：单 egocentric 相机，precision 任务（Arrange Flower、Stack Cup）也能做。对未见物体类别、数量变化有零样本泛化。比同数据微调的 GR00T-N1.5 和同参 Qwen3DiT 都强。论文 Figure 10 展示了 Video DiT 生成的 visual plan——future frame 质量本身也不错，但推理时 policy 并不消费这些像素，只读 $\mathbf{h}_t^{\tau_f}$。
+
+**样本效率曲线**：在 RoboCasa 上扫不同 demonstration 比例（10%–100%），video-dynamics proxy 的 scaling 曲线始终压在 Grounding 和 FLARE 上面。数据少时 gap 最大——这正是 hook 路线想解决的痛点：action 标注贵，但 video dynamics 可以从更大规模的 future-frame prediction 里"免费"借 prior。
+
+**Qwen3DiT 对照**：Qwen3-VL 2B + 同样的 Action DiT，参数量匹配，只是把 video world model prior 换成 static VLM prior。DiT4DiT 在几乎所有任务上都赢它——gap 来自 dynamics prior，不是模型大小。
+
+**部署（单 A100）**：
+
+| 模型 | 可训练参数 | 频率 |
+| --- | --- | --- |
+| GR00T-N1.5 | 2.7B | 13 Hz |
+| Qwen3DiT | 2.3B | 9 Hz |
+| DiT4DiT | 2.2B | 6 Hz |
+| Cosmos Policy | 2.0B | 0.7 Hz |
+
+## 7. 在 WAM 谱系里的位置
+
+读这三篇的话，我的顺序是：
+
+1. **本篇（DiT4DiT）**——理解 dual-DiT + hook 机制 + tri-timestep 联合训练，这是 hook 特征路线的原型；
+2. **[Cosmos Policy](./02-CosmosPolicy.mdx)**——对照"完整 denoise 生成"那条路：架构零改动、还能做 planning，但频率是硬瓶颈；
+3. **[MotionWAM](./03-MotionWAM.mdx)**——看 DiT4DiT 怎么推到全身人形真机：egocentric 预训练 + SONIC motion token + one-shot imagination（$\tau_f \approx 1$）。
+
+DiT4DiT 解决的是"video prior 怎么接到 action 上"，但还有两个 gap 留给 MotionWAM：
+
+1. **动作空间**：DiT4DiT 的 action 还是桌面 manipulation 的 joint/gripper chunk，没法表达全身 loco-manipulation 里腿和手的协同；
+2. **第一视角动力学**：桌面第三视角视频预训练的 prior，跟 egocentric 人形控制需要的视觉动力学不对口。
+
+Cosmos Policy 跟 DiT4DiT 没有直接继承关系（NVIDIA vs Mondo，发布时间也更早），但三篇放在一起看，WAM 领域目前就是两条清晰路线：**完整 denoise 统一建模** vs **中间特征一次前向**。DiT4DiT 选了后者，MotionWAM 把后者推到了实时全身控制。
+
+## 8. 局限
+
+DiT4DiT 自己也有明确的 ceiling：
+
+- **Action 空间**：joint/gripper chunk 绑死在 tabletop manipulation，没法表达全身 loco-manipulation；
+- **视角**：Cosmos-Predict2.5 预训练以第三视角为主，单 egocentric 相机真机虽然能跑，但 prior 和部署视角不完全匹配；
+- **Planning**：没有 future value 分支，test-time 不能 best-of-N——这是相对 Cosmos Policy 的功能性短板；
+- **频率**：6 Hz 对桌面臂够用，但对动态平衡人形仍偏紧（MotionWAM 用 one-shot imagination 和更大 motion latent 进一步压缩 Video DiT 开销）。
+
+这些 gap 基本就是 [MotionWAM](./03-MotionWAM.mdx) 要填的清单。
+
+</WordCount>

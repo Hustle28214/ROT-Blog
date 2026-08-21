@@ -1,0 +1,111 @@
+import WordCount from '../../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+# TD-MPC：短视野 latent 规划，不用树搜索
+
+我的结论：TD-MPC 把 MuZero 的 value equivalence 搬到了连续控制，但换掉了 MCTS，改成 3 步 latent rollout + MPPI 采样优化。它学的东西跟 MuZero 一样——encoder、latent 动力学、奖励、价值——全部用 TD 目标训，不重建观测。对机器人来说，这是第一条真正以控制频率为设计约束的 latent 世界模型路线。
+
+前一篇 [MuZero](./01-MuZero.mdx) 用树搜索证明了 value equivalence 能 work；MuZero 的 MCTS 在连续控制上算力爆炸，真机更跑不动。后一篇 [TD-MPC2](./03-TD-MPC2.mdx) 在此基础上做了 scaling。TD-MPC 是这条线的"第一版可用形态"。
+
+## 1. 它要解决什么问题
+
+连续控制的三个痛点叠在一起：
+
+1. **MCTS 不适用**。动作空间连续，分支因子无穷，MuZero 那套 UCT 展开直接失效。
+2. **长视野 rollout 误差累积**。latent 动力学每推一步都有误差，滚 50 步跟真实轨迹差很远。MuZero 靠 MCTS 的多条路径平均部分缓解，但计算代价太高。
+3. **样本效率**。model-free 方法如 SAC 在 DMControl 上需要百万步交互；model-based 方法如果能用想象数据，理论上可以少得多。
+
+TD-MPC 的设计哲学：既然长 rollout 不可靠，那就只滚很短（默认 $H=3$），剩下的交给终端价值函数。规划用采样式方法（MPPI）代替树搜索，速度够快，能在控制周期内跑完。
+
+## 2. 模型结构
+
+四个网络，全部在 latent 空间操作：
+
+- **Encoder** $z_t = h_\theta(o_t)$：把当前观测映射到 latent（MLP 或 CNN，取决于输入类型）；
+- **Dynamics** $\tilde z_{t+1} = d_\theta(z_t, a_t)$：一步 latent 转移；
+- **Reward** $\hat r_t = R_\theta(z_t, a_t)$：预测即时奖励；
+- **Value + Policy** $Q_\theta(z, a)$ 和 $\pi_\psi(z)$：状态-动作价值和策略先验。
+
+注意没有 decoder——跟 [MuZero](./01-MuZero.mdx) 一样，latent 不需要还原观测。
+
+## 3. 训练：全 TD，无重建
+
+四个损失项，全部基于 TD 目标：
+
+**奖励预测**（监督）：
+
+$$
+\mathcal{L}_R = \|\hat r_t - r_t\|^2
+$$
+
+**Q 函数**（TD 目标）：
+
+$$
+\mathcal{L}_Q = \big\|Q_\theta(z_t, a_t) - \big(r_t + \gamma Q_{\bar\theta}(z_{t+1}, \pi_\psi(z_{t+1}))\big)\big\|^2
+$$
+
+**Consistency**（latent 动力学对齐 encoder）：
+
+$$
+\mathcal{L}_{\mathrm{cons}} = \|d_\theta(z_t, a_t) - \mathrm{sg}\big(h_\theta(o_{t+1})\big)\|^2
+$$
+
+sg 是 stop-gradient。这一项逼动力学推出来的 $\tilde z_{t+1}$ 跟真实下一帧的 encoder 输出一致——latent 被"锚定"在真实观测上，比 MuZero 纯靠 value equivalence 多了一层约束，但仍然不要求重建像素。
+
+**Policy**（最大化 Q）：
+
+$$
+\mathcal{L}_\pi = -Q_\theta(z_t, \pi_\psi(z_t))
+$$
+
+目标网络 $\bar\theta$ 慢更新，标准 TD3/SAC 做法。
+
+## 4. 规划：短视野 MPC + MPPI
+
+每步控制时，在 latent 里做 $H$ 步 MPC（默认 $H=3$）：
+
+$$
+\max_{a_{t:t+H-1}} \; \mathbb{E}\Big[\sum_{k=0}^{H-1}\gamma^k \hat R(\tilde z_{t+k}, a_{t+k}) + \gamma^H Q_\theta(\tilde z_{t+H}, \pi_\psi(\tilde z_{t+H}))\Big]
+$$
+
+其中 $\tilde z_{t+k+1} = d_\theta(\tilde z_{t+k}, a_{t+k})$，$\tilde z_t = h_\theta(o_t)$。
+
+优化用 MPPI（Model Predictive Path Integral）：从高斯分布采样 $N$ 条动作序列，在 latent 里 rollout，按累积回报加权更新均值和方差，迭代几轮。关键加速：用学到的策略 $\pi_\psi$ 初始化采样分布的均值，大幅减少需要的采样数。
+
+只执行第一个动作 $a_t^*$，下一步重新观测、重新规划——标准 receding horizon MPC。
+
+## 5. 实验结果
+
+Hansen 等 2022 年（[arXiv:2203.04955](https://arxiv.org/abs/2203.04955)）在 DMControl 和 Meta-World 上测试：
+
+| 基准 | 成绩 |
+|------|------|
+| DMControl（dog, humanoid 等） | 样本效率超 SAC、DreamerV2，最终回报持平或更好 |
+| Meta-World（50 任务） | 多任务训练下超过 MBPO、DreamerV2 |
+| 真实机器人（Sawyer 推块） | sim-to-real 零样本迁移成功 |
+
+最亮眼的是样本效率：同样达到最高回报，TD-MPC 用的环境交互步数通常是 model-free 方法的 1/5 到 1/10。consistency loss 是稳定训练的关键——去掉它，latent 动力学很快漂移。
+
+Planning horizon 的消融很值得看：$H=1$ 太近视，$H=5$ 以上反而因为误差累积变差。$H=3$ 是那个 sweet spot，后面 [TD-MPC2](./03-TD-MPC2.mdx) 默认值没变。
+
+## 6. 局限
+
+1. **短视野的本质限制**。$H=3$ 步之后全靠 $Q$ 函数兜底，$Q$ 的误差直接变成长期规划的误差。需要长期推理的任务（比如"先绕过障碍再抓取"）表现会掉。
+2. **单任务 / 少任务**。TD-MPC 原版每个任务（或每组相近任务）需要单独调超参，encoder 和 dynamics 也是 per-task 的。换一个新的机器人形态，得重新训。
+3. **latent 仍然不可视化**。有 consistency loss 锚定，比 MuZero 好一点，但还是没有 decoder，没法检查"模型想象的未来长什么样"。
+4. **MPPI 采样数**。即使用策略先验加速，每步控制仍需几十到几百次 dynamics 前向。比 MCTS 快很多，但对 1000 Hz 关节控制仍然偏紧。
+
+## 7. 跟 WAM 的关系
+
+TD-MPC 对 WAM 最直接的启示是**架构层面的**：
+
+**短视野 + 终端价值 = 控制可行的世界模型。** WAM 目前没有对应的终端价值设计——视频模型滚几步之后靠 action chunk 硬撑，chunk 结束后重新推理，等价于一个没有 $Q$ 函数的短视野 MPC。长时信息该由谁提供，目前没有好答案。
+
+**Consistency loss 是一个可能的锚点。** WAM 的 latent（比如 DiT 的中间特征）是否也应该被约束跟真实观测的 encoder 输出对齐？TD-MPC 用这一项稳定动力学而不重建像素，这个 trade-off 值得 WAM 借鉴。
+
+**闭环频率决定规划深度。** TD-MPC 选 $H=3$ 不是因为这个数字有什么魔力，而是因为更多步就跑不到控制周期里。[MotionWAM](../Video-Action Model/03-MotionWAM.mdx) 的"一次前向、不完整去噪"是同一个逻辑在扩散模型上的版本。
+
+系列脉络：[MuZero](./01-MuZero.mdx) 证明 value equivalence → TD-MPC 把它变成可部署的 MPC → [TD-MPC2](./03-TD-MPC2.mdx) 解决 scaling。下一篇看 TD-MPC2 怎么用一个 317M 模型覆盖 80 多个任务。
+
+</WordCount>

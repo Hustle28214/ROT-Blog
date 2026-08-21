@@ -4,6 +4,92 @@ sidebar_position: 3
 
 import VideoPlayer from '../../../../src/components/Videoplayer/Videoplayer.jsx';
 
+# 离散系统数学模型
+
+## 差分方程与脉冲传递函数
+
+线性定常离散系统可写为
+
+$$
+y[k]+a_1y[k-1]+\cdots+a_ny[k-n]
+=b_0u[k]+\cdots+b_mu[k-m].
+$$
+
+在零初始条件下作 z 变换，得到脉冲传递函数
+
+$$
+G(z)=\frac{Y(z)}{U(z)}
+=\frac{b_0+b_1z^{-1}+\cdots+b_mz^{-m}}
+{1+a_1z^{-1}+\cdots+a_nz^{-n}}.
+$$
+
+它描述“输入样值到输出样值”的关系，不等同于连续传递函数 $G(s)$。系统的单位脉冲响应 $g[k]$ 满足 $G(z)=\mathcal Z\{g[k]\}$，响应为离散卷积
+
+$$
+y[k]=\sum_{i=0}^{k}g[i]u[k-i].
+$$
+
+## 含 ZOH 的连续对象离散化
+
+连续对象为 $G_p(s)$，输入端有零阶保持器时，精确脉冲传递函数为
+
+$$
+G(z)=\mathcal Z\left\{
+\left.\mathcal L^{-1}\!\left[
+\frac{1-e^{-sT}}{s}G_p(s)\right]\right|_{t=kT}
+\right\}.
+$$
+
+利用移位性质，也常写成
+
+$$
+G(z)=(1-z^{-1})\,
+\mathcal Z\left\{\left.
+\mathcal L^{-1}\!\left[\frac{G_p(s)}{s}\right]
+\right|_{t=kT}\right\}.
+$$
+
+后一式的物理意义是：先对连续对象的单位阶跃响应采样，再取一阶差分。不能简单地把 $s$ 替换成某个 z 表达式来声称得到“精确 ZOH 模型”。
+
+## 闭环模型
+
+若前向通道为 $G(z)$、反馈为 $H(z)$，且各离散环节之间没有未显式处理的采样器，则
+
+$$
+\Phi(z)=\frac{C(z)}{R(z)}
+=\frac{G(z)}{1+G(z)H(z)},\qquad
+\Phi_e(z)=\frac{E(z)}{R(z)}
+=\frac{1}{1+G(z)H(z)}.
+$$
+
+特征方程为 $1+G(z)H(z)=0$。若连续环节之间夹有采样器，通常不能先在 s 域合并再整体离散化，因为采样会破坏普通连续传递函数的串联等价性。
+
+## 状态空间离散化
+
+对 $\dot x=Ax+Bu$，若每周期内输入由 ZOH 保持，则
+
+$$
+x[k+1]=A_dx[k]+B_du[k],\quad
+A_d=e^{AT},\quad
+B_d=\int_0^T e^{A\tau}B\,\mathrm d\tau,
+$$
+
+$$
+y[k]=Cx[k]+Du[k].
+$$
+
+离散极点是 $A_d$ 的特征值，并满足 $\lambda_d=e^{\lambda_cT}$。可控性、可观性分别检查
+
+$$
+\operatorname{rank}[B_d,A_dB_d,\ldots,A_d^{n-1}B_d]=n,
+$$
+
+$$
+\operatorname{rank}[C^\mathsf T,(CA_d)^\mathsf T,\ldots,(CA_d^{n-1})^\mathsf T]^\mathsf T=n.
+$$
+
+## 配套视频
+
 > 上
 
 <VideoPlayer src="//player.bilibili.com/player.html?isOutside=true&aid=811394492&bvid=BV1F34y1h7so&cid=718589757&p=63" />

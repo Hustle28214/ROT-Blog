@@ -1,3 +1,8 @@
+---
+title: 马尔可夫决策过程
+sidebar_position: 1
+---
+
 import WordCount from '../../../src/components/WordCount/WordCount';
 
 <WordCount>
@@ -7,8 +12,6 @@ import WordCount from '../../../src/components/WordCount/WordCount';
 想象你是一个机器人，在一个迷宫里寻找宝藏，同时要避开陷阱。每走一步，你都要决定“往哪走”——这就是一个**序贯决策问题**。  
 
 **马尔可夫决策过程**（Markov Decision Process, MDP）正是用来建模这类问题的数学框架。它的核心思想是：**只要知道现在在哪、能做什么、做了之后大概会发生什么、以及能得多少奖励，就足以做出最优决策**——不需要记住整个历史！
-
-
 ### 1.1 随机过程
 
 现实世界充满不确定性。比如天气：今天是晴天，明天可能是晴、雨或阴。这种随时间演变、带有随机性的系统，就叫**随机过程**。  
@@ -31,12 +34,7 @@ $$
 
 ### 1.3 马尔可夫过程
 
-
-
-马尔可夫过程（Markov process）指具有马尔可夫性质的随机过程，也被称为马尔可夫链（Markov chain）。
-
-一个满足马尔可夫性质的随机过程，就叫**马尔可夫过程**（Markov Process），也称**马尔可夫链**。  
-它由两个要素定义：
+一个满足马尔可夫性质的随机过程，就叫**马尔可夫过程**（Markov process），也称**马尔可夫链**（Markov chain）。它由两个要素定义：
 - **状态空间** $\mathcal{S}$：所有可能状态的集合（如 \{晴, 雨, 阴\}）
 - **状态转移概率矩阵** $P$，其中：
 
@@ -102,7 +100,7 @@ $$
 - 当 $\gamma \to 0$ 时，智能体更关注**短期奖励**；  
 - 当 $\gamma \to 1$ 时，智能体更重视**长期累计奖励**。
 
-### 2.1 回报(Return)
+### 2.1 回报（Return）
 
 在一个马尔可夫奖励过程中，从第 $t$ 时刻状态 $s_t$ 开始，直到终止状态时，所有奖励的**衰减之和**称为**回报**（Return），公式如下：
 
@@ -150,7 +148,7 @@ print("根据本序列计算得到回报为：%s。" % G)
 根据本序列计算得到回报为：-2.5。
 ```
 
-### 2.2 价值函数(Value Function)
+### 2.2 价值函数（Value Function）
 
 在马尔可夫奖励过程中，一个状态的**期望回报**（即从该状态出发的未来折扣累积奖励的期望）被称为该状态的**价值**（value）。所有状态的价值构成**价值函数**（value function），其输入为状态 $s$，输出为该状态的价值，记作 $V(s)$。
 
@@ -275,11 +273,9 @@ if __name__ == "__main__":
     print("各状态的价值函数 v =", v)
 ```
 
-## 3.马尔可夫决策过程
+## 3. 马尔可夫决策过程
 
-马尔可夫过程和马尔可夫奖励过程都是自发改变的随机过程。但实际上我们可能还需要引入一个外部刺激的概念，称为智能体的**动作**（action）。动作参与共同改变这个随机过程，就有了马尔可夫决策过程（Markov decision process，MDP）
-
-在马尔可夫奖励过程（MRP）的基础上加入动作，就得到了马尔可夫决策过程（MDP）。
+马尔可夫过程和马尔可夫奖励过程都是自发演化的随机过程。在马尔可夫奖励过程（MRP）的基础上引入智能体的**动作**（action），使动作参与状态演化，就得到了马尔可夫决策过程（Markov decision process，MDP）。
 
 向四元组 $(\mathcal{S}, P, R, \gamma)$ 中加入动作空间 $\mathcal{A}$，以及状态转移概率和奖励函数都依赖于动作，得到马尔可夫决策过程的五元组定义：$(\mathcal{S}, \mathcal{A}, P, R, \gamma)$，其中：
 
@@ -317,7 +313,7 @@ $$
 
 <p/>
 
-### 3.1 策略(Policy)
+### 3.1 策略（Policy）
 
 在马尔可夫决策过程（MDP）中，智能体的策略（Policy）通常用符号 $\pi$ 表示。策略是一个函数，它根据当前状态输出动作的概率分布。具体而言，对于给定的状态 $s$，策略 $\pi$ 指定了采取每个动作 $a$ 的概率 $\pi(a \mid s)$。策略可以分为两类：
 - **确定性策略（Deterministic Policy）**：在每个状态 $s$ 下，只输出一个确定性的动作，即该动作的概率为 1，其他动作的概率为 0。
@@ -595,7 +591,7 @@ print("使用蒙特卡洛方法计算MDP的状态价值为\n", V)
 ```
 用蒙特卡洛方法估计得到的状态价值和我们用 MRP 解析解得到的状态价值是很接近的。
 
-## 5. 占用度量(Word Count)
+## 5. 占用度量（Occupancy Measure）
 
 在开始介绍占用度量之前，我们先引入状态分布的概念。
 
@@ -748,7 +744,7 @@ class OccupancyMeasureEstimator:
         total_visits = 0
         
         for episode in range(num_episodes):
-            state = self.env.reset()
+            state, _ = self.env.reset()
             done = False
             step = 0
             
@@ -768,7 +764,8 @@ class OccupancyMeasureEstimator:
                 total_visits += 1
                 
                 # 执行动作
-                next_state, reward, done, _ = self.env.step(action)
+                next_state, reward, terminated, truncated, _ = self.env.step(action)
+                done = terminated or truncated
                 state = next_state
                 step += 1
         
@@ -802,7 +799,7 @@ class OccupancyMeasureEstimator:
         total_discounted_weight = 0
         
         for episode in range(num_episodes):
-            state = self.env.reset()
+            state, _ = self.env.reset()
             done = False
             step = 0
             discount = 1.0  # γ^0 = 1
@@ -821,7 +818,8 @@ class OccupancyMeasureEstimator:
                 total_discounted_weight += discount
                 
                 # 执行动作
-                next_state, reward, done, _ = self.env.step(action)
+                next_state, reward, terminated, truncated, _ = self.env.step(action)
+                done = terminated or truncated
                 state = next_state
                 step += 1
                 discount *= self.gamma  # 更新折扣因子
@@ -939,9 +937,11 @@ if __name__ == "__main__":
             self.state = 0
             self.goal = size * size - 1
             
-        def reset(self):
+        def reset(self, *, seed=None, options=None):
+            if seed is not None:
+                np.random.seed(seed)
             self.state = 0
-            return self.state
+            return self.state, {}
             
         def step(self, action):
             # 动作: 0=上, 1=右, 2=下, 3=左
@@ -959,10 +959,10 @@ if __name__ == "__main__":
                 
             self.state = row * self.size + col
             
-            done = (self.state == self.goal)
-            reward = 1.0 if done else 0.0
+            terminated = (self.state == self.goal)
+            reward = 1.0 if terminated else 0.0
             
-            return self.state, reward, done, {}
+            return self.state, reward, terminated, False, {}
     
     # 创建环境和估计器
     env = SimpleGridWorld(size=3)
@@ -1076,8 +1076,6 @@ $$
 
 结合两个不等式，我们得到 $V^*(s) = \max_a Q^*(s, a)$。
 
-结合两个不等式，我们得到 $V^*(s) = \max_a Q^*(s, a)$。
-
 **定理 2**：最优动作价值的贝尔曼方程
 $$Q^*(s, a) = R(s, a) + \gamma \sum_{s'} P(s' \mid s, a) V^*(s')$$
 
@@ -1109,9 +1107,9 @@ Q^*(s, a) &= R(s, a) + \gamma \sum_{s'} P(s' \mid s, a) V^*(s') \\
 \end{align*}
 $$
 
-## References
+## 7. 参考文献
 
-[1].  张伟楠，沈键，俞勇.动手学强化学习.\[EB/OL\](2022-07-02)\[2025-10-19\].https://hrl.boyuai.com/chapter/1/%E5%88%9D%E6%8E%A2%E5%BC%BA%E5%8C%96%E5%AD%A6%E4%B9%A0
+[1] 张伟楠，沈键，俞勇.《动手学强化学习》[EB/OL]. 2022-07-02. https://hrl.boyuai.com/chapter/1/%E5%88%9D%E6%8E%A2%E5%BC%BA%E5%8C%96%E5%AD%A6%E4%B9%A0
 
 [2] SUTTON R S, BARTO A G. Reinforcement learning: an introduction [M]. Cambridge:MIT press, 2018.
 

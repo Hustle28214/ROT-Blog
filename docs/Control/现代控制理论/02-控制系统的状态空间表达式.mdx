@@ -7,42 +7,297 @@ import VideoPlayer from '../../../src/components/Videoplayer/Videoplayer.jsx';
 
 <WordCount>
 
-## 1.1 状态变量及状态空间表达式
+# 控制系统的状态空间表达式
+
+本章解决两个问题：怎样从不同形式的已知模型构造状态空间表达式，以及不同状态坐标下的模型为什么仍表示同一个系统。默认讨论有限维连续时间 LTI 系统
+
+$$
+\dot{\boldsymbol{x}}=A\boldsymbol{x}+B\boldsymbol{u},\qquad
+\boldsymbol{y}=C\boldsymbol{x}+D\boldsymbol{u}.
+$$
+
+## 1.1 状态变量的选择与状态空间表达式
+
+### 1.1.1 选择状态变量的原则
+
+状态选择应满足：
+
+1. **充分性**：给定 $\boldsymbol{x}(t_0)$ 和 $t\geq t_0$ 的输入后，未来运动唯一确定。
+2. **独立性**：所选变量之间没有代数约束；冗余变量会引入奇异描述。
+3. **最少性**：在保持充分性的前提下尽量少。对无极零消去的 $n$ 阶传递函数，最小实现有 $n$ 个状态。
+4. **便利性**：优先选储能元件变量或积分器输出，例如机械系统的位置、速度，电路中的电容电压、电感电流。
+
+状态不要求能够直接测量。若某些状态不可测，后续可以用观测器估计。对同一系统，$\boldsymbol{x}$ 与任意可逆线性组合都可作为状态，因此状态空间实现通常不唯一。
+
+若 $\boldsymbol{u}\in\mathbb{R}^m$、$\boldsymbol{x}\in\mathbb{R}^n$、$\boldsymbol{y}\in\mathbb{R}^p$，则
+
+$$
+A_{n\times n},\qquad B_{n\times m},\qquad
+C_{p\times n},\qquad D_{p\times m}.
+$$
+
+写完模型后先查维数，常能立即发现转置、漏项和输入排列错误。
 
 <VideoPlayer src="//player.bilibili.com/player.html?isOutside=true&aid=625409284&bvid=BV1Qt4y127ja&cid=184228554&p=2" />
 
 <br />
 
+## 1.2 状态空间表达式的模拟结构图
 
+状态方程可以看成由“加权求和—积分—反馈”组成。因为
 
-## 1.2 状态变量及状态空间表达式的模拟结构图
+$$
+\boldsymbol{x}(t)=\boldsymbol{x}(0)+
+\int_0^t\left(A\boldsymbol{x}(\tau)+B\boldsymbol{u}(\tau)\right)\mathrm{d}\tau,
+$$
+
+每个状态变量对应一个积分器输出；$A$ 将各状态反馈到积分器输入，$B$ 注入外部输入，$C,D$ 形成输出。这一观点给出从框图建模的直接规则：**将所有独立积分器输出依次选作状态。**
+
+<svg
+  viewBox="0 0 820 290"
+  role="img"
+  aria-label="状态空间模拟结构图，输入和状态经 B 与 A 汇入求和点，经过积分器产生状态，再经 C 与输入直通 D 汇合为输出"
+  style={{ width: '100%', maxWidth: '820px', color: 'var(--ifm-font-color-base, currentColor)' }}
+>
+  <defs>
+    <marker id="block-arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+      <path d="M0,0 L8,4 L0,8 Z" fill="currentColor" />
+    </marker>
+  </defs>
+  <g fill="var(--ifm-background-surface-color, transparent)" stroke="currentColor" strokeWidth="2">
+    <rect x="110" y="45" width="80" height="48" /><rect x="300" y="82" width="105" height="58" />
+    <rect x="485" y="82" width="115" height="58" /><rect x="485" y="205" width="80" height="48" />
+    <rect x="655" y="82" width="80" height="58" /><rect x="300" y="205" width="80" height="48" />
+  </g>
+  <text x="142" y="76" fill="currentColor" fontSize="20">B</text>
+  <text x="335" y="117" fill="currentColor" fontSize="20">Σ</text>
+  <text x="520" y="117" fill="currentColor" fontSize="20">1/s</text>
+  <text x="518" y="236" fill="currentColor" fontSize="20">A</text>
+  <text x="686" y="117" fill="currentColor" fontSize="20">C</text>
+  <text x="332" y="236" fill="currentColor" fontSize="20">D</text>
+  <g fill="none" stroke="var(--ifm-color-primary, currentColor)" strokeWidth="3" markerEnd="url(#block-arrow)">
+    <path d="M35,69 L110,69" /><path d="M190,69 L270,69 L270,98 L300,98" />
+    <path d="M405,111 L485,111" /><path d="M600,111 L655,111" /><path d="M735,111 L790,111" />
+    <path d="M620,111 L620,230 L565,230" /><path d="M485,230 L425,230 L425,130 L405,130" />
+    <path d="M75,69 L75,230 L300,230" /><path d="M380,230 L765,230 L765,130 L735,130" />
+  </g>
+  <text x="18" y="57" fill="currentColor" fontSize="18">u</text>
+  <text x="438" y="100" fill="currentColor" fontSize="17">ẋ</text>
+  <text x="612" y="96" fill="currentColor" fontSize="17">x</text>
+  <text x="792" y="106" fill="currentColor" fontSize="18">y</text>
+</svg>
+
+图只表示矩阵信号关系；当 $n>1$ 时，积分器方框代表 $n$ 个并行积分器。
 
 <VideoPlayer src="//player.bilibili.com/player.html?isOutside=true&aid=625409284&bvid=BV1Qt4y127ja&cid=184228667&p=3" />
 
 <br />
-## 1.3 状态空间表达式的建立（上）
+## 1.3 从框图与系统机理建立模型
 
 ### 1.3.1 从系统框图建立状态空间表达式
+
+步骤如下：
+
+1. 将每个独立积分器输出标为 $x_i$；
+2. 沿信号方向写出各积分器输入，即 $\dot x_i$；
+3. 收集 $\dot x_i$ 中各状态与各输入的系数，组成 $A,B$；
+4. 由输出求和点写出 $C,D$。
+
+**例 1：两积分器结构。** 若框图关系为
+
+$$
+\dot x_1=x_2,\qquad
+\dot x_2=-2x_1-3x_2+u,\qquad y=x_1,
+$$
+
+则
+
+$$
+A=\begin{bmatrix}0&1\\-2&-3\end{bmatrix},\quad
+B=\begin{bmatrix}0\\1\end{bmatrix},\quad
+C=\begin{bmatrix}1&0\end{bmatrix},\quad D=0.
+$$
+
+核算方法：消去 $x_2$ 得 $\ddot y+3\dot y+2y=u$，与框图代表的二阶关系一致。
 
 <VideoPlayer src="//player.bilibili.com/player.html?isOutside=true&aid=625409284&bvid=BV1Qt4y127ja&cid=184228723&p=4" />
 
 <br />
 ### 1.3.2 从系统机理建立状态空间表达式
 
+从机理建模时，先列守恒定律，再选择储能变量。以第 1 章的质量—弹簧—阻尼器为例：
+
+$$
+m\ddot q+c\dot q+kq=u.
+$$
+
+取 $x_1=q,\ x_2=\dot q$，输出同时测量位移与速度，即
+$\boldsymbol{y}=\begin{bmatrix}q&\dot q\end{bmatrix}^{\mathsf T}$，可得
+
+$$
+\dot{\boldsymbol{x}}=
+\begin{bmatrix}
+0&1\\-k/m&-c/m
+\end{bmatrix}\boldsymbol{x}
++
+\begin{bmatrix}0\\1/m\end{bmatrix}u,
+\qquad
+\boldsymbol{y}=
+\begin{bmatrix}1&0\\0&1\end{bmatrix}\boldsymbol{x}.
+$$
+
+这里 $n=2,m=1,p=2$，所以 $B$ 有一列而 $C$ 有两行。令 $m=1,c=3,k=2$ 时，特征方程为
+
+$$
+\det(sI-A)=
+\det\begin{bmatrix}s&-1\\2&s+3\end{bmatrix}
+=s^2+3s+2=(s+1)(s+2).
+$$
+
+两个模态均衰减，与有阻尼系统的物理直觉相符。
+
 <VideoPlayer src="//player.bilibili.com/player.html?isOutside=true&aid=625409284&bvid=BV1Qt4y127ja&cid=184228782&p=5" />
 
-## 1.4 状态空间表达式的建立（下）
+## 1.4 从微分方程与传递函数建立模型
 
-### 1.4.1 传递函数中无零点时的实现
+### 1.4.1 从高阶微分方程降阶
 
+对单输入单输出方程
+
+$$
+y^{(n)}+a_1y^{(n-1)}+\cdots+a_ny=b\,u,
+$$
+
+若右端不含输入的导数，可取
+
+$$
+x_1=y,\quad x_2=\dot y,\quad\ldots,\quad x_n=y^{(n-1)}.
+$$
+
+前 $n-1$ 个方程是 $\dot x_i=x_{i+1}$，最后一个由原微分方程给出。若右端含 $\dot u,\ddot u$，机械地选输出各阶导数可能使状态方程含输入导数；更稳妥的方法是先求传递函数，再构造标准实现，或从物理储能变量出发。
+
+### 1.4.2 传递函数中无零点时的实现
+
+对
+
+$$
+G(s)=\frac{b}{s^n+a_1s^{n-1}+\cdots+a_n},
+$$
+
+一种能控标准型实现为
+
+$$
+A_c=
+\begin{bmatrix}
+0&1&0&\cdots&0\\
+0&0&1&\cdots&0\\
+\vdots&\vdots&\vdots&\ddots&\vdots\\
+0&0&0&\cdots&1\\
+-a_n&-a_{n-1}&-a_{n-2}&\cdots&-a_1
+\end{bmatrix},\quad
+B_c=\begin{bmatrix}0\\0\\\vdots\\0\\1\end{bmatrix},\quad
+C_c=\begin{bmatrix}b&0&\cdots&0\end{bmatrix},\quad D=0.
+$$
+
+不同教材可能采用转置或逆序排列的“标准型”；只要代回传递函数验证，就不会被记号差异误导。
 
 <VideoPlayer src="//player.bilibili.com/player.html?isOutside=true&aid=625409284&bvid=BV1Qt4y127ja&cid=184228879&p=6" />
 
-### 1.4.2 传递函数中有零点时的实现
+### 1.4.3 传递函数中有零点：能控与能观标准型
+
+设严格真有理传递函数为
+
+$$
+G(s)=
+\frac{b_0s^{n-1}+b_1s^{n-2}+\cdots+b_{n-1}}
+{s^n+a_1s^{n-1}+\cdots+a_n}.
+$$
+
+仍取上面的 $A_c,B_c$，令
+
+$$
+C_c=\begin{bmatrix}b_{n-1}&b_{n-2}&\cdots&b_0\end{bmatrix},\qquad D=0,
+$$
+
+便得到能控标准型。由对偶关系，一种能观标准型是
+
+$$
+A_o=A_c^{\mathsf T},\qquad
+B_o=C_c^{\mathsf T},\qquad
+C_o=B_c^{\mathsf T},\qquad D=0.
+$$
+
+**例 2：标准型可核算。** 对
+
+$$
+G(s)=\frac{2s+5}{s^2+3s+2},
+$$
+
+能控标准型为
+
+$$
+A_c=\begin{bmatrix}0&1\\-2&-3\end{bmatrix},\quad
+B_c=\begin{bmatrix}0\\1\end{bmatrix},\quad
+C_c=\begin{bmatrix}5&2\end{bmatrix},\quad D=0.
+$$
+
+因为
+
+$$
+(sI-A_c)^{-1}B_c
+=\frac{1}{s^2+3s+2}\begin{bmatrix}1\\s\end{bmatrix},
+$$
+
+左乘 $C_c$ 正好得到 $(2s+5)/(s^2+3s+2)$。
+
+若分子与分母同阶，应先作多项式除法得到直通项 $D$。例如
+
+$$
+\frac{2s^2+s+1}{s^2+3s+2}
+=2+\frac{-5s-3}{s^2+3s+2},
+$$
+
+所以 $D=2$，再对严格真有理余项构造 $A,B,C$。
 
 <VideoPlayer src="//player.bilibili.com/player.html?isOutside=true&aid=625409284&bvid=BV1Qt4y127ja&cid=184228984&p=7" />
 
-### 1.4.3 多输入多输出系统微分方程的实现
+### 1.4.4 多输入多输出系统表达式
+
+MIMO 模型仍使用同一组方程，只是 $B,C,D$ 不再是单列或单行。设两质量块状态为
+
+$$
+\boldsymbol{x}=
+\begin{bmatrix}q_1&\dot q_1&q_2&\dot q_2\end{bmatrix}^{\mathsf T},
+\quad
+\boldsymbol{u}=\begin{bmatrix}u_1&u_2\end{bmatrix}^{\mathsf T},
+\quad
+\boldsymbol{y}=\begin{bmatrix}q_1&q_2\end{bmatrix}^{\mathsf T}.
+$$
+
+若两个相同质量 $m$ 分别由刚度 $k$ 的弹簧接地，并由刚度 $k_c$ 的弹簧相连，忽略阻尼，则
+
+$$
+A=
+\begin{bmatrix}
+0&1&0&0\\
+-(k+k_c)/m&0&k_c/m&0\\
+0&0&0&1\\
+k_c/m&0&-(k+k_c)/m&0
+\end{bmatrix},
+\quad
+B=
+\begin{bmatrix}
+0&0\\1/m&0\\0&0\\0&1/m
+\end{bmatrix},
+$$
+
+$$
+C=
+\begin{bmatrix}1&0&0&0\\0&0&1&0\end{bmatrix},
+\qquad D=0_{2\times2}.
+$$
+
+$B$ 的第 $j$ 列表示第 $j$ 个输入对所有状态导数的作用，$C$ 的第 $i$ 行表示第 $i$ 个输出如何由状态组成。
 
 <VideoPlayer src="//player.bilibili.com/player.html?isOutside=true&aid=625409284&bvid=BV1Qt4y127ja&cid=184228968&p=8" />
 
@@ -50,27 +305,232 @@ import VideoPlayer from '../../../src/components/Videoplayer/Videoplayer.jsx';
 
 ### 1.5.1 系统状态空间表达式的非唯一性
 
+令原状态与新状态满足
+
+$$
+\boldsymbol{x}=T\boldsymbol{z},\qquad \det(T)\neq0.
+$$
+
+代入原方程并左乘 $T^{-1}$，得到
+
+$$
+\dot{\boldsymbol{z}}=
+\underbrace{T^{-1}AT}_{\bar A}\boldsymbol{z}
++
+\underbrace{T^{-1}B}_{\bar B}\boldsymbol{u},
+\qquad
+\boldsymbol{y}=
+\underbrace{CT}_{\bar C}\boldsymbol{z}
++D\boldsymbol{u}.
+$$
+
+因此
+
+$$
+(\bar A,\bar B,\bar C,\bar D)
+=(T^{-1}AT,\ T^{-1}B,\ CT,\ D).
+$$
+
+这称为相似变换。最常见的错误是只变换 $A$ 而忘记同步变换 $B,C$，或在 $\boldsymbol{x}=T\boldsymbol{z}$ 与 $\boldsymbol{z}=T\boldsymbol{x}$ 两种约定间混用公式。
+
+**例 3：坐标变换。** 取
+
+$$
+A=\begin{bmatrix}0&1\\-2&-3\end{bmatrix},\quad
+B=\begin{bmatrix}0\\1\end{bmatrix},\quad
+C=\begin{bmatrix}1&0\end{bmatrix}.
+$$
+
+$A$ 对应特征值 $-1,-2$ 的特征向量可取
+$\boldsymbol{v}_1=\begin{bmatrix}1&-1\end{bmatrix}^{\mathsf T}$、
+$\boldsymbol{v}_2=\begin{bmatrix}1&-2\end{bmatrix}^{\mathsf T}$。令
+
+$$
+T=\begin{bmatrix}1&1\\-1&-2\end{bmatrix},
+$$
+
+则
+
+$$
+\bar A=T^{-1}AT=\begin{bmatrix}-1&0\\0&-2\end{bmatrix},\quad
+\bar B=T^{-1}B=\begin{bmatrix}1\\-1\end{bmatrix},\quad
+\bar C=CT=\begin{bmatrix}1&1\end{bmatrix}.
+$$
+
+两组坐标下的矩阵不同，但输入—输出行为相同。
+
 <VideoPlayer src="//player.bilibili.com/player.html?isOutside=true&aid=625409284&bvid=BV1Qt4y127ja&cid=184229042&p=9" />
 
-### 1.5.2 系统特征值的不变性及系统的不变性
+### 1.5.2 特征值与传递函数的不变量
+
+相似矩阵有相同的特征多项式：
+
+$$
+\det(sI-\bar A)
+=\det\!\left(T^{-1}(sI-A)T\right)
+=\det(sI-A).
+$$
+
+因此特征值、行列式、迹和特征多项式在相似变换下不变。传递函数也不变，因为
+
+$$
+\bar C(sI-\bar A)^{-1}\bar B+D
+=CT\left[T^{-1}(sI-A)T\right]^{-1}T^{-1}B+D
+=C(sI-A)^{-1}B+D.
+$$
+
+必须区分两句话：
+
+- $A$ 的每个特征值都是内部模态；
+- 传递函数的极点只显示既能由输入激发又能由输出观察到的模态。
+
+若实现不是最小实现，不能控或不能观模态可能在传递函数中被极零消去，所以 $A$ 的特征值集合未必等于化简后传递函数的极点集合。
 
 <VideoPlayer src="//player.bilibili.com/player.html?isOutside=true&aid=625409284&bvid=BV1Qt4y127ja&cid=184229018&p=10" />
 
-### 1.5.3 状态空间表达式变换为约旦标准型（上）
+### 1.5.3 对角标准型
+
+若 $A$ 有 $n$ 个线性无关的右特征向量
+$\boldsymbol{v}_1,\ldots,\boldsymbol{v}_n$，令
+
+$$
+T=\begin{bmatrix}\boldsymbol{v}_1&\cdots&\boldsymbol{v}_n\end{bmatrix},
+$$
+
+则
+
+$$
+T^{-1}AT=\operatorname{diag}(\lambda_1,\ldots,\lambda_n).
+$$
+
+在模态坐标下，无输入状态方程分解成
+$\dot z_i=\lambda_i z_i$，每个状态分量对应一个独立模态。实矩阵若有共轭复特征值，可以在复数域对角化；若希望保持实坐标，通常使用对应的 $2\times2$ 实块。
 
 
 <VideoPlayer src="//player.bilibili.com/player.html?isOutside=true&aid=625409284&bvid=BV1Qt4y127ja&cid=184229104&p=11" />
 
 
-### 1.5.4 状态空间表达式变换为约旦标准型（中）
+### 1.5.4 约旦标准型
+
+有重复特征值并不必然不能对角化；关键是线性无关特征向量是否足够。若不足，只能化为约旦标准型。一个大小为 $r$ 的约旦块为
+
+$$
+J_r(\lambda)=
+\begin{bmatrix}
+\lambda&1&0&\cdots&0\\
+0&\lambda&1&\cdots&0\\
+\vdots&\vdots&\ddots&\ddots&\vdots\\
+0&0&\cdots&\lambda&1\\
+0&0&\cdots&0&\lambda
+\end{bmatrix}.
+$$
+
+广义特征向量链满足
+
+$$
+(A-\lambda I)\boldsymbol{v}_1=0,\qquad
+(A-\lambda I)\boldsymbol{v}_{j+1}=\boldsymbol{v}_j.
+$$
+
+将各条链按顺序作为 $T$ 的列，便有 $T^{-1}AT=J$。不同教材可能把约旦块的 $1$ 放在次对角线；这只是基向量排列不同。
 
 <VideoPlayer src="//player.bilibili.com/player.html?isOutside=true&aid=625409284&bvid=BV1Qt4y127ja&cid=184229056&p=12" />
 
-### 1.5.5 状态空间表达式变换为约旦标准型（下）
+### 1.5.5 约旦块对应的时间响应
+
+约旦块不只是一种矩阵形式，它解释了重复模态为什么出现多项式因子。例如
+
+$$
+J=\begin{bmatrix}\lambda&1\\0&\lambda\end{bmatrix}
+=\lambda I+N,\qquad N^2=0,
+$$
+
+所以
+
+$$
+e^{Jt}=e^{\lambda t}e^{Nt}
+=e^{\lambda t}(I+Nt)
+=e^{\lambda t}
+\begin{bmatrix}1&t\\0&1\end{bmatrix}.
+$$
+
+因此响应中会出现 $te^{\lambda t}$。连续时间系统中，即使 $\operatorname{Re}(\lambda)<0$，该项最终仍衰减；若 $\operatorname{Re}(\lambda)=0$，非平凡约旦块会导致无界增长。
 
 <VideoPlayer src="//player.bilibili.com/player.html?isOutside=true&aid=625409284&bvid=BV1Qt4y127ja&cid=186766995&p=13" />
 
 ## 1.6 从状态空间表达式求传递函数阵
+
+对零初始状态作拉普拉斯变换：
+
+$$
+s\boldsymbol{X}(s)=A\boldsymbol{X}(s)+B\boldsymbol{U}(s).
+$$
+
+若 $sI-A$ 可逆，则
+
+$$
+\boldsymbol{X}(s)=(sI-A)^{-1}B\boldsymbol{U}(s),
+$$
+
+代入输出方程得到
+
+$$
+\boxed{
+G(s)=C(sI-A)^{-1}B+D
+}
+$$
+
+传递关系为 $\boldsymbol{Y}(s)=G(s)\boldsymbol{U}(s)$，MIMO 情形不能把它写成向量相除；
+$G(s)\in\mathbb{R}(s)^{p\times m}$，其中 $\mathbb{R}(s)$ 表示实系数有理函数集合。第 $(i,j)$ 个元素表示仅施加第 $j$ 个输入时，第 $i$ 个输出对它的传递函数。
+
+**例 4：贯穿模型的传递函数。** 对位移输出，
+
+$$
+A=\begin{bmatrix}0&1\\-k/m&-c/m\end{bmatrix},\quad
+B=\begin{bmatrix}0\\1/m\end{bmatrix},\quad
+C=\begin{bmatrix}1&0\end{bmatrix},\quad D=0.
+$$
+
+有
+
+$$
+sI-A=
+\begin{bmatrix}s&-1\\k/m&s+c/m\end{bmatrix},
+$$
+
+从而
+
+$$
+(sI-A)^{-1}B
+=
+\frac{1}{ms^2+cs+k}
+\begin{bmatrix}1\\s\end{bmatrix}.
+$$
+
+所以
+
+$$
+G(s)=\frac{Q(s)}{U(s)}=\frac{1}{ms^2+cs+k},
+$$
+
+与直接对 $m\ddot q+c\dot q+kq=u$ 在零初值下作拉普拉斯变换完全一致。
+
+### 本章常见误区
+
+1. **分母系数顺序写反。** 伴随矩阵最后一行按 $-a_n,\ldots,-a_1$ 排列；务必用 $C(sI-A)^{-1}B+D$ 复核。
+2. **漏掉直通项。** 分子分母同阶时一般 $D\neq0$，先作多项式除法。
+3. **把任意实现都称为最小实现。** 只有同时能控、能观的实现才是最小实现；本章尚未给出判据。
+4. **认为重复特征值必然形成约旦块。** 若仍有足够多独立特征向量，矩阵照样可以对角化。
+5. **坐标变换方向混乱。** 先在纸面明确写出 $\boldsymbol{x}=T\boldsymbol{z}$，再推导矩阵，避免死记。
+6. **忽略初值条件。** 公式 $G(s)=C(sI-A)^{-1}B+D$ 描述零初始状态下的输入—输出关系。
+
+### 复习检查
+
+- 能否从三阶微分方程选出三个状态并逐行写出 $A,B,C,D$？
+- 能否解释能控标准型和能观标准型为何互为对偶？
+- 给定可逆 $T$，能否同时正确计算 $\bar A,\bar B,\bar C,\bar D$？
+- 能否通过矩阵求逆独立核算一个二阶系统的传递函数？
+- 能否说明“特征值不变”为什么不等于“所有特征值都一定出现在化简后的传递函数极点中”？
 
 <VideoPlayer src="//player.bilibili.com/player.html?isOutside=true&aid=625409284&bvid=BV1Qt4y127ja&cid=184230209&p=14" />
 

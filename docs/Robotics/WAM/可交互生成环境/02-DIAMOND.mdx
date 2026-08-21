@@ -1,0 +1,90 @@
+import WordCount from '../../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+# DIAMOND：扩散世界模型，细节真的影响策略
+
+论文：[Diffusion for World Modeling: Visual Details Matter in Atari](https://arxiv.org/abs/2405.12399)（Alonso et al.，NeurIPS 2024 Spotlight）。我的结论：**在同样的 Atari 100k 预算下，把世界模型从离散 token 换成像素空间扩散，策略性能会实打实地涨**——HNS 从 IRIS 的 1.046 拉到 1.46，而且视觉质量肉眼可见地更干净。这不是"扩散比 Transformer 强"这么简单，而是同一任务上 controlled ablation 告诉我们：**世界模型的保真度会传导到策略性能**。
+
+上一篇 [IRIS](./01-IRIS.mdx) 用 VQ token 证明了想象训练可行；本篇是同一作者团队的直接进化。下一篇 [Genie](./03-Genie.mdx) 则换赛道——不再假设有 RL 动作标签，改从互联网视频里学可控性。
+
+## 1. 动机：离散 token 丢细节，策略真的在靠细节
+
+[IRIS](./01-IRIS.mdx) 把每帧压成 16 个离散 token。对大部分 Atari 场景够用，但某些游戏里"决定性细节"极小：
+
+- **Berzerk** 里的子弹，几个像素宽，移动极快；
+- **Asterix** 里的小敌人，token 化之后形状不稳定；
+- 任何需要精确空间定位的 reward shaping，都依赖这些高频结构。
+
+DIAMOND 的论点是：这些细节在 VQ 压缩里被平滑掉了，策略要么学不到关键特征，要么在想象环境里 exploit 量化伪影。扩散模型直接在像素空间做条件生成，不经过离散 bottleneck——如果细节 matter，这里应该能看到差距。实验确实看到了。
+
+## 2. 架构：动作条件的扩散动力学
+
+DIAMOND（DIffusion As a Model Of eNvironment Dreams）的世界模型是一个 **action-conditioned diffusion model**：
+
+- 输入：上一帧观测 $x_t$ 和动作 $a_t$；
+- 输出：下一帧 $x_{t+1}$ 的去噪预测；
+- 训练：标准扩散目标，在 Atari 100k 收集的真实 $(x_t, a_t, x_{t+1})$ transition 上训练。
+
+关键工程选择（论文花了大量篇幅 ablate）：
+
+1. **EDM 参数化**（Karras et al.）。比原始 DDPM 参数化更适合少步采样——世界模型每步 rollout 都要生成一帧，采样太慢整条想象训练链路就不可用。
+2. **极少扩散步数**。推理时只用几步 denoising（论文报告 5 步量级），靠 EDM 的 noise schedule 和 preconditioning 保证质量。
+3. **自回归 rollout**。跟 IRIS 一样，一次只生成下一帧，历史帧作为条件——不是一次性生成整段视频。
+
+策略训练跟 IRIS 同框架：在扩散世界模型里 rollout，用 actor-critic 更新。真实环境只提供初始 100k 帧。
+
+## 3. 数字：1.46 HNS 意味着什么
+
+Atari 100k benchmark 上 DIAMOND 的成绩：
+
+- **Mean HNS = 1.46**，比人类平均水平高 46%；
+- 在"完全在 world model 内训练"的方法里是当时的 best；
+- 相对 [IRIS](./01-IRIS.mdx) 提升约 40%，相对 SimPLe、DreamerV2 等差距更大。
+
+更细的游戏级分析：提升最大的恰恰是那些"小物体、快运动"的游戏——跟"细节 matter"的论点一致。不是所有游戏都涨，但涨的游戏模式很清晰。
+
+## 4. CSGO：世界模型可以单独当游戏引擎
+
+Atari 实验证明了"保真度 → 策略性能"。CSGO 实验证明了"世界模型可以脱离 RL 单独存在"。
+
+DIAMOND 在 **87 小时 Counter-Strike: Global Offensive 静态 gameplay 录像**上训练了一个扩散世界模型——没有 RL，没有 reward，只有 $(x_t, a_t, x_{t+1})$ 的监督。推理时：
+
+- 人类或脚本给键盘鼠标动作；
+- 模型自回归生成下一帧；
+- 在 Dust II 地图上可以走、看、开枪，效果像一个神经游戏引擎。
+
+这个 demo 比 Atari 数字更有说服力：CSGO 是 3D 第一人称、高分辨率、动作空间连续——离散 token 世界模型根本没法直接搬过来。DIAMOND 的 playable world model 开源在 [diamond-wm.github.io](https://diamond-wm.github.io)，可以直接 `python src/play.py --pretrained` 试玩。
+
+## 5. 跟 IRIS 的 controlled comparison
+
+同一团队、同一 benchmark、同一 RL 框架，唯一大变量是世界模型生成方式：
+
+| | IRIS | DIAMOND |
+| --- | --- | --- |
+| 生成方式 | VQ token 自回归 | 像素扩散 |
+| HNS (100k) | 1.046 | 1.46 |
+| 视觉质量 | 块状伪影 | 明显更干净 |
+| 采样成本 | 中等（逐 token） | 较高（多步 denoising） |
+| 3D / 高分辨率 | 未验证 | CSGO demo |
+
+这个对比的价值在于干净——不是跨实验室比数字，而是同一套 pipeline 换生成器。我的 takeaway：**如果你的策略依赖视觉细节，世界模型的生成质量不是锦上添花，是硬约束**。这个结论在机器人上还没被同样干净地验证，但直觉上更危险——机械臂场景里毫米级偏差就可能导致 grasp 失败。
+
+## 6. 代价与局限
+
+扩散不是免费的午餐：
+
+- **采样延迟**。即使压到 5 步，每帧生成仍比 token 自回归慢一个量级。想象训练要 rollout 几百万步，wall-clock 成本显著上升。
+- **误差累积**。自回归 rollout 里，上一帧的生成误差会作为下一帧的条件传下去。扩散比 token 单帧质量高，但长 horizon 漂移仍然存在——CSGO demo 里走远了场景还是会糊。
+- **数据域**。Atari 和 CSGO 都是游戏，物理规则相对简单、训练分布封闭。换到真实机器人视频，扩散模型的计算量和数据需求都是另一个量级。
+- **没有公开 scaling law**。11B 参数的 Genie 和 DIAMOND 的扩散 U-Net 不在同一个 scale 上对话——大模型 + 扩散 world model 会是什么样，还不清楚。
+
+## 7. 在系列里的位置
+
+DIAMOND 回答的是 [IRIS](./01-IRIS.mdx) 留下的问题："token 化丢的信息到底影不影响策略？"——影响，而且可以通过换生成器量化地补回来。
+
+但它没解决 [Genie](./03-Genie.mdx) 要解决的更大瓶颈：**动作标签从哪来**。DIAMOND 和 IRIS 都假设有 $(x_t, a_t, x_{t+1})$ 三元组，Atari 和 CSGO 的 action 是已知的。互联网视频没有 action label，这条线需要 Genie 的 latent action 思路。
+
+放到 [WAM](../00-世界模型的起点与前沿.mdx) 语境里，DIAMOND 跟 [MotionWAM](../Video-Action Model/03-MotionWAM.mdx)、[DiT4DiT](../Video-Action Model/01-DiT4DiT.mdx) 共享"扩散/generative 建模"的工具箱，但目标不同——DIAMOND 要的是可交互环境，后两者要的是动作生成。下一篇：[Genie](./03-Genie.mdx)。
+
+</WordCount>

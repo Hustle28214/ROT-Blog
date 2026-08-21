@@ -1,0 +1,391 @@
+import WordCount from '../../../src/components/WordCount/WordCount.jsx';
+
+<WordCount>
+
+## 1. 方差分析的基本思想
+
+方差分析（analysis of variance, ANOVA）研究多个总体均值是否相等。它并不是直接比较每一对均值，而是把观测值的总波动拆成若干来源，再比较“组间波动”和“组内波动”的相对大小。
+
+设第 $i$ 组有 $n_i$ 个观测，总样本量为 $n=\sum_{i=1}^a n_i$。记
+
+$$\bar X_{i\cdot}=\frac{1}{n_i}\sum_{j=1}^{n_i}X_{ij}, \qquad \bar X_{\cdot\cdot}=\frac{1}{n}\sum_{i=1}^a\sum_{j=1}^{n_i}X_{ij}.$$
+
+若各组均值相差很小，组间波动应与随机误差造成的组内波动处于同一数量级；若组间波动显著更大，则有理由怀疑总体均值并不全相等。
+
+:::info 与假设检验的关系
+
+ANOVA 给出的总体 $F$ 检验只回答“均值是否全部相等”，拒绝原假设后还需通过预先计划的对比或多重比较判断差异出现在哪里。
+
+:::
+
+## 2. 单因素方差分析
+
+### 2.1 模型与假设
+
+单因素模型写为
+
+$$X_{ij}=\mu+\alpha_i+\varepsilon_{ij}, \qquad i=1,\ldots,a,\quad j=1,\ldots,n_i,$$
+
+其中 $\mu$ 是总体水平，$\alpha_i$ 是第 $i$ 个水平的效应，$\varepsilon_{ij}$ 是随机误差。为使参数可识别，常规定
+
+$$\sum_{i=1}^a n_i\alpha_i=0.$$
+
+固定效应模型的经典假设为：
+
+1. **独立性**：各观测彼此独立；
+2. **正态性**：$\varepsilon_{ij}\sim N(0,\sigma^2)$；
+3. **方差齐性**：各组误差具有共同方差 $\sigma^2$；
+4. 因素水平由研究者关心并固定，推断对象就是这些水平。
+
+要检验的假设是
+
+$$H_0:\mu_1=\mu_2=\cdots=\mu_a \quad\Longleftrightarrow\quad \alpha_1=\cdots=\alpha_a=0,$$
+
+备择假设 $H_1$ 为：至少有两个总体均值不相等。
+
+:::warning 不能用多次普通 \(t\) 检验代替 ANOVA
+
+同时进行很多次显著性水平为 $\alpha$ 的检验，会使“至少犯一次第一类错误”的概率膨胀。总体 $F$ 检验先控制整体错误率，多重比较再对成对推断作校正。
+
+:::
+
+### 2.2 平方和分解
+
+每个观测对总均值的离差可以分解为
+
+$$X_{ij}-\bar X_{\cdot\cdot} = (\bar X_{i\cdot}-\bar X_{\cdot\cdot}) + (X_{ij}-\bar X_{i\cdot}).$$
+
+平方并求和，交叉项为零，得到
+
+$$\underbrace{\sum_{i=1}^a\sum_{j=1}^{n_i} (X_{ij}-\bar X_{\cdot\cdot})^2}_{SST} = \underbrace{\sum_{i=1}^a n_i (\bar X_{i\cdot}-\bar X_{\cdot\cdot})^2}_{SSA} + \underbrace{\sum_{i=1}^a\sum_{j=1}^{n_i} (X_{ij}-\bar X_{i\cdot})^2}_{SSE}.$$
+
+三项分别称为总平方和、因素平方和（组间平方和）和误差平方和（组内平方和）。相应自由度满足
+
+$$n-1=(a-1)+(n-a).$$
+
+均方为
+
+$$MSA=\frac{SSA}{a-1}, \qquad MSE=\frac{SSE}{n-a}.$$
+
+在 $H_0$ 成立时，二者都估计 $\sigma^2$；若组均值确有差异，$MSA$ 往往变大，而 $MSE$ 仍反映随机误差。
+
+### 2.3 \(F\) 检验
+
+检验统计量为
+
+$$F=\frac{MSA}{MSE}.$$
+
+在 $H_0$ 和经典模型假设下，
+
+$$F\sim F(a-1,n-a).$$
+
+这是右尾检验。在显著性水平 $\alpha$ 下，若
+
+$$F>F_{\alpha}(a-1,n-a),$$
+
+则拒绝 $H_0$。其中 $F_{\alpha}(\nu_1,\nu_2)$ 表示右尾概率为 $\alpha$ 的临界值；查表方法见[各种常用表](./各种常用表.mdx)。
+
+标准方差分析表可整理为：
+
+| 变异来源 | 平方和 | 自由度 | 均方 | 统计量 |
+| --- | ---: | ---: | ---: | ---: |
+| 因素 | $SSA$ | $a-1$ | $MSA$ | $MSA/MSE$ |
+| 误差 | $SSE$ | $n-a$ | $MSE$ |  |
+| 总计 | $SST$ | $n-1$ |  |  |
+
+### 2.4 例题
+
+某实验比较三种工艺，每种工艺测量 $4$ 次。计算得到
+
+$$SSA=24,\qquad SSE=18,\qquad a=3,\qquad n=12.$$
+
+于是
+
+$$MSA=\frac{24}{2}=12,\qquad MSE=\frac{18}{9}=2,\qquad F=6.$$
+
+应以分子自由度 $2$、分母自由度 $9$ 查询 $F$ 表或由软件求 $p$ 值。只有当 $6$ 超过所选显著性水平对应的右尾临界值时，才拒绝三种工艺均值相等的假设。
+
+:::tip 解题检查
+
+三个平方和应满足 $SST=SSA+SSE$，三个自由度也应满足 $n-1=(a-1)+(n-a)$。这两条等式能发现大量计算错误。
+
+:::
+
+### 2.5 多重比较
+
+总体检验显著后，可以研究均值差 $\mu_i-\mu_j$。常见方法包括：
+
+- **Tukey 法**：适合所有成对比较，控制族错误率；
+- **Bonferroni 法**：把整体显著性水平分配给有限个比较，简单而较保守；
+- **Dunnett 法**：多个处理组分别与同一对照组比较；
+- **计划对比**：研究前根据科学问题规定线性组合，通常比事后搜索更有解释力。
+
+均衡设计下，一般线性对比
+
+$$L=\sum_{i=1}^a c_i\mu_i,\qquad \sum_{i=1}^a c_i=0$$
+
+可用 $\hat L=\sum c_i\bar X_{i\cdot}$ 估计。具体临界值取决于采用的校正方法，不能把普通 $t$ 临界值直接用于任意数量的事后比较。
+
+### 2.6 假设不满足时
+
+独立性主要由实验设计保证，不能靠样本内检验“修复”。正态性可结合残差的 Q-Q 图判断；方差齐性可查看“残差—拟合值”图，或使用 Levene 检验等辅助方法。
+
+当样本量接近且无严重离群点时，ANOVA 对轻度非正态通常较稳健。方差明显不齐时可考虑 Welch ANOVA；数据为等级或分布严重偏斜时，可考虑变换或 Kruskal–Wallis 检验。方法选择应结合数据生成机制，而不只是机械地依据预检验结果。
+
+## 3. 双因素方差分析概念
+
+设因素 $A$ 有 $a$ 个水平，因素 $B$ 有 $b$ 个水平，每个组合有 $r$ 次重复。含交互作用的模型为
+
+$$X_{ijk} =\mu+\alpha_i+\beta_j+(\alpha\beta)_{ij}+\varepsilon_{ijk}.$$
+
+这里 $\alpha_i$、$\beta_j$ 分别表示两个因素的主效应，$(\alpha\beta)_{ij}$ 表示交互作用。
+
+交互作用意味着一个因素的效应随另一个因素的水平而改变。例如某教学方法只对低基础学生有效，却对高基础学生无明显作用，此时不能只用两个主效应概括结果。
+
+有重复且设计均衡时，平方和可分解为
+
+$$SST=SSA+SSB+SSAB+SSE,$$
+
+自由度分别为
+
+$$a-1,\quad b-1,\quad (a-1)(b-1),\quad ab(r-1).$$
+
+通常先检验交互作用。若交互作用显著，应分析简单效应，即固定一个因素水平后考察另一个因素，而不能脱离交互作用笼统解释主效应。
+
+:::info 无重复双因素设计
+
+每个水平组合只有一个观测时，交互作用与随机误差无法分离。教材中的“无重复双因素方差分析”一般默认交互作用可忽略，这一假设必须由研究背景支持。
+
+:::
+
+## 4. 一元线性回归
+
+### 4.1 模型与目标
+
+一元线性回归模型为
+
+$$Y_i=\beta_0+\beta_1x_i+\varepsilon_i,\qquad i=1,\ldots,n,$$
+
+其中 $x_i$ 通常视为给定常数，误差独立且满足
+
+$$E(\varepsilon_i)=0,\qquad \operatorname{Var}(\varepsilon_i)=\sigma^2.$$
+
+进行精确的小样本 $t$、$F$ 推断时，还假设 $\varepsilon_i\sim N(0,\sigma^2)$。$\beta_1$ 表示 $x$ 每增加一个单位时条件均值 $E(Y\mid x)$ 的平均变化量；它不是自动成立的因果效应。
+
+### 4.2 最小二乘与参数估计
+
+最小二乘法选择 $b_0,b_1$ 使残差平方和
+
+$$Q(b_0,b_1)=\sum_{i=1}^n(Y_i-b_0-b_1x_i)^2$$
+
+最小。令
+
+$$S_{xx}=\sum_{i=1}^n(x_i-\bar x)^2,\quad S_{xy}=\sum_{i=1}^n(x_i-\bar x)(Y_i-\bar Y),$$
+
+可得
+
+$$\hat\beta_1=\frac{S_{xy}}{S_{xx}}, \qquad \hat\beta_0=\bar Y-\hat\beta_1\bar x.$$
+
+拟合值和残差分别为
+
+$$\hat Y_i=\hat\beta_0+\hat\beta_1x_i, \qquad e_i=Y_i-\hat Y_i.$$
+
+最小二乘正规方程保证
+
+$$\sum_{i=1}^n e_i=0,\qquad \sum_{i=1}^n x_ie_i=0.$$
+
+误差方差的无偏估计是
+
+$$s^2=MSE=\frac{SSE}{n-2}, \qquad SSE=\sum_{i=1}^n e_i^2.$$
+
+### 4.3 方差分解与拟合优度
+
+回归中的离差分解为
+
+$$\underbrace{\sum_{i=1}^n(Y_i-\bar Y)^2}_{SST} = \underbrace{\sum_{i=1}^n(\hat Y_i-\bar Y)^2}_{SSR} + \underbrace{\sum_{i=1}^n(Y_i-\hat Y_i)^2}_{SSE}.$$
+
+决定系数
+
+$$R^2=\frac{SSR}{SST}=1-\frac{SSE}{SST}$$
+
+表示样本中 $Y$ 的总变异被线性模型解释的比例。一元含截距回归中，$R^2$ 等于样本相关系数的平方。
+
+:::warning \(R^2\) 不是模型正确性的证明
+
+高 $R^2$ 不能排除非线性、离群点、遗漏变量或外推风险；低 $R^2$ 也不意味着斜率没有科学意义。应把效应大小、区间估计和残差图一起报告。
+
+:::
+
+### 4.4 回归显著性检验
+
+检验线性关系是否显著通常写为
+
+$$H_0:\beta_1=0,\qquad H_1:\beta_1\ne 0.$$
+
+因为
+
+$$\operatorname{SE}(\hat\beta_1)=\frac{s}{\sqrt{S_{xx}}},$$
+
+所以
+
+$$t=\frac{\hat\beta_1}{s/\sqrt{S_{xx}}}\sim t(n-2)$$
+
+在 $H_0$ 下成立。等价的回归方差分析统计量为
+
+$$F=\frac{MSR}{MSE} =\frac{SSR/1}{SSE/(n-2)} \sim F(1,n-2),$$
+
+并且一元回归中 $F=t^2$。
+
+$\beta_1$ 的 $100(1-\alpha)\%$ 置信区间为
+
+$$\hat\beta_1 \pm t_{\alpha/2}(n-2)\frac{s}{\sqrt{S_{xx}}}.$$
+
+### 4.5 均值响应的置信区间
+
+在 $x=x_0$ 处，均值响应
+
+$$\mu_{Y\mid x_0}=\beta_0+\beta_1x_0$$
+
+的点估计为 $\hat Y_0=\hat\beta_0+\hat\beta_1x_0$，标准误为
+
+$$\operatorname{SE}(\hat Y_0) =s\sqrt{\frac{1}{n}+\frac{(x_0-\bar x)^2}{S_{xx}}}.$$
+
+因此置信区间为
+
+$$\hat Y_0\pm t_{\alpha/2}(n-2)s \sqrt{\frac{1}{n}+\frac{(x_0-\bar x)^2}{S_{xx}}}.$$
+
+### 4.6 单个新观测的预测区间
+
+若要预测 $x_0$ 处一个新的 $Y_{\mathrm{new}}$，还要加入新个体本身的随机误差，预测区间为
+
+$$\hat Y_0\pm t_{\alpha/2}(n-2)s \sqrt{1+\frac{1}{n}+\frac{(x_0-\bar x)^2}{S_{xx}}}.$$
+
+预测区间比同一点的均值响应置信区间更宽。两种区间在 $x_0=\bar x$ 附近最窄，远离样本中 $x$ 的中心时变宽。
+
+:::warning 谨慎外推
+
+上述公式在样本范围之外仍能算出数值，但线性关系未必继续成立。区间只反映模型内的不确定性，不能补偿错误的函数形式。
+
+:::
+
+### 4.7 例题
+
+对 $n=10$ 对数据拟合得到
+
+$$\hat Y=2.1+0.8x,\qquad S_{xx}=40,\qquad s=1.5.$$
+
+斜率的标准误为
+
+$$\operatorname{SE}(\hat\beta_1)=\frac{1.5}{\sqrt{40}}\approx0.237.$$
+
+检验 $H_0:\beta_1=0$ 的统计量为
+
+$$t=\frac{0.8}{0.237}\approx3.38,$$
+
+自由度为 $8$。接下来应查双侧 $t$ 临界值或计算 $p$ 值。若构造区间，则以 $0.8\pm t_{\alpha/2}(8)\times0.237$ 表示；这里保留符号，避免在未指定显著性水平时伪造临界值。
+
+### 4.8 残差诊断
+
+拟合回归后至少检查以下图形或指标：
+
+1. **残差—拟合值图**：理想状态下点云围绕零随机散布；弯曲趋势提示非线性，漏斗形提示异方差；
+2. **正态 Q-Q 图**：用于判断误差分布是否严重偏离正态，尤其关注尾部；
+3. **残差—观测顺序图**：时间或空间上的连续模式提示误差相关；
+4. **标准化残差**：绝对值异常大的点可能是离群观测；
+5. **杠杆值和 Cook 距离**：识别自变量位置极端、且可能显著影响拟合结果的观测。
+
+发现异常点时，应核对记录和测量过程，并分别报告保留与合理排除后的敏感性分析。仅因点“不好看”而删除数据会破坏推断的可信度。
+
+## 5. 多元线性回归
+
+### 5.1 模型与矩阵形式
+
+多元线性回归用多个解释变量描述响应：
+
+$$Y_i=\beta_0+\beta_1x_{i1}+\cdots+\beta_px_{ip}+\varepsilon_i.$$
+
+矩阵形式为
+
+$$\mathbf y=\mathbf X\boldsymbol\beta+\boldsymbol\varepsilon,$$
+
+其中 $\mathbf y$ 为 $n\times1$ 向量，$\mathbf X$ 为 $n\times(p+1)$ 设计矩阵，第一列通常全为 $1$，$\boldsymbol\beta$ 为 $(p+1)\times1$ 参数向量。
+
+在 $\mathbf X$ 列满秩时，最小二乘估计为
+
+$$\hat{\boldsymbol\beta} =(\mathbf X^\mathsf T\mathbf X)^{-1}\mathbf X^\mathsf T\mathbf y.$$
+
+拟合值与残差写为
+
+$$\hat{\mathbf y}=\mathbf H\mathbf y,\qquad \mathbf e=(\mathbf I-\mathbf H)\mathbf y,$$
+
+其中
+
+$$\mathbf H=\mathbf X(\mathbf X^\mathsf T\mathbf X)^{-1}\mathbf X^\mathsf T$$
+
+称为帽子矩阵。对角元 $h_{ii}$ 是杠杆值。
+
+若
+
+$$E(\boldsymbol\varepsilon)=\mathbf0,\qquad \operatorname{Var}(\boldsymbol\varepsilon)=\sigma^2\mathbf I,$$
+
+则
+
+$$E(\hat{\boldsymbol\beta})=\boldsymbol\beta,\qquad \operatorname{Var}(\hat{\boldsymbol\beta}) =\sigma^2(\mathbf X^\mathsf T\mathbf X)^{-1}.$$
+
+### 5.2 参数解释与检验
+
+$\beta_j$ 表示在其他解释变量保持不变时，$x_j$ 增加一个单位对应的条件均值变化。这个“保持不变”使多元回归系数与简单相关系数的含义不同。
+
+整体显著性检验为
+
+$$H_0:\beta_1=\cdots=\beta_p=0,$$
+
+统计量
+
+$$F=\frac{SSR/p}{SSE/(n-p-1)} \sim F(p,n-p-1).$$
+
+单个系数可使用
+
+$$t_j=\frac{\hat\beta_j-\beta_{j,0}} {s\sqrt{[(\mathbf X^\mathsf T\mathbf X)^{-1}]_{jj}}}$$
+
+进行检验，自由度为 $n-p-1$。
+
+加入变量时 $R^2$ 不会下降，因此比较不同变量数的模型时常参考调整决定系数
+
+$$\bar R^2 =1-\frac{SSE/(n-p-1)}{SST/(n-1)}.$$
+
+### 5.3 建模注意事项
+
+- **多重共线性**会放大系数估计的方差，使单个系数不稳定；可结合相关结构、方差膨胀因子和领域知识判断；
+- 分类变量要通过虚拟变量编码，并明确基准组；
+- 曲线项和交互项仍属于对参数线性的模型，例如加入 $x^2$ 后对 $\beta$ 仍是线性的；
+- 变量筛选不应只依赖逐步回归的 $p$ 值，应优先依据研究设计、预测目标和验证误差；
+- 观测数据中的回归关系通常不能单独证明因果关系，混杂、选择偏倚和反向因果都可能存在。
+
+## 6. ANOVA 与回归的统一
+
+ANOVA 和线性回归都属于一般线性模型。ANOVA 的组别可编码为虚拟变量；回归的显著性检验也来自“模型解释的平方和与残差平方和之比”。
+
+从矩阵投影角度看，最小二乘把 $\mathbf y$ 投影到 $\mathbf X$ 的列空间。比较嵌套模型时，额外平方和检验可写为
+
+$$F= \frac{(SSE_R-SSE_F)/(df_R-df_F)} {SSE_F/df_F},$$
+
+其中下标 $R$、$F$ 分别表示约化模型和完整模型。该形式统一了因素主效应、交互作用和一组回归系数的联合检验。
+
+## 7. 学习路线与查表
+
+学习本章前，应掌握[随机变量及其分布](./随机变量及其分布.mdx)中的正态分布、$t$ 分布、$\chi^2$ 分布和 $F$ 分布，以及[参数估计](./参数估计.mdx)中的点估计、区间估计与假设检验。
+
+手工计算临界值时，请转到[各种常用表](./各种常用表.mdx)。实际分析中建议同时报告效应估计、置信区间、检验统计量、自由度和 $p$ 值，而不只写“显著”或“不显著”。
+
+## References
+
+\[1\]. 茆诗松, 程依明, 濮晓龙. 概率论与数理统计教程[M]. 第3版. 北京: 高等教育出版社, 2019.
+
+\[2\]. 盛骤, 谢式千, 潘承毅. 概率论与数理统计[M]. 第4版. 北京: 高等教育出版社, 2008.
+
+\[3\]. Montgomery D C, Runger G C. Applied Statistics and Probability for Engineers[M]. 7th ed. Wiley, 2018.
+
+\[4\]. Kutner M H, Nachtsheim C J, Neter J, Li W. Applied Linear Statistical Models[M]. 5th ed. McGraw-Hill, 2005.
+
+</WordCount>

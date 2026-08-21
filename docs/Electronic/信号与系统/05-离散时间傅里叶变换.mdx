@@ -1,8 +1,240 @@
 
+---
+sidebar_position: 5
+---
+
 import WordCount from '../../../src/components/WordCount/WordCount.jsx';
 
 <WordCount>
 
+离散时间傅里叶变换（Discrete-Time Fourier Transform，DTFT）把离散时间序列分解为连续频率的复指数分量。它是分析离散 LTI 系统频率响应、数字滤波器和采样系统的基础。
 
+## 5.1 DTFT 的定义
+
+序列 $x[n]$ 的 DTFT 及其逆变换为
+
+$$
+X(e^{j\omega})=\sum_{n=-\infty}^{+\infty}x[n]e^{-j\omega n},
+\qquad
+x[n]=\frac{1}{2\pi}\int_{-\pi}^{\pi}X(e^{j\omega})e^{j\omega n}\,\mathrm d\omega.
+\tag{5.1}
+$$
+
+记作 $x[n]\overset{\mathrm{DTFT}}{\longleftrightarrow}X(e^{j\omega})$。频率
+$\omega$ 的单位为 $\mathrm{rad/sample}$。由于
+$e^{-j(\omega+2\pi)n}=e^{-j\omega n}$，
+
+$$
+X(e^{j(\omega+2\pi)})=X(e^{j\omega}).
+\tag{5.2}
+$$
+
+因此离散时间信号的频谱必然以 $2\pi$ 为周期，通常只研究 $[-\pi,\pi)$。
+
+### 5.1.1 从离散序列到周期频谱
+
+下图上半部分表示有限长矩形序列 $x[n]=1,\ 0\le n\le4$；下半部分强调其 DTFT 幅度的周期性。
+
+<div style={{ textAlign: 'center', margin: '1.5rem 0' }}>
+  <svg width="700" height="390" viewBox="0 0 700 390" role="img" aria-label="有限长矩形序列及其周期 DTFT 幅度" style={{ color: 'var(--ifm-font-color-base)', maxWidth: '100%' }}>
+    <defs>
+      <marker id="dtft-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+        <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor" />
+      </marker>
+    </defs>
+    <text x="20" y="28" fill="currentColor" fontSize="15" fontWeight="600">时域：x[n]</text>
+    <line x1="55" y1="145" x2="660" y2="145" stroke="currentColor" markerEnd="url(#dtft-arrow)" />
+    <line x1="160" y1="165" x2="160" y2="45" stroke="currentColor" markerEnd="url(#dtft-arrow)" />
+    {[-2,-1,0,1,2,3,4,5,6].map((n) => {
+      const x = 160 + n * 55;
+      const active = n >= 0 && n <= 4;
+      return <g key={n}>
+        <line x1={x} y1="141" x2={x} y2="149" stroke="currentColor" />
+        <text x={x} y="165" fill="currentColor" fontSize="12" textAnchor="middle">{n}</text>
+        <line x1={x} y1="145" x2={x} y2={active ? 70 : 145} stroke={active ? '#2563eb' : 'currentColor'} strokeWidth={active ? 2.5 : 1} />
+        <circle cx={x} cy={active ? 70 : 145} r={active ? 4 : 2.5} fill={active ? '#2563eb' : 'currentColor'} />
+      </g>;
+    })}
+    <text x="650" y="166" fill="currentColor" fontSize="14">n</text>
+    <text x="172" y="55" fill="currentColor" fontSize="13">1</text>
+    <text x="20" y="220" fill="currentColor" fontSize="15" fontWeight="600">频域：|X(e<tspan baselineShift="super" fontSize="11">jω</tspan>)|</text>
+    <line x1="45" y1="345" x2="665" y2="345" stroke="currentColor" markerEnd="url(#dtft-arrow)" />
+    <line x1="350" y1="360" x2="350" y2="235" stroke="currentColor" markerEnd="url(#dtft-arrow)" />
+    <path d="M45 345 C82 340 105 300 130 270 C155 245 177 320 195 345 C215 330 238 260 265 275 C295 292 315 330 350 245 C385 330 405 292 435 275 C462 260 485 330 505 345 C523 320 545 245 570 270 C595 300 618 340 655 345" fill="none" stroke="#8b5cf6" strokeWidth="3" />
+    <text x="130" y="365" fill="currentColor" fontSize="13" textAnchor="middle">−2π</text>
+    <text x="240" y="365" fill="currentColor" fontSize="13" textAnchor="middle">−π</text>
+    <text x="350" y="365" fill="currentColor" fontSize="13" textAnchor="middle">0</text>
+    <text x="460" y="365" fill="currentColor" fontSize="13" textAnchor="middle">π</text>
+    <text x="570" y="365" fill="currentColor" fontSize="13" textAnchor="middle">2π</text>
+    <text x="655" y="365" fill="currentColor" fontSize="14">ω</text>
+    <path d="M130 235 H570" fill="none" stroke="#ef4444" strokeWidth="1.4" markerEnd="url(#dtft-arrow)" />
+    <text x="350" y="229" fill="#ef4444" fontSize="13" textAnchor="middle">周期 2π</text>
+  </svg>
+</div>
+
+## 5.2 收敛条件
+
+若序列绝对可和，
+
+$$
+\sum_{n=-\infty}^{+\infty}|x[n]|<\infty,
+\tag{5.3}
+$$
+
+则 DTFT 一定存在且连续。这是充分条件而不是必要条件；能量有限的序列至少在均方意义下存在 DTFT。
+
+## 5.3 常用 DTFT 变换对
+
+### 5.3.1 冲激与移位冲激
+
+$$
+\delta[n]\longleftrightarrow 1,
+\qquad
+\delta[n-n_0]\longleftrightarrow e^{-j\omega n_0}.
+\tag{5.4}
+$$
+
+时域移位不改变幅度谱，只引入线性相位。
+
+### 5.3.2 右边指数序列
+
+当 $|a|<1$ 时，
+
+$$
+a^n u[n]\longleftrightarrow
+\sum_{n=0}^{\infty}(ae^{-j\omega})^n
+=\frac{1}{1-ae^{-j\omega}}.
+\tag{5.5}
+$$
+
+### 5.3.3 有限长矩形序列
+
+对 $x[n]=1,\ 0\le n\le N-1$，
+
+$$
+X(e^{j\omega})
+=e^{-j\omega(N-1)/2}
+\frac{\sin(N\omega/2)}{\sin(\omega/2)}.
+\tag{5.6}
+$$
+
+指数项只影响相位；幅度谱呈周期性的 Dirichlet 核形状，主瓣宽度与 $N$ 成反比。
+
+### 5.3.4 复指数序列
+
+$$
+e^{j\omega_0 n}\longleftrightarrow
+2\pi\sum_{k=-\infty}^{+\infty}\delta(\omega-\omega_0-2\pi k).
+\tag{5.7}
+$$
+
+离散时间复指数对应频域中以 $2\pi$ 为间隔重复的冲激。
+
+## 5.4 DTFT 的性质
+
+设 $x[n]\longleftrightarrow X(e^{j\omega})$，
+$y[n]\longleftrightarrow Y(e^{j\omega})$。
+
+### 5.4.1 线性、时移与频移
+
+$$
+ax[n]+by[n]\longleftrightarrow aX(e^{j\omega})+bY(e^{j\omega}),
+\tag{5.8}
+$$
+
+$$
+x[n-n_0]\longleftrightarrow e^{-j\omega n_0}X(e^{j\omega}),
+\tag{5.9}
+$$
+
+$$
+e^{j\omega_0n}x[n]\longleftrightarrow X(e^{j(\omega-\omega_0)}).
+\tag{5.10}
+$$
+
+### 5.4.2 反折与频域微分
+
+$$
+x[-n]\longleftrightarrow X(e^{-j\omega}),
+\qquad
+nx[n]\longleftrightarrow j\frac{\mathrm dX(e^{j\omega})}{\mathrm d\omega}.
+\tag{5.11}
+$$
+
+### 5.4.3 卷积与相乘
+
+$$
+x[n]*y[n]\longleftrightarrow X(e^{j\omega})Y(e^{j\omega}),
+\tag{5.12}
+$$
+
+$$
+x[n]y[n]\longleftrightarrow
+\frac{1}{2\pi}\int_{-\pi}^{\pi}
+X(e^{j\theta})Y(e^{j(\omega-\theta)})\,\mathrm d\theta.
+\tag{5.13}
+$$
+
+式 (5.13) 的频域卷积是以 $2\pi$ 为周期的卷积。
+
+### 5.4.4 共轭对称与 Parseval 定理
+
+实序列满足
+
+$$
+X(e^{-j\omega})=X^*(e^{j\omega}).
+\tag{5.14}
+$$
+
+因此实部是偶函数、虚部是奇函数，幅度谱为偶函数，相位谱为奇函数。Parseval 定理给出
+
+$$
+\sum_{n=-\infty}^{+\infty}|x[n]|^2
+=\frac{1}{2\pi}\int_{-\pi}^{\pi}|X(e^{j\omega})|^2\,\mathrm d\omega.
+\tag{5.15}
+$$
+
+## 5.5 LTI 系统的频率响应
+
+若 $y[n]=x[n]*h[n]$，则
+
+$$
+Y(e^{j\omega})=X(e^{j\omega})H(e^{j\omega}),
+\tag{5.16}
+$$
+
+其中 $H(e^{j\omega})$ 是系统冲激响应的 DTFT，称为**频率响应**。对输入
+$x[n]=e^{j\omega_0n}$，
+
+$$
+y[n]=H(e^{j\omega_0})e^{j\omega_0n}.
+\tag{5.17}
+$$
+
+复指数是 LTI 系统的特征函数：系统只改变该频率分量的幅度和相位，不产生新频率。
+
+:::info 判断系统性质
+- 因果 LTI 系统满足 $h[n]=0,\ n<0$；
+- BIBO 稳定 LTI 系统满足 $\sum_n|h[n]|<\infty$；
+- 只有当频率响应存在时，才可以直接用 $H(e^{j\omega})$ 分析稳态响应。
+:::
+
+## 5.6 DTFT、DFS 与 DFT 的关系
+
+- **DTFT**：时域序列通常非周期，频域连续且以 $2\pi$ 为周期；
+- **DFS**：时域周期且离散，频域为离散的傅里叶级数系数；
+- **DFT**：对有限长序列的 DTFT 在一周期内等间隔采样，得到 $N$ 个频率样点。
+
+对长度为 $N$ 的序列，
+
+$$
+X[k]=X(e^{j\omega})\big|_{\omega=2\pi k/N}
+=\sum_{n=0}^{N-1}x[n]e^{-j2\pi kn/N}.
+\tag{5.18}
+$$
+
+:::warning
+DTFT 的频率变量 $\omega$ 是连续的；DFT 的下标 $k$ 是离散的。画频谱时应明确图中表示的是连续频谱、频域冲激，还是频谱采样值。
+:::
 
 </WordCount>

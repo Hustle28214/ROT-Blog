@@ -1,0 +1,80 @@
+import WordCount from '../../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+# DreamerV2：离散 latent 让 world model 在 Atari 上打赢 model-free
+
+DreamerV2 是我觉得 Dreamer 系列里"质变"的一版：第一次在 Atari 100k 上稳定超过同等算力的 model-free 基线（DreamerV1 和 PlaNet 在 Atari 上都不行）。核心改动就两个——把高斯 latent 换成离散类别分布，以及 KL balancing 防止先验被后验拖着跑。
+
+论文：[Mastering Atari with Discrete World Models](https://arxiv.org/abs/2010.02193)（2020, Hafner et al.）
+
+## 核心问题
+
+[Dreamer](./02-Dreamer.mdx) 的 RSSM 用单峰高斯表示 $z_t$，在连续控制里够用，但 Atari 的 dynamics 强多模态：同一个画面按不同按钮，未来可能完全不同。高斯 latent 倾向于学一个"平均未来"，重建模糊，想象轨迹质量差，策略梯度也歪。
+
+DreamerV2 要回答：怎么改 latent 表示，让 world model 方法在离散动作、高多模态的视觉 RL 里也 work？
+
+## 离散 RSSM
+
+把 $z_t$ 从连续高斯换成 $M$ 个独立的 $K$ 类分类变量（默认 32 组 × 32 类）：
+
+$$
+z_t = \{z_t^{(1)}, \ldots, z_t^{(M)}\}, \qquad z_t^{(i)} \in \{1, \ldots, K\}
+$$
+
+先验和后验都变成分类分布：
+
+$$
+p_\theta(z_t \mid h_t) = \prod_{i=1}^{M} p_\theta(z_t^{(i)} \mid h_t), \qquad q_\phi(z_t \mid h_t, x_t) = \prod_{i=1}^{M} q_\phi(z_t^{(i)} \mid h_t, x_t)
+$$
+
+采样用 straight-through 估计：前向 hard one-hot，反向 soft softmax 传梯度。这样想象轨迹对 actor 仍然可微。
+
+KL 项变成每个分类分布的 KL 之和。离散 latent 的好处是多模态自然表达——32 组独立分类的组合空间是 $32^{32}$，足够编码 Atari 里那些"按钮 A 走这条路，按钮 B 走那条路"的分叉。
+
+## KL balancing
+
+[Dreamer](./02-Dreamer.mdx) 和 PlaNet 的标准 ELBO 里，KL 项同时更新 encoder 和 dynamics（先验）。实践中经常出现后验学得很好、先验跟不上——想象时只能用先验 rollout，先验差就意味着想象质量差。
+
+DreamerV2 把 KL 拆成两项，用不同权重：
+
+$$
+\mathcal{L}_{\mathrm{KL}} = \alpha\,\mathrm{KL}[\mathrm{sg}(q) \| p] + (1-\alpha)\,\mathrm{KL}[q \| \mathrm{sg}(p)]
+$$
+
+$\mathrm{sg}$ 是 stop-gradient。第一项主要更新先验（dynamics），第二项主要更新后验（encoder）。$\alpha = 0.8$ 是默认值。效果是先验不会被后验"拖着跑"，想象 rollout 更可靠。
+
+## 想象训练
+
+Actor-critic 想象训练的 loop 跟 [Dreamer](./02-Dreamer.mdx) 一样：从后验状态出发，先验往前滚 $H$ 步，算 $\lambda$-return，解析梯度更新 actor。
+
+Atari 的动作空间是离散的，actor 输出 18 维 logits（对应 Atari 动作子集）。Critic 和 reward predictor 都接在 $(h, z)$ 上。
+
+另外加了 GRU 状态的 layer normalization 和 model rollout 时的 KL 正则，训练更稳。这些看着是小改动，但在 26 个 Atari 游戏 × 100k 步的统一配置下，稳定性差异会被放大。
+
+图像编码器用 CNN，跟 [PlaNet](./01-PlaNet.mdx) 一样是 4 层 stride-2 卷积，把 $64 \times 64$ 图像压到 $4 \times 4 \times C$ 的 feature map，再 flatten 喂给 encoder。Atari 和 DMControl 共用同一个 encoder 架构，只是 channel 数不同。解码器是对称的 transposed convolution，重建 loss 是像素级 MSE 或 cross-entropy（取决于是否把像素离散化）。
+
+## 实验亮点
+
+Atari 100k（每个游戏只允许 2 小时交互，约 10 万帧）：DreamerV2 在 26 个游戏的中位 human-normalized score 上超过了 SimPLe 和 CURL 等 model-free 方法，是第一条 world model 路线在这个 benchmark 上做到这件事。
+
+DeepMind Control 上性能跟 DreamerV1 持平或略好，说明离散 latent 没有伤害连续任务。
+
+Ablation 里 KL balancing 和离散 latent 两个改动分别贡献很大，合在一起效果最稳。去掉 KL balancing，Atari 上好几款游戏直接训崩。
+
+## 局限
+
+1. 离散 latent 的组合空间虽然大，但训练难度也更高。straight-through 估计的梯度有 bias，$M$ 和 $K$ 的选取影响表达力和优化难度。
+2. 仍然需要调一些超参（KL 权重 $\alpha$、$\beta$、想象 horizon），只是 Atari + DMControl 可以共用一套默认值。跨到完全不同量纲的任务（Minecraft、ProcGen）还是会痛——[DreamerV3](./04-DreamerV3.mdx) 要解决的正是这个。
+3. 模型还是在自己的任务数据上从零学，没有预训练先验。数据效率和最终性能的上限受限于 online 交互量。
+4. 重建像素仍然是训练信号的一部分。对 Atari 够用，但对更复杂的环境（开放世界、3D），RSSM 的容量和重建质量会成为瓶颈。
+
+## 与系列内其他工作的关系
+
+DreamerV2 是 [Dreamer](./02-Dreamer.mdx) 在表示和训练上的关键升级，想象训练的骨架没变。
+
+它跟 [PlaNet](./01-PlaNet.mdx) 的关系：PlaNet 证明了 RSSM + latent 规划，V2 证明了 RSSM + 离散 latent + 想象 actor-critic 在 Atari 上也 work。
+
+[DreamerV3](./04-DreamerV3.mdx) 在 V2 基础上加了 symlog、twohot、free bits 等稳健化手段，把"不用调参"推到了 150+ 任务。[DreamerV4](./05-DreamerV4.mdx) 则彻底换了模型架构（Transformer + shortcut forcing），走向大规模离线预训练和实时交互，但"在想象里训策略"这条主线从 V2 一直传下来。
+
+</WordCount>

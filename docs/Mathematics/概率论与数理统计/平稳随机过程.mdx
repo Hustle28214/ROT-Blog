@@ -1,0 +1,274 @@
+import WordCount from '../../../src/components/WordCount/WordCount.jsx';
+
+<WordCount>
+
+# 平稳随机过程
+上一章用有限维分布和协方差函数描述一般随机过程。
+本章进一步研究统计规律不随时间平移而改变的过程，并从时域走向频域。
+除特别说明外，设 $\{X(t):t\in\mathbb R\}$ 为实值过程；
+讨论宽平稳性和功率谱时，假设 $\mathbb E[X^2(t)]<\infty$。
+
+## 1. 为什么需要平稳性
+只有一段观测轨迹时，我们无法在同一时刻重复观察无数次。
+若过程的统计规律随时间剧烈改变，早期数据便很难帮助认识未来。
+平稳性用“时间平移不改变某些统计性质”提供可学习的结构。
+平稳不等于样本路径恒定。
+一个平稳过程仍可持续波动；保持不变的是概率规律，而不是每次实现的数值。
+
+## 2. 严平稳
+
+### 2.1 定义
+若任意 $n\ge1$、任意时刻 $t_1,\ldots,t_n$ 以及任意平移量 $h$，都有
+$$
+(X(t_1),\ldots,X(t_n))
+\overset{d}{=}
+(X(t_1+h),\ldots,X(t_n+h)),
+$$
+则称 $\{X(t)\}$ 为严平稳过程（strict-sense stationary）。
+这里 $\overset d=$ 表示联合分布相同。
+严平稳要求全部有限维分布在时间平移下不变。
+特别地，每个 $X(t)$ 具有相同边缘分布，但相同边缘分布本身不足以推出严平稳。
+
+### 2.2 严平稳的例子
+令 $\Theta\sim\operatorname{Unif}(0,2\pi)$，并定义
+$$
+X(t)=A\cos(\omega_0t+\Theta),
+$$
+其中 $A,\omega_0$ 为常数。
+时间平移 $h$ 只把随机相位变成
+$$
+\Theta'=(\Theta+\omega_0h)\bmod 2\pi,
+$$
+而 $\Theta'$ 仍在 $[0,2\pi)$ 上均匀分布，因此该过程严平稳。
+:::warning
+Poisson 过程 $N(t)$ 和 Wiener 过程 $W(t)$ 具有平稳增量，却不是平稳过程：
+它们的方差分别为 $\lambda t$ 与 $t$，随时间增长。
+不要混淆“增量平稳”和“过程平稳”。
+:::
+
+## 3. 宽平稳
+
+### 3.1 定义
+若二阶矩存在，并且：
+1. 均值为常数，即 $\mathbb E[X(t)]=\mu$；
+2. 自协方差只依赖时间差，即
+$$
+C_X(s,t)=C_X(t-s)=C_X(\tau),
+$$
+则称 $\{X(t)\}$ 为宽平稳过程（wide-sense stationary, WSS）。
+此时二阶矩函数
+$$
+R_X(\tau)=\mathbb E[X(t)X(t+\tau)]
+$$
+也只依赖时差 $\tau$，并满足
+$$
+R_X(\tau)=C_X(\tau)+\mu^2.
+$$
+为简化频谱公式，后文常假设 $\mu=0$；非零均值可先中心化为 $Y(t)=X(t)-\mu$。
+
+### 3.2 严平稳与宽平稳的关系
+若严平稳过程存在有限二阶矩，则其均值和协方差在时间平移下不变，因此它也是宽平稳的。
+反方向一般不成立，因为宽平稳只约束一、二阶矩。
+对于 Gaussian 过程，有限维分布由均值和协方差完全确定，因此：
+$$
+\text{Gaussian 过程宽平稳}\quad\Longrightarrow\quad\text{严平稳}.
+$$
+:::example[例 1：随机相位正弦波的二阶结构]
+对
+$$
+X(t)=A\cos(\omega_0t+\Theta)
+$$
+利用均匀相位可得
+$$
+\mathbb E[X(t)]=0,
+$$
+以及
+$$
+R_X(\tau)
+=\mathbb E[X(t)X(t+\tau)]
+=\frac{A^2}{2}\cos(\omega_0\tau).
+$$
+因此它既严平稳又宽平稳，但单条路径是一条确定频率的正弦曲线。
+:::
+
+## 4. 相关函数的性质
+以下用 $R_X(\tau)$ 表示实值宽平稳过程的自相关函数。
+
+### 4.1 基本性质
+它满足：
+1. **偶对称性**
+$$
+R_X(-\tau)=R_X(\tau);
+$$
+2. **原点取二阶矩**
+$$
+R_X(0)=\mathbb E[X^2(t)]\ge0;
+$$
+3. **有界性**
+$$
+|R_X(\tau)|\le R_X(0);
+$$
+4. **非负定性**：任意 $a_1,\ldots,a_n\in\mathbb R$ 与 $t_1,\ldots,t_n$ 满足
+$$
+\sum_{i=1}^n\sum_{j=1}^n
+a_i a_j R_X(t_i-t_j)\ge0.
+$$
+有界性可由 Cauchy--Schwarz 不等式得到。
+非负定性则来自 $\mathbb E[(\sum_i a_iX(t_i))^2]\ge0$。
+
+### 4.2 互相关函数
+若 $X(t)$ 与 $Y(t)$ 联合宽平稳，则互相关函数定义为
+$$
+R_{XY}(\tau)=\mathbb E[X(t)Y(t+\tau)].
+$$
+一般 $R_{XY}(\tau)$ 不必为偶函数，但有
+$$
+R_{XY}(\tau)=R_{YX}(-\tau).
+$$
+:::note
+相关函数衰减缓慢通常表示远隔时刻仍有明显线性依赖；
+快速衰减表示“记忆”较短。
+相关为零仍不一定代表独立，除非有联合 Gaussian 等额外条件。
+:::
+
+## 5. 遍历性的概念
+
+### 5.1 总体平均与时间平均
+平稳性允许不同时刻共享统计规律，但它并不保证一条无限长轨迹能代表总体。
+遍历性（ergodicity）正是连接“总体平均”与“时间平均”的性质。
+对连续时间过程，时间均值为
+$$
+\overline X_T=\frac1T\int_0^T X(t)\,\mathrm dt.
+$$
+若
+$$
+\overline X_T\longrightarrow \mu
+$$
+以均方、几乎处处或依概率等指定方式成立，则称过程具有相应意义下的均值遍历性。
+同理，可考察时间自相关
+$$
+\widehat R_T(\tau)
+=\frac1T\int_0^T X(t)X(t+\tau)\,\mathrm dt
+$$
+是否收敛到总体自相关 $R_X(\tau)$。
+
+### 5.2 一个均值遍历判据
+对均值为 $\mu$ 的宽平稳过程，
+$$
+\operatorname{Var}(\overline X_T)
+=\frac{2}{T^2}\int_0^T(T-\tau)C_X(\tau)\,\mathrm d\tau.
+$$
+若
+$$
+\frac1T\int_0^T|C_X(\tau)|\,\mathrm d\tau\longrightarrow0,
+$$
+则 $\operatorname{Var}(\overline X_T)\to0$，从而时间均值依均方收敛到 $\mu$。
+:::example[例 2：平稳但不遍历]
+令 $X(t)=Z$，其中 $Z$ 是均值为 $0$、方差为 $1$ 的随机变量。
+该过程严平稳且宽平稳，因为每条路径都是一个随机常数。
+但
+$$
+\overline X_T=Z
+$$
+不会收敛到总体均值 $0$。
+因此平稳性不蕴含遍历性。
+:::
+
+## 6. 从相关函数到功率谱
+
+### 6.1 功率谱密度
+设零均值宽平稳过程的自相关函数 $R_X(\tau)$ 绝对可积。
+定义功率谱密度（power spectral density, PSD）为
+$$
+S_X(\omega)
+=\int_{-\infty}^{\infty}
+R_X(\tau)e^{-i\omega\tau}\,\mathrm d\tau.
+$$
+采用这一角频率约定时，逆变换为
+$$
+R_X(\tau)
+=\frac1{2\pi}\int_{-\infty}^{\infty}
+S_X(\omega)e^{i\omega\tau}\,\mathrm d\omega.
+$$
+对实值过程，$S_X(\omega)$ 是实数、偶函数且非负。
+总平均功率满足
+$$
+R_X(0)
+=\frac1{2\pi}\int_{-\infty}^{\infty}S_X(\omega)\,\mathrm d\omega.
+$$
+
+### 6.2 Wiener--Khinchin 定理
+Wiener--Khinchin 定理说明：宽平稳过程的自相关函数与功率谱互为 Fourier 变换。
+时域中的“相隔多久仍相似”，在频域中转化为“功率集中在哪些频率”。
+若 $R_X$ 不绝对可积，谱可能不能用普通函数表示，而需使用谱测度或广义函数。
+例如随机相位正弦波的功率集中在 $\pm\omega_0$ 两个频率，表现为谱线。
+:::tip[频率约定]
+若使用普通频率 $f$ 而非角频率 $\omega$，指数写成 $e^{-i2\pi f\tau}$。
+不同教材中的 $2\pi$ 因子可能不同，计算前应先确认变换约定。
+:::
+
+### 6.3 一个可积相关函数的例子
+设
+$$
+R_X(\tau)=\sigma^2e^{-a|\tau|},\qquad a>0.
+$$
+则
+$$
+S_X(\omega)
+=\int_{-\infty}^{\infty}
+\sigma^2e^{-a|\tau|}e^{-i\omega\tau}\,\mathrm d\tau
+=\frac{2a\sigma^2}{a^2+\omega^2}.
+$$
+相关衰减参数 $a$ 越大，时域记忆越短，而频谱越宽。
+这体现了时域集中与频域扩展之间的对应关系。
+
+## 7. 线性系统中的平稳过程
+设零均值宽平稳输入 $X(t)$ 通过稳定线性时不变系统，冲激响应为 $h(t)$：
+$$
+Y(t)=\int_{-\infty}^{\infty}h(u)X(t-u)\,\mathrm du.
+$$
+若相关积分存在，则输出仍为宽平稳过程。
+令系统频率响应
+$$
+H(\omega)=\int_{-\infty}^{\infty}h(t)e^{-i\omega t}\,\mathrm dt,
+$$
+则输入、输出功率谱满足
+$$
+S_Y(\omega)=|H(\omega)|^2S_X(\omega).
+$$
+这说明滤波器通过 $|H(\omega)|^2$ 对不同频率的功率进行加权。
+时间序列中的移动平均与 ARMA 模型也可用类似的滤波观点理解。
+
+## 8. 离散时间版本
+对 $\{X_t:t\in\mathbb Z\}$，宽平稳意味着均值为常数且
+$$
+\gamma(k)=\operatorname{Cov}(X_t,X_{t+k})
+$$
+只依赖整数滞后 $k$。
+其谱密度采用 Fourier 级数：
+$$
+f(\lambda)
+=\frac1{2\pi}\sum_{k=-\infty}^{\infty}
+\gamma(k)e^{-ik\lambda},
+\qquad -\pi\le\lambda\le\pi.
+$$
+逆关系为
+$$
+\gamma(k)=\int_{-\pi}^{\pi}f(\lambda)e^{ik\lambda}\,\mathrm d\lambda.
+$$
+由于离散采样，频谱以 $2\pi$ 为周期。
+下一篇先研究具有条件无记忆性的离散状态模型；再下一篇将回到实值离散时间序列，使用样本 ACF、PACF 和 ARIMA 进行建模。
+
+## 9. 小结
+1. 严平稳要求全部有限维分布对时间平移不变；
+2. 宽平稳只要求常均值和仅依赖时差的协方差；
+3. 遍历性使单条长轨迹的时间平均能够代表总体平均；
+4. 自相关函数必须偶对称、有界且非负定；
+5. Wiener--Khinchin 定理把自相关与功率谱联系起来。
+
+## References
+1. A. Papoulis and S. U. Pillai, *Probability, Random Variables, and Stochastic Processes*, 4th ed., McGraw-Hill, 2002.
+2. Athanasios Papoulis, *The Fourier Integral and Its Applications*, McGraw-Hill, 1962.
+3. M. B. Priestley, *Spectral Analysis and Time Series*, Academic Press, 1981.
+4. Robert M. Gray and Lee D. Davisson, *An Introduction to Statistical Signal Processing*, Cambridge University Press, 2004.
+</WordCount>

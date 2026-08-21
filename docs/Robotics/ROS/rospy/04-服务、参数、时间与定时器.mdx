@@ -1,0 +1,94 @@
+---
+sidebar_position: 4
+---
+
+import WordCount from '../../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+话题之外，rospy还有服务、参数和时间三套设施。用户接口都很短，但内部各有各的取舍：服务连接要不要复用、参数是不是每次都过一遍网络、仿真时间下sleep到底在等什么。
+
+## 服务走的还是TCPROS
+
+服务的用户侧抽象在service.py，传输实现在`impl/tcpros_service.py`，后者提供TCPROSServiceClient、服务端的连接处理逻辑，以及ServiceProxy、Service、ServiceImpl这几个类。
+
+服务用的是跟话题同一套TCPROS握手，只是头部字段不同：service、md5sum、callerid、persistent、probe。服务端读到头里有service字段就知道这是服务连接，交给服务处理器。
+
+响应的编码比话题多一层：先发一个字节表示调用成功与否，然后才是4字节长度加序列化的响应数据。失败时这一字节为假，后面跟的是错误字符串而不是正常响应。我们在ServiceException里看到的那段文本就是从这来的。
+
+persistent决定连接的生命周期。`ServiceProxy(name, SrvType)`默认非持久，每次call都重新建连、握手、发请求、收响应、关闭；加上`persistent=True`则在第一次调用后保留连接，后续直接复用。
+
+:::warning
+非持久服务在高频调用下开销很可观：每次都要一次lookupService、一次TCP三次握手、一次连接头往返，服务端还得新建一个线程。循环里每秒调几百次的话，绝大部分时间都花在建连上。
+
+这时候应该用`persistent=True`，但要接受它的代价：服务端重启之后这条连接就废了，proxy不会自动重连，得自己捕获异常并重建。
+:::
+
+还有一点，服务回调和话题回调一样，是在处理该连接的线程里同步执行的。服务端没有工作线程池，回调阻塞多久，这个客户端就等多久。
+
+## 参数默认每次都过网络
+
+`rospy.get_param`、`set_param`、`has_param`、`delete_param`这些函数在client.py里，通过msproxy.py的MasterProxy转成对master的XMLRPC调用。默认行为是每次调用都真的发一次请求。
+
+所以在回调里或者高频循环里读参数是有实际网络开销的。惯用做法是初始化阶段一次性把参数读进本地变量，需要运行时可调就上dynamic_reconfigure，别反复轮询master。
+
+rospy里确实有缓存，就是`impl/paramserver.py`的ParamServerCache。它的更新不靠轮询，而是靠从节点XMLRPC接口的paramUpdate回调：节点向master订阅了某个参数键之后，参数一变master就主动回调过来，缓存跟着更新。
+
+不过这里和roscpp有个明显的接口差异。roscpp给了显式的`param::getCached`让我们主动选择走缓存，rospy的公开API里没有对等的东西，ParamServerCache更多是库内部需要缓存的场合在用。所以在rospy里"读参数很贵"这个直觉基本是成立的。
+
+## ROS时间和墙上时间
+
+rostime.py封装genpy的Time和Duration，并维护"当前ROS时间"这个全局量，`rospy.Time.now()`读的就是它。
+
+`/use_sim_time`为真时，`impl/simtime.py`会订阅`/clock`，用收到的消息更新当前ROS时间。这时候ROS时间完全由`/clock`的发布者驱动，通常是Gazebo或者`rosbag play --clock`，可以比墙上时间快、慢，甚至暂停或者倒退。
+
+`rospy.sleep`因此分两种情况。用墙上时间时就是普通睡眠；用仿真时间时，它不能直接睡固定的墙上时长（仿真暂停会睡过头，仿真加速又睡太久），而是轮询ROS时间，反复检查有没有到目标时刻，中间用短暂的墙上睡眠让出CPU。
+
+:::warning
+仿真时间下如果`/clock`停了（Gazebo暂停、rosbag播完），`rospy.sleep`会一直等下去，因为ROS时间不再前进。节点看起来像卡死，其实它只是在正确地等一个永远不会到来的时刻。
+
+sleep在收到关闭信号时会抛ROSInterruptException，所以Ctrl-C仍然有效，但循环里记得捕获这个异常，不然退出时会打一堆栈。
+:::
+
+还有个坑：仿真时间下，节点启动后到收到第一条`/clock`之前，`rospy.Time.now()`返回的是零，拿它做时间差计算会得到很离谱的结果。稳妥点就在init_node之后先等一小会儿，或者显式检查时间非零。
+
+## 一个Timer一个线程
+
+timer.py提供Rate和Timer。
+
+Rate的做法是记住"下一次期望唤醒的时刻"，sleep时算它跟当前ROS时间的差值再睡过去。因为记的是绝对时刻而不是相对间隔，循环体本身的耗时会被自动扣掉，长期频率更准。它也能检测时间回跳：发现当前时间比上次记录的还早（rosbag循环播放、仿真重置），就重置内部状态，不去傻等一个已经过去的时刻。
+
+Timer则是`threading.Thread`的子类。也就是说每创建一个`rospy.Timer`，就多一个操作系统线程，定时回调在这个专属线程里执行，不经过任何统一的队列或调度器。这跟roscpp用CallbackQueue统一派发定时回调完全是两回事。
+
+推论有三条：
+
+- 多个Timer的回调彼此并发，共享状态得加锁
+- 一个Timer的回调要是执行时间超过周期，下一次触发会被推迟，同一个Timer内部是串行的。TimerEvent里带的时间戳可以用来发现这种滞后
+- Timer数量多了就是线程数量多，在GIL下这些线程并不能并行计算，只是轮流拿锁
+
+```python
+# 简化示意，非逐行原文
+class Rate(object):
+    def __init__(self, hz, reset=False):
+        self.last_time = rospy.Time.now()
+        self.sleep_dur = rospy.Duration(1.0 / hz)
+
+    def sleep(self):
+        curr = rospy.Time.now()
+        if self.last_time > curr:            # 时间回跳
+            self.last_time = curr
+        elapsed = curr - self.last_time
+        rospy.sleep(self.sleep_dur - elapsed)
+        self.last_time = self.last_time + self.sleep_dur
+
+class Timer(threading.Thread):               # 每个 Timer 独占一个线程
+    def run(self):
+        r = Rate(1.0 / self.period.to_sec())
+        while not rospy.is_shutdown():
+            r.sleep()
+            if rospy.is_shutdown():
+                break
+            self.callback(TimerEvent(...))   # 无队列，直接在本线程执行
+```
+
+</WordCount>

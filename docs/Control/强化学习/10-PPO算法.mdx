@@ -1,3 +1,8 @@
+---
+title: PPO 算法
+sidebar_position: 10
+---
+
 import WordCount from '../../../src/components/WordCount/WordCount';
 
 <WordCount>
@@ -6,7 +11,7 @@ import WordCount from '../../../src/components/WordCount/WordCount';
 
 TRPO就像是一个过于谨慎的教练，每走一步都要用复杂的数学计算来确保你不会摔倒。虽然安全，但学习进度缓慢。PPO则像是一个经验丰富的教练，用更简单有效的方法帮你保持平衡，让你快速进步。
 
-TRPO算法虽然效果出色，但其复杂的计算过程让人头疼：首先，你需要计算二阶导数（黑塞矩阵）；然后使用复杂的共轭梯度法求解约束优化问题。每一步更新都要进行线性搜索。
+上一章介绍的 [TRPO 算法](./09-TRPO算法.mdx) 虽然效果出色，但其复杂的计算过程让人头疼：首先，你需要计算二阶导数（黑塞矩阵）；然后使用复杂的共轭梯度法求解约束优化问题。每一步更新都要进行线性搜索。
 
 而PPO算法的核心洞察很精妙：**我们不一定需要精确求解约束优化问题，只要保证策略更新不要太大就行**。基于这个想法，PPO提出了两种简单实用的方法。
 
@@ -46,7 +51,7 @@ $$
 
 与TRPO相比，PPO虽然理论保证较弱，但实现更简单、计算效率更高、超参数更鲁棒，实际效果同等优秀。在实际应用中，PPO-截断通常更受欢迎，因为它只需要调节一个超参数 $\epsilon$（表示进行截断的范围），实现更加简单，在大多数任务上表现优异，训练过程更加稳定。通常 $\epsilon = 0.2$ 是一个很好的默认值，在大多数任务上都能取得不错的效果。
 
-## 3. PPO算法完整实现
+## 3. PPO 算法完整实现
 
 
 ```python
@@ -78,8 +83,11 @@ def moving_average(a, window_size):
     end = (np.cumsum(a[:-window_size:-1])[::2] / r)[::-1]
     return np.concatenate((begin, middle, end))
 
-def train_on_policy_agent(env, agent, num_episodes):
+def train_on_policy_agent(env, agent, num_episodes, seed=None):
     return_list = []
+    if seed is not None:
+        env.action_space.seed(seed)
+    episode_index = 0
     for i in range(10):
         with tqdm(total=int(num_episodes/10), desc='Iteration %d' % i) as pbar:
             for i_episode in range(int(num_episodes/10)):
@@ -91,17 +99,18 @@ def train_on_policy_agent(env, agent, num_episodes):
                     'rewards': [],
                     'dones': []
                 }
-                state, _ = env.reset()
-                done = False
-                while not done:
+                state, _ = env.reset(seed=seed if episode_index == 0 else None)
+                episode_done = False
+                while not episode_done:
                     action = agent.take_action(state)
                     next_state, reward, terminated, truncated, _ = env.step(action)
-                    done = terminated or truncated
+                    episode_done = terminated or truncated
                     transition_dict['states'].append(state)
                     transition_dict['actions'].append(action)
                     transition_dict['next_states'].append(next_state)
                     transition_dict['rewards'].append(reward)
-                    transition_dict['dones'].append(done)
+                    # dones 仅表示 MDP 终止；时间上限截断仍允许 bootstrap
+                    transition_dict['dones'].append(terminated)
                     state = next_state
                     episode_return += reward
                 return_list.append(episode_return)
@@ -110,6 +119,7 @@ def train_on_policy_agent(env, agent, num_episodes):
                     pbar.set_postfix({'episode': '%d' % (num_episodes/10 * i + i_episode+1), 
                                       'return': '%.3f' % np.mean(return_list[-10:])})
                 pbar.update(1)
+                episode_index += 1
     return return_list
 
 class PolicyNet(torch.nn.Module):
@@ -149,7 +159,8 @@ class PPO:
         self.device = device
 
     def take_action(self, state):
-        state = torch.tensor([state], dtype=torch.float).to(self.device)
+        state = torch.as_tensor(np.asarray(state), dtype=torch.float,
+                                device=self.device).unsqueeze(0)
         probs = self.actor(state)
         action_dist = torch.distributions.Categorical(probs)
         action = action_dist.sample()
@@ -221,7 +232,7 @@ if __name__ == "__main__":
                 epochs, eps, gamma, device)
 
     # 训练智能体
-    return_list = train_on_policy_agent(env, agent, num_episodes)
+    return_list = train_on_policy_agent(env, agent, num_episodes, seed=0)
 
     # 绘制结果
     episodes_list = list(range(len(return_list)))
@@ -259,26 +270,6 @@ if __name__ == "__main__":
 
 ![Image](https://github.com/user-attachments/assets/1ebe2f3c-5365-46de-a109-600b495eea9a)
 
-```bash
-(.venv) PS F:\BLOG\ROT-Blog\docs\Control\强化学习> python .\1.py
-Iteration 0:   0%|                                                                                                                     | 0/50 [00:00<?, ?it/s]F:\BLOG\ROT-Blog\docs\Control\强化学习\1.py:100: UserWarning: Creating a tensor from a list of numpy.ndarrays is extremely slow. Please consider converting the 
-list to a single numpy.ndarray with numpy.array() before converting to a tensor. (Triggered internally at C:\actions-runner\_work\pytorch\pytorch\pytorch\torch\csrc\utils\tensor_new.cpp:256.)
-  state = torch.tensor([state], dtype=torch.float).to(self.device)
-Iteration 0: 100%|████████████████████████████████████████████████████████████████████████████████| 50/50 [00:03<00:00, 12.91it/s, episode=50, return=229.600]
-Iteration 1: 100%|███████████████████████████████████████████████████████████████████████████████| 50/50 [00:04<00:00, 11.83it/s, episode=100, return=198.000] 
-Iteration 2: 100%|███████████████████████████████████████████████████████████████████████████████| 50/50 [00:07<00:00,  6.44it/s, episode=150, return=399.000] 
-Iteration 3: 100%|███████████████████████████████████████████████████████████████████████████████| 50/50 [00:08<00:00,  5.94it/s, episode=200, return=453.200] 
-Iteration 4: 100%|███████████████████████████████████████████████████████████████████████████████| 50/50 [00:09<00:00,  5.38it/s, episode=250, return=479.400] 
-Iteration 5: 100%|███████████████████████████████████████████████████████████████████████████████| 50/50 [00:09<00:00,  5.15it/s, episode=300, return=500.000] 
-Iteration 6: 100%|███████████████████████████████████████████████████████████████████████████████| 50/50 [00:09<00:00,  5.32it/s, episode=350, return=455.500] 
-Iteration 7: 100%|███████████████████████████████████████████████████████████████████████████████| 50/50 [00:09<00:00,  5.19it/s, episode=400, return=480.600] 
-Iteration 8: 100%|███████████████████████████████████████████████████████████████████████████████| 50/50 [00:09<00:00,  5.15it/s, episode=450, return=500.000] 
-Iteration 9: 100%|███████████████████████████████████████████████████████████████████████████████| 50/50 [00:09<00:00,  5.06it/s, episode=500, return=500.000] 
-训练完成，最终10个回合平均回报: 500.00
-最大回报: 500.0
-平均回报: 401.23 ± 147.74
-
-```
 </details>
 
 

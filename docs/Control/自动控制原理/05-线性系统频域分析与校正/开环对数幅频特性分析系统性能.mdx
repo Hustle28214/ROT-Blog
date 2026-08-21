@@ -1,16 +1,92 @@
 ---
 sidebar_position: 5
+title: 由开环对数频率特性分析系统性能
 ---
 
-
-
 import VideoPlayer from '../../../../src/components/Videoplayer/Videoplayer.jsx';
+import WordCount from '../../../../src/components/WordCount/WordCount';
 
-> 上
+<WordCount>
+
+## 1. 频段划分与基本思想
+
+对单位负反馈系统，开环频率特性 $L(j\omega)$ 的 Bode 图可粗分为低频、中频和高频。三段没有绝对分界，通常围绕增益交越频率 $\omega_c$ 来理解：
+
+- **低频段** $\omega\ll\omega_c$：决定跟踪精度和扰动抑制；
+- **中频段** $\omega\approx\omega_c$：主要决定稳定裕度、超调量和响应速度；
+- **高频段** $\omega\gg\omega_c$：反映传感器噪声抑制和未建模高频动态的影响。
+
+这种对应关系是工程近似。精确时域指标仍应由闭环传递函数或仿真验证。
+
+## 2. 低频段：稳态精度
+
+系统型别由开环在原点的积分环节数 $\nu$ 决定。低频渐近式可写成
+
+$$
+L(s)\approx\frac{K_0}{s^\nu},\qquad \omega\to0.
+$$
+
+增大低频开环增益可减小灵敏度
+
+$$
+S(j\omega)=\frac{1}{1+L(j\omega)}
+$$
+
+的幅值，从而改善跟踪和输入端低频扰动抑制。典型静态误差系数为
+
+$$
+K_p=\lim_{s\to0}L(s),\quad
+K_v=\lim_{s\to0}sL(s),\quad
+K_a=\lim_{s\to0}s^2L(s).
+$$
+
+提高型别能消除更高阶多项式输入的稳态误差，但积分环节增加相位滞后，可能降低稳定裕度，不能无限增加。
+
+## 3. 中频段：稳定性与快速性
+
+中频段最关注 $\omega_c$ 附近的斜率和相角。对常规最小相位系统：
+
+- 较大的 $\omega_c$ 往往对应较高闭环带宽和较快响应；
+- 穿越 $0$ dB 时斜率接近 $-20\,\mathrm{dB/dec}$，通常较容易取得适中的相位裕度；
+- 若以 $-40\,\mathrm{dB/dec}$ 或更陡斜率穿越，附加相位滞后较多，超调和振荡倾向增大；
+- $PM$ 增大通常使阻尼增强、谐振峰下降，但过大的裕度也可能牺牲速度。
+
+不能仅根据交越处单点斜率给出严格结论：非最小相位零点、纯延迟和附近的高阶极点都会改变相角。
+
+## 4. 高频段：噪声与鲁棒性
+
+测量噪声 $n$ 到输出的传递通道通常含互补灵敏度
+
+$$
+T(j\omega)=\frac{L(j\omega)}{1+L(j\omega)}.
+$$
+
+高频处若 $|L|\ll1$，则 $|T|\approx|L|$，开环幅值衰减越快，高频噪声传到输出越少。因而实际系统常要求高频开环曲线具有足够滚降，并避免用理想微分持续放大噪声。
+
+另一方面，过高的 $\omega_c$ 会把控制作用推入执行器、采样延迟和未建模模态所在频段，降低鲁棒性。设计带宽一般应显著低于首个未建模高频动态。
+
+## 5. 与谐振峰、带宽的关系
+
+闭环互补灵敏度为 $T=L/(1+L)$。当 Nyquist 曲线靠近 $-1$ 时，$|1+L|$ 变小，闭环可能出现较大的谐振峰
+
+$$
+M_r=\max_{\omega\ge0}|T(j\omega)|.
+$$
+
+因此较小的 $PM$ 往往对应较大的 $M_r$ 和较强超调。闭环带宽 $\omega_b$ 通常定义为 $|T(j\omega_b)|$ 相对低频值下降到 $1/\sqrt2$（$-3$ dB）的频率。对形状规则的系统，$\omega_b$ 与 $\omega_c$ 同量级；提高 $\omega_c$ 通常提高 $\omega_b$，但二者并不恒等。
+
+## 6. 综合读图清单
+
+1. 看低频斜率确定系统型别，看低频高度判断误差系数。
+2. 找 $\omega_c$，检查交越附近斜率和 $PM$，估计速度与阻尼。
+3. 找 $\omega_g$ 并计算 $GM$，必要时回到 Nyquist 判据。
+4. 检查高频滚降是否能抑制噪声，交越频率是否避开未建模模态。
+5. 最后用闭环 $M_r$、$\omega_b$ 和时域响应验证近似判断。
+
+## 视频补充
 
 <VideoPlayer src="//player.bilibili.com/player.html?isOutside=true&aid=811394492&bvid=BV1F34y1h7so&cid=718525092&p=47" />
-<br />
-> 下
 
 <VideoPlayer src="//player.bilibili.com/player.html?isOutside=true&aid=811394492&bvid=BV1F34y1h7so&cid=718516802&p=48" />
-<br />
+
+</WordCount>

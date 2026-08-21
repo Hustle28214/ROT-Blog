@@ -1,0 +1,858 @@
+import WordCount from '../../../src/components/WordCount/WordCount.jsx';
+
+<WordCount>
+
+# 矩阵及其运算：从向量到可逆变换
+
+线性代数并不是从一张数字表开始的，而是从一个更基本的问题开始：怎样用已有的方向组合出新的方向？
+
+本节沿着一条连续的主线展开：先理解向量及其线性组合，再用长度和点积刻画几何关系；随后把若干向量并排组成矩阵，理解 $Ax$；最后讨论矩阵之间的复合、可逆性、转置与置换。这样，矩阵的每条运算规则都有明确的来源，而不是孤立的记忆项目。
+
+我们会反复使用下面两个列向量：
+
+$$
+a_1=\begin{bmatrix}1\\2\end{bmatrix}, \qquad a_2=\begin{bmatrix}2\\1\end{bmatrix}.\tag{1.1}
+$$
+
+把它们并排放置，得到贯穿本节的矩阵
+
+$$
+A=\begin{bmatrix}1&2\\2&1\end{bmatrix} =\begin{bmatrix}a_1&a_2\end{bmatrix}. \tag{1.2}
+$$
+
+从现在起，向量、线性组合和矩阵乘法将不再是三件分离的事。
+
+## 1. 向量与线性组合
+
+### 1.1 列向量记录有顺序的分量
+
+一个 $n$ 维实列向量写作
+
+$$
+x=\begin{bmatrix} x_1\\x_2\\\vdots\\x_n \end{bmatrix}\in\mathbb R^n. \tag{1.3}
+$$
+
+“列”不是装饰，而是后续矩阵乘法所采用的基本形状。$\mathbb R^n$ 表示所有由 $n$ 个实数组成的列向量。向量的分量有固定顺序，因此
+
+$$
+\begin{bmatrix}1\\2\end{bmatrix} \ne \begin{bmatrix}2\\1\end{bmatrix}.
+$$
+
+在二维或三维中，可以把向量画成从原点出发的箭头。箭头的终点给出坐标，箭头的长度和方向提供几何直觉。更高维虽然无法直接画出，但相同的代数规则仍然成立。
+
+零向量记作
+
+$$
+0=\begin{bmatrix}0\\\vdots\\0\end{bmatrix}.
+$$
+
+它在向量加法中的作用类似数字 $0$：$x+0=x$。
+
+### 1.2 向量加法和数乘
+
+形状相同的向量按分量相加：
+
+$$
+\begin{bmatrix}x_1\\x_2\end{bmatrix} + \begin{bmatrix}y_1\\y_2\end{bmatrix} = \begin{bmatrix}x_1+y_1\\x_2+y_2\end{bmatrix}. \tag{1.4}
+$$
+
+标量 $c$ 与向量相乘，则每个分量都乘以 $c$：
+
+$$
+c\begin{bmatrix}x_1\\x_2\end{bmatrix} = \begin{bmatrix}cx_1\\cx_2\end{bmatrix}. \tag{1.5}
+$$
+
+几何上，$x+y$ 可以由平行四边形法则得到；$cx$ 改变向量长度，当 $c\lt 0$ 时还会反转方向。这两种操作结合起来，就得到线性代数最核心的构造。
+
+### 1.3 线性组合
+
+给定向量 $v_1,\ldots,v_k$ 和标量 $c_1,\ldots,c_k$，表达式
+
+$$
+c_1v_1+c_2v_2+\cdots+c_kv_k \tag{1.6}
+$$
+
+称为这些向量的一个**线性组合**。系数决定每个向量参与组合的权重。
+
+对贯穿示例，取系数 $3$ 和 $-1$：
+
+$$
+3a_1-a_2 =3\begin{bmatrix}1\\2\end{bmatrix} -\begin{bmatrix}2\\1\end{bmatrix} =\begin{bmatrix}1\\5\end{bmatrix}. \tag{1.7}
+$$
+
+这里的重要问题不是一次计算，而是：当系数遍历所有实数时，我们总共能得到哪些向量？
+
+### 1.4 张成的初步直觉
+
+向量 $v_1,\ldots,v_k$ 的所有线性组合构成的集合称为它们的**张成**，记作
+
+$$
+\operatorname{span}\{v_1,\ldots,v_k\} = \left\{c_1v_1+\cdots+c_kv_k:\ c_i\in\mathbb R\right\}. \tag{1.8}
+$$
+
+在二维平面中：
+
+- 一个非零向量的所有倍数张成一条过原点的直线；
+- 两个方向不同的向量通常能张成整个平面；
+- 两个方向相同或相反的向量仍然只能张成一条直线。
+
+$a_1$ 与 $a_2$ 不在同一条直线上，所以它们能够组合出平面中的任意向量。例如，式 (1.7) 已经组合出了 $(1,5)^T$。
+
+:::note
+这里先把“张成”当作“所有可达线性组合”的描述。向量空间、基、维数和线性相关将在后续章节中系统讨论，本节不提前展开。
+:::
+
+线性组合回答“能否由已有方向构造目标”的问题。接下来还需要回答：一个向量有多长？两个方向有多接近？
+
+## 2. 长度、点积与正交
+
+### 2.1 向量长度
+
+对 $x=(x_1,\ldots,x_n)^T$，欧几里得长度定义为
+
+$$
+\|x\| = \sqrt{x_1^2+x_2^2+\cdots+x_n^2}.
+\tag{2.1}
+$$
+
+这是勾股定理在 $n$ 个分量上的延伸。贯穿示例中的两个列向量长度相同：
+
+$$
+\|a_1\| =\sqrt{1^2+2^2} =\sqrt5, \qquad \|a_2\|=\sqrt5.
+\tag{2.2}
+$$
+
+长度满足三个基本性质：
+
+$$
+\|x\|\ge 0, \qquad \|x\|=0\iff x=0, \qquad \|cx\|=|c|\|x\|.
+\tag{2.3}
+$$
+
+另外还有三角不等式
+
+$$
+\|x+y\|\le \|x\|+\|y\|,
+\tag{2.4}
+$$
+
+它说明从原点直接到 $x+y$，不会比先走到 $x$ 再沿 $y$ 的方向移动更长。
+
+### 2.2 单位向量与归一化
+
+长度为 $1$ 的向量称为**单位向量**。若 $x\ne0$，则
+
+$$
+u=\frac{x}{\|x\|}
+\tag{2.5}
+$$
+
+与 $x$ 同方向且长度为 $1$。这个过程称为归一化。
+
+因此
+
+$$
+u_1=\frac1{\sqrt5}\begin{bmatrix}1\\2\end{bmatrix}, \qquad u_2=\frac1{\sqrt5}\begin{bmatrix}2\\1\end{bmatrix} \tag{2.6}
+$$
+
+都是单位向量。
+
+:::tip
+归一化只保留方向、去掉尺度。零向量没有方向，因此不能归一化；式 (2.5) 中除以 $\|0\|$ 也没有意义。
+:::
+
+### 2.3 点积把几何关系变成数字
+
+两个同维列向量的点积定义为
+
+$$
+x^Ty=x\cdot y =x_1y_1+x_2y_2+\cdots+x_ny_n. \tag{2.7}
+$$
+
+这里 $x^T$ 是把列向量转成行向量；转置将在第 7 节集中讨论。现在只需注意，行向量乘列向量得到一个数。
+
+点积与长度直接相连：
+
+$$
+x^Tx=x\cdot x=\|x\|^2.
+\tag{2.8}
+$$
+
+它对加法和数乘具有线性规则：
+
+$$
+(x+y)\cdot z=x\cdot z+y\cdot z, \qquad (cx)\cdot y=c(x\cdot y). \tag{2.9}
+$$
+
+对贯穿示例，
+
+$$
+a_1\cdot a_2=1\cdot2+2\cdot1=4. \tag{2.10}
+$$
+
+正值说明两者夹角小于 $90^\circ$，但点积的大小还受到向量长度影响。要单独提取角度，需要先除去长度。
+
+### 2.4 夹角与正交
+
+非零向量 $x,y$ 的夹角 $\theta\in[0,\pi]$ 由
+
+$$
+\cos\theta = \frac{x\cdot y}{\|x\|\|y\|}
+\tag{2.11}
+$$
+
+确定。因此贯穿示例中
+
+$$
+\cos\theta = \frac4{\sqrt5\sqrt5} =\frac45. \tag{2.12}
+$$
+
+当 $x\cdot y=0$ 时，$\cos\theta=0$，两个非零向量夹角为 $90^\circ$，称它们**正交**。按照惯例，零向量与所有向量的点积都为零，所以也说零向量与所有向量正交，尽管它本身没有方向。
+
+例如
+
+$$
+\begin{bmatrix}1\\2\end{bmatrix} \cdot \begin{bmatrix}-2\\1\end{bmatrix} =-2+2=0. \tag{2.13}
+$$
+
+点积把长度、角度和正交统一在同一个代数公式中。现在我们把若干列向量并排放置，进入矩阵语言。
+
+## 3. 矩阵与 $Ax$
+
+### 3.1 矩阵的形状
+
+一个 $m$ 行、$n$ 列的实矩阵记作
+
+$$
+A=(a_{ij})\in\mathbb R^{m\times n}, \qquad 1\le i\le m, \quad 1\le j\le n. \tag{3.1}
+$$
+
+$a_{ij}$ 是第 $i$ 行、第 $j$ 列的元素。形状 $m\times n$ 不是附加信息，而是运算能否成立的先决条件。
+
+例如
+
+$$
+B= \begin{bmatrix} 1&0&-1\\ 2&3&4 \end{bmatrix} \in\mathbb R^{2\times3}. \tag{3.2}
+$$
+
+它有三列，每列属于 $\mathbb R^2$；也有两行，每行包含三个分量。一般的 $m\times n$ 矩阵可以按列写成
+
+$$
+A=\begin{bmatrix}a_1&a_2&\cdots&a_n\end{bmatrix}, \qquad a_j\in\mathbb R^m. \tag{3.3}
+$$
+
+也可以按行写成
+
+$$
+A= \begin{bmatrix} r_1^T\\r_2^T\\\vdots\\r_m^T \end{bmatrix}, \qquad r_i\in\mathbb R^n. \tag{3.4}
+$$
+
+### 3.2 $Ax$ 的列视角：列的线性组合
+
+若 $A\in\mathbb R^{m\times n}$ 且 $x\in\mathbb R^n$，则 $Ax\in\mathbb R^m$。按列理解，
+
+$$
+Ax = \begin{bmatrix}a_1&\cdots&a_n\end{bmatrix} \begin{bmatrix}x_1\\\vdots\\x_n\end{bmatrix} =x_1a_1+\cdots+x_na_n. \tag{3.5}
+$$
+
+这正是线性组合。矩阵把可用的列收集在一起，输入向量 $x$ 提供组合系数，输出 $Ax$ 是组合结果。
+
+对贯穿示例，
+
+$$
+A\begin{bmatrix}3\\-1\end{bmatrix} = 3a_1-a_2 = \begin{bmatrix}1\\5\end{bmatrix}. \tag{3.6}
+$$
+
+因此，“求 $Ax$”和“按 $x$ 的分量组合 $A$ 的列”是同一件事。
+
+### 3.3 $Ax$ 的行视角：每一行与 $x$ 做点积
+
+按行理解同一乘积，有
+
+$$
+Ax = \begin{bmatrix} r_1^Tx\\r_2^Tx\\\vdots\\r_m^Tx \end{bmatrix}. \tag{3.7}
+$$
+
+输出的第 $i$ 个分量是第 $i$ 行与 $x$ 的点积。对式 (1.2)，
+
+$$
+A\begin{bmatrix}3\\-1\end{bmatrix} = \begin{bmatrix} 1\cdot3+2\cdot(-1)\\ 2\cdot3+1\cdot(-1) \end{bmatrix} = \begin{bmatrix}1\\5\end{bmatrix}. \tag{3.8}
+$$
+
+列视角解释“输出由哪些列组合而成”，行视角解释“每个输出分量如何测量输入”。两者不是不同定义，而是同一乘积的两个观察方向。
+
+:::note
+形状检查可以先于计算：$A$ 是 $m\times n$，所以输入必须有 $n$ 个分量，输出必有 $m$ 个分量。若形状不匹配，乘积不是“算错了”，而是根本没有定义。
+:::
+
+### 3.4 矩阵表示线性作用
+
+矩阵 $A$ 定义了规则 $x\mapsto Ax$。这个规则保持线性组合：
+
+$$
+A(x+y)=Ax+Ay, \qquad A(cx)=cAx. \tag{3.9}
+$$
+
+更一般地，
+
+$$
+A(c_1x_1+\cdots+c_kx_k) =c_1Ax_1+\cdots+c_kAx_k. \tag{3.10}
+$$
+
+这解释了“线性代数”中的“线性”：先组合输入再作用，与先分别作用再按同样系数组合，结果一致。
+
+## 4. 矩阵的加法、数乘与基本规则
+
+### 4.1 加法与数乘
+
+只有形状相同的矩阵才能相加。若 $A,B\in\mathbb R^{m\times n}$，则
+
+$$
+(A+B)_{ij}=a_{ij}+b_{ij}. \tag{4.1}
+$$
+
+标量 $c$ 与矩阵相乘定义为
+
+$$
+(cA)_{ij}=ca_{ij}. \tag{4.2}
+$$
+
+例如
+
+$$
+\begin{bmatrix}1&2\\2&1\end{bmatrix} + \begin{bmatrix}0&-1\\3&2\end{bmatrix} = \begin{bmatrix}1&1\\5&3\end{bmatrix}. \tag{4.3}
+$$
+
+把矩阵看作线性作用时，$A+B$ 表示对同一输入分别施加 $A$、$B$，再把输出相加：
+
+$$
+(A+B)x=Ax+Bx. \tag{4.4}
+$$
+
+零矩阵的所有元素均为零，记作 $0_{m\times n}$，在形状明确时简写为 $0$。负矩阵 $-A$ 由每个元素取负得到，因此 $A+(-A)=0$。
+
+### 4.2 单位矩阵
+
+$n$ 阶单位矩阵在主对角线上为 $1$，其余位置为 $0$：
+
+$$
+I_n= \begin{bmatrix} 1&0&\cdots&0\\ 0&1&\cdots&0\\ \vdots&\vdots&\ddots&\vdots\\ 0&0&\cdots&1 \end{bmatrix}. \tag{4.5}
+$$
+
+它不改变输入：
+
+$$
+I_nx=x. \tag{4.6}
+$$
+
+对于 $A\in\mathbb R^{m\times n}$，左右两侧需要不同阶数的单位矩阵：
+
+$$
+I_mA=A, \qquad AI_n=A. \tag{4.7}
+$$
+
+单位矩阵是矩阵乘法中的恒等作用，类似普通乘法中的数字 $1$，但下标所表达的形状不能忽略。
+
+## 5. 矩阵乘法：作用的复合
+
+### 5.1 为什么内侧尺寸必须相同
+
+设
+
+$$
+A\in\mathbb R^{m\times n}, \qquad B\in\mathbb R^{n\times p}.
+$$
+
+$B$ 先把 $p$ 维输入变成 $n$ 维输出，$A$ 再接收这个 $n$ 维向量并变成 $m$ 维输出。因此复合作用写作
+
+$$
+x\overset{B}{\longmapsto}Bx\overset{A}{\longmapsto}A(Bx)=(AB)x. \tag{5.1}
+$$
+
+乘积 $AB$ 的形状是 $m\times p$：
+
+$$
+\underbrace{A}_{m\times n} \underbrace{B}_{n\times p} = \underbrace{AB}_{m\times p}. \tag{5.2}
+$$
+
+中间的两个 $n$ 必须相同，外侧的 $m,p$ 决定结果形状。
+
+### 5.2 行乘列：单个元素的公式
+
+$AB$ 的第 $i,j$ 个元素，是 $A$ 的第 $i$ 行与 $B$ 的第 $j$ 列的点积：
+
+$$
+(AB)_{ij} = \sum_{k=1}^{n}a_{ik}b_{kj}. \tag{5.3}
+$$
+
+例如令
+
+$$
+B= \begin{bmatrix} 1&0\\ -1&2 \end{bmatrix}. \tag{5.4}
+$$
+
+则
+
+$$
+AB = \begin{bmatrix}1&2\\2&1\end{bmatrix} \begin{bmatrix}1&0\\-1&2\end{bmatrix} = \begin{bmatrix}-1&4\\1&2\end{bmatrix}. \tag{5.5}
+$$
+
+例如左上角来自第一行与第一列：$1\cdot1+2\cdot(-1)=-1$。
+
+行乘列是计算单个元素的直接方法，但不是理解矩阵乘法的唯一方式。
+
+### 5.3 按列理解：$AB$ 的列是 $A$ 对 $B$ 各列的作用
+
+若
+
+$$
+B=\begin{bmatrix}b_1&b_2&\cdots&b_p\end{bmatrix},
+$$
+
+那么
+
+$$
+AB = \begin{bmatrix}Ab_1&Ab_2&\cdots&Ab_p\end{bmatrix}. \tag{5.6}
+$$
+
+因此，$AB$ 的每一列都是 $A$ 的列的线性组合，组合系数由 $B$ 的对应列给出。
+
+在式 (5.4) 中，$B$ 的两列分别为 $(1,-1)^T$ 与 $(0,2)^T$，所以
+
+$$
+AB = \begin{bmatrix} a_1-a_2&2a_2 \end{bmatrix} = \begin{bmatrix}-1&4\\1&2\end{bmatrix}. \tag{5.7}
+$$
+
+这个视角通常比逐元素计算更能揭示结果的来源。
+
+### 5.4 按行理解：$AB$ 的行来自 $B$ 的行组合
+
+若 $A$ 的第 $i$ 行为 $r_i^T$，则 $AB$ 的第 $i$ 行是
+
+$$
+r_i^TB. \tag{5.8}
+$$
+
+它是 $B$ 各行的线性组合，系数来自 $A$ 的第 $i$ 行。于是：
+
+- 按列看，$B$ 提供系数来组合 $A$ 的列；
+- 按行看，$A$ 提供系数来组合 $B$ 的行。
+
+这两句话是同一乘法规则的对偶描述。
+
+### 5.5 外积之和
+
+把 $A$ 按列分开、把 $B$ 按行分开：
+
+$$
+A=\begin{bmatrix}a_1&\cdots&a_n\end{bmatrix}, \qquad B= \begin{bmatrix} b_1^T\\\vdots\\b_n^T \end{bmatrix}.
+$$
+
+则
+
+$$
+AB=a_1b_1^T+a_2b_2^T+\cdots+a_nb_n^T. \tag{5.9}
+$$
+
+每个 $a_kb_k^T$ 都是一个 $m\times p$ 矩阵，称为列向量与行向量的**外积**。例如
+
+$$
+\begin{bmatrix}u_1\\u_2\end{bmatrix} \begin{bmatrix}v_1&v_2&v_3\end{bmatrix} = \begin{bmatrix} u_1v_1&u_1v_2&u_1v_3\\ u_2v_1&u_2v_2&u_2v_3 \end{bmatrix}. \tag{5.10}
+$$
+
+外积之和适合分析一个乘积由哪些简单矩阵叠加而成。这里不进一步讨论秩或分解，只保留这一结构视角。
+
+### 5.6 分块矩阵
+
+大型矩阵可以按相容形状切成若干块。例如
+
+$$
+M= \begin{bmatrix} A&B\\ C&D \end{bmatrix}, \qquad x= \begin{bmatrix}u\\v\end{bmatrix}.
+$$
+
+只要块的尺寸匹配，就可以像普通元素一样计算：
+
+$$
+Mx = \begin{bmatrix} Au+Bv\\ Cu+Dv \end{bmatrix}. \tag{5.11}
+$$
+
+两个分块矩阵相乘时，仍采用行乘列：
+
+$$
+\begin{bmatrix}A&B\\C&D\end{bmatrix} \begin{bmatrix}E&F\\G&H\end{bmatrix} = \begin{bmatrix} AE+BG&AF+BH\\ CE+DG&CF+DH \end{bmatrix}. \tag{5.12}
+$$
+
+条件是每一个块乘积都有定义，并且相加的块形状相同。分块不是新乘法，而是把已有乘法组织到更大的尺度上。
+
+### 5.7 结合律、分配律与不交换性
+
+矩阵乘法满足结合律：
+
+$$
+(AB)C=A(BC), \tag{5.13}
+$$
+
+也满足左右分配律：
+
+$$
+A(B+C)=AB+AC, \qquad (A+B)C=AC+BC. \tag{5.14}
+$$
+
+结合律说明多个作用复合时，可以改变计算分组而不改变作用顺序。比如 $ABCx$ 可先计算 $Cx$，再计算 $B(Cx)$，最后施加 $A$。
+
+但是矩阵乘法通常**不满足交换律**。对式 (1.2) 和式 (5.4)，已经有
+
+$$
+AB=\begin{bmatrix}-1&4\\1&2\end{bmatrix},
+$$
+
+而
+
+$$
+BA = \begin{bmatrix}1&2\\3&0\end{bmatrix} \ne AB. \tag{5.15}
+$$
+
+更根本地，$AB$ 有定义时，$BA$ 甚至可能因形状不匹配而没有定义。矩阵乘法表示作用的复合，交换顺序等于改变先后步骤，结果自然可能不同。
+
+:::tip
+计算长乘积时可以利用结合律选择代价更低的分组，但不能擅自交换因子。例如 $(AB)x=A(Bx)$，通常先算 $Bx$ 可以避免先生成较大的中间矩阵 $AB$。
+:::
+
+## 6. 逆矩阵：撤销线性作用
+
+### 6.1 逆矩阵的定义
+
+对方阵 $A\in\mathbb R^{n\times n}$，若存在矩阵 $A^{-1}$ 使
+
+$$
+A^{-1}A=I_n, \qquad AA^{-1}=I_n, \tag{6.1}
+$$
+
+则称 $A$ **可逆**，$A^{-1}$ 称为 $A$ 的逆矩阵。
+
+逆矩阵撤销 $A$ 的作用：若 $y=Ax$，则
+
+$$
+x=A^{-1}y. \tag{6.2}
+$$
+
+这不仅是一条求解公式，还说明可逆性的含义：输出完整保留了输入信息，每个输出恰好对应一个输入。
+
+### 6.2 为什么有些矩阵没有逆
+
+若存在非零向量 $z$ 使
+
+$$
+Az=0, \tag{6.3}
+$$
+
+那么 $A$ 不可逆。因为若逆存在，两边左乘 $A^{-1}$ 会得到 $z=0$，与 $z\ne0$ 矛盾。
+
+更直观地，若 $Az=0$，则对任何 $x$，
+
+$$
+A(x+z)=Ax+Az=Ax. \tag{6.4}
+$$
+
+两个不同输入 $x$ 和 $x+z$ 得到同一输出，信息已经丢失，不可能再唯一恢复。
+
+从列组合看，式 (6.3) 意味着 $A$ 的列存在一组不全为零的系数，组合结果却为零。这样的列无法为每个目标提供唯一系数，因此方阵不会可逆。
+
+下面这些说法刻画的是同一现象的不同侧面。对 $n\times n$ 方阵 $A$，它可逆意味着：
+
+- $Ax=0$ 只有零解；
+- 不同输入不会被映到同一输出；
+- 对每个 $b\in\mathbb R^n$，$Ax=b$ 都有唯一解；
+- $A$ 的列能以唯一方式组合出任意 $b$；
+- 对 $A$ 做消元时，每一列都能找到主元。
+
+这些等价关系将在方程组和向量空间章节中得到更系统的论证。这里把它们作为判据的整体直觉。
+
+:::note
+只有方阵才按式 (6.1) 讨论双侧逆。长方形矩阵可能有单侧逆，但它不能同时对所有输入和输出实现一一对应，本节不展开这一主题。
+:::
+
+### 6.3 二阶矩阵的快速检查
+
+对
+
+$$
+A=\begin{bmatrix}a&b\\c&d\end{bmatrix},
+$$
+
+若 $ad-bc\ne0$，则
+
+$$
+A^{-1} = \frac1{ad-bc} \begin{bmatrix}d&-b\\-c&a\end{bmatrix}. \tag{6.5}
+$$
+
+若 $ad-bc=0$，这个公式不能使用，而且 $A$ 确实不可逆。这里的 $ad-bc$ 是二阶情形的快速判据；行列式的定义、性质和高阶计算留给专门章节。
+
+对贯穿示例，
+
+$$
+1\cdot1-2\cdot2=-3\ne0,
+$$
+
+所以 $A$ 可逆，并且
+
+$$
+A^{-1} =-\frac13 \begin{bmatrix}1&-2\\-2&1\end{bmatrix} = \begin{bmatrix}-\frac13&\frac23\\[2pt]\frac23&-\frac13\end{bmatrix}. \tag{6.6}
+$$
+
+直接相乘可验证
+
+$$
+AA^{-1}=A^{-1}A=I_2. \tag{6.7}
+$$
+
+### 6.4 Gauss–Jordan 求逆
+
+二阶公式不适合一般规模。求逆的通用方法是同时处理 $n$ 个右端项：
+
+$$
+AX=I_n. \tag{6.8}
+$$
+
+若能通过行变换把左侧 $A$ 化为 $I_n$，右侧会同步变成 $A^{-1}$：
+
+$$
+\left[\,A\mid I_n\,\right] \longrightarrow \left[\,I_n\mid A^{-1}\,\right]. \tag{6.9}
+$$
+
+对贯穿示例：
+
+$$
+\left[ \begin{array}{cc|cc} 1&2&1&0\\ 2&1&0&1 \end{array} \right].
+$$
+
+先用第一行消去第二行首项，$R_2\leftarrow R_2-2R_1$：
+
+$$
+\left[ \begin{array}{cc|cc} 1&2&1&0\\ 0&-3&-2&1 \end{array} \right].
+$$
+
+再令 $R_2\leftarrow-\frac13R_2$：
+
+$$
+\left[ \begin{array}{cc|cc} 1&2&1&0\\ 0&1&\frac23&-\frac13 \end{array} \right].
+$$
+
+最后用第二行消去第一行第二项，$R_1\leftarrow R_1-2R_2$：
+
+$$
+\left[ \begin{array}{cc|cc} 1&0&-\frac13&\frac23\\ 0&1&\frac23&-\frac13 \end{array} \right]. \tag{6.10}
+$$
+
+右半部分正是式 (6.6) 中的 $A^{-1}$。
+
+若左半部分无法化成单位矩阵，例如某一步出现无法获得主元的零列，那么 $A$ 不可逆。这里消元只服务于求逆；行变换、主元、方程组解的分类以及 $LU$ 分解将在“矩阵的初等变换与线性方程组”一章中完整讨论。
+
+### 6.5 逆矩阵是唯一的
+
+若 $B$ 和 $C$ 都是 $A$ 的逆，则
+
+$$
+B =BI =B(AC) =(BA)C =IC =C. \tag{6.11}
+$$
+
+因此可逆矩阵只有一个逆，记号 $A^{-1}$ 不会产生歧义。
+
+### 6.6 乘积的逆必须逆序
+
+若 $A$ 和 $B$ 都可逆，则 $AB$ 也可逆，并且
+
+$$
+(AB)^{-1}=B^{-1}A^{-1}. \tag{6.12}
+$$
+
+验证只需保持顺序：
+
+$$
+(AB)(B^{-1}A^{-1}) =A(BB^{-1})A^{-1} =AA^{-1} =I. \tag{6.13}
+$$
+
+$AB$ 表示先施加 $B$、再施加 $A$；撤销复合作用时，必须先撤销最后施加的 $A$，再撤销 $B$，所以逆矩阵按相反顺序出现。
+
+同理，三个可逆矩阵满足
+
+$$
+(ABC)^{-1}=C^{-1}B^{-1}A^{-1}. \tag{6.14}
+$$
+
+:::tip
+不要写 $A^{-1}=1/A$。矩阵没有普通分数意义下的除法，而且乘法不交换。解 $Ax=b$ 时，严谨写法是左乘 $A^{-1}$ 得到 $x=A^{-1}b$。
+:::
+
+## 7. 转置、对称矩阵与置换矩阵
+
+### 7.1 转置交换行与列
+
+若 $A\in\mathbb R^{m\times n}$，其转置 $A^T\in\mathbb R^{n\times m}$ 定义为
+
+$$
+(A^T)_{ij}=a_{ji}. \tag{7.1}
+$$
+
+例如
+
+$$
+C= \begin{bmatrix} 1&2&3\\ 4&5&6 \end{bmatrix}, \qquad C^T= \begin{bmatrix} 1&4\\ 2&5\\ 3&6 \end{bmatrix}. \tag{7.2}
+$$
+
+转置把 $C$ 的列变成 $C^T$ 的行，也把 $C$ 的行变成 $C^T$ 的列。基本规则是
+
+$$
+(A^T)^T=A, \qquad (A+B)^T=A^T+B^T, \qquad (cA)^T=cA^T. \tag{7.3}
+$$
+
+乘积转置时顺序反转：
+
+$$
+(AB)^T=B^TA^T. \tag{7.4}
+$$
+
+这是因为 $AB$ 的第 $i,j$ 个元素由 $A$ 的第 $i$ 行和 $B$ 的第 $j$ 列产生；转置后，行列角色交换，因子的顺序也随之交换。
+
+若 $A$ 可逆，则 $A^T$ 也可逆，而且
+
+$$
+(A^T)^{-1}=(A^{-1})^T. \tag{7.5}
+$$
+
+可由 $AA^{-1}=I$ 两边转置得到。
+
+### 7.2 对称矩阵
+
+若方阵满足
+
+$$
+S^T=S, \tag{7.6}
+$$
+
+则称 $S$ 为**对称矩阵**。它关于主对角线镜像位置的元素相等：$s_{ij}=s_{ji}$。
+
+贯穿示例中的
+
+$$
+A= \begin{bmatrix}1&2\\2&1\end{bmatrix}
+$$
+
+就是对称矩阵。任意形状的实矩阵 $C$ 都能构造出两个对称矩阵：
+
+$$
+C^TC \qquad\text{和}\qquad CC^T, \tag{7.7}
+$$
+
+因为
+
+$$
+(C^TC)^T=C^T(C^T)^T=C^TC.
+$$
+
+但二者通常形状不同：若 $C$ 是 $m\times n$，则 $C^TC$ 是 $n\times n$，$CC^T$ 是 $m\times m$。
+
+对称性在后续的二次型、特征值和正交投影中会非常重要，本节只建立定义和基本运算规则。
+
+### 7.3 置换矩阵交换顺序
+
+置换矩阵由单位矩阵交换行得到。二维交换矩阵为
+
+$$
+P= \begin{bmatrix} 0&1\\ 1&0 \end{bmatrix}. \tag{7.8}
+$$
+
+左乘向量会交换两个分量：
+
+$$
+P\begin{bmatrix}x_1\\x_2\end{bmatrix} = \begin{bmatrix}x_2\\x_1\end{bmatrix}. \tag{7.9}
+$$
+
+左乘矩阵会交换矩阵的行。例如
+
+$$
+P \begin{bmatrix}a&b\\c&d\end{bmatrix} = \begin{bmatrix}c&d\\a&b\end{bmatrix}. \tag{7.10}
+$$
+
+右乘同一个 $P$ 则交换列：
+
+$$
+\begin{bmatrix}a&b\\c&d\end{bmatrix}P = \begin{bmatrix}b&a\\d&c\end{bmatrix}. \tag{7.11}
+$$
+
+一般的置换矩阵每行、每列恰有一个 $1$，其余元素为 $0$。它的列是单位矩阵各列的重新排列，因此这些列仍然彼此正交且长度为 $1$。由此得到
+
+$$
+P^TP=I, \qquad P^{-1}=P^T. \tag{7.12}
+$$
+
+对式 (7.8) 的简单交换，恰好还有 $P^T=P$ 和 $P^2=I$。但一般置换不一定对称，也不一定做两次就恢复；普遍成立的是 $P^{-1}=P^T$。
+
+置换矩阵把“重新编号”或“交换顺序”表达成普通矩阵乘法。后续讨论消元时，它会用于记录换行操作。
+
+## 8. 贯穿示例的完整回看
+
+现在回到
+
+$$
+A= \begin{bmatrix}1&2\\2&1\end{bmatrix} = \begin{bmatrix}a_1&a_2\end{bmatrix}.
+$$
+
+从不同层次看，它包含了一条完整的概念链。
+
+第一层是向量：$a_1$ 和 $a_2$ 是两个列向量，它们都有长度 $\sqrt5$，点积为 $4$，夹角满足 $\cos\theta=4/5$。它们方向不同，因此线性组合可以覆盖整个二维平面。
+
+第二层是矩阵乘向量：
+
+$$
+Ax=x_1a_1+x_2a_2. \tag{8.1}
+$$
+
+输入 $x$ 是组合系数，输出是实际组合出的向量。按行看，输出的两个分量又分别是 $A$ 的两行与 $x$ 的点积。
+
+第三层是矩阵乘矩阵：$AB$ 表示先施加 $B$、再施加 $A$。它既可以逐项按行乘列计算，也可以看成 $A$ 分别作用于 $B$ 的各列，或看成若干外积之和。
+
+第四层是可逆性：$A$ 不会把两个不同输入压成同一输出，所以 $A^{-1}$ 存在。已知 $y=Ax$ 后，$A^{-1}y$ 可以唯一恢复 $x$。
+
+第五层是结构：$A^T=A$，所以它对称；置换矩阵则通过乘法重排行或列，并满足 $P^{-1}=P^T$。
+
+### 8.1 一份概念链总结
+
+可以把本节主线压缩成下面的依赖关系：
+
+1. **列向量**记录有顺序的分量；加法和数乘产生**线性组合**。
+2. 所有线性组合构成初步的**张成**概念，回答“哪些目标能够被构造”。
+3. **长度**描述大小，**点积**同时连接长度、夹角与正交。
+4. 把若干列并排得到**矩阵**；$Ax$ 就是用 $x$ 的分量组合这些列。
+5. $Ax$ 的列视角强调构造，行视角强调每个输出分量都是一次点积。
+6. **矩阵乘法**表示线性作用的复合，因此尺寸要衔接、结合律成立，而顺序通常不能交换。
+7. **单位矩阵**是不改变输入的作用；**逆矩阵**撤销可逆作用。
+8. 可逆意味着输入信息没有丢失；Gauss–Jordan 把求逆化成 $AX=I$ 的统一求解。
+9. **转置**交换行列，乘积转置会逆序；**对称矩阵**在转置下保持不变。
+10. **置换矩阵**以乘法实现重排，并满足 $P^{-1}=P^T$。
+
+### 8.2 自检问题
+
+读完本节后，应当能够不依赖机械口诀回答这些问题：
+
+- 为什么 $m\times n$ 矩阵只能左乘 $n$ 维列向量？
+- 为什么 $Ax$ 既是列的线性组合，又是一组行与 $x$ 的点积？
+- 为什么 $(AB)x$ 表示先做 $B$ 再做 $A$？
+- 为什么矩阵乘法可以重新加括号，却通常不能交换因子？
+- 若存在非零 $z$ 使 $Az=0$，为什么 $A$ 一定没有逆？
+- 为什么 $(AB)^{-1}$ 与 $(AB)^T$ 都要反转因子顺序？
+- 为什么置换矩阵的逆等于它的转置？
+
+如果这些问题能够从“线性组合—作用—复合—撤销”的主线自然推出，就已经掌握了本节最重要的结构。
+
+## References
+
+[1] Gilbert Strang, *Introduction to Linear Algebra*, Wellesley-Cambridge Press. 本节教学顺序参考其中 1.1、1.2、1.3、2.4、2.5 与 2.7 节的概念推进，但内容与表述均为重新组织的中文教程。
+
+[2] MIT OpenCourseWare, [18.06 Linear Algebra, Spring 2010](https://ocw.mit.edu/courses/18-06-linear-algebra-spring-2010/).
+
+[3] MIT OpenCourseWare, [18.06SC Linear Algebra, Fall 2011](https://ocw.mit.edu/courses/18-06sc-linear-algebra-fall-2011/).
+
+[4] MIT OpenCourseWare, [Lecture 3: Multiplication and Inverse Matrices](https://ocw.mit.edu/courses/18-06-linear-algebra-spring-2010/resources/lecture-3-multiplication-and-inverse-matrices/).
+
+</WordCount>

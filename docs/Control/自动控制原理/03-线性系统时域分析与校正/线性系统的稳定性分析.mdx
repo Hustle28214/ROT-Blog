@@ -1,0 +1,68 @@
+---
+sidebar_position: 4
+---
+
+# 线性系统的稳定性分析
+
+## 稳定性的含义
+
+对线性定常连续系统，若零输入响应在任意有限初始状态下均趋于零，则系统渐近稳定。对有理闭环传递函数，这等价于闭环特征方程的全部根严格位于 $s$ 平面左半平面。
+
+<svg viewBox="0 0 680 310" role="img" aria-label="s 平面稳定域：左半平面稳定，虚轴为临界边界，右半平面不稳定" style={{maxWidth:'680px',width:'100%',color:'var(--ifm-font-color-base)'}}>
+  <defs><marker id="s-arrow" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8 Z" fill="currentColor"/></marker></defs>
+  <rect x="42" y="24" width="295" height="245" fill="var(--ifm-color-success-contrast-background)" opacity="0.65"/>
+  <rect x="337" y="24" width="300" height="245" fill="var(--ifm-color-danger-contrast-background)" opacity="0.55"/>
+  <g stroke="currentColor" strokeWidth="2" fill="none" markerEnd="url(#s-arrow)">
+    <path d="M42 147 H640"/><path d="M337 282 V20"/>
+  </g>
+  <g stroke="currentColor" strokeWidth="1.4">
+    <path d="M187 141 V153"/><path d="M487 141 V153"/><path d="M331 72 H343"/><path d="M331 222 H343"/>
+  </g>
+  <g fill="currentColor" fontSize="15">
+    <text x="644" y="152">Re(s)</text><text x="346" y="20">Im(s)</text><text x="323" y="165">0</text>
+    <text x="174" y="171">−σ</text><text x="478" y="171">+σ</text>
+    <text x="352" y="77">+jω</text><text x="352" y="227">−jω</text>
+    <text x="95" y="52">渐近稳定域</text><text x="495" y="52">不稳定域</text><text x="345" y="294">虚轴边界</text>
+  </g>
+  <g stroke="var(--ifm-color-primary)" strokeWidth="3"><path d="M179 98 l16 16 m0-16 l-16 16"/><path d="M229 205 l16 16 m0-16 l-16 16"/></g>
+  <g stroke="var(--ifm-color-danger)" strokeWidth="3"><path d="M480 100 l16 16 m0-16 l-16 16"/></g>
+</svg>
+
+虚轴上的单极点产生不衰减振荡或常值模态，只是临界稳定；虚轴重根以及任何右半平面极点都会导致不稳定。讨论稳态误差前，必须先确认闭环稳定。
+
+## 劳斯判据
+
+对特征多项式
+
+$$
+D(s)=a_ns^n+a_{n-1}s^{n-1}+\cdots+a_1s+a_0,\qquad a_n>0,
+$$
+
+劳斯表前两行为
+
+$$
+\begin{array}{c|cccc}
+s^n&a_n&a_{n-2}&a_{n-4}&\cdots\\
+s^{n-1}&a_{n-1}&a_{n-3}&a_{n-5}&\cdots
+\end{array}
+$$
+
+后续元素按相邻两行的行列式递推。**第一列符号变化次数等于右半平面根数**；因此无缺项的一般情形下，第一列全同号是稳定的充要条件。
+
+三阶多项式 $a_3s^3+a_2s^2+a_1s+a_0$ 在系数均正时还需满足
+
+$$
+a_2a_1>a_3a_0.
+$$
+
+仅凭“系数均正”不能断言高阶系统稳定，它只是必要条件。
+
+## 特殊情况
+
+- 第一列首项为零而该行不全零：用正小量 $\varepsilon$ 代替，完成表格后考察 $\varepsilon\to0^+$ 时的符号；
+- 某一整行全零：上一行构造辅助多项式，对其求导后替换全零行。这说明存在关于原点对称的根，常对应虚轴根；
+- 参数稳定范围：先保证特征多项式阶次与首项符号不突变，再由劳斯表第一列列出全部不等式。
+
+## 常见辨析
+
+稳定性由闭环极点决定，与输入形式无关；但“有界输入产生有界输出”的 BIBO 稳定只反映可控可观的输入—输出模态。若存在不稳定极零相消，外部传递函数可能看似稳定而内部状态不稳定。

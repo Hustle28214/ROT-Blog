@@ -1,0 +1,90 @@
+import WordCount from '../../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+# MuZero：latent 里搜树，不重建观测
+
+我的结论先说：MuZero 把世界模型从"模拟器"变成了"决策用的 latent 空间"。它不重建像素、不学环境规则，却在围棋、国际象棋、将棋和 Atari 上同时达到超人水平。对 WAM 的启示不是去抄 MCTS，而是 value equivalence——latent 只要能让奖励、价值、策略预测对齐搜索目标，内部长什么样根本不重要。
+
+上一篇 [Dreamer 系列](../Latent动力学与想象训练/02-Dreamer.mdx) 还在用 ELBO 重建观测；MuZero 把重建项整个删了。下一篇 [TD-MPC](./02-TD-MPC.mdx) 和 [TD-MPC2](./03-TD-MPC2.mdx) 把同一思路搬到连续控制，换掉树搜索。三篇合起来就是"决策等价世界模型"这条线的完整脉络。
+
+## 1. 它要解决什么问题
+
+经典 model-based RL 有两条路，都不理想。
+
+第一条是像 AlphaZero 那样，给完整游戏规则，在真实状态空间做 MCTS。棋类游戏状态离散、转移确定，可行；Atari 像素空间太大，根本搜不动。
+
+第二条是像 Dreamer 那样学 latent 动力学再想象训练，但 ELBO 逼模型重建观测。重建占掉了大量表示容量，而策略真正需要的往往只是"这一步奖励多少、下一步往哪走"。
+
+MuZero 的命题很直接：能不能不学规则、不重建观测，只学一个对 MCTS 充分的 latent 动力学？
+
+## 2. 三个网络，一条训练链
+
+MuZero 学三个函数，全部在 latent 里操作：
+
+- **表征** $s^0 = h_\theta(o_{\le t})$：把观测历史（通常最近 $K$ 帧）压成初始 latent；
+- **动力学** $s^k, r^k = g_\theta(s^{k-1}, a^k)$：给定上一步 latent 和动作，推出下一步 latent 和即时奖励；
+- **预测** $p^k, v^k = f_\theta(s^k)$：输出策略先验 $\pi(a \mid s^k)$ 和状态价值 $v^k$。
+
+推理时不在真实环境里展开，而是在学到的 $g_\theta$ 里做蒙特卡洛树搜索。因为动力学是学出来的，MuZero 不需要知道围棋规则或 Atari 物理——这是它能跨域的根本原因。
+
+## 3. 核心公式：value equivalence
+
+损失函数里没有任何一项要求 $s^k$ 还原回观测：
+
+$$
+\mathcal{L} = \sum_{k=0}^{K}\Big[\ell^r(u_{t+k}, r^k) + \ell^v(z_{t+k}, v^k) + \ell^p(\pi_{t+k}, p^k)\Big] + c\|\theta\|^2
+$$
+
+三项分别对齐：
+
+- $\ell^r$：预测奖励 $r^k$ 和真实奖励 $u_{t+k}$（分类交叉熵，奖励被离散化到固定区间）；
+- $\ell^v$：预测价值 $v^k$ 和 bootstrap 目标 $z_{t+k}$（MCTS 根节点价值或 $n$ 步回报）；
+- $\ell^p$：预测策略 $p^k$ 和 MCTS 访问分布 $\pi_{t+k}$（交叉熵）。
+
+$\pi_{t+k}$ 不是行为策略，而是搜索产生的改进策略。模型被训练成"搜出来的结果是什么样，我就预测什么样"——这叫 **value equivalence**。latent 可以学出任何内部表示，只要这三个量对得上。
+
+## 4. MCTS：pUCT 在 latent 里跑
+
+搜索用改进版 PUCT。每个节点选动作时：
+
+$$
+U(s, a) = Q(s, a) + P(s, a) \cdot \frac{\sqrt{\sum_b N(s, b)}}{1 + N(s, a)} \cdot \Big(c_1 + \ln\frac{\sum_b N(s, b) + c_2 + 1}{c_2}\Big)
+$$
+
+$P(s, a)$ 来自网络预测 $p^k$，$Q(s, a)$ 来自子节点价值的备份。展开时用 $g_\theta$ 推进 latent，用 $f_\theta$ 给 leaf 估值，不需要环境交互。
+
+训练数据来自 self-play：当前网络跟自己对弈/玩游戏，MCTS 既产生行为又产生训练标签。跟 AlphaZero 的区别仅在于展开和评估都在 latent 里完成。
+
+## 5. 实验结果
+
+DeepMind 2019 年论文（[arXiv:1911.08265](https://arxiv.org/abs/1911.08265)）报的结果：
+
+| 领域 | 成绩 |
+|------|------|
+| 围棋 | 超 AlphaGo Zero 和 AlphaZero |
+| 国际象棋 | 100 局对局评估超 Stockfish |
+| 将棋 | 超 elmo |
+| Atari 57 游戏 | 超之前所有 model-free 方法，样本效率显著更高 |
+
+同一套算法架构、同一套超参思路，横跨离散棋类和像素 Atari——在 MuZero 之前这几乎没人做到。Sampled MuZero、EfficientZero 等后续工作在此基础上继续压样本效率，但 value equivalence 的核心没变。
+
+## 6. 局限：latent 是黑箱
+
+value equivalence 换来自由度，也换来三个实际问题：
+
+1. **不可解释**。latent 没有观测锚定，没法可视化"模型认为未来长什么样"。真机上出了问题，你很难判断是动力学错了还是价值错了。
+2. **复合误差**。MCTS 滚 $K$ 步（通常 5–50），每步动力学误差叠加。棋类状态空间结构化、转移相对平滑，这个问题被掩盖；连续控制和高维感知里会致命——这也是 [TD-MPC](./02-TD-MPC.mdx) 只滚 3 步的直接原因。
+3. **搜索开销**。MCTS 每步要做几百次网络前向。Atari 30 FPS 还能跑，机器人 50–1000 Hz 的控制频率根本塞不进去。
+
+## 7. 跟 WAM 的关系
+
+MuZero 跟今天的视频 WAM 看起来完全不同：一个不生成像素，一个核心就是生成像素。但落到机器人上，我觉得有两点直接可借鉴。
+
+**第一，预测得像 ≠ 预测得有用。** 视频 WAM 的 FVD、PSNR 衡量的是生成质量，不是决策质量。MuZero 用 value equivalence 明确把这两者分开了——WAM 也需要单独验证：生成的未来帧里，有多少信息真的被动作分支用上了？
+
+**第二，闭环频率是硬约束。** MuZero 的 MCTS 在真机上跑不动，[TD-MPC2](./03-TD-MPC2.mdx) 换成 3 步 MPPI 才实用。[MotionWAM](../Video-Action Model/03-MotionWAM.mdx) 只做一次前向、不完整去噪，本质上是同一种妥协：不是"能不能预测更远"，而是"控制周期里来得及算什么"。
+
+回到 [WAM 总览](../00-世界模型的起点与前沿.mdx)，MuZero 代表了一条明确放弃生成、只服务决策的路。后面两篇把这个思路推到了连续控制和多任务 scaling 上。
+
+</WordCount>

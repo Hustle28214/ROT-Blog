@@ -1,0 +1,317 @@
+import WordCount from '../../../src/components/WordCount/WordCount.jsx';
+
+<WordCount>
+
+# 大数定律及中心极限定理
+
+概率论中的极限定理回答两个核心问题：大量重复观测的平均值为何趋于稳定？许多微小随机影响之和为何常呈正态形状？大数定律回答第一个问题，中心极限定理回答第二个问题。
+
+## 1. 两种随机变量收敛
+
+设 $X_1,X_2,\ldots$ 和 $X$ 定义在同一概率空间上。
+
+### 1.1 依概率收敛
+
+若对任意 $\varepsilon>0$，
+
+$$
+\lim_{n\to\infty}P\{|X_n-X|\ge\varepsilon\}=0,
+$$
+
+则称 $X_n$ 依概率收敛于 $X$，记作
+
+$$
+X_n\xrightarrow{P}X.
+$$
+
+它表示当 $n$ 很大时，$X_n$ 与 $X$ 出现明显偏差的概率很小。依概率收敛并不要求每条样本路径最终都靠近。
+
+### 1.2 依分布收敛
+
+设 $F_n,F$ 分别为 $X_n,X$ 的分布函数。若在 $F$ 的每个连续点 $x$ 上，
+
+$$
+\lim_{n\to\infty}F_n(x)=F(x),
+$$
+
+则称 $X_n$ 依分布收敛于 $X$，记作
+
+$$
+X_n\xrightarrow{d}X.
+$$
+
+依分布收敛只关心分布形状，不要求随机变量定义在同一概率空间上。
+
+二者关系为
+
+$$
+X_n\xrightarrow{P}X\quad\Longrightarrow\quad X_n\xrightarrow{d}X.
+$$
+
+反向一般不成立；但当极限 $X=c$ 为常数时，
+
+$$
+X_n\xrightarrow{d}c\quad\Longleftrightarrow\quad X_n\xrightarrow{P}c.
+$$
+
+:::tip 连续映射与 Slutsky 定理
+若 $X_n\xrightarrow{P}X$，连续函数 $g$ 满足
+$g(X_n)\xrightarrow{P}g(X)$。若 $X_n\xrightarrow{d}X$ 且
+$Y_n\xrightarrow{P}c$，则
+
+$$
+X_n+Y_n\xrightarrow{d}X+c,\qquad
+X_nY_n\xrightarrow{d}cX.
+$$
+
+当 $c\ne0$ 时，还有 $X_n/Y_n\xrightarrow{d}X/c$。这些结论常用于标准化统计量。
+:::
+
+## 2. Markov 与 Chebyshev 不等式
+
+### 2.1 Markov 不等式
+
+若随机变量 $X\ge0$ 几乎处处且 $E(X)<\infty$，则对任意 $a>0$，
+
+$$
+P\{X\ge a\}\le\frac{E(X)}a.
+$$
+
+证明只需注意 $X\ge a\mathbf 1_{\{X\ge a\}}$，两边取期望即可。它把尾概率控制转化为均值控制。
+
+### 2.2 Chebyshev 不等式
+
+若 $E(X)=\mu$、$\operatorname{Var}(X)=\sigma^2<\infty$，则对任意
+$\varepsilon>0$，
+
+$$
+P\{|X-\mu|\ge\varepsilon\}
+\le\frac{\sigma^2}{\varepsilon^2}.
+$$
+
+这是对非负变量 $(X-\mu)^2$ 使用 Markov 不等式得到的。等价地，对 $k>0$，
+
+$$
+P\{|X-\mu|<k\sigma\}\ge1-\frac1{k^2}.
+$$
+
+:::info 例：无分布假设的误差界
+某测量误差 $X$ 的均值为 $0$、标准差为 $2$。即使不知道其分布，仍有
+
+$$
+P\{|X|\ge6\}\le\frac{2^2}{6^2}=\frac19.
+$$
+
+这是保守上界；掌握更多分布信息通常能得到更精确的结果。
+:::
+
+## 3. 弱大数定律
+
+令
+
+$$
+\overline X_n=\frac1n\sum_{i=1}^nX_i
+$$
+
+为样本均值。大数定律关注 $\overline X_n$ 是否接近总体均值。
+
+### 3.1 Chebyshev 弱大数定律
+
+若 $X_1,X_2,\ldots$ 两两不相关，具有共同均值
+$E(X_i)=\mu$，且方差一致有界，即存在 $C<\infty$ 使
+$\operatorname{Var}(X_i)\le C$，则
+
+$$
+\overline X_n\xrightarrow{P}\mu.
+$$
+
+事实上，
+
+$$
+E(\overline X_n)=\mu,\qquad
+\operatorname{Var}(\overline X_n)
+=\frac1{n^2}\sum_{i=1}^n\operatorname{Var}(X_i)
+\le\frac Cn.
+$$
+
+由 Chebyshev 不等式，
+
+$$
+P\{|\overline X_n-\mu|\ge\varepsilon\}
+\le\frac{C}{n\varepsilon^2}\longrightarrow0.
+$$
+
+特别地，独立同分布且具有有限方差的随机变量序列满足该结论。
+
+### 3.2 Bernoulli 弱大数定律
+
+若 $X_i$ 独立同分布于 $\operatorname{Bernoulli}(p)$，令
+$S_n=\sum_{i=1}^nX_i$ 表示成功次数，则
+
+$$
+\frac{S_n}{n}\xrightarrow{P}p.
+$$
+
+因此，大量重复试验中的频率会稳定在理论概率附近。这不是说有限次试验的频率必等于概率，而是任意固定误差被超过的概率趋于 $0$。
+
+:::warning 大数定律不描述波动形状
+大数定律只说明 $\overline X_n-\mu$ 趋于 $0$，没有告诉我们误差通常有多大或近似服从什么分布。中心极限定理补充了这部分信息。
+:::
+
+## 4. 中心极限定理
+
+### 4.1 Lindeberg--Levy 中心极限定理
+
+设 $X_1,X_2,\ldots$ 独立同分布，且
+
+$$
+E(X_i)=\mu,\qquad
+\operatorname{Var}(X_i)=\sigma^2,\qquad 0<\sigma^2<\infty.
+$$
+
+记 $S_n=X_1+\cdots+X_n$，则
+
+$$
+\frac{S_n-n\mu}{\sigma\sqrt n}
+=\frac{\sqrt n(\overline X_n-\mu)}{\sigma}
+\xrightarrow{d}N(0,1).
+$$
+
+因此当 $n$ 足够大时，
+
+$$
+S_n\approx N(n\mu,n\sigma^2),\qquad
+\overline X_n\approx N\left(\mu,\frac{\sigma^2}{n}\right).
+$$
+
+“中心”指减去均值，“极限”指标准化和的分布趋于标准正态。原变量不必服从正态，但必须满足独立同分布与有限非零方差等条件。
+
+若记标准正态分布函数为
+
+$$
+\Phi(x)=\frac1{\sqrt{2\pi}}\int_{-\infty}^xe^{-t^2/2}\,dt,
+$$
+
+则对任意 $a<b$，
+
+$$
+P\left\{a<\frac{S_n-n\mu}{\sigma\sqrt n}\le b\right\}
+\longrightarrow\Phi(b)-\Phi(a).
+$$
+
+### 4.2 De Moivre--Laplace 定理
+
+设 $S_n\sim B(n,p)$，其中 $0<p<1$，$q=1-p$。则
+
+$$
+\frac{S_n-np}{\sqrt{npq}}\xrightarrow{d}N(0,1).
+$$
+
+这是中心极限定理在 Bernoulli 和上的特例。于是
+
+$$
+P\{a\le S_n\le b\}
+\approx
+\Phi\left(\frac{b+0.5-np}{\sqrt{npq}}\right)
+-\Phi\left(\frac{a-0.5-np}{\sqrt{npq}}\right).
+$$
+
+$\pm0.5$ 称为**连续性校正**：离散整数 $k$ 对应连续区间
+$[k-0.5,k+0.5]$。当 $np$ 与 $nq$ 都不太小时，正态近似通常较可靠；常用经验条件是二者均至少为 $5$ 或 $10$。
+
+## 5. 正态近似应用
+
+### 5.1 二项概率近似
+
+某零件合格率为 $p=0.9$，独立抽取 $n=100$ 件。令 $S$ 为合格品数，求至少 $85$ 件合格的近似概率。
+
+这里
+
+$$
+np=90,\qquad npq=9,\qquad \sqrt{npq}=3.
+$$
+
+作连续性校正后，
+
+$$
+\begin{aligned}
+P\{S\ge85\}
+&=P\{S>84\}\\
+&\approx P\left\{Z>\frac{84.5-90}{3}\right\}\\
+&=\Phi(1.833)\approx0.9666.
+\end{aligned}
+$$
+
+### 5.2 随机和与容量设计
+
+设每日需求量 $X_1,\ldots,X_{100}$ 独立同分布，均值为 $20$，标准差为 $4$。总需求
+$S_{100}$ 近似服从
+
+$$
+N(2000,1600).
+$$
+
+若库存为 $2066$，缺货概率近似为
+
+$$
+P\{S_{100}>2066\}
+\approx1-\Phi\left(\frac{2066-2000}{40}\right)
+=1-\Phi(1.65)\approx0.0495.
+$$
+
+因此 $2066$ 左右的库存对应约 $95\%$ 的满足率。计算中必须区分单个变量的标准差 $\sigma$ 与总和的标准差 $\sigma\sqrt n$。
+
+### 5.3 样本均值的近似概率
+
+若总体均值 $\mu=50$、标准差 $\sigma=12$，抽取 $n=144$ 个独立同分布样本，则
+
+$$
+\overline X\approx N(50,1).
+$$
+
+所以
+
+$$
+P\{48\le\overline X\le52\}
+\approx\Phi(2)-\Phi(-2)\approx0.9545.
+$$
+
+这解释了均值的标准误差 $\sigma/\sqrt n$：样本量增大四倍，典型误差约缩小一半。
+
+:::tip 近似计算的标准步骤
+1. 明确目标变量是“和”“均值”还是“成功次数”；
+2. 计算其精确均值与方差；
+3. 减均值、除以标准差完成标准化；
+4. 对离散变量考虑连续性校正；
+5. 用 $\Phi$ 计算并检查结果是否位于 $[0,1]$。
+:::
+
+## 6. 两类定律的比较
+
+大数定律给出
+
+$$
+\overline X_n-\mu\xrightarrow{P}0,
+$$
+
+说明样本均值具有稳定性。中心极限定理给出
+
+$$
+\frac{\overline X_n-\mu}{\sigma/\sqrt n}\xrightarrow{d}N(0,1),
+$$
+
+说明误差的典型量级是 $n^{-1/2}$，标准化后的形状近似正态。前者支撑“用频率估计概率、用样本均值估计总体均值”，后者支撑近似概率、置信区间与假设检验。
+
+:::warning 正态近似并非无条件成立
+样本量“大”没有统一阈值。严重偏斜、重尾或极端稀有事件会减慢收敛；若方差不存在，Lindeberg--Levy 定理不能直接使用。应用前应检查独立性、同分布性、方差有限性及 $n$ 是否足以抵消原分布的偏斜。
+:::
+
+## References
+
+\[1\]. 盛骤, 谢式千, 潘承毅. 概率论与数理统计[M]. 第4版. 北京: 高等教育出版社, 2008.
+
+\[2\]. 茆诗松, 程依明, 濮晓龙. 概率论与数理统计教程[M]. 第3版. 北京: 高等教育出版社, 2019.
+
+\[3\]. Patrick Billingsley. Probability and Measure[M]. 3rd ed. Wiley, 1995.
+
+</WordCount>

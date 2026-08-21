@@ -1,0 +1,107 @@
+---
+sidebar_position: 2
+---
+
+import WordCount from '../../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+先说结论：`pub.publish(msg)`这一行并不是"把消息发出去"，而是"把一个还没执行的序列化任务交给TopicManager"。真正的序列化可能晚一点发生，也可能压根不发生。
+
+本文沿着advertise和publish两条路，把发布侧的对象关系理一遍。
+
+## advertise干了三件事
+
+`NodeHandle::advertise`是个模板函数，先构造AdvertiseOptions。关键是`AdvertiseOptions::create`，它借助message_traits把消息类型的静态信息抄进运行时结构：
+
+```cpp
+// 简化示意
+template<class M>
+static AdvertiseOptions create(const std::string& topic, uint32_t queue_size, ...) {
+  AdvertiseOptions ops;
+  ops.topic = topic;
+  ops.queue_size = queue_size;
+  ops.md5sum = message_traits::md5sum<M>();
+  ops.datatype = message_traits::datatype<M>();
+  ops.message_definition = message_traits::definition<M>();
+  ops.has_header = message_traits::hasHeader<M>();
+  return ops;
+}
+```
+
+这四个字段后面会出现在两个地方：向master注册的时候，以及跟订阅方握手的连接头里。md5sum就是在这一步被钉死的，后面所有"类型不匹配"的报错都来自这个值的比较。
+
+然后进`TopicManager::advertise`：
+
+1. 解析话题名，走names的resolve和remap，把相对名变成全局名
+2. 找有没有同名的Publication，有就复用，没有才新建。同一进程重复advertise同一个话题不会产生两份注册
+3. 通过`master::execute`调master的registerPublisher
+
+注意第三步之前本地Publication就已经建好了。也就是说master短暂不可用不影响本地结构完整，但订阅方永远不会知道你的存在，因为撮合完全靠master。
+
+## Publication里有什么
+
+Publication是一个话题在发布侧的全部状态，主要三样：
+
+- `subscriber_links_`，所有已连接的订阅者链路
+- 发布队列，受advertise时给的queue_size限制
+- `last_message_`，latch模式下存的最后一条消息
+
+Publisher对象本身很轻，只是Publication的一个句柄，析构时递减引用，必要时unadvertise。
+
+## publish为什么要延迟序列化
+
+这是发布路径上最值得看的一段。`Publisher::publish`不直接序列化，而是把"怎么序列化"打包成一个可调用对象传给TopicManager。
+
+```cpp
+// 简化示意
+template<typename M>
+void Publisher::publish(const M& message) const {
+  // 只是打包，此时并没有执行
+  SerFunc ser_func = boost::bind(serializeMessage<M>, boost::ref(message));
+  TopicManager::instance()->publish(topic_, ser_func, message);
+}
+```
+
+`TopicManager::publish`拿到之后先问`Publication::getPublishTypes`：这个话题现在需不需要serialize、能不能nocopy。判断依据是订阅者的构成：
+
+- 有网络订阅者，必须序列化
+- 订阅者全在同一进程内而且消息类型一致，可以走零拷贝，直接把消息的智能指针交过去
+- 两种都有，那就两条路一起走，序列化一份给网络，指针共享给进程内
+
+只有确实需要的时候才去调那个延迟函数。这个设计在同进程场景下收益很明显，nodelet那套进程内通信就是靠它跳过序列化和内存拷贝的，一张大图不会被反复编码。
+
+## 两种SubscriberLink
+
+SubscriberLink是抽象基类，两个实现：
+
+- TransportSubscriberLink，面向网络的订阅者，消息进`outbox_`，由Connection和底层Transport异步写出去
+- IntraProcessSubscriberLink，同进程订阅者，绕过网络直接推给对方
+
+丢包就发生在TransportSubscriberLink这。`outbox_`到了advertise时指定的queue_size之后，新消息进来会把最旧的挤掉，而不是把发布者阻塞住。
+
+:::warning
+"我明明按100Hz发，订阅方只收到一部分"，原因基本就两个，都跟队列有关：发布侧outbox_满了丢最旧的，或者订阅侧回调队列满了丢最旧的。
+
+发布侧丢一般意味着网络或者对端处理跟不上，订阅侧丢一般是回调太慢或者spin频率不够。诊断的时候把两侧queue_size分别调大做对照，就知道是哪边在丢。但调大队列只是诊断手段，真上生产盲目放大队列，只是把丢包换成延迟累积而已。
+:::
+
+## latch没有想象中那么强
+
+latch常被理解成"消息会一直在那"，实际机制很朴素：Publication把最后一条消息存进`last_message_`，等新订阅者接进来的时候补发这一条。
+
+所以它有几个边界：
+
+- 只保留一条，不是历史队列
+- 补发发生在连接建立那一刻，晚来的订阅者拿到的是"当前的最后一条"，不是它加入之前的所有消息
+- 发布者要是一条都没发过，晚来的订阅者什么也拿不到
+
+地图、机器人描述这类静态配置话题用latch很合适，高频数据流用它没有意义。
+
+## 连接回调
+
+advertise还能传一个SubscriberStatusCallback，有订阅者接入或者断开的时候被调用。回调参数是SingleSubscriberPublisher，可以只对这一个新来的订阅者发一条消息。需要"每来一个订阅者就发一份初始状态"、而这份状态又得现场算（latch存不了）的时候，用它比较合适。
+
+要留意的是连接回调和latch补发都发生在订阅者刚接入的时刻。两个一起用，订阅者可能会收到两条内容差不多的消息。
+
+</WordCount>

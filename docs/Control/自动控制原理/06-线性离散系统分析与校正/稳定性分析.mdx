@@ -4,6 +4,65 @@ sidebar_position: 4
 
 import VideoPlayer from '../../../../src/components/Videoplayer/Videoplayer.jsx';
 
+# 离散系统稳定性
+
+因果有理离散系统 BIBO 稳定，当且仅当脉冲响应绝对可和：
+
+$$
+\sum_{k=0}^{\infty}|g[k]|<\infty.
+$$
+
+等价地，闭环传递函数约分后所有极点都严格满足 $|z_i|<1$。单位圆上的简单极点只意味着临界响应，不满足 BIBO 稳定；重极点会使响应发散。内部稳定性还要求不能用不稳定的零极点相消来“隐藏”模态。
+
+<svg viewBox="0 0 520 330" role="img" aria-label="z 平面单位圆及离散系统稳定区域" style={{maxWidth:'100%',color:'var(--ifm-font-color-base)'}}>
+  <defs><marker id="arrow-zplane" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="currentColor"/></marker></defs>
+  <circle cx="255" cy="165" r="110" fill="var(--ifm-color-primary)" fillOpacity="0.12" stroke="var(--ifm-color-primary)" strokeWidth="2"/>
+  <g stroke="currentColor" strokeWidth="1.5"><path d="M25 165H490" markerEnd="url(#arrow-zplane)"/><path d="M255 305V20" markerEnd="url(#arrow-zplane)"/><path d="M145 158V172M365 158V172M248 55H262M248 275H262"/></g>
+  <g fill="currentColor" fontSize="14"><text x="494" y="170">Re z</text><text x="263" y="22">Im z</text><text x="358" y="188">1</text><text x="132" y="188">−1</text><text x="266" y="60">j</text><text x="265" y="282">−j</text><text x="215" y="158">稳定域</text><text x="374" y="76">|z|=1</text></g>
+  <g stroke="currentColor" strokeWidth="2"><path d="M205 120l10 10m0-10l-10 10M290 210l10 10m0-10l-10 10"/><path d="M395 105l10 10m0-10l-10 10"/></g>
+</svg>
+
+## 与连续域的对应
+
+由 $z=e^{sT}$，连续左半平面映到单位圆内。但离散系统的稳定边界是 **单位圆**，不能直接检查 z 平面的“左半平面”。常用双线性变量
+
+$$
+w=\frac{z-1}{z+1},
+\qquad z=\frac{1+w}{1-w},
+$$
+
+把单位圆内映到 $\operatorname{Re}w<0$。将特征多项式 $D(z)$ 代入 $z=(1+w)/(1-w)$，乘以 $(1-w)^n$ 化为 w 多项式，再使用 Routh 判据。注意 $z=-1$ 对应映射无穷远，代数化简时不可遗漏次数下降情形。
+
+## Jury 判据
+
+Jury 判据直接判断实系数多项式
+
+$$
+D(z)=a_0z^n+a_1z^{n-1}+\cdots+a_n,\qquad a_0>0
+$$
+
+的全部根是否位于单位圆内。先检查必要条件
+
+$$
+D(1)>0,\qquad (-1)^nD(-1)>0,\qquad |a_n|<a_0,
+$$
+
+再按 Jury 表逐阶降阶检验；高阶题中按课程给定的表格流程最稳妥，不能只用上述三个必要条件。
+
+二阶情形 $D(z)=a_0z^2+a_1z+a_2$（$a_0>0$）时，上述三式恰为充要条件：
+
+$$
+a_0+a_1+a_2>0,\qquad
+a_0-a_1+a_2>0,\qquad
+|a_2|<a_0.
+$$
+
+## 参数与采样周期
+
+稳定性步骤：写出闭环特征方程 $\rightarrow$ 整理成 z 多项式 $\rightarrow$ 用 Jury 或 w-Routh 求参数范围 $\rightarrow$ 单独检查边界。改变 $T$ 会改变离散模型及极点位置，不能认为连续控制器稳定就对任意采样周期都稳定。
+
+## 配套视频
+
 > 上
 
 <VideoPlayer src="//player.bilibili.com/player.html?isOutside=true&aid=811394492&bvid=BV1F34y1h7so&cid=718671941&p=65" />

@@ -1,0 +1,94 @@
+import WordCount from '../../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+# Genie：从无标签视频里发明动作
+
+论文：[Genie: Generative Interactive Environments](https://arxiv.org/abs/2402.15391)（Bruce et al.，DeepMind，2024）。我的结论：**互联网视频没有动作标签，不代表学不出可控的交互环境**——Genie 用 11B 参数、20 万小时游戏视频，训练出一个 foundation world model，可以从单张图片（照片、手绘、文生图都行）生成可逐帧操作的 2D 世界。最漂亮的设计是 latent action model 里的信息瓶颈：词表 deliberately 只给 8 个 code，逼模型学"跨视频通用的控制语义"而不是"把整帧内容偷渡进 action channel"。
+
+[IRIS](./01-IRIS.mdx) 和 [DIAMOND](./02-DIAMOND.mdx) 都假设动作已知；Genie 解决的是这条线最大的数据瓶颈。后续 [Genie 2/3](./04-Genie2与Genie3.mdx) 把 2D 推到 3D 和实时，但只有博客没有论文——Genie 1 是这条线唯一有完整技术细节的公开工作。
+
+## 1. 问题设定：只有视频，没有 $(s, a, s')$
+
+之前的生成式环境（IRIS、DIAMOND）都需要明确的 action label 来条件化下一帧预测。但互联网上最廉价的数据是游戏录像——YouTube、Twitch 上几十亿小时，**几乎没有任何帧级动作标注**。
+
+Genie 的核心命题：能不能只从 $(x_t, x_{t+1})$ 视频对里，反推出一个离散的 latent action space，使得
+
+$$
+p(x_{t+1} \mid x_{\le t}, a_{\le t})
+$$
+
+在推理时对人给的 action 输入响应？
+
+如果成功，任何有连续帧的视频都是训练数据——不需要模拟器、不需要 RL loop、不需要人工标注。
+
+## 2. 三个组件
+
+Genie 的架构拆成三个独立训练的模块，最后 co-train：
+
+**Spatiotemporal Video Tokenizer（ST-ViViT）**。把每帧编码成 $16 \times 16$ 的空间 token 网格，时间维也做压缩。关键设计：必须是 **spatiotemporal** 的——纯空间 tokenizer（像 IRIS 的 VQ-VAE）会丢掉帧间运动信息，latent action 就没法从 token 序列里推断。Tokenizer 在 200k 小时视频上预训练，codebook 大小 1024。
+
+**Latent Action Model（LAM）**。这是 Genie 的灵魂。给定历史帧 $x_{1:t}$ 和下一帧 $x_{t+1}$，encoder 输出连续 latent action $\tilde{a}_t$，经过 VQ 量化成 $a_t \in \{1, \ldots, 8\}$——**词表只有 8 个**。Decoder 拿 $x_{1:t}$ 和 $a_t$ 重建 $x_{t+1}$。
+
+词表 deliberately 极小。论文的 ablation 很清楚：词表一大（比如 32 或 128），latent action 就会把帧内容编码进去——$a_t$ 变成了 $x_{t+1}$ 的压缩表示，动力学模型退化成"给定 action 直接抄答案"。8 个 code 逼 LAM 只提取 **跨帧变化的最小控制因子**（左、右、跳、攻击……），而不是帧内容本身。
+
+**Dynamics Model（MaskGIT）**。给定历史 token 和 latent action，预测下一帧 token。用 MaskGIT 的 parallel decoding 而不是纯自回归——一次预测多个 token，生成速度比 IRIS 式的逐 token 快很多。
+
+## 3. 训练流程
+
+两阶段：
+
+1. **Tokenizer 预训练**：在 200k 小时互联网 2D 平台游戏视频上做 VQ 重建，不加 action 条件。
+2. **LAM + Dynamics co-train**：LAM 从像素直接学 latent action（VQ-VAE 目标），Dynamics 在 token 空间预测下一帧（给定 LAM 推断的 action）。Action label 全程不出现——LAM 的 $a_t$ 完全从 $(x_t, x_{t+1})$ 对里 unsupervised 学出来。
+
+推理时分两步：用户给一张 prompt 图（或文本 → 文生图 → prompt），Tokenizer 编码成初始 token；然后每步用户给一个离散 action（8 选 1），Dynamics 生成下一帧 token，解码回像素。
+
+## 4. 规模与 emergent 能力
+
+- **11B 参数**（当时最大的 world model）；
+- **200,000+ 小时**互联网 2D 平台游戏视频；
+- Scaling 实验：从 40M 到 2.7B，性能单调提升——架构不是瓶颈，数据和算力才是。
+
+Emergent 能力（论文 demo 和 appendix 里）：
+
+- **跨视觉风格的一致控制**。同一张 latent action "move left"，在像素风、手绘风、照片风格的 prompt 上都让角色往左走——说明 8 个 code 学到的是语义级控制，不是某个特定游戏的按键映射。
+- **Out-of-distribution prompt**。手绘草图、Real-ESRGAN 超分图、文生图输出，都能变成可操作的 2D 世界——这是 foundation model 级别的泛化，不是单个游戏的过拟合。
+- **Behavioral cloning from unseen videos**。用 LAM 从专家视频里提取 latent action trajectory，在全新 RL 环境里训 BC agent，200 条 expert demo 就能接近 oracle——说明 latent action space 有跨环境迁移性。
+
+## 5. 信息瓶颈：为什么 8 个 code 够
+
+这是我认为整篇最值得反复看的 design choice。直觉上 8 个动作对复杂 2D 游戏太少了——但 precisely 因为少，LAM 不能走捷径：
+
+| 词表大小 | LAM 行为 | 可控性 |
+| --- | --- | --- |
+| 8 | 提取最小控制因子 | 高——action 语义清晰 |
+| 32 | 开始编码帧内容 | 中——action 和 content 混淆 |
+| 128+ | 近似无损帧压缩 | 低——动力学退化为 copy |
+
+训练时 LAM 看的是 $(x_t, x_{t+1})$ 真实对，推理时 action 由人指定——中间靠 VQ bottleneck 保证 $a_t$ 的语义是"控制"而不是"内容"。这个 trick 跟 VQ-VAE 用于离散化的经典用法方向相反：通常希望 codebook 足够大以保留信息；这里 deliberately 限制容量以 **丢弃** 内容、保留控制。
+
+## 6. 局限
+
+Genie 1 的边界很清楚：
+
+- **只有 2D 平台游戏域**。训练数据全是 side-scroller，没有 3D 第一人称、没有真实世界视频。
+- **8 个离散 action 太粗**。复杂游戏需要的 action space 远大于 8——Genie 的 demo 看起来流畅，部分原因是平台游戏本身 control dimension 低。
+- **长时一致性未验证**。论文 demo 通常几秒到十几秒，没有系统评测分钟级 object permanence 或物理守恒。
+- **没有 RL 闭环**。Genie 生成了环境，但没有在生成的环境里训出超越 BC 的智能体——"生成"和"用来训策略"之间还有 gap。
+
+## 7. 在系列里的位置
+
+Genie 1 跟 [IRIS](./01-IRIS.mdx)/[DIAMOND](./02-DIAMOND.mdx) 的对比：
+
+| | IRIS / DIAMOND | Genie |
+| --- | --- | --- |
+| 动作来源 | 环境/模拟器已知 | 从视频 unsupervised 推断 |
+| 训练数据 | 100k 帧 RL 交互 | 200k 小时互联网视频 |
+| 目标 | 策略性能 | 生成可交互环境 |
+| 维度 | 2D Atari / 3D CSGO | 2D 平台游戏 |
+
+Genie 打开的是 **数据规模** 这条路——不再被 RL 采样效率绑死，改用互联网视频的体量换多样性。代价是 action space 只能 latent、不可解释，生成质量受 tokenizer 限制。
+
+[Genie 2/3](./04-Genie2与Genie3.mdx) 在 Genie 1 的框架上往 3D、实时、长 horizon 推，但技术细节只存在于博客。下一篇：[Genie 2 与 Genie 3](./04-Genie2与Genie3.mdx)。
+
+</WordCount>

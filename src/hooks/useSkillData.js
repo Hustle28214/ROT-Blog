@@ -1088,11 +1088,17 @@ const generateCompleteDocsData = () => {
                         'Eigen实验': { docPath: 'Robotics/视觉SLAM十四讲/Eigen实验', level: 'intermediate', tags: ['slam'] }
                     }
                 },
-                '机器人强化学习': {
-                    docPath: 'Robotics/机器人强化学习',
+                'Robotic RL': {
+                    docPath: 'Robotics/Robotic RL',
                     skills: {
-                        'RL项目复现计划': { docPath: 'Robotics/机器人强化学习/RL项目复现计划', level: 'intermediate', tags: ['rl'] },
-                        'HumanoidGym': { docPath: 'Robotics/机器人强化学习/HumanoidGym', level: 'intermediate', tags: ['rl'] }
+                        'RL项目复现计划': { docPath: 'Robotics/Robotic RL/RL项目复现计划', level: 'intermediate', tags: ['rl'] },
+                        'HumanoidGym': { docPath: 'Robotics/Robotic RL/HumanoidGym', level: 'intermediate', tags: ['rl'] }
+                    }
+                },
+                'WAM': {
+                    docPath: 'Robotics/WAM',
+                    skills: {
+                        'MotionWAM': { docPath: 'Robotics/WAM/MotionWAM', level: 'advanced', tags: ['wam'] }
                     }
                 }
             }

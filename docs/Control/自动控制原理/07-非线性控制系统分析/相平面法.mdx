@@ -4,6 +4,82 @@ sidebar_position: 1
 
 import VideoPlayer from '../../../../src/components/Videoplayer/Videoplayer.jsx';
 
+# 相平面法
+
+二阶自治系统
+
+$$
+\dot x_1=f_1(x_1,x_2),\qquad
+\dot x_2=f_2(x_1,x_2)
+$$
+
+的状态轨迹画在 $(x_1,x_2)$ 平面上。若用 $x_1=x,\ x_2=\dot x$，在 $\dot x\ne0$ 的区段可消去时间：
+
+$$
+\frac{\mathrm d x_2}{\mathrm d x_1}
+=\frac{\dot x_2}{\dot x_1}
+=\frac{f_2(x_1,x_2)}{f_1(x_1,x_2)}.
+$$
+
+轨迹方向仍须由向量场 $(f_1,f_2)$ 或时间变化确定。自治系统的相轨迹除奇点外不能相交，否则会违反解的唯一性。
+
+## 奇点与线性化分类
+
+奇点 $x^\*$ 满足 $f(x^\*)=0$。在其附近令 $\xi=x-x^\*$，线性化为
+
+$$
+\dot\xi=J(x^\*)\xi,\qquad
+J=\left.\frac{\partial f}{\partial x}\right|_{x^\*}.
+$$
+
+设 $\tau=\operatorname{tr}J,\ \Delta=\det J$，双曲奇点可按特征值分类：
+
+| 条件 | 类型 | 局部稳定性 |
+|---|---|---|
+| $\Delta<0$ | 鞍点 | 不稳定 |
+| $\Delta>0,\ \tau^2-4\Delta>0$ | 结点 | $\tau<0$ 稳定，$\tau>0$ 不稳定 |
+| $\Delta>0,\ \tau^2-4\Delta<0$ | 焦点 | $\tau<0$ 稳定，$\tau>0$ 不稳定 |
+| $\Delta>0,\ \tau=0$ 且为线性系统 | 中心 | 李雅普诺夫稳定但非渐近稳定 |
+
+若有零实部特征值（非双曲情形），线性化通常不能定论，需用高阶项、李雅普诺夫法或中心流形。特别地，非线性系统仅凭线性化出现纯虚根，不能直接断言为中心。
+
+<svg viewBox="0 0 620 390" role="img" aria-label="相平面中的稳定焦点轨迹与极限环示意图" style={{maxWidth:'100%',color:'var(--ifm-font-color-base)'}}>
+  <defs><marker id="arrow-phase" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="currentColor"/></marker></defs>
+  <g fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M35 195H590" markerEnd="url(#arrow-phase)"/><path d="M310 360V25" markerEnd="url(#arrow-phase)"/></g>
+  <path d="M440 195 C440 100 355 63 270 90 C167 123 167 270 265 307 C367 345 465 270 440 195Z" fill="none" stroke="var(--ifm-color-primary)" strokeWidth="2.7" markerEnd="url(#arrow-phase)"/>
+  <path d="M535 195 C532 70 415 26 292 47 C135 73 78 239 175 325 C264 405 438 363 483 257 C515 180 472 117 405 107 C348 98 283 128 273 182 C263 231 305 263 347 254 C380 247 393 213 377 190 C366 174 344 172 331 184" fill="none" stroke="currentColor" strokeWidth="2" markerEnd="url(#arrow-phase)"/>
+  <path d="M364 186 C340 160 304 165 294 191 C283 218 307 240 331 231 C347 225 351 208 343 197" fill="none" stroke="currentColor" strokeWidth="2" markerEnd="url(#arrow-phase)"/>
+  <circle cx="330" cy="195" r="4" fill="currentColor"/>
+  <g fill="currentColor" fontSize="14"><text x="594" y="200">x₁</text><text x="317" y="25">x₂</text><text x="337" y="216">稳定焦点</text><text x="430" y="93">稳定极限环</text><text x="448" y="337">外侧轨迹收敛</text><text x="176" y="170">内侧轨迹扩张</text></g>
+</svg>
+
+## 极限环
+
+极限环是相平面中的孤立闭轨。它对应非线性系统的周期运动：
+
+- 邻近内外轨迹均趋近：稳定极限环；
+- 邻近轨迹均远离：不稳定极限环；
+- 一侧趋近、另一侧远离：半稳定极限环。
+
+中心附近的一族闭轨不是极限环，因为每条闭轨都不是孤立的。对平面系统，Poincaré–Bendixson 思想可用于证明极限环存在；Bendixson 判据指出，在单连通区域内若
+
+$$
+\frac{\partial f_1}{\partial x_1}
++\frac{\partial f_2}{\partial x_2}
+$$
+
+恒同号且不恒为零，则该区域内不存在闭轨。
+
+## 作图与分析步骤
+
+1. 求奇点并用 Jacobian 初步分类。
+2. 画零斜线 $f_1=0$、$f_2=0$，据各区域符号标出向量方向。
+3. 求等倾线 $\mathrm dx_2/\mathrm dx_1=c$，或寻找可积分的一阶轨迹方程。
+4. 根据初值画轨迹，检查是否趋于奇点、闭轨或无界。
+5. 对分段非线性，在切换线上保持状态连续，并按两侧向量场连接轨迹。
+
+## 配套视频
+
 > 1
 
 <VideoPlayer src="//player.bilibili.com/player.html?isOutside=true&aid=811394492&bvid=BV1F34y1h7so&cid=718631823&p=71" />

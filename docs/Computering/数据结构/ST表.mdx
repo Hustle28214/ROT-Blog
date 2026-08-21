@@ -2,7 +2,12 @@ import WordCount from '../../../src/components/WordCount/WordCount';
 
 <WordCount>
 
-## 
+## ST表
+
+ST表（Sparse Table，稀疏表），最著名的用途是解决RMQ（Range Maximum/Minimum Query，区间最大/最小值查询）问题，更深入一点说，是解决可重复贡献问题的数据结构。
+
+ST表基于倍增（binary lifting）思想构建，预处理的时间复杂度为O(nlogn)，查询的时间复杂度为O(1)。ST表的核心思想是将数组分解成若干个长度为2的幂次方的区间，并在预处理阶段计算出这些区间的最值，从而在查询时可以快速得到任意区间的最值。
+
 
 
 </WordCount>

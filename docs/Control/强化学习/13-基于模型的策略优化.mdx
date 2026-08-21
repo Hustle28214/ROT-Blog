@@ -1,0 +1,646 @@
+---
+title: 基于模型的策略优化（MBPO）
+sidebar_position: 13
+---
+
+import WordCount from '../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+## 1. 引言：从 Dyna-Q 与 SAC 到 MBPO
+
+基于模型的强化学习（model-based reinforcement learning）试图学习环境动力学，再利用模型生成额外经验，以减少昂贵的真实环境交互。经典的 [Dyna-Q](./04-Dyna-Q算法.mdx) 已经给出了这一范式：
+
+1. 与真实环境交互并保存经验；
+2. 用真实经验更新环境模型；
+3. 从模型中采样“想象经验”；
+4. 用真实经验和想象经验共同改进价值函数或策略。
+
+Dyna-Q 通常在离散状态、离散动作场景中使用表格模型和 Q-learning。**Model-Based Policy Optimization（MBPO）** 将相同思想推广到连续控制：用神经网络学习概率动力学模型，用短期模型 rollout 生成数据，并用强大的无模型离策略算法优化策略。
+
+MBPO 论文采用 [Soft Actor-Critic（SAC）](./12-SAC算法.mdx) 作为策略优化器。SAC 的离策略性质使它可以重复利用 replay buffer 中的真实与模型数据；最大熵目标又能提供较稳定的连续控制学习。二者的关系可以概括为：
+
+$$
+\text{MBPO}=\text{学习动力学模型}+\text{短模型 rollout}+\text{SAC 等离策略优化器}.
+$$
+
+MBPO 的关键并不是“让策略长期生活在模型里”，而是只相信模型的短期预测。这样既能增加可用于策略学习的数据，又能限制模型误差随时间累积。
+
+## 2. 概率动力学模型与负对数似然
+
+设真实环境转移为未知分布 $p(s_{t+1},r_t\mid s_t,a_t)$。常见做法不是直接预测下一状态，而是预测状态增量与奖励：
+
+$$
+y_t=
+\begin{bmatrix}
+s_{t+1}-s_t\\
+r_t
+\end{bmatrix},
+\qquad
+\hat p_\theta(y_t\mid s_t,a_t)
+=\mathcal N\!\left(\mu_\theta(s_t,a_t),
+\operatorname{diag}(\sigma_\theta^2(s_t,a_t))\right).
+$$
+
+预测状态增量通常比直接预测绝对状态更容易，因为许多物理系统在一个时间步内只发生局部变化。网络同时输出均值 $\mu_\theta$ 和对数标准差 $\log\sigma_\theta$，因而既描述预测结果，也描述条件噪声或数据不足带来的不确定性。
+
+忽略与参数无关的常数后，单个样本的高斯负对数似然（negative log-likelihood，NLL）为
+
+$$
+\mathcal L_{\mathrm{NLL}}(\theta)
+=\frac{1}{2}\sum_j
+\left[
+\frac{(y_{t,j}-\mu_{\theta,j})^2}{\sigma_{\theta,j}^2}
++2\log\sigma_{\theta,j}
+\right].
+$$
+
+只用均方误差训练确定性模型，相当于假设各处预测方差固定。NLL 则允许模型根据输入调节方差。不过，网络可能通过给出不合理的大方差来降低误差惩罚，因此实践中通常会限制 $\log\sigma$ 的范围。
+
+### 2.1 模型集成
+
+原始 MBPO 使用概率神经网络集成（ensemble）。多个模型使用不同初始化和 bootstrap 数据训练：
+
+$$
+\hat p_{\theta_1},\hat p_{\theta_2},\ldots,\hat p_{\theta_K}.
+$$
+
+rollout 时随机选择一个模型成员。成员之间预测均值的分歧主要反映**认知不确定性**（数据不足），单个模型输出的方差主要描述**偶然不确定性**（系统或观测噪声）。集成不能保证模型正确，但通常比单一网络更稳健。
+
+输入与监督目标应使用真实数据统计量标准化。特别要防止标准差接近零：
+
+$$
+\tilde x=(x-\mu_x)/(\sigma_x+\varepsilon),\qquad
+\tilde y=(y-\mu_y)/(\sigma_y+\varepsilon).
+$$
+
+模型采样得到标准化空间中的 $\tilde y$ 后，需要反标准化再恢复 $s_{t+1}=s_t+\Delta s_t$。
+
+## 3. 短 rollout 与模型偏差
+
+即使一步预测误差很小，多步闭环预测也会偏离真实状态分布。设一步模型误差大致为 $\epsilon$，策略从模型预测状态继续选动作，则误差可能随 rollout 长度 $h$ 快速累积，而不只是简单地增加 $h\epsilon$。策略甚至可能主动利用模型漏洞，找到在模型中回报很高、在真实环境中却无效的动作。
+
+MBPO 的解决办法是：
+
+1. 从真实 replay buffer 中采样起始状态；
+2. 只在模型中展开很短的 $h$ 步；
+3. 将生成的转移加入模型 replay buffer；
+4. 用真实数据和模型数据的混合批次训练策略。
+
+记从真实状态分布出发、在模型中展开 $h$ 步得到的状态分布为 $\hat d_h^\pi$。短 rollout 让训练分布停留在真实数据附近。论文的理论分析表明，模型带来的性能误差上界会随 rollout 长度和模型误差增加，因此 $h$ 存在偏差—方差权衡：
+
+- $h$ 太小：合成数据少，模型的样本效率优势有限；
+- $h$ 太大：数据更多，但模型偏差和策略利用模型漏洞的风险更高。
+
+MBPO 常让 $h$ 随训练从较小值逐渐增长，因为后期真实数据更多、模型通常更准确。需要强调的是，**不确定性高时继续延长 rollout 并不合理**；也可以在模型集成分歧超过阈值时提前终止。
+
+## 4. MBPO 算法
+
+令真实数据缓冲区为 $\mathcal D_{\mathrm{env}}$，模型数据缓冲区为 $\mathcal D_{\mathrm{model}}$，动力学模型集成为 $\{\hat p_{\theta_i}\}_{i=1}^K$，策略为 $\pi_\phi$。
+
+模型训练目标为
+
+$$
+\theta_i\leftarrow\arg\min_{\theta_i}
+\mathbb E_{(s,a,r,s')\sim\mathcal D_{\mathrm{env}}}
+\left[-\log\hat p_{\theta_i}(s'-s,r\mid s,a)\right].
+$$
+
+从真实状态 $s_0\sim\mathcal D_{\mathrm{env}}$ 出发，模型 rollout 执行
+
+$$
+a_t\sim\pi_\phi(\cdot\mid s_t),\qquad
+(\Delta s_t,r_t)\sim\hat p_{\theta_i}(\cdot\mid s_t,a_t),\qquad
+s_{t+1}=s_t+\Delta s_t.
+$$
+
+策略更新使用混合分布
+
+$$
+(s,a,r,s',d)\sim
+\beta\mathcal D_{\mathrm{env}}+(1-\beta)\mathcal D_{\mathrm{model}},
+$$
+
+其中 $\beta$ 是真实数据比例。若策略优化器采用 SAC，其软 Q 目标为
+
+$$
+y=r+\gamma(1-d)
+\left[
+\min_{j=1,2}Q_{\bar\psi_j}(s',a')
+-\alpha\log\pi_\phi(a'\mid s')
+\right],
+\quad a'\sim\pi_\phi(\cdot\mid s').
+$$
+
+### 4.1 伪代码
+
+```text
+初始化策略与价值网络、模型集成、D_env、D_model
+for 每个真实环境步:
+    按当前策略选择动作，必要时加入探索
+    在真实环境执行动作，将转移加入 D_env
+
+    if 到达模型更新时间:
+        用 D_env 的 bootstrap 样本训练每个概率动力学模型
+        清理过旧的 D_model 数据
+        从 D_env 采样多个真实起始状态
+        for t = 0, ..., h - 1:
+            从策略采样动作
+            为每个样本随机选一个模型，采样下一状态和奖励
+            将合成转移加入 D_model
+            令预测的下一状态成为下一轮输入
+
+    重复若干次:
+        按比例混合 D_env 与 D_model 的小批量
+        用离策略 actor-critic 更新策略和价值网络
+```
+
+原论文还包含验证集筛选精英模型、rollout 长度调度、模型数据保留窗口以及完整 SAC 训练细节。这些工程选择会显著影响结果。
+
+## 5. 教学版 Pendulum-v1 示例
+
+下面的单文件程序可以直接运行，依赖为：
+
+```bash
+pip install gymnasium numpy torch
+```
+
+该示例包含 replay buffer、三个概率动力学模型、NLL 训练、短模型 rollout，以及一个精简的双 Q actor-critic。它用于展示 MBPO 的数据流，**不是 Janner 等人论文代码的完整复现**：没有精英模型验证筛选、自动温度调节、严格的模型保留窗口和论文超参数；为了控制运行时间，训练步数也较少。不同随机种子和硬件下回报会有明显波动。
+
+```python
+from __future__ import annotations
+
+import copy
+import math
+import random
+from dataclasses import dataclass
+
+import gymnasium as gym
+import numpy as np
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+from torch.distributions import Normal
+
+
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+
+def set_seed(seed: int) -> None:
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+
+
+class ReplayBuffer:
+    def __init__(self, obs_dim: int, act_dim: int, capacity: int):
+        self.capacity = capacity
+        self.obs = np.zeros((capacity, obs_dim), dtype=np.float32)
+        self.act = np.zeros((capacity, act_dim), dtype=np.float32)
+        self.rew = np.zeros((capacity, 1), dtype=np.float32)
+        self.next_obs = np.zeros((capacity, obs_dim), dtype=np.float32)
+        self.done = np.zeros((capacity, 1), dtype=np.float32)
+        self.ptr = 0
+        self.size = 0
+
+    def add(
+        self,
+        obs: np.ndarray,
+        act: np.ndarray,
+        rew: float,
+        next_obs: np.ndarray,
+        done: float,
+    ) -> None:
+        i = self.ptr
+        self.obs[i] = obs
+        self.act[i] = act
+        self.rew[i] = rew
+        self.next_obs[i] = next_obs
+        self.done[i] = done
+        self.ptr = (self.ptr + 1) % self.capacity
+        self.size = min(self.size + 1, self.capacity)
+
+    def sample_numpy(self, batch_size: int) -> tuple[np.ndarray, ...]:
+        idx = np.random.randint(0, self.size, size=batch_size)
+        return (
+            self.obs[idx],
+            self.act[idx],
+            self.rew[idx],
+            self.next_obs[idx],
+            self.done[idx],
+        )
+
+    def sample_torch(self, batch_size: int) -> tuple[torch.Tensor, ...]:
+        return tuple(
+            torch.as_tensor(x, device=DEVICE)
+            for x in self.sample_numpy(batch_size)
+        )
+
+    def arrays(self) -> tuple[np.ndarray, ...]:
+        return (
+            self.obs[: self.size].copy(),
+            self.act[: self.size].copy(),
+            self.rew[: self.size].copy(),
+            self.next_obs[: self.size].copy(),
+            self.done[: self.size].copy(),
+        )
+
+    def clear(self) -> None:
+        self.ptr = 0
+        self.size = 0
+
+
+class MLP(nn.Module):
+    def __init__(self, in_dim: int, out_dim: int, hidden: int = 128):
+        super().__init__()
+        self.net = nn.Sequential(
+            nn.Linear(in_dim, hidden),
+            nn.ReLU(),
+            nn.Linear(hidden, hidden),
+            nn.ReLU(),
+            nn.Linear(hidden, out_dim),
+        )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.net(x)
+
+
+class GaussianActor(nn.Module):
+    def __init__(self, obs_dim: int, act_dim: int, action_limit: float):
+        super().__init__()
+        self.body = MLP(obs_dim, 2 * act_dim)
+        self.action_limit = action_limit
+
+    def sample(
+        self, obs: torch.Tensor
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        mean, log_std = self.body(obs).chunk(2, dim=-1)
+        log_std = torch.clamp(log_std, -5.0, 2.0)
+        dist = Normal(mean, log_std.exp())
+        raw = dist.rsample()
+        squashed = torch.tanh(raw)
+        action = self.action_limit * squashed
+        correction = torch.log(
+            self.action_limit * (1.0 - squashed.pow(2)) + 1e-6
+        )
+        log_prob = (dist.log_prob(raw) - correction).sum(
+            dim=-1, keepdim=True
+        )
+        return action, log_prob
+
+    @torch.no_grad()
+    def act(self, obs: np.ndarray, deterministic: bool = False) -> np.ndarray:
+        x = torch.as_tensor(obs, dtype=torch.float32, device=DEVICE)
+        if x.ndim == 1:
+            x = x.unsqueeze(0)
+        mean, log_std = self.body(x).chunk(2, dim=-1)
+        if deterministic:
+            raw = mean
+        else:
+            raw = Normal(mean, torch.clamp(log_std, -5.0, 2.0).exp()).sample()
+        action = self.action_limit * torch.tanh(raw)
+        return action.cpu().numpy()
+
+
+class DoubleQ(nn.Module):
+    def __init__(self, obs_dim: int, act_dim: int):
+        super().__init__()
+        self.q1 = MLP(obs_dim + act_dim, 1)
+        self.q2 = MLP(obs_dim + act_dim, 1)
+
+    def forward(
+        self, obs: torch.Tensor, act: torch.Tensor
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        x = torch.cat([obs, act], dim=-1)
+        return self.q1(x), self.q2(x)
+
+
+class ProbabilisticDynamics(nn.Module):
+    def __init__(self, obs_dim: int, act_dim: int):
+        super().__init__()
+        self.obs_dim = obs_dim
+        self.out_dim = obs_dim + 1
+        self.net = MLP(obs_dim + act_dim, 2 * self.out_dim, hidden=200)
+        self.register_buffer("x_mean", torch.zeros(obs_dim + act_dim))
+        self.register_buffer("x_std", torch.ones(obs_dim + act_dim))
+        self.register_buffer("y_mean", torch.zeros(self.out_dim))
+        self.register_buffer("y_std", torch.ones(self.out_dim))
+
+    def set_stats(self, x: np.ndarray, y: np.ndarray) -> None:
+        self.x_mean.copy_(
+            torch.as_tensor(x.mean(0), dtype=torch.float32, device=DEVICE)
+        )
+        self.x_std.copy_(
+            torch.as_tensor(x.std(0) + 1e-6, dtype=torch.float32, device=DEVICE)
+        )
+        self.y_mean.copy_(
+            torch.as_tensor(y.mean(0), dtype=torch.float32, device=DEVICE)
+        )
+        self.y_std.copy_(
+            torch.as_tensor(y.std(0) + 1e-6, dtype=torch.float32, device=DEVICE)
+        )
+
+    def forward(
+        self, x: torch.Tensor
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        normalized_x = (x - self.x_mean) / self.x_std
+        mean, log_std = self.net(normalized_x).chunk(2, dim=-1)
+        log_std = torch.clamp(log_std, -5.0, 1.0)
+        return mean, log_std
+
+    @torch.no_grad()
+    def sample(
+        self, obs: torch.Tensor, act: torch.Tensor
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        mean, log_std = self(torch.cat([obs, act], dim=-1))
+        normalized_y = mean + log_std.exp() * torch.randn_like(mean)
+        y = normalized_y * self.y_std + self.y_mean
+        delta_obs = y[:, : self.obs_dim]
+        reward = y[:, self.obs_dim :]
+        return obs + delta_obs, reward
+
+
+def train_dynamics(
+    models: list[ProbabilisticDynamics],
+    real_buffer: ReplayBuffer,
+    epochs: int = 10,
+    batch_size: int = 256,
+) -> None:
+    obs, act, rew, next_obs, _ = real_buffer.arrays()
+    x = np.concatenate([obs, act], axis=1)
+    y = np.concatenate([next_obs - obs, rew], axis=1)
+    n = x.shape[0]
+
+    for model in models:
+        model.set_stats(x, y)
+        optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
+        bootstrap = np.random.randint(0, n, size=n)
+        model.train()
+        for _ in range(epochs):
+            np.random.shuffle(bootstrap)
+            for start in range(0, n, batch_size):
+                idx = bootstrap[start : start + batch_size]
+                xb = torch.as_tensor(x[idx], dtype=torch.float32, device=DEVICE)
+                yb = torch.as_tensor(y[idx], dtype=torch.float32, device=DEVICE)
+                target = (yb - model.y_mean) / model.y_std
+                mean, log_std = model(xb)
+                inv_var = torch.exp(-2.0 * log_std)
+                nll = 0.5 * (
+                    (target - mean).pow(2) * inv_var + 2.0 * log_std
+                ).mean()
+                optimizer.zero_grad()
+                nll.backward()
+                optimizer.step()
+
+
+@torch.no_grad()
+def generate_model_rollouts(
+    models: list[ProbabilisticDynamics],
+    actor: GaussianActor,
+    real_buffer: ReplayBuffer,
+    model_buffer: ReplayBuffer,
+    rollout_batch_size: int,
+    rollout_horizon: int,
+) -> None:
+    obs = real_buffer.sample_torch(rollout_batch_size)[0]
+    for model in models:
+        model.eval()
+
+    for _ in range(rollout_horizon):
+        act, _ = actor.sample(obs)
+        next_obs = torch.empty_like(obs)
+        reward = torch.empty((obs.shape[0], 1), device=DEVICE)
+        member_ids = torch.randint(len(models), (obs.shape[0],), device=DEVICE)
+
+        for member_id, model in enumerate(models):
+            mask = member_ids == member_id
+            if mask.any():
+                predicted_obs, predicted_reward = model.sample(
+                    obs[mask], act[mask]
+                )
+                next_obs[mask] = predicted_obs
+                reward[mask] = predicted_reward
+
+        obs_np = obs.cpu().numpy()
+        act_np = act.cpu().numpy()
+        next_obs_np = next_obs.cpu().numpy()
+        reward_np = reward.cpu().numpy()
+        for i in range(obs.shape[0]):
+            # Pendulum 没有物理终止状态；TimeLimit 截断不属于动力学终止。
+            model_buffer.add(
+                obs_np[i], act_np[i], float(reward_np[i, 0]),
+                next_obs_np[i], 0.0
+            )
+        obs = next_obs
+
+
+@dataclass
+class Agent:
+    actor: GaussianActor
+    critic: DoubleQ
+    target_critic: DoubleQ
+    actor_optimizer: torch.optim.Optimizer
+    critic_optimizer: torch.optim.Optimizer
+    alpha: float = 0.2
+    gamma: float = 0.99
+    tau: float = 0.005
+
+
+def make_agent(obs_dim: int, act_dim: int, action_limit: float) -> Agent:
+    actor = GaussianActor(obs_dim, act_dim, action_limit).to(DEVICE)
+    critic = DoubleQ(obs_dim, act_dim).to(DEVICE)
+    target_critic = copy.deepcopy(critic).to(DEVICE)
+    return Agent(
+        actor=actor,
+        critic=critic,
+        target_critic=target_critic,
+        actor_optimizer=torch.optim.Adam(actor.parameters(), lr=3e-4),
+        critic_optimizer=torch.optim.Adam(critic.parameters(), lr=3e-4),
+    )
+
+
+def mixed_batch(
+    real_buffer: ReplayBuffer,
+    model_buffer: ReplayBuffer,
+    batch_size: int,
+    real_ratio: float,
+) -> tuple[torch.Tensor, ...]:
+    real_n = batch_size if model_buffer.size == 0 else int(batch_size * real_ratio)
+    model_n = batch_size - real_n
+    parts = [real_buffer.sample_torch(real_n)]
+    if model_n > 0:
+        parts.append(model_buffer.sample_torch(model_n))
+    return tuple(torch.cat(items, dim=0) for items in zip(*parts))
+
+
+def update_agent(
+    agent: Agent,
+    real_buffer: ReplayBuffer,
+    model_buffer: ReplayBuffer,
+    batch_size: int = 256,
+    real_ratio: float = 0.5,
+) -> None:
+    obs, act, rew, next_obs, done = mixed_batch(
+        real_buffer, model_buffer, batch_size, real_ratio
+    )
+
+    with torch.no_grad():
+        next_act, next_log_prob = agent.actor.sample(next_obs)
+        target_q1, target_q2 = agent.target_critic(next_obs, next_act)
+        target_q = torch.min(target_q1, target_q2) - agent.alpha * next_log_prob
+        backup = rew + agent.gamma * (1.0 - done) * target_q
+
+    q1, q2 = agent.critic(obs, act)
+    critic_loss = F.mse_loss(q1, backup) + F.mse_loss(q2, backup)
+    agent.critic_optimizer.zero_grad()
+    critic_loss.backward()
+    agent.critic_optimizer.step()
+
+    policy_act, log_prob = agent.actor.sample(obs)
+    for parameter in agent.critic.parameters():
+        parameter.requires_grad_(False)
+    policy_q1, policy_q2 = agent.critic(obs, policy_act)
+    actor_loss = (
+        agent.alpha * log_prob - torch.min(policy_q1, policy_q2)
+    ).mean()
+    agent.actor_optimizer.zero_grad()
+    actor_loss.backward()
+    agent.actor_optimizer.step()
+    for parameter in agent.critic.parameters():
+        parameter.requires_grad_(True)
+
+    with torch.no_grad():
+        for target, source in zip(
+            agent.target_critic.parameters(), agent.critic.parameters()
+        ):
+            target.mul_(1.0 - agent.tau).add_(source, alpha=agent.tau)
+
+
+def evaluate(
+    env: gym.Env, actor: GaussianActor, episodes: int = 5
+) -> float:
+    returns = []
+    for episode in range(episodes):
+        obs, _ = env.reset(seed=10_000 + episode)
+        total_reward = 0.0
+        while True:
+            action = actor.act(obs, deterministic=True)[0]
+            obs, reward, terminated, truncated, _ = env.step(action)
+            total_reward += float(reward)
+            if terminated or truncated:
+                break
+        returns.append(total_reward)
+    return float(np.mean(returns))
+
+
+def main() -> None:
+    seed = 7
+    set_seed(seed)
+    env = gym.make("Pendulum-v1")
+    eval_env = gym.make("Pendulum-v1")
+    obs, _ = env.reset(seed=seed)
+    env.action_space.seed(seed)
+
+    obs_dim = int(np.prod(env.observation_space.shape))
+    act_dim = int(np.prod(env.action_space.shape))
+    action_limit = float(env.action_space.high[0])
+    real_buffer = ReplayBuffer(obs_dim, act_dim, capacity=100_000)
+    model_buffer = ReplayBuffer(obs_dim, act_dim, capacity=200_000)
+    models = [
+        ProbabilisticDynamics(obs_dim, act_dim).to(DEVICE) for _ in range(3)
+    ]
+    agent = make_agent(obs_dim, act_dim, action_limit)
+
+    total_steps = 15_000
+    random_steps = 1_000
+    model_update_interval = 250
+    rollout_batch_size = 400
+
+    for step in range(1, total_steps + 1):
+        if step <= random_steps:
+            action = env.action_space.sample()
+        else:
+            action = agent.actor.act(obs)[0]
+
+        next_obs, reward, terminated, truncated, _ = env.step(action)
+        # TimeLimit 截断仍应 bootstrap，只有真正 terminated 才将 done 置一。
+        real_buffer.add(
+            obs, action, float(reward), next_obs, float(terminated)
+        )
+        obs = next_obs
+        if terminated or truncated:
+            obs, _ = env.reset()
+
+        if step >= random_steps and step % model_update_interval == 0:
+            train_dynamics(models, real_buffer)
+            # 教学版只保留最近一次模型生成的数据，减少陈旧模型数据影响。
+            model_buffer.clear()
+            rollout_horizon = min(5, 1 + (step - random_steps) // 3_500)
+            generate_model_rollouts(
+                models,
+                agent.actor,
+                real_buffer,
+                model_buffer,
+                rollout_batch_size,
+                rollout_horizon,
+            )
+
+        if step >= random_steps:
+            update_agent(agent, real_buffer, model_buffer)
+
+        if step % 2_500 == 0:
+            score = evaluate(eval_env, agent.actor)
+            print(
+                f"step={step:5d}, return={score:8.1f}, "
+                f"real={real_buffer.size}, model={model_buffer.size}"
+            )
+
+    env.close()
+    eval_env.close()
+
+
+if __name__ == "__main__":
+    main()
+```
+
+### 5.1 如何阅读该实现
+
+- `real_buffer` 只保存真实环境数据，是训练动力学模型和选择 rollout 起点的依据。
+- `ProbabilisticDynamics` 预测标准化的 $(\Delta s,r)$ 高斯分布；三个成员通过不同 bootstrap 索引形成简单集成。
+- `generate_model_rollouts` 每条转移随机选择集成成员，并从其高斯分布采样，而不是只取均值。
+- `model_buffer` 保存短 rollout 数据。示例每次重训模型后清空它，以减少旧模型生成数据造成的分布陈旧问题。
+- `mixed_batch` 用真实与合成数据各占一半的批次更新 actor-critic。
+- Gymnasium 的 `terminated` 表示 MDP 终止，`truncated` 表示时间上限等外部截断。Pendulum 的时间上限不应阻止价值函数 bootstrap，因此缓冲区只记录 `terminated`。
+
+如果目标是复现实验结果，应从原作者实现或维护良好的研究框架出发，而不是直接扩展这段教学代码。
+
+## 6. 局限与实践建议
+
+### 6.1 主要局限
+
+1. **模型偏差**：训练数据覆盖不足时，模型在分布外动作上可能自信地预测错误结果。
+2. **误差累积**：模型 rollout 越长，状态分布越容易偏离真实分布。
+3. **不确定性不等于正确性**：集成成员可能因相似架构和相同数据产生一致但错误的预测。
+4. **训练复杂度**：相比纯 SAC，MBPO 增加了模型训练、数据调度和更多超参数。
+5. **高维观测困难**：直接在图像像素空间学习精确动力学通常很难，需要潜变量模型或任务相关表征。
+6. **终止条件难建模**：具有跌倒、碰撞等终止事件的环境，需要额外学习终止模型，或使用已知终止函数过滤模型转移。
+
+### 6.2 实践建议
+
+- **先建立无模型基线**：先确认 SAC 在真实环境上能学习，再加入模型数据，否则很难区分策略实现错误和模型偏差。
+- **监控多步误差**：除一步 NLL 外，还应在独立真实轨迹上检查 1、3、5 步预测误差。
+- **从 $h=1$ 开始**：只有验证误差下降且集成分歧可控时才逐渐增加 rollout 长度。
+- **控制模型数据比例**：模型不可靠时提高 $\beta$，让更新更多依赖真实数据。
+- **标准化并划分验证集**：仅看训练 NLL 容易掩盖过拟合；原始 MBPO 会按验证误差选择精英模型。
+- **限制陈旧数据**：动力学模型更新后，旧模型生成的数据可能不再匹配当前模型和策略，应设置保留窗口或定期清理。
+- **检测分布外输入**：集成分歧、输入距离或专门的不确定性估计可以用于缩短或提前终止 rollout。
+- **保留真实评估**：模型内回报不能替代真实环境回报，模型只用于训练，不应用于最终性能评估。
+- **分别记录数据来源**：真实和模型数据使用不同缓冲区，便于调整采样比例并定位问题。
+
+MBPO 最重要的经验不是“模型越用得多越好”，而是：让模型在它相对可信的短时间尺度内提高样本效率，再由稳定的无模型优化器完成策略学习。
+
+## 参考文献
+
+1. Janner, M., Fu, J., Zhang, M., & Levine, S. (2019). **When to Trust Your Model: Model-Based Policy Optimization**. *Advances in Neural Information Processing Systems 32 (NeurIPS 2019)*. [arXiv:1906.08253](https://arxiv.org/abs/1906.08253)
+
+</WordCount>

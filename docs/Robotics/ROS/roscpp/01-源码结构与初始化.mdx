@@ -1,0 +1,87 @@
+---
+sidebar_position: 1
+---
+
+import WordCount from '../../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+本文记录roscpp的源码结构，以及一个节点到底是怎么活起来的。
+
+:::tip
+源码在ros_comm仓库的clients/roscpp目录下，看的时候对着noetic分支就行。
+:::
+
+## 目录怎么分的
+
+roscpp的目录分得挺清楚：
+
+- `include/ros/*.h`是公开API。我们天天include的`ros/ros.h`本身几乎没有代码，就是个汇总头文件，把init.h、node_handle.h、publisher.h、subscriber.h、spinner.h、callback_queue.h、rate.h、timer.h、param.h这些一并包进来。写节点只include它一个就够，代价是编译依赖拉得很宽。
+- `src/libros/`是实现，管理器、Publication、Subscription、各种连接对象都在这。
+- `src/libros/transport/`单独放传输层，transport_tcp.cpp和transport_udp.cpp负责搬字节。
+
+有个容易忽略的点：序列化不在roscpp里。它在roscpp_serialization这个独立的包，`ros/serialization.h`里的`Serializer<T>`、`SerializedMessage`都是它提供的；消息的元信息来自roscpp_traits的message_traits，包括MD5Sum、DataType、Definition、HasHeader。
+
+所以roscpp对我们的消息类型其实一无所知，它只认"一段字节加一个md5sum"。
+
+## 五个管理器
+
+roscpp的运行时就是五个单例，都用`instance()`拿：
+
+1. TopicManager，管Publication和Subscription，advertise、subscribe、publish都从这走
+2. ServiceManager，管服务
+3. ConnectionManager，持有服务端transport，接受连接然后按连接头分派
+4. XMLRPCManager，从节点的XMLRPC服务端加客户端，控制面全在这
+5. PollManager，只跑一个poll线程，驱动所有socket的读写事件
+
+既然是单例，一个进程就只有一个节点身份。所以同一进程里建多个NodeHandle并不会变出多个节点，它们共享这五个管理器，区别只在命名空间和回调队列。
+
+## ros::init其实没干什么
+
+我一开始以为`ros::init`就是"启动节点"，读了才发现它只做配置层面的事：
+
+1. 解析命令行里的remapping，包括`__name`、`__ns`、`__master`、`__ip`、`__hostname`、`__log`这几个特殊参数，以及一般形式的`topic:=new_topic`
+2. `network::init`，确定本机对外用哪个IP或者hostname
+3. `master::init`，确定master地址
+4. `this_node::init`，确定节点名和命名空间
+5. `file_log::init`，日志文件
+
+没有线程被创建，没有端口被监听，也没有向master注册。
+
+真正把节点跑起来的是`ros::start()`，它按固定顺序拉起五个管理器：PollManager、ConnectionManager、TopicManager、ServiceManager、XMLRPCManager。这个顺序不是随便排的。poll线程得先在，连接管理才有事件源；XMLRPC放最后，因为它一上线就可能收到别人发来的requestTopic，那时候前面那些结构必须已经能用了。
+
+start里还顺手做了三件平时注意不到的事：
+
+- 注册ROSOutAppender并且advertise `/rosout`，ROS_INFO能出现在rqt_console里就靠这个
+- 调`initInternalTimerManager()`，给`ros::Timer`准备内部的定时器管理
+- 查`/use_sim_time`，为真就订阅`/clock`，从此`ros::Time::now()`返回的是仿真时间
+
+## NodeHandle的引用计数
+
+我们平时没人手动调`ros::start()`，节点照样能跑，秘密在NodeHandle的构造函数里。它内部维护一个引用计数，第一个NodeHandle创建时触发start，最后一个析构时可能触发shutdown。
+
+```cpp
+// 简化示意，不是逐行原文
+NodeHandle::NodeHandle(...) {
+  if (++g_nh_refcount == 1 && !ros::isStarted()) {
+    ros::start();
+  }
+  construct(...);
+}
+
+NodeHandle::~NodeHandle() {
+  if (--g_nh_refcount == 0 && g_started_by_nodehandle) {
+    ros::shutdown();
+  }
+}
+```
+
+:::warning
+这就是"节点莫名其妙提前退出"的根因。如果在某个作用域里建了NodeHandle、拿到Publisher之后让句柄析构掉，引用计数归零，整个节点被shutdown，后面的publish和spin就全废了。
+
+常见的触发场景是把NodeHandle建在一个临时函数里，或者只在构造函数的局部变量里用一下。稳妥的做法是让它活得跟节点一样久，做成员变量或者main的局部变量；实在需要在没有句柄的阶段保持存活，就显式调一次`ros::start()`。
+:::
+
+NodeHandle自己存的东西不多，主要三样：namespace_决定相对话题名怎么解析，remappings_是句柄级的重映射，callback_queue_可以被替换掉。最后这个很关键，它是把回调隔离到独立线程的唯一入口，讲订阅的时候再展开。
+
+</WordCount>

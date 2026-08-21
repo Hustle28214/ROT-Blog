@@ -1,0 +1,83 @@
+import WordCount from '../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+论文：[DiT4DiT: Jointly Modeling Video Dynamics and Actions for Generalizable Robot Control](https://arxiv.org/abs/2603.10448)，Mondo Robotics + HKUST(GZ)/HKUST，2026 年 3 月。代码和项目页在 [dit4dit.github.io](https://dit4dit.github.io/)。
+
+## 1. 先说结论
+
+DiT4DiT 是 [MotionWAM](./01-MotionWAM.mdx) 的直接前身，同一批作者。它第一次系统性地证明了：**视频 DiT 中间层的 denoise 特征，可以当作比 VLM 图文特征更好的策略条件**。
+
+LIBERO 平均 98.6%，RoboCasa GR1 50.8%，用的训练数据比很多 baseline 少一截。Unitree G1 真机上也有更强的表现和零样本泛化。样本效率提升 10 倍以上，收敛快 7 倍。真机部署 6 Hz（单卡 A100），参数 2.2B，比 GR00T-N1.5（2.7B，13 Hz）小但任务表现更好。
+
+MotionWAM 基本上是在 DiT4DiT 的 dual-DiT + tri-timestep 框架上，把 action 空间从桌面臂/chunk 换成了 SONIC 的全身 motion token，并补了三阶段 egocentric-to-embodiment 训练。
+
+## 2. 问题表述：先预测视频动力学，再反推动作
+
+VLA 学的是直接映射 $\pi_\theta(\mathbf{a}_t \mid \mathbf{o}_t, l)$。DiT4DiT 换成 predict-then-invert：
+
+$$
+\mathbf{o}_{t+1} \sim p_v(\cdot \mid \mathbf{o}_t, l), \qquad
+\mathbf{a}_t \sim p_a\!\left(\cdot \mid \mathbf{o}_t, \mathcal{H}(\mathbf{o}_{t+1}^{\tau_v})\right)
+$$
+
+$\mathcal{H}$ 从 Video DiT 的 velocity network 里截 hidden state，$\mathbf{o}_{t+1}^{\tau_v}$ 是未来帧在 flow 步 $\tau_v$ 的中间状态。训练目标是联合分布 $p_{va}(\mathbf{o}_{t+1}, \mathbf{a}_t \mid \mathbf{o}_t, l)$。
+
+VLA 的表征来自静态 image-text 预训练，物理动力学全靠有限的 action 数据硬学。视频 生成模型反过来，已经在互联网规模数据里编码了时空结构和隐式物理，DiT4DiT 要做的就是把这个 prior 接到动作预测上。
+
+## 3. Dual-DiT 架构
+
+**Video DiT**：Cosmos-Predict2.5-2B 初始化（causal video VAE + flow-matching DiT，语言条件来自 Cosmos-Reason1）。观测 $\mathbf{o}_t$ 和未来帧 $\mathbf{o}_{t+1}$ 经 VAE 压成 $\mathbf{z}_t^0, \mathbf{z}_{t+1}^0$。
+
+不在推理时使用完全 denoise 好的未来帧，而是在某个 transformer block 上挂 forward hook，在固定 flow 步 $\tau_f$ 截激活：
+
+$$
+\mathbf{h}_t^{\tau_f} = \mathcal{H}\big[v_\theta^{\text{video}}\big]\big(\mathbf{z}_{t+1}^{\tau_f}, \tau_f \mid \mathbf{z}_t^0, l\big)
+$$
+
+**Action DiT**：从 GR00T-N1 改来，用 AdaLN 注入 diffusion timestep，cross-attention 吃 $\mathbf{h}_t^{\tau_f}$，输入还有本体状态 embedding 和带噪 action chunk，输出 action 速度场。
+
+## 4. Tri-timestep：三个时间步各干各的
+
+这是 DiT4DiT 训练里我觉得最精巧的设计。视频生成、特征提取、动作推理对 diffusion timestep 的要求是冲突的，所以干脆拆成三个：
+
+- $\tau_v \sim \mathcal{U}[0,1]$：Video DiT 训练用，均匀采样，学完整 denoise 轨迹；
+- $\tau_f$ 固定：提 hidden state 用，保证 Action DiT 每次看到的视觉条件稳定；
+- $\tau_a \sim \text{Beta}(\alpha, \beta)$：Action DiT 训练用，偏向 flow 轨迹的关键阶段。
+
+联合损失：
+
+$$
+\mathcal{L}^{\text{total}} = \mathcal{L}_{\text{action}} + \lambda \mathcal{L}_{\text{video}}
+$$
+
+VAE 和 text encoder 冻结，只更新两个 DiT。Action loss 带 mask，适配不同具身的 action 维度。
+
+## 5. 实验里值得记住的数字
+
+仿真：LIBERO 98.6%，RoboCasa GR1 50.8%，都是 SOTA。真机 G1 上比同数据微调的 VLA baseline 更强，对未见物体类别和场景变化也更稳。
+
+部署（单 A100）：
+
+| 模型 | 可训练参数 | 频率 |
+| --- | --- | --- |
+| GR00T-N1.5 | 2.7B | 13 Hz |
+| Qwen3DiT | 2.3B | 9 Hz |
+| DiT4DiT | 2.2B | 6 Hz |
+
+Qwen3DiT 是用 Qwen3-VL 2B + 同样的 Motion DiT 做的对照，参数量匹配，只是把 video world model prior 换成了 static VLM prior。DiT4DiT 在几乎所有任务上都赢它，说明 gap 来自 dynamics prior，不是模型大小。
+
+Hidden state 从指定 transformer block 提取（论文附录有层数 ablation），inference 用 4 步 flow matching 积分出 action chunk。
+
+## 6. 到 MotionWAM 的演进
+
+DiT4DiT 解决的是"video prior 怎么接到 action 上"，但还有两个 gap 没填：
+
+1. **动作空间**：DiT4DiT 的 action 还是桌面 manipulation 的 joint/gripper chunk，没法表达全身 loco-manipulation 里腿和手的协同；
+2. **第一视角动力学**：桌面第三视角视频预训练的 prior，跟 egocentric 人形控制需要的视觉动力学不对口。
+
+MotionWAM 的改法：Video DiT 换成 egocentric 预训练（Stage 1，2136 小时），Action DiT 输出 SONIC motion token（Stage 3），$\tau_f$ 固定到纯噪声端做 one-shot imagination，频率从 6 Hz 推到 4.9 Hz（参数也更大，2.5B）。
+
+所以读 WAM 的话，我的顺序是：先看这篇理解 dual-DiT + hook 机制，再看 [MotionWAM](./01-MotionWAM.mdx) 看怎么推到全身真机，最后看 [Cosmos Policy](./07-CosmosPolicy.mdx) 对照"完整 denoise 生成"那条路慢在哪里。
+
+</WordCount>

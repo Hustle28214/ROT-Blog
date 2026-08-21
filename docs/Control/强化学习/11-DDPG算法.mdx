@@ -1,10 +1,15 @@
+---
+title: DDPG 算法
+sidebar_position: 11
+---
+
 import WordCount from '../../../src/components/WordCount/WordCount';
 
 <WordCount>
 
-## 1. DDPG算法
+## 1. DDPG 算法
 
-之前的章节介绍了基于策略梯度的算法 REINFORCE、Actor-Critic 以及两个改进算法——TRPO 和 PPO。这类算法有一个共同的特点：它们都是在线策略算法，这意味着它们的样本效率比较低。
+之前的章节介绍了基于策略梯度的 REINFORCE、Actor-Critic、TRPO，以及上一章的 [PPO 算法](./10-PPO算法.mdx)。这类算法有一个共同的特点：它们都是在线策略算法，这意味着它们的样本效率比较低。
 
 我们回忆一下 DQN 算法，DQN 算法直接估计最优函数 Q，可以做到离线策略学习，但是它只能处理动作空间有限的环境，这是因为它需要从所有动作中挑选一个值最大的动作。如果动作个数是无限的，虽然我们可以将动作空间离散化，但这比较粗糙，无法精细控制。
 
@@ -120,7 +125,7 @@ $$
 
 DDPG 算法通过结合确定性策略梯度和深度神经网络，成功地将 DQN 的思想扩展到了连续动作空间，成为深度强化学习中的重要算法之一。
 
-## 4. DDPG算法完整实现
+## 4. DDPG 算法完整实现
 
 ```python
 import random
@@ -158,23 +163,29 @@ def moving_average(a, window_size):
     end = (np.cumsum(a[:-window_size:-1])[::2] / r)[::-1]
     return np.concatenate((begin, middle, end))
 
-def train_off_policy_agent(env, agent, num_episodes, replay_buffer, minimal_size, batch_size):
+def train_off_policy_agent(env, agent, num_episodes, replay_buffer, minimal_size,
+                           batch_size, seed=None):
     return_list = []
+    if seed is not None:
+        env.action_space.seed(seed)
+    episode_index = 0
     for i in range(10):
         with tqdm(total=int(num_episodes/10), desc='Iteration %d' % i) as pbar:
             for i_episode in range(int(num_episodes/10)):
                 episode_return = 0
-                state, _ = env.reset()
-                done = False
-                while not done:
+                state, _ = env.reset(seed=seed if episode_index == 0 else None)
+                episode_done = False
+                while not episode_done:
                     action = agent.take_action(state)
                     # 确保动作是标量值
                     if isinstance(action, np.ndarray):
                         action = action.item() if action.size == 1 else action[0]
                     
                     next_state, reward, terminated, truncated, _ = env.step([action])
-                    done = terminated or truncated
-                    replay_buffer.add(state, action, float(reward), next_state, done)
+                    episode_done = terminated or truncated
+                    # 回放池中的 done 仅屏蔽真正终止状态的 bootstrap
+                    replay_buffer.add(state, action, float(reward), next_state,
+                                      terminated)
                     state = next_state
                     episode_return += reward
                     
@@ -195,6 +206,7 @@ def train_off_policy_agent(env, agent, num_episodes, replay_buffer, minimal_size
                         'return': '%.3f' % np.mean(return_list[-10:])
                     })
                 pbar.update(1)
+                episode_index += 1
     return return_list
 
 class PolicyNet(torch.nn.Module):
@@ -336,7 +348,9 @@ if __name__ == "__main__":
 
     # 训练智能体
     print("开始训练DDPG智能体...")
-    return_list = train_off_policy_agent(env, agent, num_episodes, replay_buffer, minimal_size, batch_size)
+    return_list = train_off_policy_agent(
+        env, agent, num_episodes, replay_buffer, minimal_size, batch_size, seed=0
+    )
 
     # 绘制结果
     episodes_list = list(range(len(return_list)))
@@ -377,28 +391,6 @@ if __name__ == "__main__":
 <summary>运行结果</summary>
 
 <img width="1200" height="500" alt="Image" src="https://github.com/user-attachments/assets/2a612c3d-1e95-4738-b9c5-b584894e3b7d" />
-
-```bash
-(.venv) PS F:\BLOG\ROT-Blog\docs\Control\强化学习> python .\1.py
-环境: Pendulum-v1
-状态维度: 3, 动作维度: 1, 动作边界: 2.0
-开始训练DDPG智能体...
-Iteration 0: 100%|██████████████████████████████████████████████████████████████████████████████| 20/20 [00:12<00:00,  1.62it/s, episode=20, return=-1250.105]
-Iteration 1: 100%|███████████████████████████████████████████████████████████████████████████████| 20/20 [00:16<00:00,  1.21it/s, episode=40, return=-831.800] 
-Iteration 2: 100%|███████████████████████████████████████████████████████████████████████████████| 20/20 [00:15<00:00,  1.26it/s, episode=60, return=-201.454] 
-Iteration 3: 100%|███████████████████████████████████████████████████████████████████████████████| 20/20 [00:15<00:00,  1.33it/s, episode=80, return=-184.158] 
-Iteration 4: 100%|██████████████████████████████████████████████████████████████████████████████| 20/20 [00:15<00:00,  1.31it/s, episode=100, return=-156.415] 
-Iteration 5: 100%|██████████████████████████████████████████████████████████████████████████████| 20/20 [00:15<00:00,  1.33it/s, episode=120, return=-153.596] 
-Iteration 6: 100%|██████████████████████████████████████████████████████████████████████████████| 20/20 [00:15<00:00,  1.26it/s, episode=140, return=-177.353] 
-Iteration 7: 100%|██████████████████████████████████████████████████████████████████████████████| 20/20 [00:15<00:00,  1.30it/s, episode=160, return=-211.238] 
-Iteration 8: 100%|██████████████████████████████████████████████████████████████████████████████| 20/20 [00:15<00:00,  1.33it/s, episode=180, return=-191.531] 
-Iteration 9: 100%|██████████████████████████████████████████████████████████████████████████████| 20/20 [00:15<00:00,  1.30it/s, episode=200, return=-141.028] 
-
-训练完成!
-最终10个回合平均回报: -141.03
-最大回报: -0.17
-平均回报: -388.66 ± 437.20
-```
 
 </details>
 </WordCount>

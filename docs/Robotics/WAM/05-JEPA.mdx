@@ -1,0 +1,54 @@
+import WordCount from '../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+# JEPA：在表征空间预测，不生成像素
+
+生成式世界模型要预测未来每一帧的纹理、光照、阴影，但控制真正需要的往往是"物体还在不在、往哪动、会不会接触"。JEPA 这条线的立场很直接：别画像素了，在抽象表征里预测未来就够了。
+
+## 1. 核心公式
+
+给定上下文 $x$，把输入拆成两块，一块当条件，一块当要预测的目标：
+
+$$
+\hat{z}_{\text{target}} = g_\theta(x_{\text{context}}), \qquad
+\mathcal{L} = d\big(\hat{z}_{\text{target}}, \mathrm{sg}(f_\phi(x_{\text{target}})\big)
+$$
+
+其中 $f_\phi$ 是 encoder，$g_\theta$ 是 predictor，$\mathrm{sg}(\cdot)$ 是 stop-gradient。predictor 只能看到 context 的表征，target 的表征由另一个 encoder 分支提供但不回传梯度。这样 predictor 被迫学"从已知推断未知"，而不是走捷径去复制输入。
+
+跟生成模型比，JEPA 不重建像素，所以不会把容量浪费在纹理这种对控制无关、又很难精确预测的东西上。
+
+## 2. I-JEPA → V-JEPA
+
+[I-JEPA](https://arxiv.org/abs/2301.08243)（2023）先在图像上做。它随机遮掉图像里的大块区域，让 predictor 从可见块的表征去预测被遮块的表征。没有 pixel decoder，没有对比学习的负样本，训练比 MAE 还省算力，ImageNet 上的表征质量却更好。
+
+[V-JEPA](https://arxiv.org/abs/2404.08471)（2024）把同一套思路搬到视频：在时空块上做 masking，predictor 预测被遮住的时空块的 latent。学到的是运动、遮挡、物体持续性的抽象结构，而不是下一帧长什么样。
+
+## 3. V-JEPA 2 与 action-conditioned 版本
+
+[V-JEPA 2](https://arxiv.org/abs/2506.09985)（Meta，2025）在超过一百万小时视频上预训练，规模把这条线推到了 foundation model 级别。它同时做理解（分类、检测）和预测（latent rollout），说明抽象预测学到的不只是"辅助特征"，本身就可以当世界模型用。
+
+真正跟机器人控制接上的，是 action-conditioned 版本 V-JEPA 2-AC。它在 latent 动力学里加入动作条件，给定当前观测和目标图像，在表征空间里做目标条件规划。关键数字是：只用不到 62 小时 DROID 机器人数据做后训练，就能在新环境里做零样本机械臂规划。
+
+这个样本效率很夸张，但也要注意它的设定：规划是在 latent 里做的，最后还要一个控制器把 latent 目标转成关节命令，中间那层不是端到端学出来的。
+
+## 4. 跟生成式 WAM 怎么选
+
+我自己会把它们看成两种取舍，而不是谁取代谁：
+
+| | 生成式（Dreamer / DiT4DiT / Cosmos Policy） | JEPA |
+| --- | --- | --- |
+| 预测对象 | 像素或 video latent | 抽象 embedding |
+| 推理成本 | 高（扩散/flow matching） | 低（一次前向） |
+| 可视化 | 能直接看未来帧 | 只能看 latent，不好 debug |
+| 接触/几何细节 | 重建像素时可能保留 | 可能在上采样过程中丢掉 |
+| 数据规模 | 互联网视频 + 少量机器人数据 | 大规模无动作视频就够 |
+
+JEPA 适合"我要快、我要规划、我不需要给人看模拟画面"的场景。生成式 WAM 适合"我需要 dynamics prior 真的参与动作生成，而且愿意为此付推理成本"的场景。[DiT4DiT](./06-DiT4DiT.mdx) 和 [MotionWAM](./01-MotionWAM.mdx) 其实是在找第三条路：保留视频 模型的 dynamics prior，但不完整生成视频。
+
+## 5. 还没解决的问题
+
+JEPA 的 latent 不可解释，模型错了你很难从可视化里看出来，这在真机上是个实打实的风险。另外它目前的主战场还是固定基座机械臂的目标条件规划，离 [MotionWAM](./01-MotionWAM.mdx) 那种全身 loco-manipulation 还有距离——后者需要的第一视角视觉动力学、接触、平衡，JEPA 表征里到底有没有、有多少，还需要更严格的闭环评测，不能只看规划成功率。
+
+</WordCount>

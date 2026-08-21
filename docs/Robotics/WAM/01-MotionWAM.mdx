@@ -1,0 +1,91 @@
+import WordCount from '../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+论文：[MotionWAM: Towards Foundation World Action Models for Real-Time Humanoid Loco-Manipulation](https://arxiv.org/abs/2606.09215)，Mondo Robotics + HKUST(GZ)/HKUST，2026 年 6 月。项目页在 [这里](https://dit4dit.github.io/MotionWAM/)。
+
+## 1. 先说结论
+
+这是我见到的第一个能在人形真机上闭环跑起来的全身 loco-manipulation World Action Model。它做对了两件事：
+
+1. 把"上半身关节 + 下半身速度指令"的解耦接口换成一个统一的全身 motion latent，腿终于不只是用来保持平衡了，可以去踩踏板、踢球。
+2. 不等视频世界模型把未来帧 denoise 完，直接从中间层的激活里把 dynamics prior 抠出来用，所以一次前向就能出动作。
+
+Unitree G1 九个真机任务，成功率 76.1%，最强的 VLA baseline（GR00T-N1.7）是 43.9%。同参数量级的世界模型策略 Cosmos Policy 只能跑 0.7 Hz，它能跑 4.9 Hz。
+
+## 2. 它想解决的两个问题
+
+第一个是分层范式的问题。现在几乎所有自主人形 loco-manipulation 都是"高层操作策略 + 底层运动控制器"的组合：上半身拿到细粒度的关节目标，下半身只拿到速度、躯干高度、朝向这种粗指令。上下两半身处在不一致的动作空间里，腿被限制成只做平衡保持，踩踏板、踢东西这类由任务驱动的足部动作根本表达不出来。
+
+第二个是 WAM 本身太慢。WAM 靠视频生成器往策略里注入 dynamics prior，出来的行为在时序上更连贯、物理上更靠谱，这是纯图文预训练策略学不到的。但在高维 video-action latent 上反复 denoise 太贵了，连桌面机械臂都跑不到实时，更别说需要动态平衡的人形。
+
+## 3. 统一的全身 motion latent
+
+$\mathbf{m}_t = (\mathbf{m}_t^{\text{cont}}, \mathbf{k}_t)$，建在 SONIC 这个通用全身控制器上面。
+
+SONIC 的共享 latent 被 Finite Scalar Quantization 卡了个瓶颈（2 个 token、每个 32 档），所以 $\mathbf{k}_t$ 是一个 64 维的离散向量，取值落在 $\{-1, -\frac{15}{16}, \ldots, 1\}$ 上，它概括的是移动、躯干、高度、足部交互这些意图。$\mathbf{m}_t^{\text{cont}}$ 收的是 SONIC 管不到的灵巧通道，也就是左右夹爪或者灵巧手的指令。
+
+有个实现细节我觉得挺有意思：Stage 3 里他们没有单独开一个分类头去预测离散的 token index，而是把 index 当成一个连续标量 $\tilde{k}_t$ 直接塞进 $\mathbf{m}_t$ 里，整个 latent 用同一个 flow matching 目标回归，推理时再四舍五入取回整数：
+
+$$
+\mathbf{m}_t = (\mathbf{m}_t^{\text{cont}}, \tilde{k}_t) \longrightarrow \hat{\mathbf{m}}_t \xrightarrow{\hat{k}_t = \mathrm{round}(\hat{\tilde{k}}_t)} (\hat{\mathbf{m}}_t^{\text{cont}}, \hat{k}_t) \xrightarrow{\text{SONIC}} \mathbf{a}_t
+$$
+
+## 4. 架构：一次前向就够了
+
+整体是 dual-DiT。Video DiT 从 Cosmos-Predict2.5-2B 初始化，把第一视角的条件帧和未来帧压成 latent。
+
+关键的地方在于它怎么取特征。它没有去消费一个完全 denoise 好的未来帧，而是在某一个 transformer block 上挂了 forward hook，在固定的 flow 时刻 $\tau_f$ 截走激活：
+
+$$
+\mathbf{h}_t^{\tau_f} = \mathcal{H}\!\left[v_\theta^{\text{video}}\right]\!\left(\mathbf{z}_{t+1}^{\tau_f}, \tau_f \mid \mathbf{z}_t^0, l\right)
+$$
+
+而且 $\tau_f$ 固定在纯噪声那一端（$\tau_f \approx 1$）。也就是说 Video DiT 跑在"一次性想象"模式：给它干净的条件 latent 加上未来帧的高斯噪声，一次前向出来的激活就已经编码了"场景接下来要往哪走"，那些未来帧压根没被 denoise 过。这个就是它能实时的原因。
+
+Motion DiT 接着吃 $\mathbf{h}_t^{\tau_f}$，通过交错的 self/cross-attention 结合本体状态 $p_t$ 和带噪的 motion latent token，输出速度场，积分出 $\mathbf{m}_t$。多具身预训练时用 per-embodiment 的输入输出投影层包住一个共享 trunk，部署时就只留 G1 那一套投影层。
+
+## 5. 三阶段训练
+
+VAE 和 text encoder 全程冻结，两个分支轮流特化，而不是从头一起优化。
+
+- Stage 1，第一视角视频预训练。只更新 Video DiT，用 $\mathcal{L}_{\text{video}}$ 在大约 2136 小时的第一视角人类视频和人形机器人视频上做未来帧生成。他们的判断是这一阶段的瓶颈是第一视角的视觉动力学，不是动作多样性，所以先用便宜的无动作视频把 trunk 喂饱，不被小得多的带动作标注数据卡住。
+- Stage 2，跨具身动作后训练。挂上 Motion DiT，在端执行器和标注格式都不统一的一堆 G1 数据上联合训练。为了防止动作信号一来就把 dynamics prior 冲掉，视频损失被保留下来当表征正则：$\mathcal{L}_{\text{Stage 2}} = \mathcal{L}_{\text{motion}} + \mathcal{L}_{\text{video}}$。
+- Stage 3，全身遥操作数据微调。九个任务每个 200 条，用 PICO VR 三点追踪采，经 SMPL-24 重定向到 G1，动作输出切成统一的全身 motion token。
+
+## 6. 实验数据
+
+所有方法都在同一批 Stage 3 数据上微调，也都通过同一个 SONIC 接口出动作，唯一的变量就是策略条件在视频世界模型的中间 denoise 特征上、还是在 VLM 那种图文特征上。
+
+九个任务平均从 43.9%（GR00T-N1.7）提到 76.1%。差距最大的都是需要全身协同的：Kick Soccer、Load Cart、Retrieve Item 各 +40%，Wipe Board +45%，Do Laundry +30%。只有 VLM 的 Qwen3DiT 在所有 locomotion 重的任务上基本归零，$\pi_{0.5}$ 整体也没过 20%。语义先验强并不代表能迁移到闭环物理上。
+
+三阶段的消融（五个代表任务，真机 20 次试验）：
+
+| 变体 | Stage 1 | Stage 2 | 平均成功率 |
+| --- | --- | --- | --- |
+| w/o Stage 2 | ✓ | – | 42.0% |
+| w/o Stage 1 | – | ✓ | 59.0% |
+| 完整 | ✓ | ✓ | 70.0% |
+
+去掉 Stage 1 掉 11%，去掉 Stage 2 掉 28%。没有 Stage 1，Video DiT 带着一个通用的、非第一视角的 dynamics prior 进 Stage 2，hidden state 里的语义还有用，但预测出来的 motion latent 明显没那么准。没有 Stage 2，Motion DiT 直接挂在 Stage 1 的 trunk 上只在小的目标任务数据上训，没有跨具身的动作锚定，每个任务都崩。
+
+部署频率（单张 A100，chunk 级速率）：
+
+| 模型 | 可训练参数 | 频率 |
+| --- | --- | --- |
+| GR00T-N1.7 | 1.6B | 6.5 Hz |
+| Qwen3DiT | 2.3B | 9.0 Hz |
+| Cosmos Policy | 2.0B | 0.7 Hz |
+| MotionWAM | 2.5B | 4.9 Hz |
+
+跟 Cosmos Policy 这个参数量相当的世界模型策略比，快了七倍，因为对方必须把未来视频迭代 denoise 完才能出动作。
+
+## 7. 局限和我的想法
+
+论文自己承认的：Stage 3 只在 G1 上验证过，三阶段这套配方能不能跨硬件迁移还不知道；没有做严格的新物体泛化实验，训练和测试的物体在视觉上是相似的；只靠一个第一视角相机，操作物体一出视野或者头部视角漂出训练分布，就丢掉视觉锚定然后卡住。
+
+我自己比较在意的是它对 SONIC 的依赖。motion token 的表达能力上限基本就是 SONIC 的上限，这层要是不支持某类全身行为，上面的 WAM 再强也变不出来。另外 4.9 Hz 是 chunk 级的频率，踢球这种需要快速反应的动作实际上是靠 action chunk 内部撑着的，真要做更强的动态交互，这个速率我觉得还是紧。
+
+不过"从中间 denoise 特征里读 prior，而不是等它 denoise 完"这个思路挺值得借鉴的，本质上是把视频世界模型当特征提取器而不是生成器用，一下就把 WAM 那个最贵的部分绕掉了。
+
+</WordCount>

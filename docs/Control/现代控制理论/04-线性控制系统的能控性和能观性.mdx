@@ -2,98 +2,421 @@
 sidebar_position: 4
 ---
 
-
-
 import VideoPlayer from '../../../src/components/Videoplayer/Videoplayer.jsx';
+import WordCount from '../../../src/components/WordCount/WordCount';
 
+<WordCount>
 
-## 3.1 能控性的定义
+# 第 3 章 线性控制系统的能控性和能观性
+
+考虑连续 LTI 系统
+
+$$
+\dot{x}=Ax+Bu,\qquad y=Cx+Du,
+$$
+
+其中 \(x\in\mathbb{R}^n\)、\(u\in\mathbb{R}^m\)、\(y\in\mathbb{R}^p\)。能控性回答“输入能否改变全部内部状态”，能观性回答“输出是否包含全部内部状态的信息”。二者都是状态空间实现的结构性质。
+
+## 3.1 能控性：定义与直观解释
+
+若存在有限时间 \(t_f>t_0\) 和允许的输入 \(u(t)\)，能把任意初始状态 \(x(t_0)\) 转移到任意目标状态 \(x(t_f)\)，则系统完全能控。对 LTI 系统，常用等价表述是：任意初始状态都能在有限时间内被驱动到原点。
+
+由状态响应
+
+$$
+x(t_f)=e^{A(t_f-t_0)}x(t_0)+
+\int_{t_0}^{t_f}e^{A(t_f-\tau)}Bu(\tau)\,\mathrm d\tau
+$$
+
+可见输入先经 \(B\) 进入状态空间，再被 \(A\) 的内部动力学传播。若存在一个方向，无论怎样选择 \(u\) 都不能产生该方向的状态分量，该方向便不可控。
 
 <VideoPlayer src="//player.bilibili.com/player.html?isOutside=true&aid=625409284&bvid=BV1Qt4y127ja&cid=184229609&p=21" />
 
-<br />
+## 3.2 能控性判据
 
-## 3.2 线性定常系统能控性判别
+### 3.2.1 Kalman 秩判据
 
-### 01
+构造能控矩阵
+
+$$
+\mathcal{C}=
+\begin{bmatrix}B&AB&A^2B&\cdots&A^{n-1}B\end{bmatrix}.
+$$
+
+系统完全能控的充要条件是
+
+$$
+\operatorname{rank}\mathcal{C}=n.
+$$
+
+只需计算到 \(A^{n-1}B\)，因为 Cayley–Hamilton 定理保证更高次幂不会增加列空间。多输入时 \(B\) 有多列，判据形式不变。
 
 <VideoPlayer src="//player.bilibili.com/player.html?isOutside=true&aid=625409284&bvid=BV1Qt4y127ja&cid=184229666&p=22" />
 
-<br />
-### 02
-
 <VideoPlayer src="//player.bilibili.com/player.html?isOutside=true&aid=625409284&bvid=BV1Qt4y127ja&cid=184229667&p=23" />
 
-<br />
-### 03 直接从A和B判断系统的能控性-单输入系统
+### 3.2.2 PBH 判据
+
+Popov–Belevitch–Hautus（PBH）判据为
+
+$$
+\operatorname{rank}
+\begin{bmatrix}\lambda I-A&B\end{bmatrix}=n,
+\qquad \forall\lambda\in\sigma(A).
+$$
+
+等价地，不存在非零左特征向量 \(q^{\mathsf T}\) 使
+
+$$
+q^{\mathsf T}A=\lambda q^{\mathsf T},
+\qquad q^{\mathsf T}B=0.
+$$
+
+若某个模态的左特征方向与所有输入通道正交，输入就无法激励该模态。PBH 判据适合逐个检查特征值，也适合含参数的问题。
+
+### 3.2.3 能控 Gramian
+
+在区间 \([0,T]\) 上定义
+
+$$
+W_c(T)=\int_0^T e^{A\tau}BB^{\mathsf T}
+e^{A^{\mathsf T}\tau}\,\mathrm d\tau.
+$$
+
+系统在 \([0,T]\) 上完全能控当且仅当 \(W_c(T)\) 正定。把零初态驱动到 \(x_f\) 的最小能量输入为
+
+$$
+u^\star(t)=B^{\mathsf T}e^{A^{\mathsf T}(T-t)}
+W_c^{-1}(T)x_f,
+$$
+
+最小能量为 \(x_f^{\mathsf T}W_c^{-1}(T)x_f\)。因此 Gramian 的小特征值对应“很难控制”的方向。
+
+若 \(A\) Hurwitz 稳定，无限时域 Gramian 满足
+
+$$
+AW_c+W_cA^{\mathsf T}+BB^{\mathsf T}=0.
+$$
+
+### 3.2.4 SISO 例题
+
+设
+
+$$
+A=\begin{bmatrix}0&1\\-2&-3\end{bmatrix},
+\qquad B=\begin{bmatrix}0\\1\end{bmatrix}.
+$$
+
+则
+
+$$
+\mathcal{C}=
+\begin{bmatrix}B&AB\end{bmatrix}
+=\begin{bmatrix}0&1\\1&-3\end{bmatrix},
+\qquad \det\mathcal{C}=-1\ne0,
+$$
+
+所以系统完全能控。对特征值 \(-1,-2\)，PBH 矩阵也都满行秩。
 
 <VideoPlayer src="//player.bilibili.com/player.html?isOutside=true&aid=625409284&bvid=BV1Qt4y127ja&cid=184229696&p=24" />
-<br />
 
-### 04 直接从A和B判断系统的能控性-多输入系统
+### 3.2.5 MIMO 例题
+
+设
+
+$$
+A=\begin{bmatrix}0&0&0\\0&0&1\\0&0&0\end{bmatrix},
+\qquad
+B=\begin{bmatrix}1&0\\0&0\\0&1\end{bmatrix}.
+$$
+
+有
+
+$$
+AB=\begin{bmatrix}0&0\\0&1\\0&0\end{bmatrix},
+\qquad A^2B=0.
+$$
+
+\(\mathcal C=[B\ AB\ A^2B]\) 的列空间包含三个标准基方向，故
+\(\operatorname{rank}\mathcal C=3\)，系统完全能控。这个例子说明，多输入判定不能只检查 \(B\) 是否满行秩；动力学 \(A\) 可以把输入作用传播到其他状态。
 
 <VideoPlayer src="//player.bilibili.com/player.html?isOutside=true&aid=625409284&bvid=BV1Qt4y127ja&cid=184229728&p=25" />
 
-<br />
-## 3.3 能观性
+## 3.3 能观性：定义与判据
 
-### 3.3.1 定义
+### 3.3.1 定义与直观解释
+
+若已知区间 \([t_0,t_f]\) 上的输入 \(u(t)\) 与输出 \(y(t)\)，能够唯一确定初始状态 \(x(t_0)\)，则系统完全能观。减去已知输入造成的输出后，问题归结为：不同初始状态能否产生不同的零输入输出。
+
+不可观状态不是“不存在”，而是它对输出没有可辨识影响；它仍可能影响内部动态，甚至可能不稳定。
 
 <VideoPlayer src="//player.bilibili.com/player.html?isOutside=true&aid=625409284&bvid=BV1Qt4y127ja&cid=184229751&p=26" />
-<br />
-### 3.3.2 定常系统能观性判定方法：约旦标准型
+
+### 3.3.2 Kalman 与 PBH 判据
+
+构造能观矩阵
+
+$$
+\mathcal{O}=
+\begin{bmatrix}C\\CA\\CA^2\\\vdots\\CA^{n-1}\end{bmatrix}.
+$$
+
+系统完全能观当且仅当
+
+$$
+\operatorname{rank}\mathcal{O}=n.
+$$
+
+对应的 PBH 判据是
+
+$$
+\operatorname{rank}
+\begin{bmatrix}\lambda I-A\\C\end{bmatrix}=n,
+\qquad \forall\lambda\in\sigma(A).
+$$
+
+等价地，不存在非零右特征向量 \(v\) 同时满足
+
+$$
+Av=\lambda v,\qquad Cv=0.
+$$
+
+即任何特征模态都不能完全落在输出的“盲区”内。
 
 <VideoPlayer src="//player.bilibili.com/player.html?isOutside=true&aid=625409284&bvid=BV1Qt4y127ja&cid=184229837&p=27" />
-<br />
-### 3.3.3 定常系统能观性判定方法：直接型
 
 <VideoPlayer src="//player.bilibili.com/player.html?isOutside=true&aid=625409284&bvid=BV1Qt4y127ja&cid=184229888&p=28" />
-<br />
-## 3.4 能控性和能观性的对偶关系
 
+### 3.3.3 能观 Gramian
+
+有限时域能观 Gramian 为
+
+$$
+W_o(T)=\int_0^T e^{A^{\mathsf T}\tau}C^{\mathsf T}C
+e^{A\tau}\,\mathrm d\tau.
+$$
+
+系统在 \([0,T]\) 上完全能观当且仅当 \(W_o(T)\) 正定。零输入输出能量满足
+
+$$
+\int_0^T y^{\mathsf T}(t)y(t)\,\mathrm dt
+=x^{\mathsf T}(0)W_o(T)x(0),
+$$
+
+所以小特征值方向在输出中很弱，数值上难以估计。若 \(A\) Hurwitz 稳定，无限时域 Gramian 满足
+
+$$
+A^{\mathsf T}W_o+W_oA+C^{\mathsf T}C=0.
+$$
+
+### 3.3.4 SISO 能观性例题
+
+沿用
+
+$$
+A=\begin{bmatrix}0&1\\-2&-3\end{bmatrix}.
+$$
+
+若 \(C=[1\ 0]\)，则
+
+$$
+\mathcal O=\begin{bmatrix}1&0\\0&1\end{bmatrix},
+$$
+
+系统完全能观。若改成 \(C=[1\ 1]\)，则
+
+$$
+\mathcal O=\begin{bmatrix}1&1\\-2&-2\end{bmatrix},
+$$
+
+秩为 \(1\)，系统不可观；对应 \(\lambda=-2\) 的特征向量
+\(v=[1,-2]^{\mathsf T}\) 满足 \(Cv=0\)，PBH 判据得到同一结论。
+
+## 3.4 能控与能观的对偶性
+
+\((A,B)\) 能控，当且仅当 \((A^{\mathsf T},B^{\mathsf T})\) 能观；\((A,C)\) 能观，当且仅当 \((A^{\mathsf T},C^{\mathsf T})\) 能控。因为
+
+$$
+\mathcal C(A^{\mathsf T},C^{\mathsf T})
+=\mathcal O(A,C)^{\mathsf T}.
+$$
+
+因此能控性的结论通常转置后就能得到能观性的对应结论：能控矩阵对应能观矩阵，左特征向量对应右特征向量，\(W_c\) 对应 \(W_o\)。
 
 <VideoPlayer src="//player.bilibili.com/player.html?isOutside=true&aid=625409284&bvid=BV1Qt4y127ja&cid=184229962&p=29" />
-<br />
 
-## 3.5 状态空间表达式的能控标准型和能观标准型
+## 3.5 能控标准型与能观标准型
 
-### 01
+对严格真有理 SISO 传递函数
+
+$$
+G(s)=\frac{b_{n-1}s^{n-1}+\cdots+b_1s+b_0}
+{s^n+a_{n-1}s^{n-1}+\cdots+a_1s+a_0},
+$$
+
+一种能控标准型实现为
+
+$$
+A_c=\begin{bmatrix}
+0&1&0&\cdots&0\\
+0&0&1&\cdots&0\\
+\vdots&\vdots&\vdots&\ddots&\vdots\\
+0&0&0&\cdots&1\\
+-a_0&-a_1&-a_2&\cdots&-a_{n-1}
+\end{bmatrix},
+\quad
+B_c=\begin{bmatrix}0\\0\\\vdots\\0\\1\end{bmatrix},
+\quad
+C_c=\begin{bmatrix}b_0&b_1&\cdots&b_{n-1}\end{bmatrix}.
+$$
+
+通过对偶可取能观标准型
+
+$$
+A_o=A_c^{\mathsf T},\qquad
+B_o=C_c^{\mathsf T},\qquad
+C_o=B_c^{\mathsf T}.
+$$
+
+不同教材可能采用状态倒序排列，因而伴随矩阵外观不同，但只要传递函数一致且存在相似变换，就是等价实现。可逆变换
+
+$$
+\bar{x}=T^{-1}x,\qquad
+\bar{A}=T^{-1}AT,\quad
+\bar{B}=T^{-1}B,\quad
+\bar{C}=CT
+$$
+
+不改变特征值、传递函数、能控性与能观性。
+
 <VideoPlayer src="//player.bilibili.com/player.html?isOutside=true&aid=625409284&bvid=BV1Qt4y127ja&cid=184230380&p=30" />
-<br />
 
-### 02
 <VideoPlayer src="//player.bilibili.com/player.html?isOutside=true&aid=625409284&bvid=BV1Qt4y127ja&cid=184230375&p=31" />
-<br />
-### 03
 
 <VideoPlayer src="//player.bilibili.com/player.html?isOutside=true&aid=625409284&bvid=BV1Qt4y127ja&cid=184230442&p=32" />
-<br />
 
-## 3.6 线性系统的结构分解
+## 3.6 Kalman 结构分解
 
-### 01
+状态空间可按“能控/不能控”和“能观/不能观”分成四类：
+
+<svg viewBox="0 0 820 390" role="img" aria-label="Kalman 分解的四个子空间：能控能观、能控不能观、不能控能观、不能控不能观" style={{width: '100%', maxWidth: 820, color: 'var(--ifm-font-color-base)', background: 'var(--ifm-background-surface-color)', borderRadius: 12}}>
+  <g stroke="currentColor" strokeWidth="2">
+    <rect x="160" y="55" width="560" height="280" rx="12" fill="none" />
+    <line x1="440" y1="55" x2="440" y2="335" />
+    <line x1="160" y1="195" x2="720" y2="195" />
+  </g>
+  <g fill="currentColor" textAnchor="middle">
+    <text x="300" y="38" fontSize="19">能控</text>
+    <text x="580" y="38" fontSize="19">不能控</text>
+    <text x="86" y="130" fontSize="19">能观</text>
+    <text x="86" y="270" fontSize="19">不能观</text>
+    <text x="300" y="120" fontSize="20">能控且能观</text>
+    <text x="300" y="150" fontSize="16">传递函数的最小实现部分</text>
+    <text x="580" y="120" fontSize="20">不能控但能观</text>
+    <text x="580" y="150" fontSize="16">输出可见，输入不可达</text>
+    <text x="300" y="260" fontSize="20">能控但不能观</text>
+    <text x="300" y="290" fontSize="16">输入可达，输出不可见</text>
+    <text x="580" y="260" fontSize="20">不能控且不能观</text>
+    <text x="580" y="290" fontSize="16">既不可达也不可见</text>
+  </g>
+</svg>
+
+先按能控子空间 \(\mathcal R=\operatorname{im}\mathcal C\) 选基，可把系统化成
+
+$$
+\bar A=\begin{bmatrix}A_c&A_{12}\\0&A_{\bar c}\end{bmatrix},
+\qquad
+\bar B=\begin{bmatrix}B_c\\0\end{bmatrix}.
+$$
+
+再结合不可观子空间
+
+$$
+\mathcal N=\ker\mathcal O
+$$
+
+选取相容基，就得到四子空间 Kalman 分解。矩阵的具体块排列随基的排列而变，但结构含义不变。只有“能控且能观”块同时连接输入与输出，因此只有该块决定传递函数的最小实现。
+
 <VideoPlayer src="//player.bilibili.com/player.html?isOutside=true&aid=625409284&bvid=BV1Qt4y127ja&cid=184234922&p=33" />
-<br />
 
-
-### 02
 <VideoPlayer src="//player.bilibili.com/player.html?isOutside=true&aid=625409284&bvid=BV1Qt4y127ja&cid=184240641&p=34" />
-<br />
 
-## 3.7 传递函数的矩阵实现
+## 3.7 传递函数实现与最小实现
 
-### 01
+状态空间实现对应的传递函数矩阵为
+
+$$
+G(s)=C(sI-A)^{-1}B+D.
+$$
+
+同一 \(G(s)\) 有无穷多个状态空间实现。若一个实现既完全能控又完全能观，则它是**最小实现**；反之，任何最小实现都必须既能控又能观。最小实现的阶数等于传递函数矩阵的 McMillan 次数，任意两个最小实现之间存在可逆相似变换。
+
+对 SISO 严格真有理传递函数，先将分子分母约成互素多项式，约分后分母次数就是最小实现阶数。MIMO 情形不能仅逐元素约分，因为不同通道共享内部模态；应检查整体实现的能控性、能观性，或使用 Smith–McMillan 结构。
 
 <VideoPlayer src="//player.bilibili.com/player.html?isOutside=true&aid=625409284&bvid=BV1Qt4y127ja&cid=185020842&p=35" />
-<br />
 
-### 02
 <VideoPlayer src="//player.bilibili.com/player.html?isOutside=true&aid=625409284&bvid=BV1Qt4y127ja&cid=185020897&p=36" />
-<br />
 
+### 3.7.1 MIMO 综合例题
 
-## 3.8 传递函数中零极点对消与状态能观性和能控性的关系
+设
 
+$$
+A=\operatorname{diag}(-1,-2,-3),\quad
+B=\begin{bmatrix}1&0\\0&1\\0&0\end{bmatrix},\quad
+C=\begin{bmatrix}1&0&1\\0&1&0\end{bmatrix},\quad D=0.
+$$
+
+第三个状态不受任何输入作用，所以 \(\operatorname{rank}\mathcal C=2\)，系统不可控。三个状态都能在输出中产生影响，且特征值互异；由 PBH 判据可知 \((A,C)\) 能观。因此第三个模态属于“不能控但能观”。
+
+由于从零初态出发时第三个状态永远为零，
+
+$$
+G(s)=
+\begin{bmatrix}
+\dfrac{1}{s+1}&0\\
+0&\dfrac{1}{s+2}
+\end{bmatrix}.
+$$
+
+极点 \(-3\) 不出现在传递函数中。删去第三个状态后得到二阶、能控且能观的最小实现。
+
+## 3.8 零极点对消与隐藏模态
+
+若状态实现含不可控或不可观模态，对应的 \(A\) 的特征值可能在 \(C(sI-A)^{-1}B\) 中被消去。因此：
+
+- \(A\) 的特征值是内部模态，但不一定都是传递函数极点。
+- 在非最小 SISO 实现中，约去的因子对应不可控或不可观部分；仅看约分后的传递函数无法判断是哪一种。
+- 能控但不可观的模态可被输入激励，输出却看不见；不可控但能观的模态可能由非零初态出现在输出中，却无法由输入激励。
+- 传递函数只描述零初始条件下的输入输出关系，会隐藏不可控或不可观的内部动态。
+
+例如
+
+$$
+A=\begin{bmatrix}-1&0\\0&-2\end{bmatrix},\quad
+B=\begin{bmatrix}1\\1\end{bmatrix},\quad
+C=\begin{bmatrix}1&0\end{bmatrix}.
+$$
+
+该系统能控但不可观，且
+
+$$
+G(s)=C(sI-A)^{-1}B=\frac{1}{s+1}.
+$$
+
+\(-2\) 模态未出现在传递函数中。若隐藏的是不稳定模态，传递函数仍可能看似稳定，因此内部稳定性必须结合最小性检查。
 
 <VideoPlayer src="//player.bilibili.com/player.html?isOutside=true&aid=625409284&bvid=BV1Qt4y127ja&cid=186595532&p=37" />
-<br />
+
+## 3.9 常见误区与复习清单
+
+1. **把 \(B\) 满秩当作能控。** 能控性由 \([B,AB,\ldots]\) 决定；\(B\) 本身不必满行秩。
+2. **把 \(C\) 满秩当作能观。** \(CA^k\) 提供的动态信息同样重要。
+3. **只检查一个特征值的 PBH 矩阵。** 必须检查 \(A\) 的所有不同特征值。
+4. **用数值行列式判断高阶矩阵秩。** 应使用秩或奇异值；接近奇异意味着数值上“难控/难观”。
+5. **认为反馈会任意改变结构性质。** \((A,B)\) 能控性在状态反馈 \(A+BK\) 下不变；\((A,C)\) 能观性在输出注入 \(A+LC\) 下不变。
+6. **认为传递函数稳定就保证内部稳定。** 非最小实现可能含被对消的不稳定模态。
+7. **混淆有限与无限时域 Gramian。** 有限时域定义不要求 \(A\) 稳定；无限时域积分通常要求 \(A\) Hurwitz 稳定。
+8. **认为坐标变换会改变结构性质。** 可逆相似变换只改变状态坐标。
+
+</WordCount>

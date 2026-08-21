@@ -1,10 +1,15 @@
+---
+title: TRPO 算法
+sidebar_position: 9
+---
+
 import WordCount from '../../../src/components/WordCount/WordCount';
 
 <WordCount>
 
 想象一下你在学习走钢丝——这就是传统的策略梯度算法。你小心翼翼地迈出每一步，但有时候步子太大，就会突然失去平衡摔下来。这种"一步走错，满盘皆输"的情况在深度强化学习中同样存在：当策略网络是深度模型时，沿着梯度方向更新参数，很可能因为步长太大导致策略性能急剧下降。
 
-TRPO算法就像给走钢丝的演员系上了安全绳。它提出了一个精妙的思路：在参数更新时划定一个"信任区域"，在这个安全区域内进行策略改进，确保每次更新都能稳定提升性能。
+TRPO 算法就像给走钢丝的演员系上了安全绳。它提出了一个精妙的思路：在参数更新时划定一个“信任区域”，在这个安全区域内进行策略改进，限制每次更新对策略性能的冲击。
 
 ## 1. TRPO 算法
 
@@ -61,7 +66,7 @@ $$
 理想情况下，如果对于所有状态 $s$，有 $\mathbb{E}_{a \sim \pi_{\theta'}(\cdot|s)} [A^{\pi_\theta}(s, a)] \geq 0$，则性能单调递增。
 
 
-#### 巧妙近似
+### 1.1 巧妙近似
 
 直接优化上述条件是不现实的，因为新策略 $\pi_{\theta'}$ 的状态访问分布 $\nu^{\pi_{\theta'}}$ 未知。TRPO采用近似方法，用旧策略 $\pi_\theta$ 的状态分布 $\nu^{\pi_\theta}$ 替代 $\nu^{\pi_{\theta'}}$，并定义替代目标：
 $$
@@ -231,7 +236,7 @@ def compute_advantage(gamma, lmbda, td_delta):
     return torch.tensor(advantage_list, dtype=torch.float)
 ```
 
-## 7. TRPO算法完整实现
+## 7. TRPO 算法完整实现
 
 ```python
 import torch
@@ -262,8 +267,11 @@ def moving_average(a, window_size):
     end = (np.cumsum(a[:-window_size:-1])[::2] / r)[::-1]
     return np.concatenate((begin, middle, end))
 
-def train_on_policy_agent(env, agent, num_episodes):
+def train_on_policy_agent(env, agent, num_episodes, seed=None):
     return_list = []
+    if seed is not None:
+        env.action_space.seed(seed)
+    episode_index = 0
     for i in range(10):
         with tqdm(total=int(num_episodes/10), desc='Iteration %d' % i) as pbar:
             for i_episode in range(int(num_episodes/10)):
@@ -275,17 +283,18 @@ def train_on_policy_agent(env, agent, num_episodes):
                     'rewards': [],
                     'dones': []
                 }
-                state, _ = env.reset()
-                done = False
-                while not done:
+                state, _ = env.reset(seed=seed if episode_index == 0 else None)
+                episode_done = False
+                while not episode_done:
                     action = agent.take_action(state)
                     next_state, reward, terminated, truncated, _ = env.step(action)
-                    done = terminated or truncated
+                    episode_done = terminated or truncated
                     transition_dict['states'].append(state)
                     transition_dict['actions'].append(action)
                     transition_dict['next_states'].append(next_state)
                     transition_dict['rewards'].append(reward)
-                    transition_dict['dones'].append(done)
+                    # dones 仅表示 MDP 终止；时间上限截断仍允许 bootstrap
+                    transition_dict['dones'].append(terminated)
                     state = next_state
                     episode_return += reward
                 return_list.append(episode_return)
@@ -294,6 +303,7 @@ def train_on_policy_agent(env, agent, num_episodes):
                     pbar.set_postfix({'episode': '%d' % (num_episodes/10 * i + i_episode+1), 
                                       'return': '%.3f' % np.mean(return_list[-10:])})
                 pbar.update(1)
+                episode_index += 1
     return return_list
 
 class PolicyNet(torch.nn.Module):
@@ -334,7 +344,8 @@ class TRPO:
         self.device = device
 
     def take_action(self, state):
-        state = torch.tensor([state], dtype=torch.float).to(self.device)
+        state = torch.as_tensor(np.asarray(state), dtype=torch.float,
+                                device=self.device).unsqueeze(0)
         probs = self.actor(state)
         action_dist = torch.distributions.Categorical(probs)
         action = action_dist.sample()
@@ -477,7 +488,7 @@ if __name__ == "__main__":
     
     agent = TRPO(hidden_dim, env.observation_space, env.action_space, lmbda,
                  kl_constraint, alpha, critic_lr, gamma, device)
-    return_list = train_on_policy_agent(env, agent, num_episodes)
+    return_list = train_on_policy_agent(env, agent, num_episodes, seed=0)
 
     episodes_list = list(range(len(return_list)))
     plt.figure(figsize=(12, 5))
@@ -506,22 +517,8 @@ if __name__ == "__main__":
 
 ![image](https://github.com/user-attachments/assets/bf1ba2fd-4237-48c5-9b0c-1222886b25e8)
 
-```bash
-(.venv) PS F:\BLOG\ROT-Blog\docs\Control\强化学习> python .\1.py
-Iteration 0:   0%|                                                                                                                     | 0/50 [00:00<?, ?it/s]F:\BLOG\ROT-Blog\docs\Control\强化学习\1.py:101: UserWarning: Creating a tensor from a list of numpy.ndarrays is extremely slow. Please consider converting the 
-list to a single numpy.ndarray with numpy.array() before converting to a tensor. (Triggered internally at C:\actions-runner\_work\pytorch\pytorch\pytorch\torch\csrc\utils\tensor_new.cpp:256.)
-  state = torch.tensor([state], dtype=torch.float).to(self.device)
-Iteration 0: 100%|█████████████████████████████████████████████████████████████████████████████████| 50/50 [00:02<00:00, 24.66it/s, episode=50, return=53.000]
-Iteration 1: 100%|████████████████████████████████████████████████████████████████████████████████| 50/50 [00:02<00:00, 21.10it/s, episode=100, return=98.600] 
-Iteration 2: 100%|███████████████████████████████████████████████████████████████████████████████| 50/50 [00:03<00:00, 14.84it/s, episode=150, return=119.700] 
-Iteration 3: 100%|███████████████████████████████████████████████████████████████████████████████| 50/50 [00:03<00:00, 14.00it/s, episode=200, return=119.500] 
-Iteration 4: 100%|███████████████████████████████████████████████████████████████████████████████| 50/50 [00:04<00:00, 12.17it/s, episode=250, return=120.800] 
-Iteration 5: 100%|███████████████████████████████████████████████████████████████████████████████| 50/50 [00:03<00:00, 13.38it/s, episode=300, return=120.700] 
-Iteration 6: 100%|███████████████████████████████████████████████████████████████████████████████| 50/50 [00:03<00:00, 13.75it/s, episode=350, return=124.600] 
-Iteration 7: 100%|███████████████████████████████████████████████████████████████████████████████| 50/50 [00:03<00:00, 13.72it/s, episode=400, return=124.100] 
-Iteration 8: 100%|███████████████████████████████████████████████████████████████████████████████| 50/50 [00:03<00:00, 13.28it/s, episode=450, return=125.100] 
-Iteration 9: 100%|███████████████████████████████████████████████████████████████████████████████| 50/50 [00:03<00:00, 13.84it/s, episode=500, return=117.000]
-```
 </details>
+
+下一章将在 TRPO 的信任区域思想之上，介绍实现更简洁的 [PPO 算法](./10-PPO算法.mdx)。
 
 </WordCount>

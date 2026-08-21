@@ -1,3 +1,8 @@
+---
+title: 时序差分算法
+sidebar_position: 3
+---
+
 import WordCount from '../../../src/components/WordCount/WordCount';
 
 <WordCount>
@@ -12,7 +17,7 @@ $$
 V(S_t) \leftarrow V(S_t) + \alpha[G_t - V(S_t)]
 $$
 
-这里我们将 3.5 节的 $\frac{1}{N(S_t)}$ 替换成了 $\alpha$，表示对价值估计更新的步长。可以将 $\alpha$ 取为一个常数，此时更新方式不再像蒙特卡洛方法那样严格地取期望。蒙特卡洛方法必须要等整个序列结束之后才能计算得到这一次的回报 $G_t$，而时序差分方法只需要当前步结束即可进行计算。具体来说，时序差分算法用当前获得的奖励加上下一个状态的价值估计来作为在当前状态会获得的回报，即：
+这里我们将蒙特卡洛增量更新中的 $\frac{1}{N(S_t)}$ 替换成了 $\alpha$，表示对价值估计更新的步长。可以将 $\alpha$ 取为一个常数，此时更新方式不再像蒙特卡洛方法那样严格地取期望。蒙特卡洛方法必须要等整个序列结束之后才能计算得到这一次的回报 $G_t$，而时序差分方法只需要当前步结束即可进行计算。具体来说，时序差分算法用当前获得的奖励加上下一个状态的价值估计来作为在当前状态会获得的回报，即：
 
 $$
 V(S_t) \leftarrow V(S_t) + \alpha[R_{t+1} + \gamma V(S_{t+1}) - V(S_t)]
@@ -42,7 +47,7 @@ $$
 
 然后我们用贪婪算法来选取在某个状态下动作价值最大的那个动作，即 $\pi(s) = \arg\max_a Q(s,a)$。这样似乎已经形成了一个完整的强化学习算法：用贪婪算法根据动作价值选取动作来和环境交互，再根据得到的数据用时序差分算法更新动作价值估计。
 
-然而这个简单的算法存在两个需要进一步考虑的问题。第一，如果要用时序差分算法来准确地估计策略的状态价值函数，我们需要用极大量的样本来进行更新。但实际上我们可以忽略这一点，直接用一些样本来评估策略，然后就可以更新策略了。我们可以这么做的原因是策略提升可以在策略评估未完全进行的情况进行，回顾一下，价值迭代（参见 4.4 节）就是这样，这其实是广义策略迭代（generalized policy iteration）的思想。第二，如果在策略提升中一直根据贪婪算法得到一个确定性策略，可能会导致某些状态动作对 $(s,a)$ 永远没有在序列中出现，以至于无法对其动作价值进行估计，进而无法保证策略提升后的策略比之前的好。我们在第 2 章中对此有详细讨论。简单常用的解决方案是不再一味使用贪婪算法，而是采用一个 $\epsilon$-贪婪策略：以 $1-\epsilon$ 的概率采用动作价值最大的那个动作，另外有 $\epsilon$ 的概率从动作空间中随机采取一个动作，其公式表示为：
+然而这个简单的算法存在两个需要进一步考虑的问题。第一，如果要用时序差分算法来准确地估计策略的状态价值函数，我们需要用极大量的样本来进行更新。但实际上可以只用部分样本评估策略，然后立即更新策略；价值迭代也采用了这种策略评估与提升交错进行的广义策略迭代（generalized policy iteration）思想。第二，如果在策略提升中一直根据贪婪算法得到一个确定性策略，可能会导致某些状态动作对 $(s,a)$ 永远没有在序列中出现，以至于无法对其动作价值进行估计，进而无法保证策略提升后的策略比之前的好。简单常用的解决方案是不再一味使用贪婪算法，而是采用一个 $\epsilon$-贪婪策略：以 $1-\epsilon$ 的概率采用动作价值最大的那个动作，另外有 $\epsilon$ 的概率从动作空间中随机采取一个动作，其公式表示为：
 
 $$
 \pi(a|s) = 
@@ -76,7 +81,7 @@ $$
 G_t^{(n)} = R_{t+1} + \gamma R_{t+2} + \gamma^2 R_{t+3} + \cdots + \gamma^{n-1} R_{t+n} + \gamma^n V(S_{t+n})
 $$
 
-于是，相应存在一种多步 Sarsa 算法，它把 Sarsa 算法中的动作价值函数的更新公式（参见 5.3 节）：
+于是，相应存在一种多步 Sarsa 算法，它把前述 Sarsa 动作价值函数的单步更新公式：
 
 $$
 Q(S_t, A_t) \leftarrow Q(S_t, A_t) + \alpha[R_{t+1} + \gamma Q(S_{t+1}, A_{t+1}) - Q(S_t, A_t)]
@@ -128,7 +133,7 @@ $$
 
 而 Sarsa 估计当前 $\epsilon$-贪婪策略的动作价值函数。需要强调的是，Q-learning 的更新并非必须使用当前贪心策略采样得到的数据，因为给定任意 $(S_t, A_t, R_{t+1}, S_{t+1})$ 都可以直接根据更新公式来更新 $Q(S_t, A_t)$，为了探索，我们通常使用一个 $\epsilon$-贪婪策略来与环境交互。Sarsa 必须使用当前 $\epsilon$-贪婪策略采样得到的数据，因为它的更新中用到的 $A_{t+1}$ 是当前策略在 $S_{t+1}$ 下的动作。我们称 Sarsa 是在线策略（on-policy）算法，称 Q-learning 是离线策略（off-policy）算法，这两个概念在强化学习中非常重要。
 
-我们称采样数据的策略为行为策略（behavior policy），称用这些数据来更新的策略为目标策略（target policy）。在线策略（on-policy）算法表示行为策略和目标策略是同一个策略；而离线策略（off-policy）算法表示行为策略和目标策略不是同一个策略。Sarsa 是典型的在线策略算法，而 Q-learning 是典型的离线策略算法。判断二者类别的一个重要手段是看计算时序差分的价值目标的数据是否来自当前的策略，如图 5-1 所示。具体而言：
+我们称采样数据的策略为行为策略（behavior policy），称用这些数据来更新的策略为目标策略（target policy）。在线策略（on-policy）算法表示行为策略和目标策略是同一个策略；而离线策略（off-policy）算法表示行为策略和目标策略不是同一个策略。Sarsa 是典型的在线策略算法，而 Q-learning 是典型的离线策略算法。判断二者类别的一个重要手段是看计算时序差分目标所用的下一动作是否来自当前行为策略。具体而言：
 
 **Sarsa（在线策略）- "言行一致的学习者"**
 - 更新公式：$Q(S_t, A_t) \leftarrow Q(S_t, A_t) + \alpha[R_{t+1} + \gamma Q(S_{t+1}, A_{t+1}) - Q(S_t, A_t)]$
@@ -147,7 +152,94 @@ $$
 ![Image](https://github.com/user-attachments/assets/ca8570be-66d7-41ef-ada7-04222c29f397)
 
 
-## 5. Q-Learning 收敛性证明
+## 5. CliffWalking 中的 Sarsa 与 Q-learning
+
+下面的示例可直接运行，依赖 `gymnasium` 和 `numpy`。两种算法使用相同的环境、超参数与随机种子，并遵循 Gymnasium 的新式 `reset`/`step` 返回约定。终止或截断后不再引导下一状态价值，避免把终止状态的估计错误地加入 TD 目标。
+
+```python
+import gymnasium as gym
+import numpy as np
+
+
+def epsilon_greedy(q, state, epsilon, rng):
+    if rng.random() < epsilon:
+        return int(rng.integers(q.shape[1]))
+    best_actions = np.flatnonzero(q[state] == q[state].max())
+    return int(rng.choice(best_actions))
+
+
+def train(algorithm, episodes=500, alpha=0.5, gamma=1.0,
+          epsilon=0.1, seed=0):
+    env = gym.make("CliffWalking-v1")
+    rng = np.random.default_rng(seed)
+    q = np.zeros((env.observation_space.n, env.action_space.n))
+    episode_returns = []
+
+    for episode in range(episodes):
+        state, _ = env.reset(seed=seed + episode)
+        action = epsilon_greedy(q, state, epsilon, rng)
+        total_reward = 0.0
+
+        while True:
+            next_state, reward, terminated, truncated, _ = env.step(action)
+            done = terminated or truncated
+            total_reward += reward
+
+            if algorithm == "sarsa":
+                next_action = (
+                    None if done
+                    else epsilon_greedy(q, next_state, epsilon, rng)
+                )
+                bootstrap = 0.0 if done else q[next_state, next_action]
+            elif algorithm == "q_learning":
+                next_action = None
+                bootstrap = 0.0 if done else q[next_state].max()
+            else:
+                raise ValueError("algorithm 必须是 'sarsa' 或 'q_learning'")
+
+            td_target = reward + gamma * bootstrap
+            q[state, action] += alpha * (td_target - q[state, action])
+
+            if done:
+                break
+            state = next_state
+            action = (
+                next_action
+                if algorithm == "sarsa"
+                else epsilon_greedy(q, state, epsilon, rng)
+            )
+
+        episode_returns.append(total_reward)
+
+    env.close()
+    return q, np.asarray(episode_returns)
+
+
+def greedy_policy(q):
+    arrows = np.array(["↑", "→", "↓", "←"])
+    policy = arrows[np.argmax(q, axis=1)].reshape(4, 12)
+    policy[3, 1:11] = "C"
+    policy[3, 11] = "G"
+    return policy
+
+
+if __name__ == "__main__":
+    sarsa_q, sarsa_returns = train("sarsa", seed=42)
+    ql_q, ql_returns = train("q_learning", seed=42)
+
+    window = 100
+    print("最后 100 回合平均回报：")
+    print(f"Sarsa:     {sarsa_returns[-window:].mean():.2f}")
+    print(f"Q-learning: {ql_returns[-window:].mean():.2f}")
+    print("\nSarsa 贪婪策略：")
+    print(greedy_policy(sarsa_q))
+    print("\nQ-learning 贪婪策略：")
+    print(greedy_policy(ql_q))
+```
+
+CliffWalking 每走一步奖励为 $-1$，跌入悬崖奖励为 $-100$。Sarsa 的 TD 目标使用行为策略实际选择的 $A_{t+1}$，因此会把探索时跌落悬崖的风险计入价值，通常学到离悬崖更远的安全路径。Q-learning 的目标使用 $\max_{a'}Q(S_{t+1},a')$，倾向于学习贴近悬崖的最短路径；其贪婪策略回报更高，但训练期间的探索可能造成更大的负回报。单次随机实验不足以证明算法优劣，严谨比较应使用多个随机种子并报告均值与方差。
+
+## 6. Q-learning 收敛性
 
 假设一个随机过程 $\{\Delta_t\}$ 的形式为：
 $$

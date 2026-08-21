@@ -1,3 +1,8 @@
+---
+title: SAC 算法
+sidebar_position: 12
+---
+
 import WordCount from '../../../src/components/WordCount/WordCount';
 
 <WordCount>
@@ -6,7 +11,7 @@ import WordCount from '../../../src/components/WordCount/WordCount';
 
 想象一下，你正在训练一个机器人学习走路。早期的算法就像是一个严格的教练，要求机器人严格按照指令行动，但这往往导致学习过程缓慢且容易卡在局部最优。而SAC算法则像是一位开明的导师，鼓励机器人在学习过程中保持适度的好奇心，在追求高分的同时也不忘探索未知的可能性。
 
-传统的离线策略算法如DDPG虽然样本效率较高，但训练过程就像在钢丝上行走，稍有不慎就会失去平衡。SAC算法的出现改变了这一局面，它巧妙地将探索与利用相结合，在保持高效率的同时显著提升了训练的稳定性。
+上一章的 [DDPG 算法](./11-DDPG算法.mdx) 虽然样本效率较高，但训练过程就像在钢丝上行走，稍有不慎就会失去平衡。SAC 算法的出现改变了这一局面，它巧妙地将探索与利用相结合，在保持高效率的同时显著提升了训练的稳定性。
 
 ## 1. SAC（Soft Actor-Critic）算法
 
@@ -248,19 +253,25 @@ def moving_average(a, window_size):
     end = (np.cumsum(a[:-window_size:-1])[::2] / r)[::-1]
     return np.concatenate((begin, middle, end))
 
-def train_off_policy_agent(env, agent, num_episodes, replay_buffer, minimal_size, batch_size):
+def train_off_policy_agent(env, agent, num_episodes, replay_buffer, minimal_size,
+                           batch_size, seed=None):
     return_list = []
+    if seed is not None:
+        env.action_space.seed(seed)
+    episode_index = 0
     for i in range(10):
         with tqdm(total=int(num_episodes/10), desc='Iteration %d' % i) as pbar:
             for i_episode in range(int(num_episodes/10)):
                 episode_return = 0
-                state, _ = env.reset()
-                done = False
-                while not done:
+                state, _ = env.reset(seed=seed if episode_index == 0 else None)
+                episode_done = False
+                while not episode_done:
                     action = agent.take_action(state)
                     next_state, reward, terminated, truncated, _ = env.step(action)
-                    done = terminated or truncated
-                    replay_buffer.add(state, action, reward, next_state, done)
+                    episode_done = terminated or truncated
+                    # 回放池中的 done 仅屏蔽真正终止状态的 bootstrap
+                    replay_buffer.add(state, action, reward, next_state,
+                                      terminated)
                     state = next_state
                     episode_return += reward
                     if replay_buffer.size() > minimal_size:
@@ -280,6 +291,7 @@ def train_off_policy_agent(env, agent, num_episodes, replay_buffer, minimal_size
                         'return': '%.3f' % np.mean(return_list[-10:])
                     })
                 pbar.update(1)
+                episode_index += 1
     return return_list
 
 class PolicyNetContinuous(torch.nn.Module):
@@ -470,9 +482,9 @@ if __name__ == "__main__":
 
     # 训练智能体
     print("开始训练SAC智能体...")
-    return_list = train_off_policy_agent(env, agent, num_episodes,
-                                          replay_buffer, minimal_size,
-                                          batch_size)
+    return_list = train_off_policy_agent(
+        env, agent, num_episodes, replay_buffer, minimal_size, batch_size, seed=0
+    )
 
     # 绘制结果
     episodes_list = list(range(len(return_list)))
@@ -514,8 +526,7 @@ if __name__ == "__main__":
 
 ![SAC运行结果](https://github.com/user-attachments/assets/473399ec-512c-4b37-9062-f52c719faf0a)
 
-```bash
-(.venv) PS F:\BLOG\ROT-Blog\docs\Control\强化学习> python .\1.py
+```text
 环境: Pendulum-v1
 状态维度: 3, 动作维度: 1, 动作边界: 2.0
 目标熵: -1
@@ -540,5 +551,6 @@ Iteration 9: 100%|████████████████████�
 
 </details>
 
+SAC 仍然完全依赖真实环境采样。下一章将转向第 13 章 MBPO：先学习环境动力学模型，再用模型生成短轨迹辅助策略更新，从“无模型、离线策略”自然过渡到基于模型的强化学习。
 
 </WordCount>

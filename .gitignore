@@ -10,6 +10,8 @@
 
 # Misc
 .DS_Store
+__pycache__/
+*.py[cod]
 
 # Environment variables (contains sensitive information)
 .env

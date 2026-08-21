@@ -3,14 +3,235 @@ sidebar_position: 1
 ---
 
 import WordCount from '../../../src/components/WordCount/WordCount';
-
-<WordCount>
-
-
-
 import VideoPlayer from '../../../src/components/Videoplayer/Videoplayer.jsx';
 
+<WordCount>
+# 绪论：从输入—输出到状态空间
 
+现代控制理论并不是把经典控制理论推翻重来，而是换了一种观察系统的方式：经典方法主要研究“输入怎样变成输出”，状态空间方法还要描述系统内部储存的信息怎样随时间演化。本章先建立直觉和统一符号，后续章节再学习建模、分析与设计。
+
+## 1. 为什么需要现代控制理论
+
+### 1.1 经典控制与现代控制的侧重点
+
+| 比较角度 | 经典控制理论 | 现代控制理论 |
+| --- | --- | --- |
+| 核心描述 | 传递函数、频率特性 | 状态空间方程 |
+| 主要对象 | 常以单输入单输出（SISO）线性定常系统为主 | 自然支持多输入多输出（MIMO）、时变与非线性系统 |
+| 内部信息 | 主要关注输入—输出关系 | 显式描述内部状态 |
+| 初始条件 | 求传递函数时通常取零初值 | 初始状态是模型的一部分 |
+| 常用分析语言 | 根轨迹、Bode 图、Nyquist 图 | 能控性、能观性、李雅普诺夫稳定性 |
+| 常用设计方法 | 超前—滞后校正、PID 等 | 状态反馈、极点配置、观测器、最优控制等 |
+
+两者应互补使用。对于低阶 SISO 系统，频域方法直观而高效；面对多个执行器、多个传感器，或必须利用系统内部变量时，状态空间方法更合适。对于同一个线性定常系统，两种描述之间可以相互转换，但转换得到的状态实现通常不唯一。
+
+### 1.2 状态、输入与输出
+
+在时刻 $t_0$，若已知一组最少的内部变量以及未来输入，就能唯一确定系统在所有 $t\geq t_0$ 时的运动，那么这组变量称为**状态变量**。将它们排列成列向量得到
+
+$$
+\boldsymbol{x}(t)=
+\begin{bmatrix}x_1(t)&x_2(t)&\cdots&x_n(t)\end{bmatrix}^{\mathsf T}.
+$$
+
+- **输入** $\boldsymbol{u}(t)\in\mathbb{R}^m$：外界施加给系统的作用，例如力、电压或控制指令。
+- **状态** $\boldsymbol{x}(t)\in\mathbb{R}^n$：概括系统“记忆”的最少信息，例如位置与速度、电容电压、电感电流。
+- **输出** $\boldsymbol{y}(t)\in\mathbb{R}^p$：希望观测、记录或控制的量，不一定包含全部状态。
+
+状态不是“所有物理量”的同义词。状态变量可以是物理量，也可以是变量的线性组合；只要足以决定未来且彼此独立，就是合法的选择。
+
+<svg
+  viewBox="0 0 700 330"
+  role="img"
+  aria-label="二维状态空间相平面示意图，横轴为位移 x1，纵轴为速度 x2，轨迹从初始状态沿箭头趋向平衡点"
+  style={{ width: '100%', maxWidth: '700px', color: 'var(--ifm-font-color-base, currentColor)' }}
+>
+  <defs>
+    <marker id="phase-arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+      <path d="M0,0 L8,4 L0,8 Z" fill="currentColor" />
+    </marker>
+  </defs>
+  <line x1="70" y1="270" x2="650" y2="270" stroke="currentColor" strokeWidth="2" markerEnd="url(#phase-arrow)" />
+  <line x1="350" y1="305" x2="350" y2="35" stroke="currentColor" strokeWidth="2" markerEnd="url(#phase-arrow)" />
+  <text x="610" y="302" fill="currentColor" fontSize="18">x₁（位移）</text>
+  <text x="365" y="55" fill="currentColor" fontSize="18">x₂（速度）</text>
+  <text x="360" y="292" fill="currentColor" fontSize="15">平衡点</text>
+  <circle cx="350" cy="270" r="6" fill="var(--ifm-color-primary, currentColor)" />
+  <path
+    d="M120,85 C215,35 315,95 300,165 C288,220 225,230 225,187 C225,140 300,127 335,168 C370,209 346,245 350,264"
+    fill="none"
+    stroke="var(--ifm-color-primary, currentColor)"
+    strokeWidth="4"
+    markerEnd="url(#phase-arrow)"
+  />
+  <circle cx="120" cy="85" r="5" fill="currentColor" />
+  <text x="78" y="72" fill="currentColor" fontSize="16">初始状态 x(t₀)</text>
+  <text x="156" y="118" fill="currentColor" fontSize="16">状态轨迹</text>
+  <text x="48" y="294" fill="currentColor" fontSize="14">x₁&lt;0</text>
+  <text x="538" y="294" fill="currentColor" fontSize="14">x₁&gt;0</text>
+</svg>
+
+图中每一点表示一个完整的瞬时状态，不是质点在真实空间中的位置。随时间变化，状态点画出一条轨迹；对于稳定的无输入阻尼系统，轨迹最终趋向平衡点。
+
+## 2. 状态空间模型的基本形式
+
+一般连续时间系统可写成
+
+$$
+\dot{\boldsymbol{x}}(t)=\boldsymbol{f}\!\left(\boldsymbol{x}(t),\boldsymbol{u}(t),t\right),\qquad
+\boldsymbol{y}(t)=\boldsymbol{g}\!\left(\boldsymbol{x}(t),\boldsymbol{u}(t),t\right).
+$$
+
+若系统是线性时不变（linear time-invariant，LTI）系统，则化为
+
+$$
+\boxed{
+\begin{aligned}
+\dot{\boldsymbol{x}}(t)&=A\boldsymbol{x}(t)+B\boldsymbol{u}(t),\\
+\boldsymbol{y}(t)&=C\boldsymbol{x}(t)+D\boldsymbol{u}(t).
+\end{aligned}}
+$$
+
+矩阵维数必须相容：
+
+$$
+A\in\mathbb{R}^{n\times n},\quad
+B\in\mathbb{R}^{n\times m},\quad
+C\in\mathbb{R}^{p\times n},\quad
+D\in\mathbb{R}^{p\times m}.
+$$
+
+- $A$ 描述系统自身的状态演化；
+- $B$ 描述输入如何驱动状态；
+- $C$ 决定从状态中读取哪些输出；
+- $D$ 描述输入到输出的瞬时直通。许多严格真有理物理系统中 $D=0$，但不能先验地总令其为零。
+
+状态空间建模的基本思想是：**找到储能或记忆环节，选取独立状态，将高阶动态拆成一阶联立方程，再按矩阵形式整理。**
+
+## 3. 贯穿例子：质量—弹簧—阻尼器
+
+考虑质量为 $m$ 的物块，连接刚度为 $k$ 的弹簧和阻尼系数为 $c$ 的阻尼器。外力 $u(t)$ 作用于物块，位移 $q(t)$ 向右为正，并取输出 $y(t)=q(t)$。
+
+<svg
+  viewBox="0 0 760 260"
+  role="img"
+  aria-label="质量弹簧阻尼系统，墙体经弹簧和阻尼器连接质量块，外力 u 向右，位移 q 向右为正"
+  style={{ width: '100%', maxWidth: '760px', color: 'var(--ifm-font-color-base, currentColor)' }}
+>
+  <defs>
+    <marker id="mechanical-arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+      <path d="M0,0 L8,4 L0,8 Z" fill="currentColor" />
+    </marker>
+  </defs>
+  <line x1="55" y1="35" x2="55" y2="220" stroke="currentColor" strokeWidth="6" />
+  <g stroke="currentColor" strokeWidth="2">
+    <line x1="25" y1="50" x2="55" y2="30" /><line x1="25" y1="85" x2="55" y2="65" />
+    <line x1="25" y1="120" x2="55" y2="100" /><line x1="25" y1="155" x2="55" y2="135" />
+    <line x1="25" y1="190" x2="55" y2="170" /><line x1="25" y1="225" x2="55" y2="205" />
+  </g>
+  <path d="M55,90 L95,90 L115,65 L145,115 L175,65 L205,115 L235,65 L265,90 L330,90" fill="none" stroke="var(--ifm-color-primary, currentColor)" strokeWidth="4" />
+  <text x="175" y="52" fill="currentColor" fontSize="18">弹簧 k</text>
+  <line x1="55" y1="175" x2="145" y2="175" stroke="currentColor" strokeWidth="4" />
+  <rect x="145" y="153" width="70" height="44" fill="none" stroke="var(--ifm-color-primary, currentColor)" strokeWidth="3" />
+  <line x1="180" y1="175" x2="285" y2="175" stroke="currentColor" strokeWidth="4" />
+  <line x1="285" y1="145" x2="285" y2="205" stroke="currentColor" strokeWidth="4" />
+  <line x1="285" y1="175" x2="330" y2="175" stroke="currentColor" strokeWidth="4" />
+  <text x="165" y="226" fill="currentColor" fontSize="18">阻尼器 c</text>
+  <rect x="330" y="65" width="170" height="135" rx="8" fill="var(--ifm-background-surface-color, transparent)" stroke="currentColor" strokeWidth="4" />
+  <text x="398" y="142" fill="currentColor" fontSize="26">m</text>
+  <line x1="500" y1="105" x2="655" y2="105" stroke="var(--ifm-color-primary, currentColor)" strokeWidth="4" markerEnd="url(#mechanical-arrow)" />
+  <text x="555" y="88" fill="currentColor" fontSize="20">u(t)</text>
+  <line x1="415" y1="40" x2="600" y2="40" stroke="currentColor" strokeWidth="2" markerEnd="url(#mechanical-arrow)" />
+  <text x="476" y="28" fill="currentColor" fontSize="18">q(t) 正方向</text>
+</svg>
+
+由牛顿第二定律，
+
+$$
+m\ddot q(t)+c\dot q(t)+kq(t)=u(t).
+$$
+
+选择 $x_1(t)=q(t)$、$x_2(t)=\dot q(t)$，则
+
+$$
+\begin{aligned}
+\dot x_1(t)&=x_2(t),\\
+\dot x_2(t)&=-\frac{k}{m}x_1(t)-\frac{c}{m}x_2(t)+\frac{1}{m}u(t),\\
+y(t)&=x_1(t).
+\end{aligned}
+$$
+
+因此
+
+$$
+\dot{\boldsymbol{x}}=
+\underbrace{\begin{bmatrix}0&1\\-k/m&-c/m\end{bmatrix}}_{A}\boldsymbol{x}
++
+\underbrace{\begin{bmatrix}0\\1/m\end{bmatrix}}_{B}u,\qquad
+y=
+\underbrace{\begin{bmatrix}1&0\end{bmatrix}}_{C}\boldsymbol{x}
++
+\underbrace{\begin{bmatrix}0\end{bmatrix}}_{D}u.
+$$
+
+这个模型将在下一章继续用于说明从机理建模、特征值、坐标变换和传递函数。若输出改为速度，$A,B$ 不变，而 $C$ 改为 $\begin{bmatrix}0&1\end{bmatrix}$；这说明“内部动态”和“测量方式”可以分开描述。
+
+### 可核算小例题
+
+令 $m=1$、$c=3$、$k=2$，在某一时刻
+
+$$
+\boldsymbol{x}=\begin{bmatrix}1\\-1\end{bmatrix},\qquad u=4.
+$$
+
+则
+
+$$
+\dot{\boldsymbol{x}}
+=
+\begin{bmatrix}0&1\\-2&-3\end{bmatrix}
+\begin{bmatrix}1\\-1\end{bmatrix}
++
+\begin{bmatrix}0\\1\end{bmatrix}4
+=
+\begin{bmatrix}-1\\5\end{bmatrix},
+\qquad y=1.
+$$
+
+回代物理方程也可核对：$\dot q=-1$，且 $\ddot q=u-3\dot q-2q=4+3-2=5$。
+
+## 4. 本课程的学习路线
+
+1. **建立模型**：从微分方程、传递函数、物理机理和结构图得到 $(A,B,C,D)$。
+2. **理解运动**：求状态转移矩阵和状态响应，区分零输入响应与零状态响应。
+3. **分析结构性质**：判断稳定性、能控性和能观性；它们决定哪些控制目标原则上可实现。
+4. **设计控制器**：利用状态反馈配置极点，进一步学习最优控制等方法。
+5. **估计不可测状态**：设计状态观测器，并由分离原理组合控制器与观测器。
+6. **拓展模型**：离散系统、非线性系统线性化以及随机系统。
+
+学习时建议始终回答四个问题：状态选了什么？矩阵维数是否正确？初始状态如何进入响应？结论在坐标变换后是否仍成立？
+
+## 5. 符号与约定
+
+- 标量用斜体字母，如 $x,u,t$；向量用粗体，如 $\boldsymbol{x}$；矩阵用大写字母，如 $A$。
+- 所有向量默认是列向量，$\mathsf T$ 表示转置。
+- $\dot{\boldsymbol{x}}$ 表示对连续时间 $t$ 求导；离散时间状态通常写作 $\boldsymbol{x}[k]$。
+- $I_n$ 表示 $n$ 阶单位矩阵；不引起混淆时简写为 $I$。
+- $\det(A)$、$\operatorname{rank}(A)$、$\operatorname{tr}(A)$ 分别表示行列式、秩和迹。
+- $\lambda_i(A)$ 表示 $A$ 的特征值；$s$ 表示拉普拉斯复变量。
+- 除非另行说明，本教程讨论实系数、有限维、连续时间 LTI 系统；从状态空间求传递函数时采用零初始状态。
+
+## 6. 常见误区与自检
+
+1. **把输出等同于状态。** 输出可以只是状态的一部分，也可以是状态与输入的线性组合。
+2. **认为状态选择唯一。** 只要可逆坐标变换后仍完整描述动态，就得到同一系统的另一组状态。
+3. **由状态数直接断言传递函数阶数。** 若实现中存在不能控或不能观的模态，传递函数中可能发生极零消去，其最小阶数会低于状态维数。
+4. **忽略初始状态。** 传递函数只编码零初始状态下的输入—输出关系，而状态模型还描述非零初始状态引起的运动。
+5. **只背矩阵，不检查单位。** 例如贯穿例子中 $A$ 的第二行各项都必须产生加速度量纲。
+
+完成本章后，应能解释：为什么只有位置不能构成二阶机械系统的完整状态？为什么同一个 $A,B$ 可以对应不同输出？为什么 MIMO 系统使用矩阵描述比逐个写传递函数更自然？
+
+## 7. 视频补充
 
 <VideoPlayer src="//player.bilibili.com/player.html?isOutside=true&aid=625409284&bvid=BV1Qt4y127ja&cid=184164856&p=1" />
 

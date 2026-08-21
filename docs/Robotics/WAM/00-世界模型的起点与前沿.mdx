@@ -1,0 +1,167 @@
+import WordCount from '../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+# 世界模型：从内部模拟器到世界动作模型
+
+世界模型（World Model）没有唯一公认的实现形式。本文采用一个对机器人和强化学习都比较实用的定义：
+
+> 世界模型是一个学习得到的预测模型：给定历史观测和候选动作，预测环境接下来与任务有关的状态、观测、奖励或抽象表征；智能体再利用这些预测进行规划、策略学习或数据生成。
+
+写成最小形式就是
+
+$$
+\hat{s}_{t+1}, \hat{r}_t \sim p_\theta(s_{t+1}, r_t \mid s_{\le t}, a_t).
+$$
+
+这里的 $s_t$ 不一定是真实物理状态，也可以是图像、视频 token 或学习得到的 latent。是否能够被动作干预，是区分“控制用世界模型”和普通视频生成器的关键；只生成看起来合理的视频，并不自动等于学会了可供控制使用的因果动力学。
+
+## 1. “开端”不止一个
+
+把 [World Models（2018）](https://arxiv.org/abs/1803.10122)称为世界模型的开端并不准确。它是现代深度学习语境下的普及节点，但思想和技术源流更早。
+
+### 1.1 概念源头：在头脑中试演未来
+
+Kenneth Craik 在 1943 年的 *The Nature of Explanation* 中提出，生物会在内部构造现实的“小尺度模型”，用它尝试不同方案并预测结果。这是世界模型的认知科学源头，但还不是可训练的神经网络算法。
+
+在控制理论中，状态空间模型、系统辨识、卡尔曼滤波和模型预测控制（MPC）早已在做相近的事情：从观测估计隐状态，学习或给定动力学，再向前滚动模型选择动作。今天的学习型世界模型可以看作把其中的状态表示和动力学一起交给神经网络学习。
+
+### 1.2 神经世界模型：1990
+
+Jürgen Schmidhuber 1990 年的技术报告 [Making the World Differentiable](https://people.idsia.ch/~juergen/FKI-126-90ocr.pdf) 已经提出：
+
+- 用自监督循环神经网络学习环境动力学和未来强化信号；
+- 通过可微模型进行“mental simulation”；
+- 让控制器在模型中规划，并用预测误差驱动好奇心。
+
+这比 2018 年早了近三十年，也是“神经网络 + 学习动力学 + 内部规划”这条技术线的早期完整表述。
+
+### 1.3 Dyna：1991
+
+Sutton 的 [Dyna](https://dl.acm.org/doi/10.1145/122344.122377) 把学习、规划和行动放在同一个循环中：真实交互既更新价值函数，也更新环境模型；模型生成的模拟经验再反过来训练策略。它奠定了后续 model-based RL 的基本问题：
+
+1. 模型应该预测什么？
+2. 模拟数据和真实数据如何混合？
+3. 如何防止策略利用模型误差？
+
+### 1.4 现代普及节点：World Models，2018
+
+Ha 和 Schmidhuber 的 [World Models](https://worldmodels.github.io/) 用 VAE 压缩图像、MDN-RNN 预测 latent dynamics，再用小型控制器执行动作，形成经典的 **V（视觉编码器）—M（记忆/动力学）—C（控制器）** 结构。它最有影响力的演示是：控制器可以完全在模型生成的“梦境”中训练，再迁回真实环境。
+
+这篇工作没有发明世界模型思想，但给出了极易理解、可复现的深度学习配方，使“在想象中训练智能体”成为一条清晰主线。
+
+## 2. 第一条主线：为强化学习学习 latent dynamics
+
+### 2.1 PlaNet 与 Dreamer
+
+[PlaNet](https://arxiv.org/abs/1811.04551)（2019）引入 Recurrent State-Space Model（RSSM），把确定性记忆和随机隐变量结合起来，在 latent 空间中进行在线规划。随后 [Dreamer](https://arxiv.org/abs/1912.01603)（2020）不再为每一步在线搜索动作，而是在想象轨迹中直接学习 actor 和 value。
+
+Dreamer 系列持续回答同一个问题：能否只靠一个通用训练配方，从像素学习模型并解决不同控制任务？
+
+- [DreamerV2](https://arxiv.org/abs/2010.02193)（2020）：离散 latent，在 Atari 上取得强结果；
+- [DreamerV3](https://arxiv.org/abs/2301.04104)（2023）：用归一化和稳健损失减少跨任务调参，在 150 多个任务上使用同一配置；
+- [Dreamer 4](https://arxiv.org/abs/2509.24527)（2025）：继续扩大模型和离线数据规模，在学习到的世界模型中训练 Minecraft 智能体。
+
+这一支的重点不是生成最清晰的视频，而是让 latent 保留奖励、可控性和长期决策真正需要的信息。
+
+### 2.2 MuZero：不重建世界，只预测决策所需量
+
+[MuZero](https://arxiv.org/abs/1911.08265)（2019）学习表征、动力学和预测三个网络，只预测搜索需要的 reward、value 和 policy，不要求重建真实观测。它说明世界模型不必是人能观看的模拟器：只要 latent rollout 对决策充分，就可以和蒙特卡洛树搜索结合。
+
+### 2.3 TD-MPC2：把世界模型和 MPC 拉回实时连续控制
+
+[TD-MPC](https://arxiv.org/abs/2203.04955) 与 [TD-MPC2](https://arxiv.org/abs/2310.16828)（2024）把短视野 latent planning、终端价值和策略先验结合起来。TD-MPC2 在一个模型中覆盖大量连续控制任务，代表了“任务相关 latent + 短期 MPC”路线：不追求重建所有细节，而追求低延迟、鲁棒的动作选择。
+
+## 3. 第二条主线：把游戏与视频变成可交互模拟器
+
+### 3.1 从 IRIS、DIAMOND 到 Dreamer 4
+
+[IRIS](https://arxiv.org/abs/2209.00588)（2022）把视觉观测离散成 token，再用自回归 Transformer 预测游戏未来。[DIAMOND](https://arxiv.org/abs/2405.12399)（2024）改用扩散模型生成环境，减少自回归离散模型常见的视觉伪影。这类工作要求模型既能接受动作，又能长期保持可交互性，可被看作“神经游戏引擎”。
+
+### 3.2 Genie：从无动作视频中发现可控世界
+
+[Genie](https://arxiv.org/abs/2402.15391)（2024）从互联网游戏视频中学习 latent action，不要求原始视频带键盘或手柄标签；[Genie 2](https://deepmind.google/discover/blog/genie-2-a-large-scale-foundation-world-model/)（2024）进一步从图像生成可操作的 3D 风格环境；[Genie 3](https://deepmind.google/discover/blog/genie-3-a-new-frontier-for-world-models/)（2025）把交互生成推进到 720p、24 FPS 和分钟级一致性。
+
+这条路线当前很热，因为它可能成为智能体训练环境的生成器。不过，画面一致性、可控性、物体永久性和真实物理仍应分别评估，不能只看视频观感。
+
+### 3.3 自动驾驶世界模型
+
+[GAIA-1](https://arxiv.org/abs/2309.17080)（Wayve，2023）联合视频、文本和车辆动作生成驾驶场景；随后 DriveDreamer、Vista、GAIA-2 等工作把世界模型用于闭环驾驶仿真、稀有场景生成和策略评测。自动驾驶天然拥有大规模连续视频、车辆控制量和结构化地图，因此是视频世界模型最早规模化落地的场景之一。
+
+## 4. 第三条主线：不生成像素的 JEPA
+
+生成未来像素会浪费容量去描述纹理、光照和其他不可预测细节。JEPA 路线改为在表征空间预测：
+
+$$
+\hat{z}_{t+1}=f_\theta(z_{\le t},a_t), \qquad
+\mathcal{L}=d(\hat{z}_{t+1},\operatorname{sg}(z_{t+1})).
+$$
+
+[I-JEPA](https://arxiv.org/abs/2301.08243)（2023）从图像开始，[V-JEPA](https://arxiv.org/abs/2404.08471)（2024）扩展到视频。[V-JEPA 2](https://arxiv.org/abs/2506.09985)（Meta，2025）在超过一百万小时视频上预训练；其 action-conditioned 版本使用少于 62 小时 DROID 机器人视频后，可以根据目标图像在新环境中做零样本机械臂规划。
+
+JEPA 与生成式路线代表两种不同取舍：
+
+- **生成式模型**保留丰富、可视化的未来，适合模拟、数据生成和人类检查，但计算昂贵；
+- **联合嵌入预测**只保留抽象可预测结构，适合表征和规划，但可能丢失控制需要的接触细节。
+
+目前没有证据表明其中一条会完全取代另一条。
+
+## 5. 第四条主线：机器人世界模型走向 WAM
+
+传统机器人世界模型先预测未来，再由 MPC 或单独的逆动力学模块求动作。世界动作模型（World Action Model, WAM）进一步把预测与动作生成紧密耦合：
+
+$$
+p_\theta(o_{t+1:t+H},a_{t:t+H-1}\mid o_{\le t},l).
+$$
+
+其中 $l$ 是语言任务。WAM 不只是“视频模型加一个动作头”，它需要让未来预测真正参与动作生成，并满足闭环控制的时延要求。
+
+### 5.1 当前值得跟踪的代表工作
+
+- [UniSim](https://arxiv.org/abs/2310.06114)（2023）：把多来源交互数据统一成可用于训练视觉智能体的生成式模拟器。
+- [Genie Envisioner](https://arxiv.org/abs/2508.05635)（2025）：面向机器人操控的统一策略与世界模型，探索预测视频和动作的联合建模。
+- [V-JEPA 2-AC](https://ai.meta.com/research/publications/v-jepa-2-self-supervised-video-models-enable-understanding-prediction-and-planning/)（2025）：以 action-conditioned latent world model 做目标条件规划，代表非像素生成路线。
+- [DreamZero](https://arxiv.org/abs/2602.15922)（2026）：在 14B 视频扩散骨干上联合建模视频和动作，以 7 Hz 做闭环控制，并展示视频数据的跨具身迁移。
+- [Cosmos 3](https://arxiv.org/abs/2606.02800)（NVIDIA，2026）：统一语言、图像、视频、音频和动作的 omnimodal world model，可按输入输出配置执行 forward dynamics、inverse dynamics 或 policy generation。
+- [MotionWAM](./01-MotionWAM.mdx)（2026）：不等待未来视频完整去噪，而是读取 Video DiT 的中间特征生成全身 motion latent，把人形机器人控制推进到 4.9 Hz。详见 [DiT4DiT](./06-DiT4DiT.mdx)（前身）和 [Cosmos Policy](./07-CosmosPolicy.mdx)（完整 denoise 对照）。
+
+这里“热门”指公开论文、代码或工业投入形成了密集进展，不代表这些方法已经解决开放世界机器人控制。尤其要检查三个容易被宣传掩盖的问题：
+
+1. **动作是否真的影响预测**：模型可能只沿数据集中的常见运动外推；
+2. **闭环频率是否够用**：视频生成质量高，不等于机器人上能实时执行；
+3. **长时误差是否可恢复**：短视频合理，不等于滚动几十秒后仍保持几何、接触和目标一致。
+
+## 6. 当前最重要的研究问题
+
+### 6.1 预测什么
+
+像素最通用但昂贵；latent 高效但可能遗漏细节；3D/4D 表示有几何结构但数据和建模成本高。现在的趋势不是无条件生成更多未来，而是只生成控制需要的部分：latent subgoal、中间视频特征、占据、关键点、接触或短视野未来。
+
+### 6.2 如何获得动作对齐数据
+
+互联网视频规模大，却没有机器人动作；机器人轨迹有动作，但数量小且具身各异。latent action、逆动力学标注、跨具身 token 和“视频预训练 + 少量动作后训练”都是在解决这个瓶颈。
+
+### 6.3 如何限制模型幻觉
+
+策略会主动寻找模型的薄弱点。常用办法包括短视野滚动、模型集成与不确定性、真实数据校正、价值终止、闭环重规划，以及让几何或物理约束进入模型。只报告 FVD 或单段视频质量，无法证明模型适合控制。
+
+### 6.4 如何评测
+
+世界模型至少要分开评测：
+
+- **预测**：多步一致性、动作响应、物体永久性、几何和接触；
+- **控制**：任务成功率、恢复能力、控制频率、推理成本；
+- **泛化**：新物体、新场景、新动作组合和新具身；
+- **安全**：不确定性是否校准，失败能否被检测和接管。
+
+## 7. 建议阅读顺序
+
+1. **思想与基本范式**：Schmidhuber 1990 → Dyna → World Models；
+2. **latent model-based RL**：[PlaNet → Dreamer](./02-Dreamer系列.mdx) → [MuZero → TD-MPC2](./03-MuZero与TD-MPC2.mdx)；
+3. **可交互生成环境**：[IRIS → DIAMOND → Genie 系列](./04-可交互生成环境.mdx)；
+4. **抽象预测**：[I-JEPA → V-JEPA → V-JEPA 2-AC](./05-JEPA.mdx)；
+5. **机器人 WAM**：[DiT4DiT](./06-DiT4DiT.mdx) → [Cosmos Policy](./07-CosmosPolicy.mdx) → [MotionWAM](./01-MotionWAM.mdx)。
+
+后续凡是以**学习环境动力学、动作条件未来、latent rollout、视频世界模拟或预测—动作联合建模**为核心的文章，都归入本 WAM 目录；纯 VLA、纯视频生成或传统控制工作只有在世界模型直接参与训练、规划或动作生成时才收入。
+
+</WordCount>

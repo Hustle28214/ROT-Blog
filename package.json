@@ -12,7 +12,7 @@
         "write-heading-ids": "docusaurus write-heading-ids",
         "generate:docs-stats": "node scripts/generateStats.js",
         "prebuild": "npm run generate:skill-data && npm run generate:docs-stats",
-        "build": "docusaurus build"
+        "build": "cross-env NODE_OPTIONS=--max-old-space-size=8192 docusaurus build"
     },
     "dependencies": {
         "@docusaurus/core": "^3.9.2",

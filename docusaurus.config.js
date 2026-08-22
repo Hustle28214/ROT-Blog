@@ -120,7 +120,7 @@ const config = {
         hashed: true,
         // For Docs using Chinese, The `language` is recommended to set to:
         // ```
-        language: ["en", "zh"],
+        language: ["zh"],
         // ```
       }),
     ],

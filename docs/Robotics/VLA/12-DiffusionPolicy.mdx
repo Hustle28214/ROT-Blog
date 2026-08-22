@@ -1,0 +1,111 @@
+import WordCount from '../../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+# Diffusion Policy：用扩散模型学习视觉运动策略
+
+论文：[Diffusion Policy: Visuomotor Policy Learning via Action Diffusion](https://arxiv.org/abs/2303.04137)（Chi 等，RSS 2023）。Diffusion Policy 是 π0 之前最重要的连续动作生成方法。它的核心判断是：**行为克隆的根本问题不是网络容量，而是 MSE 回归无法建模多模态动作分布**——相同观测下人类有多种合理动作，均值动作往往在物理上无效。扩散模型通过学习动作分布的得分函数，自然地表征任意形状的多峰分布。
+
+## 1. 为什么 MSE 和 IBC 都不够
+
+三种主流动作头的缺陷：
+
+- **MSE 回归**：输出分布均值，多模态场景下"均值动作"是物理上不可行的中间状态
+- **GMM（高斯混合）**：参数数目固定，难以描述复杂高维分布
+- **IBC（基于能量函数）**：理论上能建模任意分布，但实践中梯度优化极不稳定——多任务上成功率接近 0%
+
+扩散模型绕开了上述问题：不直接回归动作，而是学习动作分布的得分函数，通过迭代去噪采样。
+
+## 2. 方法：DDPM 应用到动作空间
+
+**前向加噪（训练阶段）：**
+
+$$\mathbf{A}^k = \sqrt{\bar{\alpha}_k}\,\mathbf{A}^0 + \sqrt{1-\bar{\alpha}_k}\,\epsilon^k, \quad \epsilon^k \sim \mathcal{N}(0, I)$$
+
+噪声调度用平方余弦调度（Square Cosine Schedule），训练步数 $K=100$。
+
+**训练目标：** 网络 $\epsilon_\theta$ 以观测 $\mathbf{O}_t$、带噪动作 $\mathbf{A}^k$ 和噪声步 $k$ 为输入，预测噪声：
+
+$$\mathcal{L} = \text{MSE}(\epsilon^k,\ \epsilon_\theta(\mathbf{O}_t,\ \mathbf{A}^k,\ k))$$
+
+**推断（反向去噪）：**
+
+$$\mathbf{A}^{k-1} = \alpha(\mathbf{A}^k - \gamma\,\epsilon_\theta(\mathbf{O}_t,\ \mathbf{A}^k,\ k) + \mathcal{N}(0, \sigma^2 I))$$
+
+**DDIM 加速：** 训练用 DDPM 100 步，推断只需 **DDIM 10 步**，RTX 3080 上推断延迟约 0.1 秒，支持 10 Hz 控制（通过插值提升至 125 Hz 执行频率）。
+
+## 3. 两种网络架构
+
+**CNN 版（DP-C）：**
+- 视觉编码器：从零训练的 ResNet-18，BatchNorm 换成 GroupNorm（EMA 训练兼容），全局平均池化换成**空间 Softmax 池化**（保留位置信息）
+- 噪声预测网络：1D 时序卷积，用 **FiLM（特征仿射变换）** 注入观测和扩散步条件
+
+**Transformer 版（DP-T）：**
+- 基于 minGPT 改造，带噪动作序列作为输入 token
+- 扩散步 $k$ 通过正弦位置编码嵌入为首 token
+- 观测通过每个 Decoder 块的**多头交叉注意力**注入
+- 动作 token 之间用**因果掩码自注意力**
+
+## 4. 退缩时域控制
+
+Diffusion Policy 不输出单步动作，而是预测一段动作序列，执行一部分后重新规划：
+
+| 参数 | 含义 |
+|---|---|
+| $T_o$：观测时域 | 输入过去 $T_o$ 帧观测 |
+| $T_p$：预测时域 | 预测未来 $T_p$ 步动作 |
+| $T_a$：执行时域 | 执行 $T_a$ 步后重新规划 |
+
+最优 $T_a = 8$（多数任务）。**热启动（Warm-starting）**：下次推断以上次预测序列的后续部分初始化，而非纯噪声，降低感知延迟。
+
+## 5. 实验结果
+
+**RoboMimic 视觉输入（最优检查点成功率）：**
+
+| 方法 | Square ph | Transport ph | ToolHang ph |
+|---|---|---|---|
+| LSTM-GMM | 0.82 | 0.88 | 0.68 |
+| IBC | 0.03 | 0.00 | 0.00 |
+| **DP-CNN** | **0.98** | **1.00** | **0.95** |
+| **DP-T** | **1.00** | **0.98** | **0.76** |
+
+**Franka Kitchen 多阶段（逐阶段成功率）：**
+
+| 方法 | p1 | p2 | p3 | p4 |
+|---|---|---|---|---|
+| BET | 0.99 | 0.93 | 0.71 | 0.44 |
+| **DP-CNN** | 1.00 | 1.00 | 1.00 | **0.99** |
+
+Kitchen p4 相较最佳基线提升 **+125%**。
+
+**真实机器人（N=20 次试验）：**
+
+| 任务 | 方法 | 成功率 |
+|---|---|---|
+| Push-T（UR5）| DP-CNN | **95%**（vs LSTM-GMM 20%）|
+| Mug Flipping（Franka）| DP | **90%**（vs LSTM-GMM 0%）|
+| Sauce Spreading（Franka）| DP | **100%**（vs LSTM-GMM 0%）|
+| Shirt Folding（双臂）| DP | **75%** |
+
+跨 15 项任务、4 个基准测试，综合平均提升 **+46.9%**。
+
+**视觉主干消融（RoboMimic Square PH）：**
+
+| 主干 | 从零训练 | 微调预训练 |
+|---|---|---|
+| ResNet-18 (IN-21k) | 94% | 92% |
+| ViT-B/16 (CLIP) | 22% | **98%** |
+
+ViT 从零训练极差，微调预训练 CLIP ViT 最佳——说明视觉表征质量对 Diffusion Policy 影响很大。
+
+## 6. 与 π0 的关系
+
+Diffusion Policy 用的是 DDPM——带随机噪声的离散时间扩散，路径是弯曲的 SDE。π0 用的是流匹配（Flow Matching）——直线最优传输路径，没有随机噪声，推断只需 10 步且更稳定。Diffusion Policy 是 π0 流匹配动作头的直接前驱，但推断步数（100 DDPM / 10 DDIM）比流匹配的 10 步代价更高。
+
+## 7. 局限
+
+Diffusion Policy 每个任务单独训练，无跨任务泛化。推断延迟比简单方法高（虽然动作块弥补了部分问题）。完全依赖高质量示范，无法从次优轨迹中学习。CNN 版在高频动作变化的速度控制任务上表现偏弱；Transformer 版对超参敏感，训练稳定性差于 CNN 版。
+
+代码见 [columbia-ai-robotics/diffusion_policy](https://github.com/columbia-ai-robotics/diffusion_policy)。
+
+</WordCount>

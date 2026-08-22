@@ -1,0 +1,96 @@
+import WordCount from '../../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+# HPT：跨体型异构预训练
+
+论文：[Scaling Proprioceptive-Visual Learning with Heterogeneous Pre-training](https://arxiv.org/abs/2409.20537)（Lirui Wang 等，MIT，NeurIPS 2024）。HPT 处理的问题叫做**形态异构性（Morphology Heterogeneity）**：不同机器人的关节数、传感器类型、动作空间完全不兼容，直接联合训练根本无法对齐。HPT 的解法是 Trunk-Stem-Head 三段架构——**Stem 把异构输入压缩成统一的 16 个 token，Trunk 在这个统一表征上做大规模预训练，Head 负责各自机器人的动作输出**。
+
+## 1. 核心问题：为什么跨体型预训练很难
+
+现有方法要么单体型从头训练，要么浅层多任务训练。难点在于：
+
+- WidowX 有 6 个关节，Franka 有 7 个，移动机械臂有 16+ 个
+- 视觉输入通道数、分辨率各不相同
+- 动作空间维度从 4D 到 18D 不等
+
+简单拼接输入、共用一个 Transformer，不同维度的数据无法对齐，信号互相干扰。
+
+## 2. Trunk-Stem-Head 架构
+
+**Stem（体型专用编码器）：**
+
+每种模态都有一个独立的 Stem，负责把异构输入压缩为固定长度的 **16 个 token**，无论输入维度多大：
+
+- **本体感知 Stem**：MLP → 正弦位置编码 → 交叉注意力 → 16 token
+- **视觉 Stem**：冻结 ResNet-18（$7 \times 7$ 空间特征）→ 交叉注意力 → 16 token
+- **语言（T5）**：投影 → 8 token
+
+关键设计：16 token 的容量限制迫使 Stem 真正提炼信息，而不是把原始特征直接透传。
+
+**Trunk（共享 Transformer）：**
+
+处理拼接后的 token 序列，对任务和体型都无感知。五种规模：
+
+| 规模 | 深度 | 宽度 | 注意力头 | 参数量 |
+|---|---|---|---|---|
+| Small | 16 | 128 | 8 | 3.1M |
+| Base | 16 | 256 | 8 | 12.6M |
+| Large | 16 | 512 | 8 | 50.5M |
+| XLarge | 32 | 768 | 16 | 226.8M |
+| Huge | 80 | 1024 | 16 | 1.1B |
+
+**Head（体型专用动作解码器）：**
+
+将 Trunk 输出映射到目标机器人的动作空间。
+
+## 3. 预训练数据
+
+**默认设置**：27 个数据集，16K 条轨迹，批大小 256。
+**扩展设置**：52 个数据集，约 27 万条轨迹，1.55 亿样本，批大小 2048。
+
+数据来源：
+- 41 个来自 Open X-Embodiment（Bridge、DROID、BC-Z、RoboNet、Language Table 等）
+- 7 个仿真数据集（Drake、MuJoCo、Isaac Sim、PyBullet、Sapien、Flex）
+- 3 个人类操作视频（EPIC-Kitchen、PoCo Hammer/Spatula）
+- 1 个部署机器人数据集（FrodoBot-2K）
+
+预训练目标：行为克隆的 **Huber Loss**（$\delta=0.1$）。优化器：AdamW，权重衰减 0.05，基础学习率 2e-4，余弦调度。
+
+## 4. 微调：只训 3MB
+
+微调时 **Trunk 冻结**，只重新初始化并训练 Stem 和 Head（约 3MB 参数），而单体型从头训练基线需要 100M+ 参数。
+
+微调超参：学习率 5e-6，批大小 256，2 万步。推断速度：HPT-Base 在 RTX 3070 上 **47 Hz**，HPT-XLarge **19 Hz**。
+
+## 5. 实验结果
+
+**真实机器人 Sweep Leftover 任务：**
+
+| 方法 | 成功率 |
+|---|---|
+| 从头训练 | 43.3 ± 3.8% |
+| VC-1（视觉预训练）| 53.3 ± 2.6% |
+| 无本体感知微调 | 63.3 ± 2.6% |
+| HPT-Base 微调 | 70.0 ± 3.0% |
+| **HPT-XLarge 微调** | **76.7 ± 3.3%** |
+
+仿真基准（Meta-World、RoboMimic、Fleet-Tools）和 Google EDR 任务（关闭抽屉、移动物体、抓可乐罐）上，HPT 预训练相比 Octo、RT1-X、RT2-X 一致领先 **>20%**。
+
+**Scaling Law 发现：** 数据、模型规模、计算量必须**一起**增长。只扩大模型不增加数据会很快饱和。模型从 1M 到 1B 参数，数据集 token 从 3200 万到 50 亿，FLOPs 从 0.03 到 31 GFLOPs——三者同步 scaling。
+
+## 6. 与同期工作的差异
+
+| 维度 | HPT | Octo | RT-2 |
+|---|---|---|---|
+| 核心贡献 | 跨体型对齐架构 | 开源通用策略 | VLM 协同微调 |
+| 本体感知 | 与视觉**联合**预训练 | 事后拼接 | 基本无 |
+| 每模态 token 数 | **16** | 256 | — |
+| 微调成本 | ~3MB 参数 | 全量 | 不可微调 |
+| 最大规模 | 1.1B | 93M | 55B |
+
+HPT 证明了一件事：**异构对齐的关键在于压缩而非扩展**——每模态只给 16 个 token，Trunk 才能真正学到体型无关的通用表征。
+
+代码和预训练权重见 [liruiw/hpt](https://github.com/liruiw/hpt)，项目主页 [liruiw.github.io/hpt](https://liruiw.github.io/hpt)。
+
+</WordCount>

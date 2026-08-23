@@ -1,0 +1,119 @@
+import WordCount from '../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+# 3D-VLA：把 3D 场景理解加进 VLA
+
+论文：[3D-VLA: A 3D Vision-Language-Action Generative World Model](https://arxiv.org/abs/2403.09631)（UMass Amherst，ICML 2024）。前面讲过的 VLA（RT-2、OpenVLA、π0）视觉输入都是 2D 图像。这在很多任务上够用，但对**需要空间推理的任务**——绕过遮挡去抓、精确对齐两个物体、判断物体离机械臂多远——2D 视觉的信息不够。3D-VLA 的思路是把 3D 场景表征直接加进 VLA，让模型看到点云和深度。
+
+## 1. 为什么 2D 不够
+
+先想清楚 2D 视觉损失了什么信息。
+
+给一张 RGB 图像，你能看到物体的颜色、形状、大致位置，但**深度信息是隐含的**——大脑靠透视、遮挡、纹理这些线索去反推，机器学习模型也是靠预训练数据里的先验做同样的事。这对分类任务够用，因为"苹果"就是"苹果"，深度信息不影响判断。
+
+但机器人操作需要**精确的空间坐标**。抓一个杯子要知道杯子相对末端的绝对距离，机械臂运动学解算需要 3D 位置。从 2D 图像反推深度有系统性误差——特别是对**新物体**（预训练里没见过的形状）、**遮挡场景**（一部分被挡住时深度线索缺失）、**大尺度场景**（透视线索在远距离失效）。
+
+传统机器人系统用深度相机（RGB-D）直接测深度绕过这个问题，但 VLA 领域早期主流数据集（Bridge、Fractal）都是 RGB 相机，没有深度信息。3D-VLA 的贡献之一是**构造带 3D 标注的机器人数据集**。
+
+## 2. 数据集：3D Embodied Instruction Tuning
+
+3D-VLA 构造了一个新的数据集，做法是给现有 2D VLA 数据集加深度和 3D 标注：
+
+- 从 Open X-Embodiment 抽取 RGB 视频
+- 用 [ZoeDepth](https://arxiv.org/abs/2302.12288)（单目深度估计）给每一帧生成深度图
+- 用 [SAM](https://arxiv.org/abs/2304.02643) 做实例分割
+- 用 [GPT-4V](https://openai.com/index/gpt-4v-system-card) 给每一帧生成结构化的 3D 语义描述（"红色杯子在桌面 (0.3, -0.2, 0.75) 位置"）
+
+最终数据集包含约 200 万条带 3D 标注的机器人示范。GPT-4V 生成的语义描述后来被用作训练目标（下节讲）。
+
+## 3. 架构
+
+```
+[RGB 图像]  →  ViT-L  →  2D patch tokens
+[深度图]    →  ViT-L  →  Depth patch tokens
+[点云]      →  Point Transformer  →  3D point tokens
+[语言]      →  T5 tokenizer  →  text tokens
+                    ↓
+              3D-VLA (LLaMA-2 7B backbone)
+                    ↓
+    ┌───────────────┼───────────────┐
+    ↓               ↓               ↓
+动作 token     3D 边界框预测    生成场景描述
+```
+
+3D-VLA 用三种视觉模态：
+
+- **RGB**：普通 ViT-L 处理
+- **深度图**：把深度图当灰度图，用另一个 ViT-L 处理
+- **点云**：从 RGB-D 反投影出来的稀疏点云，用 [Point Transformer](https://arxiv.org/abs/2012.09164) 编码
+
+三种视觉 token 拼在一起，加语言 token，一起喂给 LLaMA-2 7B 骨干。
+
+输出分三种（都是 token 序列）：
+
+- **动作 token**：跟 RT-2 一样，256 bin 离散化
+- **3D 边界框 token**：预测目标物体的 3D 位置和大小（$x, y, z, w, h, d$，每维离散化）
+- **场景描述 token**：自然语言描述当前场景，作为辅助损失
+
+**为什么加边界框和场景描述这两个辅助输出？** 直觉是让模型在预测动作之前先做**中间推理**：先定位到"要操作哪个物体在哪里"，再决定"手怎么动"。这跟 [RT-2 的 Chain-of-Thought](./06-RT2.mdx) 思路一样，但把中间步骤显式化了。
+
+## 4. 训练
+
+**两阶段**：
+
+1. **3D 感知预训练**：在带 3D 标注的数据上训练边界框预测和场景描述任务，不训动作。目的是让模型的 3D 表征稳定下来。
+2. **动作微调**：加入动作 loss 联合训练。
+
+损失是三个任务的加权和：
+
+$$\mathcal{L} = \mathcal{L}_{\text{action}} + \lambda_1 \mathcal{L}_{\text{bbox}} + \lambda_2 \mathcal{L}_{\text{desc}}$$
+
+$\lambda_1 = 0.5, \lambda_2 = 0.3$（超参扫出来的）。
+
+## 5. 实验结果
+
+**RLBench 仿真 8 任务**：
+
+| 方法 | 平均成功率 |
+|---|---|
+| RT-2 | 22% |
+| OpenVLA | 34% |
+| 3D-VLA（无 3D 输入，只加辅助任务） | 42% |
+| 3D-VLA（完整版） | 68% |
+
+跟 OpenVLA 相比 +34 分。消融显示 3D 输入本身贡献 +26 分，辅助任务贡献 +8 分——3D 输入是主要来源。
+
+**未见物体泛化**：
+
+| 方法 | 新物体成功率 |
+|---|---|
+| OpenVLA | 15% |
+| 3D-VLA | 51% |
+
+对新物体的泛化差距更大，说明 3D 表征帮助模型跳过了"从 RGB 反推物体深度"这一步——直接看到几何形状。
+
+## 6. 局限
+
+推断成本高。3D-VLA 有三条视觉编码器分支（RGB ViT + 深度 ViT + Point Transformer），前向传播时间比 OpenVLA 大约翻倍，实测 3 Hz（RTX 4090）。真正的高频控制场景不太够用。
+
+**依赖 ZoeDepth 的深度估计质量**。3D-VLA 训练数据里深度不是相机直接测的，是 ZoeDepth 从单目图像估计的。ZoeDepth 在室内桌面场景效果尚可，但对反光、透明、纹理少的物体（玻璃杯、金属零件）估计有系统偏差，训练数据里就带这些偏差。
+
+数据集是 3D-VLA 团队自己构造的，跟 Open X-Embodiment 不完全对齐，跟 [SimplerEnv](./Benchmarks/03-SimplerEnv.mdx) 里的评测协议也不通用，结果的可复现性依赖作者发布的数据。
+
+**边界框预测和场景描述作为辅助损失**这个思路在下游任务上有效，但要求训练数据里有对应标注，成本比纯动作监督高不少。
+
+## 7. 3D 感知这条路的现状
+
+3D-VLA 之后陆续有 [SpatialVLA](./22-SpatialVLA.mdx)、RVT-2、Act3D 等工作沿着"给 VLA 加 3D 表征"这条线走。不同方案在**如何编码 3D**上有分歧：
+
+- 3D-VLA：RGB-D + 点云并行分支
+- SpatialVLA：直接用位置编码把 3D 坐标塞进 VLA
+- RVT-2：多视角 2D 投影，用 2D CNN 处理
+- Act3D：把动作预测在 3D 体素空间里做
+
+目前还没有明确的赢家——每种方案在不同 benchmark 上各有胜负。这条路要走下去主要瓶颈还是数据：**真实机器人 RGB-D 数据规模比纯 RGB 小一个数量级**。
+
+代码和数据见 [3D-VLA GitHub 仓库](https://github.com/UMass-Foundation-Model/3D-VLA)。
+
+</WordCount>

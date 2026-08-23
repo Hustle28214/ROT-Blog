@@ -1,0 +1,106 @@
+import WordCount from '../../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+# Open X-Embodiment：机器人界的 ImageNet 时刻
+
+论文：[Open X-Embodiment: Robotic Learning Datasets and RT-X Models](https://arxiv.org/abs/2310.08864)（Google DeepMind 与 21 家机构联合，ICRA 2024 Best Paper）。这篇工作在 2023 年底放出，随后成为几乎所有开源 VLA（OpenVLA、Octo、RDT-1B、π0 等）默认的预训练语料来源，被社区普遍视为机器人学习的"ImageNet 时刻"。
+
+## 1. 动机
+
+计算机视觉领域从 AlexNet 到 CLIP 之所以能持续放大规模，很大程度上依赖于统一的、大规模的公共数据集；语言领域则有 Common Crawl、The Pile。但机器人学习长期停留在"每个实验室一套 setup、一套控制接口、一套数据格式"的孤岛状态。跨机构、跨机器人形态（cross-embodiment）预训练一直做不起来，核心瓶颈并不是模型，而是数据：
+
+- 不同的机械臂自由度、末端执行器、控制频率完全不同；
+- 观测流从单目 RGB 到多视角 RGB-D、力矩传感器五花八门；
+- 动作空间可以是关节角、EE 位姿增量、笛卡尔速度、甚至底盘线速度。
+
+OXE 的做法非常朴素：不是重新采集，而是把社区已有的 60 个公开数据集统一收编到一份数据集里。合并后规模为 22 种机器人形态、超过 100 万条 episode、527 项技能、160,266 项任务。这是第一次把"机器人数据"这一坨零散资源整合到可以直接喂给大模型的规模。
+
+## 2. 数据组织与统一格式
+
+OXE 底层使用 Google 的 [RLDS](https://github.com/google-research/rlds)（Reinforcement Learning Datasets）规范，并以 TFDS（TensorFlow Datasets）分发。每条 episode 是一个 step 序列，每个 step 至少包含：
+
+| 字段 | 说明 |
+| --- | --- |
+| `observation.image_*` | 一路或多路 RGB 流（第三视角、腕部视角等） |
+| `observation.state`（可选） | 关节角 / EE 位姿 / gripper 开合 |
+| `action` | 该 step 的控制指令 |
+| `language_instruction` | 自然语言任务描述 |
+| `reward` / `is_terminal` / `is_first` | RL 风格的辅助字段 |
+
+关键的统一策略是**动作空间对齐**。原始数据集的动作维度从 4 维到 20+ 维不等，OXE 选择一个大多数机械臂都能表达的最小公共表征：7-DoF end-effector delta 动作，即 `(dx, dy, dz, droll, dpitch, dyaw, gripper)`。对于原生不是 EE 控制的数据集（如某些关节角数据集），采用启发式转换或直接舍弃某些维度。这个决定并不完美，但它让"一个模型吃所有机器人"成为可能。
+
+## 3. 数据分布
+
+OXE 的数据构成非常不均衡，Google 自己的 RT-1 数据占据大头，其它则以 tabletop 操作为主。粗略量级如下：
+
+| 形态类别 | 代表机器人 | 代表数据集 | episode 量级 |
+| --- | --- | --- | --- |
+| 单臂 7-DoF | Google Robot (Everyday Robots) | RT-1 / Fractal | ~130k |
+| 单臂 7-DoF | Franka Panda | DROID, RoboSet, Austin 系列 | ~200k+ |
+| 单臂低成本 | WidowX 250 | BridgeData V2 | ~60k |
+| 单臂工业 | xArm 7 / UR5 | Berkeley UR5、Stanford Hydra 等 | ~50k+ |
+| 双臂 | ALOHA、Berkeley Bimanual | 若干小数据集 | 数千 |
+| 工业臂 | Kuka iiwa、Sawyer | QT-Opt Kuka、Sawyer 系列 | ~200k+（含 QT-Opt） |
+| 移动操作 | Fetch、Tiago、Stretch | Berkeley Fanuc、Stanford Mobile 等 | 数千 |
+| 四足 | ANYmal、Go1 | Berkeley Cable Routing 等 | 少量 |
+
+其中几个重点数据集需要单独提一下：
+
+- **RT-1 data / Fractal**：13 万条 Google Robot 采集的日常桌面操作，是数据量最大也最"干净"的一块。
+- **BridgeData V2**：WidowX 上采集的 6 万条 flexible manipulation，动作分布最广。
+- **RoboSet**：Franka 上的家庭场景数据。
+- **DROID**：斯坦福等机构联合采集的 76k Franka 数据，是 OXE 发布之后合入的大块补充。
+
+## 4. RT-1-X 与 RT-2-X
+
+论文同时给出了两个基线，用来验证"混合数据预训练"到底有没有用：
+
+| 模型 | 架构基础 | 训练数据 | 输入 | 输出 |
+| --- | --- | --- | --- | --- |
+| RT-1-X | RT-1（EfficientNet + TokenLearner + Transformer） | 9 个代表性 OXE 子集 co-train | 图像 + 指令 | 离散化的 7-DoF EE 动作 |
+| RT-2-X | PaLI-X 55B / PaLM-E 12B 变体 | Web VQA 数据 + OXE co-fine-tune | 图像 + 指令 | 动作作为 tokens 输出 |
+
+一句话概括：**RT-1-X 是把 RT-1 架构直接在 OXE 混合数据上重新训练；RT-2-X 是把已有的视觉-语言大模型（PaLI-X / PaLM-E）在 web 数据和 OXE 上做 co-fine-tune，把动作当成一种特殊的 token 词表输出。**两者的对照实验是理解 OXE 价值的关键。
+
+## 5. 关键发现
+
+论文实验章节最值得记住的几条结论：
+
+1. **跨形态 co-training 有效**：在 in-distribution 任务上，RT-1-X 相较于每个数据集单独训练的原始模型，平均带来约 **50% 的相对性能提升**，且在几乎所有子数据集上都非负迁移。
+2. **小数据集受益最大**：数据量少（<10k episode）的实验室数据集提升幅度最大，因为它们从大数据集里"借"到了视觉表征和低层技能。
+3. **RT-2-X 的 emergent skills**：RT-2-X 能够完成一些在其原始数据（RT-2 训练集）里从未出现、但在其它 OXE 子集中出现过的物体组合。这是首次在真机上观察到跨机构、跨机器人的技能迁移。
+4. **规模仍关键**：RT-2-X（55B 参数 + web co-training）显著优于 RT-1-X，尤其在语义泛化任务上。也就是说，OXE 的价值随着模型容量提升而放大。
+
+## 6. 影响
+
+OXE 之后，机器人基础模型这一赛道的语料格局基本被它锁定：
+
+| 后续 VLA | 与 OXE 的关系 |
+| --- | --- |
+| OpenVLA (2024) | 直接以 OXE 的 970k episode 为主要预训练语料 |
+| Octo (2024) | 以 OXE 为唯一预训练数据，训练 diffusion policy |
+| RDT-1B (2024) | 使用 OXE + 自采数据做多机器人预训练 |
+| π0 (2024) | OXE 是其 pre-training mixture 的核心之一 |
+| CrossFormer / HPT | 直接沿用 OXE 的 RLDS 格式与 7-DoF 动作接口 |
+
+除了语料本身，OXE 还带来了两个"事实标准"：
+
+- **RLDS 成为机器人数据的通用序列化格式**，几乎所有新工作都会给出一份 RLDS 转换脚本。
+- **7-DoF EE delta 成为默认动作接口**，即使模型内部支持更复杂的动作，也一般提供一个 7-DoF 的对外 API。
+
+这带来了后续 VLA 在 tokenizer 与 action space 规范化上的强大压力：新方法要么直接兼容 OXE 接口，要么必须付出额外的适配成本。
+
+## 7. 局限
+
+OXE 并非终点，几条已经被社区反复讨论的问题：
+
+- **任务分布偏窄**：绝大多数 episode 都是 tabletop pick-and-place，长程操作、装配、可变形物体、工具使用等场景显著不足。
+- **action 空间对齐是启发式**：把不同机器人硬压到 7-DoF EE delta 会丢失关节层面的信息，也无法表达双臂协作、全身控制、底盘运动等。
+- **缺少高精度力控 / 触觉数据**：几乎全是视觉 + 位置控制，装配、插拔、擦拭这类需要 force feedback 的任务基本没有覆盖。
+- **数据质量参差**：不同实验室的相机内参、光照、标注质量差异极大，模型经常学到"这个视角来自哪个数据集"这种伪相关。
+- **语言标注粒度不一**：从"pick up the coke can"到长段落描述都有，语义粒度未对齐。
+
+尽管如此，OXE 依然是 2023–2026 年这一波 VLA 浪潮最重要的基础设施之一。它证明了一件事：**只要数据格式统一了，机器人学习就能吃到 scaling law 的红利。**
+
+</WordCount>

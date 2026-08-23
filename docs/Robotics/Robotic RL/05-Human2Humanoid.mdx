@@ -2,4 +2,178 @@ import WordCount from '../../../src/components/WordCount/WordCount';
 
 <WordCount>
 
+# H2O / OmniH2O：从人类动作到人形全身控制
+
+论文：[Learning Human-to-Humanoid Real-Time Whole-Body Teleoperation](https://arxiv.org/abs/2403.04436)（He 等，IROS 2024）与后续 [OmniH2O](https://arxiv.org/abs/2406.08858)（同组，2024）。H2O 与 OmniH2O 是 CMU LeCAR 组在 Unitree H1 平台上做的一整套 "human-to-humanoid" 工作，目标是让通用人形机器人以**实时、稳定、无需外部动捕**的方式复现人类的全身动作，并进一步把 tele-op 得到的数据回流为策略学习的监督信号。它是当前 humanoid whole-body control 走向"平民化 tele-op + 大规模模仿学习"的关键一环。
+
+## 1. 问题设定
+
+考虑 Unitree H1 人形机器人：19 个可控关节（2 腰、5×2 上肢、5×2 下肢），高约 1.8 m，质量约 47 kg。给定一段人类参考运动 $\{q^h_t\}_{t=1}^T$（来自动捕、视频姿态估计或 VR 头显+手柄的稀疏关键点），我们要在物理硬件上实时求解一个策略 $\pi_\theta(a_t \mid o_t, g_t)$，使得：
+
+$$
+\min_\theta\; \mathbb{E}\Big[\sum_t \|\phi(s^r_t) - \phi(q^h_t)\|^2\Big]\quad \text{s.t.}\ \text{balance,\ joint limit,\ torque limit,\ collision.}
+$$
+
+其中 $\phi(\cdot)$ 是稀疏关键点映射（head、双手、双脚），$s^r_t$ 是机器人状态。挑战集中在三点：
+
+| 挑战 | 说明 |
+|------|------|
+| 形态失配 | 人类骨架 24+ DoF，H1 只有 19 DoF；肢长、质量分布不同 |
+| 动力学可行性 | 人类动作大量利用软组织、脚趾、髋部灵活性，H1 无法直接复现 |
+| 实时性 | tele-op 要求端到端 $\le 20$ ms，不能依赖离线优化 |
+
+H2O 的思路是把它拆成两段：**Sim-to-Data**（把不可行的人类动作过滤/重定向成 H1 可执行的可行轨迹库），再用 **Teacher-Student RL 蒸馏**训练一个只看 proprio + 稀疏 goal 的策略。
+
+## 2. 数据管线：Sim-to-Data
+
+数据源以 AMASS（约 11k 段动捕 clip）与 Human3.6M 为主，统一表示为 SMPL 骨架参数 $(\beta, \theta_{1:J})$。管线分四步。
+
+**Step 1. SMPL → H1 retargeting。** 用一个 GMR/PHC-style 的可微 kinematic optimization：
+
+$$
+\min_{q^r_{1:T}}\; \sum_t \Big[\sum_{k \in \mathcal{K}} \|p^r_k(q^r_t) - p^h_k(q^h_t)\|^2 + \lambda_s \|q^r_t - q^r_{t-1}\|^2 \Big]
+$$
+
+其中 $\mathcal{K}$ 是 head/hands/feet/pelvis 稀疏关键点集合，$\lambda_s$ 是平滑正则。骨长差异用 subject-specific scaling 处理。
+
+**Step 2. Kinematic filter。** 丢掉违反 joint limit 或与自身碰撞的帧。
+
+**Step 3. Dynamic filter（sim rollout）。** 把 retargeted 轨迹作为 reference 送入 Isaac Gym，用一个 pre-trained "tracking prior" 策略跑 rollout；若 CoM 越出 support polygon 或跟踪误差超过阈值 $\epsilon$ 一定比例则丢弃。
+
+**Step 4. Motion library。** 最终得到约 **50k 条**可行 clip，覆盖 walking、running、boxing、kicking、dancing 等。
+
+| 阶段 | 输入片段数 | 保留比例 |
+|------|-----------|----------|
+| AMASS 原始 | 约 11k sequences（约 40 hours） | 100% |
+| SMPL→H1 retarget | 约 11k | 约 95% |
+| Kinematic filter | | 约 70% |
+| Dynamic filter | | 最终约 50k 短 clip |
+
+这一步的价值在于：下游 RL 只在**可行流形**上学习，避免策略被那些人类能做、H1 做不到的动作污染。
+
+## 3. Teacher-Student 蒸馏
+
+H2O 采用经典的 privileged learning 框架。
+
+**Teacher $\pi^T$。** 输入包含特权信息：全局根位姿 $p_\text{root}, R_\text{root}$、根线速度/角速度、每个 link 的接触力、地面高度、reference 轨迹的未来 $H$ 帧。网络是 3 层 MLP（1024 隐藏），输出关节目标位置 $\hat q^r_t$，经过 PD 控制器变成扭矩。
+
+Teacher 用 PPO 训练，奖励是多项加权和：
+
+$$
+r_t = w_p r^{pos}_t + w_v r^{vel}_t + w_c r^{contact}_t + w_e r^{energy}_t + w_a r^{alive}_t + w_r r^{reg}_t.
+$$
+
+各项含义：
+
+| 项 | 表达 | 作用 |
+|----|------|------|
+| $r^{pos}$ | $\exp(-\alpha \sum_k \|p^r_k - p^h_k\|^2)$ | 稀疏关键点跟踪 |
+| $r^{vel}$ | $\exp(-\beta \|\dot q^r - \dot q^h\|^2)$ | 速度匹配，抑制抖动 |
+| $r^{contact}$ | 惩罚非脚部 link 触地 | 保持双足姿态 |
+| $r^{energy}$ | $-\|\tau\|^2$ | 节能、平滑 |
+| $r^{alive}$ | 常数 $c > 0$ | 存活奖励 |
+| $r^{reg}$ | joint limit、动作平滑 | 硬件安全 |
+
+**Student $\pi^S$。** 只看 proprio（关节位置/速度 + IMU + base 角速度）+ 未来 $H$ 帧的稀疏关键点目标 $\{\phi(q^h_{t:t+H})\}$。DAgger 蒸馏：
+
+$$
+\mathcal{L}_{\text{DAgger}} = \mathbb{E}_{s\sim d_{\pi^S}}\big[\|\pi^S(o^S) - \pi^T(o^T)\|^2\big] + \lambda\, \mathcal{L}_{\text{PPO}}(\pi^S).
+$$
+
+前者是行为克隆项，后者是保留少量 PPO 让 student 在偏离 teacher 分布时也能自救。student 使用 LSTM/GRU 处理 proprio 历史，以补偿隐去的特权信息。
+
+## 4. 关键设计
+
+**稀疏关键点作目标。** H2O 只用 5 个关键点（head + 两手 + 两脚，可选加 pelvis）作 tracking target，共 15 维 $xyz$。这比 full-body 24 关节角度更好：一是与人形形态差异解耦，二是 VR/RGB 系统只能可靠估计这几个稀疏点。
+
+**Domain randomization。** 训练时随机化：
+
+$$
+m \sim \mathcal{U}[0.8, 1.2] m_0,\ \mu \sim \mathcal{U}[0.5, 1.5],\ \tau_\text{delay} \sim \mathcal{U}[0, 30\ \text{ms}],\ k_p, k_d\ \text{扰动}.
+$$
+
+同时在 proprio 上加高斯噪声，模拟 IMU / 编码器噪声。
+
+**Curriculum。** 训练课程按动作难度分档：
+
+| 阶段 | 动作类型 | 目标 |
+|------|---------|------|
+| Stage 1 | rest, standing sway | 学基础平衡 |
+| Stage 2 | walking, waving | 稀疏跟踪 + 步态 |
+| Stage 3 | running, kicking | 高动态 |
+| Stage 4 | boxing, dance, single-leg | 完整 library |
+
+每阶段收敛后扩大采样比例。这与 ASAP 的 delta action 补偿不同：H2O 靠 data-level 过滤 + curriculum，不显式建 residual dynamics。
+
+**动作空间。** target joint position + PD，控制频率 50 Hz，PD 增益按关节手动整定后加随机化。
+
+## 5. 实验结果
+
+论文在 Unitree H1 上做了大量真机测试。关键结论：
+
+**跟踪误差（真机，mm，越低越好）：**
+
+| 方法 | Head | Hands | Feet | Avg |
+|------|------|-------|------|-----|
+| HumanPlus | 82 | 118 | 74 | 91 |
+| ExBody | 71 | 96 | 65 | 77 |
+| **H2O** | **48** | **63** | **41** | **51** |
+
+**技能库覆盖。** H2O 能实时复现：
+
+- 步态类：walk、side-step、turn-in-place；
+- 动作类：boxing punch 组合、football side-kick、拳击闪避；
+- 平衡类：single-leg squat、slow tai-chi；
+- 交互类：tabletop reach、pick-place（手末端 5 cm 精度）。
+
+**Ablation。**
+
+| Ablation | 存活率 | 跟踪误差 |
+|----------|--------|----------|
+| 无 dynamic filter | 61% | 88 mm |
+| 无 domain rand | 74% | 63 mm |
+| 无 teacher（直接 PPO end-to-end） | 45% | 112 mm |
+| **完整 H2O** | **97%** | **51 mm** |
+
+看得出，Sim-to-Data 过滤和 teacher-student 蒸馏各自都是必需组件。
+
+## 6. OmniH2O 的扩展
+
+OmniH2O 沿用 H2O 的低层策略，但把上层 tele-op 输入通道扩成**多模态**：
+
+$$
+g_t = \text{Encoder}(u_t),\quad u_t \in \{\text{VR-headset+controllers},\ \text{RGB video},\ \text{language}\}.
+$$
+
+三种模式对应三种"看视频/跟人做"的场景：
+
+| 模态 | 关键点来源 | 备注 |
+|------|-----------|------|
+| VR | 头显 6DoF + 两只 controller | 精度最高，用于操作演示 |
+| RGB video | HMR/4D-Humans 姿态估计 | 无需佩戴，可远程模仿网络视频 |
+| Language | LLM → 动作库 retrieval | 例如 "do a boxing jab" 触发对应 clip |
+
+另一个关键点是把 tele-op 数据**回收**：VR 遥操作过程中记录 $\{o_t, a_t\}$ 作为 imitation learning 的数据源，训一个纯 vision-conditioned 的自主策略。作者报告了 40+ 种日常技能的模仿学习结果，包括冲咖啡、递物、扫地。这条 pipeline 与 ALOHA/Mobile-ALOHA 精神一致，但目标平台从双臂桌面机器人变成全身人形。
+
+**与 H2O 的关系。** OmniH2O 并未换掉 low-level tracker，只是把 upstream 的动作生成器从"人类动作 → sparse keypoints"扩展到"任意模态 → sparse keypoints"。可以理解为一个多入口的语义层加在 H2O 的运动层之上。
+
+## 7. 讨论
+
+**与 ASAP 的互补。** H2O 处理"人类动作 → 机器人动作"的 kinematic 匹配问题，靠 data filtering 拒绝不可行动作。ASAP 则处理"仿真轨迹 → 真机"的 dynamics 差距，靠 residual action 补偿。两者可以叠加：先用 H2O 生成 sim 内可行的 tracking policy，再用 ASAP 的 delta $\pi_\Delta$ 补 sim-to-real。事实上后续 ASAP 论文的 baseline 之一就是 H2O。
+
+**与 HumanPlus / ExBody / GMR 的关系。**
+
+| 方法 | 数据 | 控制器 | 差异点 |
+|------|------|--------|--------|
+| ExBody | AMASS + retargeted subset | 单阶段 PPO，upper/lower 解耦 | 上下半身独立奖励 |
+| HumanPlus | AMASS + video pose | Shadow imitation | 全身跟踪 + 上层 skill policy |
+| GMR | 通用 retargeting | 无策略学习 | 只做 kinematic 层 |
+| **H2O** | AMASS filtered × dynamic | Teacher-Student + DAgger | 强调 dynamic feasibility filter |
+
+H2O 的差异在于 **dynamic filter + 稀疏关键点 + teacher-student** 这个组合，把"可行数据集"当作显式对象来构造，而不是让 RL 隐式地丢弃不可行动作。这个设计后来在 ExBody2、Humanoid-Gym 等工作里被普遍采纳。
+
+**局限。** 一是稀疏关键点丢失了手指姿态，OmniH2O 用外挂 dex-hand 策略补；二是长时序动作（>10 s）漂移仍明显，需要 reset；三是 tracking policy 对未见过的高度动态动作（例如 back-flip）泛化差，需要 ASAP 一类的 residual 补偿。
+
+综上，H2O/OmniH2O 提供了一条现在被广泛借鉴的路径：**用 Sim-to-Data 保证可行性，用 Teacher-Student 保证部署效率，用稀疏关键点作为跨形态与跨模态的通用接口**。它是 humanoid whole-body policy 从 demo 走向可复现工程的一次关键落地。
+
 </WordCount>

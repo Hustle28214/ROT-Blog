@@ -1,0 +1,133 @@
+import WordCount from '../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+# TinyVLA：小模型也能做 VLA
+
+论文：[TinyVLA: Towards Fast, Data-Efficient Vision-Language-Action Models for Robotic Manipulation](https://arxiv.org/abs/2409.12514)（华东师大、Midea 集团，2024）。TinyVLA 想问一个具体问题：VLA 模型一定要 7B 参数吗？OpenVLA 7B、π0 3B、Octo 93M——中间那段 500M 到 2B 的区间有没有更好的性价比？TinyVLA 给出的方案是：**用一个 1.4B 参数的小 VLM 加扩散动作头**，在 LIBERO 上追平 OpenVLA，训练数据只用 OpenVLA 的 1%，推断快 20 倍。
+
+## 1. 大模型的隐性成本
+
+先说清楚为什么想要小 VLA。7B 参数的 VLA 在部署时有几个具体问题：
+
+- **推断延迟**：OpenVLA 在 RTX 4090 上 6 Hz。ALOHA 需要 50Hz，OpenVLA 完全跑不动。
+- **微调门槛**：全量微调 7B 需要 8× A100（160GB 显存）。LoRA 微调降到单卡 A100（40GB），但训练时间还是 20+ 小时。学术组的普通 4090 单卡跑不动微调。
+- **数据需求**：7B 模型如果只用几千条示范微调，很容易过拟合。OpenVLA 要求下游至少 500 条示范才有稳定表现。
+
+如果模型只有 1B 出头，前面三点都能大幅缓解。问题是：**能不能不牺牲太多性能**？
+
+## 2. 方案
+
+TinyVLA 有两个关键选择。
+
+**选择 1：小 VLM 骨干**
+
+不用 Prismatic-7B，改用 [Pythia-1.4B](https://arxiv.org/abs/2304.01373) 加 SigLIP 视觉编码器，总参数 1.4B。Pythia 是 EleutherAI 训的开源语言模型，1.4B 版本是他们家里最小的能用尺寸。作者也试过 Pythia-410M，但发现表达能力不够，操作任务成功率显著下降。
+
+**选择 2：扩散动作头**
+
+不用 RT-2/OpenVLA 的离散 token 生成，而是接一个小型扩散 policy head（类似 [Diffusion Policy](./12-DiffusionPolicy.mdx) 的 1D CNN，约 100M 参数）。
+
+**为什么小模型要配扩散头？** 作者的观察是：小 VLM 的语言表达能力有限，但动作预测的多模态问题跟模型大小无关——是数据本身的性质。用扩散头替换离散 token 生成，等于把动作精度这部分负担从 VLM 转移到专门的扩散网络上，让 VLM 专注做视觉理解和条件生成。
+
+架构总参数约 1.5B：
+
+```
+[图像] → SigLIP (400M)  →  visual tokens
+[语言] → Pythia embedding →  language tokens
+              ↓
+    Pythia-1.4B backbone (1B)
+              ↓
+        Cognition Feature
+              ↓
+   Diffusion Head (100M, 1D CNN)
+              ↓
+        动作块 (16 × 7)
+```
+
+这个"VLM + 独立扩散头"的架构后来在 [CogACT](./20-CogACT.mdx) 里被明确称为"componentized VLA"。TinyVLA 是这个思路的一个早期实例。
+
+## 3. 训练
+
+**两阶段**：
+
+1. **视觉-语言预训练**：在 LLaVA-1.5 的数据上做视觉指令调优，让 Pythia + SigLIP 拥有基本的图文理解能力。这一步的数据大约 66 万条图文对，比 Prismatic 少 10 倍——因为 1.4B 参数不需要那么多数据。
+2. **机器人微调**：直接在下游任务示范上微调，加扩散头联合训练。
+
+关键差别是**没有大规模机器人数据预训练**。OpenVLA 用 97 万条 Open X-Embodiment 训练，TinyVLA 完全跳过这一步，直接从视觉-语言预训练进入下游微调。作者的实验显示这样做在下游任务上不掉分——原因是**模型小，需要的机器人数据本来就少**。
+
+## 4. 实验结果
+
+**LIBERO 仿真（500 条示范微调）**：
+
+| 方法 | 参数 | 训练机器人数据 | LIBERO 平均 |
+|---|---|---|---|
+| OpenVLA | 7B | 97 万条 | 76% |
+| Octo | 93M | 80 万条 | 74% |
+| TinyVLA | 1.5B | 500 条 | 77% |
+
+TinyVLA 用 OpenVLA 的 1% 数据、20% 参数，追平了 OpenVLA 的成功率。
+
+**真实机器人（Franka 5 任务）**：
+
+| 方法 | 平均成功率 | 推断 Hz |
+|---|---|---|
+| OpenVLA | 68% | 6 |
+| TinyVLA | 71% | 25 |
+
+真实机器人上稍微超过 OpenVLA，推断速度快 4 倍。
+
+**少样本鲁棒性**：
+
+| 每任务示范数 | 10 | 50 | 200 |
+|---|---|---|---|
+| OpenVLA | 30% | 55% | 70% |
+| TinyVLA | 45% | 62% | 71% |
+
+低样本区间 TinyVLA 优势更大。原因是小模型过拟合风险低——7B 参数只见 10 条示范会记住每条轨迹的细节而不是学到泛化模式，1.5B 参数在同样数据量下更倾向学模式。
+
+## 5. 消融
+
+作者做过几个关键消融，回答"为什么这个组合有效"。
+
+**动作头选择（1.4B VLM 固定）**：
+
+| 动作头 | 成功率 |
+|---|---|
+| 离散 token（RT-2 风格） | 52% |
+| MLP 回归（MSE） | 41% |
+| 扩散头 | 77% |
+
+扩散头是决定性的选择。离散 token 只有 52% 说明 1.4B 参数不够支撑离散化的量化误差，MLP 回归的 41% 印证了多模态问题。
+
+**骨干规模**：
+
+| 骨干 | 参数 | 成功率 |
+|---|---|---|
+| Pythia-410M | 400M | 58% |
+| Pythia-1.4B | 1.4B | 77% |
+| Pythia-2.8B | 2.8B | 79% |
+
+从 410M 到 1.4B 提升 19 分，从 1.4B 到 2.8B 只提升 2 分。1.4B 是 sweet spot。
+
+## 6. 局限
+
+TinyVLA 没有在多任务通用性上评估。它的定位是"给下游任务快速微调一个可用策略"，不是"训一个通用 VLA 让所有下游都能用"。要做通用策略，模型可能还是需要更大规模。
+
+**没有跨机器人数据训练**，跨平台泛化能力弱于 OpenVLA。作者也承认如果下游平台和训练平台差异大，需要重新在目标平台上采几百条示范做微调。
+
+Pythia 是 2023 年的模型，架构比 Llama、Gemma 老，效率上有改进空间。TinyVLA 团队后续工作试了 SmolLM、Qwen2.5 等新的小型 LLM 做骨干，效果有小幅改进。
+
+## 7. 小 VLA 这条线的现状
+
+TinyVLA 之后陆续出现的小型 VLA：
+
+- [SmolVLA](./01-SmolVLA.mdx)：450M 参数，Hugging Face 出品，进一步做小
+- Isaac GR00T N1 mini：约 2B，Nvidia
+- LiquidVLA、MobileVLA：其他团队的小模型尝试
+
+小 VLA 的共同特点是**放弃通用性换取部署友好**。它们不追求单一模型覆盖所有下游，而是快速微调、边缘部署、低数据消耗。这条路和大 VLA 是并行发展的——不是取代关系，是不同的应用场景。
+
+代码见 [lesjie-wen/tinyvla](https://github.com/lesjie-wen/tinyvla)。
+
+</WordCount>

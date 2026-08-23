@@ -1,0 +1,113 @@
+import WordCount from '../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+# SpatialVLA：把 3D 位置编码塞进 VLA
+
+论文：[SpatialVLA: Exploring Spatial Representations for Visual-Language-Action Model](https://arxiv.org/abs/2501.15830)（上海 AI 实验室，2025）。SpatialVLA 跟 [3D-VLA](./21-3D-VLA.mdx) 都想解决"VLA 缺少 3D 空间感知"的问题，但技术路线不同：3D-VLA 加了独立的深度和点云编码器分支，模型架构改动大；SpatialVLA 保持 VLA 的单路视觉编码器不变，只是把 3D 信息编码成额外的 token 拼进输入序列。轻改动、易复用是它的主要卖点。
+
+## 1. 主要问题：怎么把 3D 塞进 VLA 而不破坏预训练
+
+VLA 骨干（Prismatic、PaliGemma）是在 2D 图文对上预训练的，权重里的注意力模式针对 2D patch 序列优化。如果像 3D-VLA 那样加独立的深度分支和点云分支，等于给模型接了新输入头，从零训一部分权重，容易破坏 VLM 的预训练能力。
+
+SpatialVLA 的思路是**尽量少改架构**：不加新分支，只是把 3D 信息编码成一些额外的输入 token，跟原来的图像 patch token 拼在一起。这样 VLM 的整个网络可以直接复用，只需要少量微调。
+
+两个具体机制：
+
+- **Ego3D 位置编码**：把每个图像 patch 的相机坐标系 3D 位置编码进它的嵌入
+- **Adaptive Spatial Action Grids**：不再用固定的 256 bin 均匀离散化，而是根据训练数据分布自适应地切 bin
+
+## 2. Ego3D 位置编码
+
+标准 ViT 每个 patch 有一个 2D 位置编码，告诉模型这个 patch 在图像的哪个位置。SpatialVLA 加一个 3D 位置编码，告诉模型这个 patch 在相机坐标系下的 3D 位置。
+
+具体做法：
+
+- 用一个单目深度模型（[ZoeDepth](https://arxiv.org/abs/2302.12288)）估计每个像素的深度
+- 用相机内参把 (像素 u, v, 深度 d) 反投影到相机坐标系 (x, y, z)
+- 每个 patch 取中心像素的 3D 坐标 $(x_p, y_p, z_p)$
+- 用正弦-余弦函数生成 3D 位置编码：
+
+$$\text{PE}_{3D}(x, y, z) = \text{concat}(\gamma(x), \gamma(y), \gamma(z))$$
+
+$\gamma(\cdot)$ 是 NeRF 里那种多频率正弦编码。3D 编码加到原来的 2D patch 嵌入上：
+
+$$\text{token}_p = \text{PatchEmbed}(p) + \text{PE}_{2D}(u, v) + \text{PE}_{3D}(x_p, y_p, z_p)$$
+
+**为什么加而不是拼接？** 加法保持了 token 维度不变，可以直接接进已有的 Transformer 层；拼接需要扩展维度，需要改投影矩阵。加法工程上简单，训练时如果 3D 编码不重要模型可以学到把它抑制掉。
+
+**为什么用 NeRF 式的多频率编码而不是学习式嵌入？** 学习式嵌入需要预定义坐标 bin，对连续 3D 空间不友好。多频率正弦编码是无参数的，可以表达任意精度。
+
+## 3. Adaptive Spatial Action Grids
+
+第二个改动是动作离散化。RT-2、OpenVLA 用固定的 256 bin 均匀离散化：把 $[a_{\min}, a_{\max}]$ 均匀切成 256 段。这样做的问题在**空间维度**上特别明显——真实操作里动作的分布远远不均匀。
+
+以 $\Delta x$（x 方向位移增量）为例，训练数据里 90% 的动作幅度都在 $\pm 2\text{cm}$ 内，只有 10% 是大幅度动作。均匀 256 bin 切法把大部分 bin 用在了大幅度区间（几乎没样本），细粒度小幅度动作只分到几个 bin，量化误差反而大。
+
+SpatialVLA 的做法是**基于数据分布自适应切 bin**：对每一维动作，用训练数据的直方图切成 256 个**样本数相等**的 bin。这样细粒度动作有更多 bin 覆盖，量化误差更小。
+
+具体实现是先在训练数据上计算每维动作的经验 CDF，然后用 CDF 的 256 等分点作为 bin 边界。这就是"等频率离散化"，跟传统的分位数分桶一样，但用到动作空间是这里的贡献。
+
+## 4. 架构
+
+SpatialVLA 的骨干是 PaliGemma-3B，跟 [π0](./03-π0.mdx) 用的是同一个 VLM。改动只在两点：
+
+- Patch 嵌入加 Ego3D 位置编码
+- 动作输出用 Adaptive Spatial Action Grids 离散化
+
+参数量约 3B，跟 π0 差不多，比 OpenVLA 小一半。
+
+训练数据用 Open X-Embodiment，跟 OpenVLA 一样约 100 万条。ZoeDepth 深度是离线生成的，训练时直接读取。
+
+## 5. 实验结果
+
+**SimplerEnv 仿真（WidowX + Google Robot）**：
+
+| 方法 | WidowX | Google Robot | 平均 |
+|---|---|---|---|
+| RT-1-X | 3% | 47% | 25% |
+| OpenVLA | 18% | 52% | 35% |
+| SpatialVLA | 54% | 76% | 65% |
+
+跟 OpenVLA 相比 +30 分。作者的消融显示 Ego3D 编码贡献 +12 分，Adaptive Grids 贡献 +8 分，剩下的 +10 分来自 PaliGemma 换 Prismatic 骨干带来的顺带收益。
+
+**真实机器人（Franka 抓放）**：
+
+| 方法 | 已见物体 | 未见物体 |
+|---|---|---|
+| OpenVLA | 65% | 20% |
+| SpatialVLA | 82% | 48% |
+
+未见物体上差距更大，说明 3D 编码帮助模型对新形状泛化。
+
+**与 3D-VLA 对比**：
+
+| 方法 | 参数量 | 推断 Hz | RLBench 8 任务平均 |
+|---|---|---|---|
+| 3D-VLA | 7B + 3D 分支 | 3 Hz | 68% |
+| SpatialVLA | 3B | 8 Hz | 63% |
+
+SpatialVLA 用一半参数、更快的推断、稍低的成功率。工程性价比更好，但纯性能不如加了独立 3D 分支的 3D-VLA。这是"少改动 vs 多改动"的典型 trade-off。
+
+## 6. 局限
+
+依赖单目深度估计。ZoeDepth 的估计误差会传递到位置编码里，对深度估计困难的场景（反光物体、大面积纹理缺失）不友好。作者也讨论了：如果有 RGB-D 相机，可以直接用实测深度代替 ZoeDepth。
+
+Adaptive Grids 是基于训练数据分布的，如果测试时动作分布跟训练不一致（比如换个机器人平台），bin 边界就不再匹配，量化误差会变大。这个问题在跨平台微调时需要重新拟合 bin 边界。
+
+只在单帧上应用 3D 编码，没有考虑时序 3D 一致性。同一物体在相邻帧的 3D 位置应该连续，但当前编码是独立处理每帧的。
+
+## 7. 3D 感知路线的对比
+
+| 方法 | 3D 输入方式 | 架构改动 |
+|---|---|---|
+| [3D-VLA](./21-3D-VLA.mdx) | 独立深度 + 点云编码器分支 | 大 |
+| SpatialVLA | Patch 位置加 3D 编码 | 小 |
+| RVT-2 | 多视角 2D 投影 | 中 |
+| Act3D | 3D 体素动作空间 | 大 |
+
+SpatialVLA 是"最小改动派"的代表。它证明了**给 VLA 加 3D 信息不一定要重新设计架构**——好的位置编码可能就够了。这个思路对希望在已有 VLA 权重上快速加空间感知的团队特别有价值。
+
+代码见 [SpatialVLA/SpatialVLA](https://github.com/SpatialVLA/SpatialVLA)。
+
+</WordCount>

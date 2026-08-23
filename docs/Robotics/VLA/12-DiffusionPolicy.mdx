@@ -2,109 +2,151 @@ import WordCount from '../../../src/components/WordCount/WordCount';
 
 <WordCount>
 
-# Diffusion Policy：用扩散模型学习视觉运动策略
+# Diffusion Policy：用扩散模型生成动作
 
-论文：[Diffusion Policy: Visuomotor Policy Learning via Action Diffusion](https://arxiv.org/abs/2303.04137)（Chi 等，RSS 2023）。Diffusion Policy 是 π0 之前最重要的连续动作生成方法。它的核心判断是：**行为克隆的根本问题不是网络容量，而是 MSE 回归无法建模多模态动作分布**——相同观测下人类有多种合理动作，均值动作往往在物理上无效。扩散模型通过学习动作分布的得分函数，自然地表征任意形状的多峰分布。
+论文：[Diffusion Policy: Visuomotor Policy Learning via Action Diffusion](https://arxiv.org/abs/2303.04137)（Chi 等，RSS 2023）。这篇是把扩散模型用到机器人策略上的开山工作。它的观察是：**行为克隆效果不好的根本原因往往不是网络容量不够，而是动作的输出分布假设错了**。RT-1、BC-Z 这些方法用 MSE 回归或高斯混合来预测动作，都在做单峰或有限模态的假设，而人类示范里同一场景下的合理动作往往是多种完全不同的策略。扩散模型能建模任意形状的分布，把这个问题从根上换掉。
 
-## 1. 为什么 MSE 和 IBC 都不够
+## 1. 先说 MSE 为什么在模仿学习上会失败
 
-三种主流动作头的缺陷：
+看一个具体场景：桌上有一个杯子，示范者要绕过一个障碍物去抓它。有的示范从左边绕，有的从右边绕，两条路径都是合理的。
 
-- **MSE 回归**：输出分布均值，多模态场景下"均值动作"是物理上不可行的中间状态
-- **GMM（高斯混合）**：参数数目固定，难以描述复杂高维分布
-- **IBC（基于能量函数）**：理论上能建模任意分布，但实践中梯度优化极不稳定——多任务上成功率接近 0%
+**MSE 回归的做法**是让网络输出实数动作向量 $\hat{a}$，损失是 $\|\hat{a} - a\|^2$。在这个场景下，网络的最优输出是所有训练动作的**均值**——也就是"直接向前走"。但这条中间路径撞上了障碍物，物理上根本不合法。
 
-扩散模型绕开了上述问题：不直接回归动作，而是学习动作分布的得分函数，通过迭代去噪采样。
+这就是 MSE 的根本毛病：**它假设条件动作分布是单峰高斯**，一旦真实分布是多峰的，均值不在任何峰上，学出来的策略在多峰交界处的动作是无效的。
 
-## 2. 方法：DDPM 应用到动作空间
+**GMM（高斯混合）**：把输出分布写成有限个高斯的混合，网络预测每个高斯的均值、协方差和权重。理论上能表达多峰，但实践中有两个问题：一是模态数 $K$ 是预设的，太少表达不了、太多训不稳；二是训 GMM 需要 EM 或者最大似然，跟深度网络的反向传播结合不好。
 
-**前向加噪（训练阶段）：**
+**IBC（Implicit Behavioral Cloning）**：用能量函数 $E(a, o)$ 定义分布 $p(a | o) \propto \exp(-E(a, o))$。理论上能建模任意分布，但推断时需要用 Langevin 采样或者对比学习，训练极不稳定。Chi 论文里的实验显示 IBC 在多任务上成功率经常接近 0。
 
-$$\mathbf{A}^k = \sqrt{\bar{\alpha}_k}\,\mathbf{A}^0 + \sqrt{1-\bar{\alpha}_k}\,\epsilon^k, \quad \epsilon^k \sim \mathcal{N}(0, I)$$
+**扩散模型**是第四个选项。它绕过了显式建模分布密度这件事，而是学"从噪声一步步去噪到目标动作"的过程。这样即使真实分布是任意奇怪形状（不连通、多峰、有孔），扩散模型也能生成正确的样本。
 
-噪声调度用平方余弦调度（Square Cosine Schedule），训练步数 $K=100$。
+## 2. 扩散模型是什么
 
-**训练目标：** 网络 $\epsilon_\theta$ 以观测 $\mathbf{O}_t$、带噪动作 $\mathbf{A}^k$ 和噪声步 $k$ 为输入，预测噪声：
+在应用到动作之前，先讲清楚 DDPM 到底在做什么。
 
-$$\mathcal{L} = \text{MSE}(\epsilon^k,\ \epsilon_\theta(\mathbf{O}_t,\ \mathbf{A}^k,\ k))$$
+**前向过程（加噪）**：从一个真实数据 $a^0$（比如一段真实动作）出发，逐步加高斯噪声，经过 $K$ 步之后变成纯噪声 $a^K \sim \mathcal{N}(0, I)$。第 $k$ 步的加噪写成：
 
-**推断（反向去噪）：**
+$$a^k = \sqrt{\bar{\alpha}_k} \cdot a^0 + \sqrt{1 - \bar{\alpha}_k} \cdot \epsilon, \quad \epsilon \sim \mathcal{N}(0, I)$$
 
-$$\mathbf{A}^{k-1} = \alpha(\mathbf{A}^k - \gamma\,\epsilon_\theta(\mathbf{O}_t,\ \mathbf{A}^k,\ k) + \mathcal{N}(0, \sigma^2 I))$$
+$\bar{\alpha}_k$ 是一个从 1 递减到 0 的调度，$k=0$ 时是原数据，$k=K$ 时是纯噪声。这个过程是**确定性的、可写成解析式的**，不需要学习。
 
-**DDIM 加速：** 训练用 DDPM 100 步，推断只需 **DDIM 10 步**，RTX 3080 上推断延迟约 0.1 秒，支持 10 Hz 控制（通过插值提升至 125 Hz 执行频率）。
+**反向过程（去噪）**：目标是学一个网络 $\epsilon_\theta(a^k, k)$，输入带噪动作和噪声级别 $k$，预测里面加了什么噪声 $\epsilon$。训练时任取真实动作 $a^0$、任取一个 $k$、任取一个噪声 $\epsilon$，用前向过程算出 $a^k$，然后要求网络预测出那个 $\epsilon$：
 
-## 3. 两种网络架构
+$$\mathcal{L} = \|\epsilon - \epsilon_\theta(a^k, k)\|^2$$
 
-**CNN 版（DP-C）：**
-- 视觉编码器：从零训练的 ResNet-18，BatchNorm 换成 GroupNorm（EMA 训练兼容），全局平均池化换成**空间 Softmax 池化**（保留位置信息）
-- 噪声预测网络：1D 时序卷积，用 **FiLM（特征仿射变换）** 注入观测和扩散步条件
+**推断（生成新动作）**：从纯噪声 $a^K$ 开始，用训好的 $\epsilon_\theta$ 一步步去噪：
 
-**Transformer 版（DP-T）：**
-- 基于 minGPT 改造，带噪动作序列作为输入 token
+$$a^{k-1} = \alpha_k \cdot (a^k - \gamma_k \cdot \epsilon_\theta(a^k, k)) + \sigma_k \cdot \mathcal{N}(0, I)$$
+
+其中 $\alpha_k, \gamma_k, \sigma_k$ 是调度决定的常数。走完 $K$ 步就得到一个新样本 $a^0$。
+
+**为什么这个能建模多峰分布？** 直觉上，去噪过程在**每一步都可以选择往哪个峰靠**。同一个噪声 $a^K$ 走不同的随机数种子会去到不同的峰上——因为每一步反向都带一个小的 $\sigma_k \cdot \mathcal{N}(0, I)$ 随机项。所以扩散模型天然是一个从条件分布采样的生成器，不需要显式建模分布密度。
+
+## 3. 把扩散用到动作上
+
+Diffusion Policy 把上面的公式套用到动作生成，条件是观测 $o_t$（图像和本体感知），生成的是**一段动作序列** $\mathbf{A}_t = [a_t, a_{t+1}, ..., a_{t+T_p-1}]$。
+
+**训练损失**：
+
+$$\mathcal{L} = \text{MSE}(\epsilon,\ \epsilon_\theta(\mathbf{O}_t,\ \mathbf{A}^k,\ k))$$
+
+跟标准 DDPM 唯一区别是网络多了一个观测输入 $\mathbf{O}_t$——扩散过程本身是条件的。
+
+**噪声调度**：用平方余弦调度（Square Cosine Schedule），训练步数 $K=100$。
+
+**推断加速**：训练时 100 步 DDPM，推断只需 10 步 DDIM（Denoising Diffusion Implicit Models）。DDIM 是一种把 DDPM 的随机去噪改成确定性 ODE 求解的变体，可以用更大的步长而不牺牲精度。10 步 DDIM 在 RTX 3080 上推断延迟约 100ms，支持 10 Hz 控制。
+
+## 4. 网络架构（两种版本）
+
+作者做了两种去噪网络的实现，都是 encoder-decoder 结构。
+
+**CNN 版（DP-C）**：
+
+- 视觉编码器：从零训练的 ResNet-18。有两个小改动：BatchNorm 换成 GroupNorm（因为 EMA 训练和 BN 冲突），最后一层全局平均池化换成**空间 Softmax 池化**（保留物体的位置信息）
+- 噪声预测网络：1D 时序卷积。观测和扩散步 $k$ 通过 **FiLM**（跟 [RT-1](./15-RT1.mdx) 里的用法一样）注入到每层卷积特征
+
+**Transformer 版（DP-T）**：
+
+- 基于 minGPT 改造
+- 带噪动作序列作为输入 token
 - 扩散步 $k$ 通过正弦位置编码嵌入为首 token
 - 观测通过每个 Decoder 块的**多头交叉注意力**注入
 - 动作 token 之间用**因果掩码自注意力**
 
-## 4. 退缩时域控制
+两种版本各有优劣：DP-C 训练更稳但对高频动作弱，DP-T 表达能力强但对超参敏感。作者建议先用 DP-C 跑基线。
 
-Diffusion Policy 不输出单步动作，而是预测一段动作序列，执行一部分后重新规划：
+## 5. 退缩时域控制（Receding Horizon Control）
+
+Diffusion Policy 不是每步单独预测动作，而是每次预测一段序列并执行其中一部分。这个思路来自最优控制里的模型预测控制（MPC）。
+
+三个时间参数：
 
 | 参数 | 含义 |
 |---|---|
-| $T_o$：观测时域 | 输入过去 $T_o$ 帧观测 |
-| $T_p$：预测时域 | 预测未来 $T_p$ 步动作 |
-| $T_a$：执行时域 | 执行 $T_a$ 步后重新规划 |
+| $T_o$（观测时域） | 输入过去 $T_o$ 帧观测 |
+| $T_p$（预测时域） | 预测未来 $T_p$ 步动作 |
+| $T_a$（执行时域） | 执行 $T_a$ 步后重新规划 |
 
-最优 $T_a = 8$（多数任务）。**热启动（Warm-starting）**：下次推断以上次预测序列的后续部分初始化，而非纯噪声，降低感知延迟。
+作者的经验最优是 $T_a = 8$（多数任务）。$T_a$ 太小推断次数太多、延迟高；$T_a$ 太大就变成开环控制，对新观测反应慢。
 
-## 5. 实验结果
+**热启动（Warm-starting）**：下次推断时，把上次预测序列的后续部分作为初始点，而不是从纯噪声开始。这样可以减少去噪步数（有时候只需 3–5 步就能收敛），降低感知延迟。
 
-**RoboMimic 视觉输入（最优检查点成功率）：**
+## 6. 实验结果
+
+**RoboMimic 视觉输入（最优检查点成功率）**：
 
 | 方法 | Square ph | Transport ph | ToolHang ph |
 |---|---|---|---|
 | LSTM-GMM | 0.82 | 0.88 | 0.68 |
 | IBC | 0.03 | 0.00 | 0.00 |
-| **DP-CNN** | **0.98** | **1.00** | **0.95** |
-| **DP-T** | **1.00** | **0.98** | **0.76** |
+| DP-CNN | 0.98 | 1.00 | 0.95 |
+| DP-T | 1.00 | 0.98 | 0.76 |
 
-**Franka Kitchen 多阶段（逐阶段成功率）：**
+IBC 在这套 benchmark 上直接崩掉，验证了能量函数训练不稳定的问题。DP 显著超过 GMM。
+
+**Franka Kitchen 多阶段（逐阶段成功率）**：
 
 | 方法 | p1 | p2 | p3 | p4 |
 |---|---|---|---|---|
 | BET | 0.99 | 0.93 | 0.71 | 0.44 |
-| **DP-CNN** | 1.00 | 1.00 | 1.00 | **0.99** |
+| DP-CNN | 1.00 | 1.00 | 1.00 | 0.99 |
 
-Kitchen p4 相较最佳基线提升 **+125%**。
+Kitchen 是 4 阶段连续任务，任何单阶段失败就整体失败。DP 在 p4 阶段成功率 99%，最佳基线只有 44%。这个差距说明**扩散策略在长时程任务上误差累积更小**——每一步的动作分布更准，串起来的失败率更低。
 
-**真实机器人（N=20 次试验）：**
+**真实机器人（N=20 次试验）**：
 
 | 任务 | 方法 | 成功率 |
 |---|---|---|
-| Push-T（UR5）| DP-CNN | **95%**（vs LSTM-GMM 20%）|
-| Mug Flipping（Franka）| DP | **90%**（vs LSTM-GMM 0%）|
-| Sauce Spreading（Franka）| DP | **100%**（vs LSTM-GMM 0%）|
-| Shirt Folding（双臂）| DP | **75%** |
+| Push-T（UR5） | DP-CNN | 95%（vs LSTM-GMM 20%） |
+| Mug Flipping（Franka） | DP | 90%（vs LSTM-GMM 0%） |
+| Sauce Spreading（Franka） | DP | 100%（vs LSTM-GMM 0%） |
+| Shirt Folding（双臂） | DP | 75% |
 
-跨 15 项任务、4 个基准测试，综合平均提升 **+46.9%**。
+跨 15 项任务、4 个基准，DP 相对最佳基线综合平均提升 46.9%。
 
-**视觉主干消融（RoboMimic Square PH）：**
+**视觉主干消融（RoboMimic Square PH）**：
 
 | 主干 | 从零训练 | 微调预训练 |
 |---|---|---|
 | ResNet-18 (IN-21k) | 94% | 92% |
-| ViT-B/16 (CLIP) | 22% | **98%** |
+| ViT-B/16 (CLIP) | 22% | 98% |
 
-ViT 从零训练极差，微调预训练 CLIP ViT 最佳——说明视觉表征质量对 Diffusion Policy 影响很大。
+有意思的观察：ViT 从零训练极差（22%），但微调预训练 CLIP ViT 是最好的（98%）。原因是 ViT 没有 CNN 的归纳偏置（局部性、平移不变性），小数据集上从零训难以收敛；但一旦有大规模预训练权重，它的表达能力比 ResNet 强。这个结论后来被 [Octo](./13-Octo.mdx) 和 [OpenVLA](./05-OpenVLA.mdx) 吸收——它们都用预训练视觉编码器。
 
-## 6. 与 π0 的关系
+## 7. 与 π0 / RDT / CogACT 的关系
 
-Diffusion Policy 用的是 DDPM——带随机噪声的离散时间扩散，路径是弯曲的 SDE。π0 用的是流匹配（Flow Matching）——直线最优传输路径，没有随机噪声，推断只需 10 步且更稳定。Diffusion Policy 是 π0 流匹配动作头的直接前驱，但推断步数（100 DDPM / 10 DDIM）比流匹配的 10 步代价更高。
+Diffusion Policy 之后，扩散动作头这条线继续演化：
 
-## 7. 局限
+- [Octo](./13-Octo.mdx)：把 DP 的思路做成通用策略，接大规模数据预训练，但扩散头缩到 3 层 MLP
+- [π0](./03-π0.mdx)：换 DDPM 为流匹配。流匹配用直线最优传输路径，训练更稳，推断只需 10 步（DP-DDIM 也 10 步，但流匹配没有随机噪声项）
+- [RDT](./19-RDT.mdx)：把扩散网络从 CNN/小 MLP 换成大 DiT（800M），双臂平台上效果明显
+- [CogACT](./20-CogACT.mdx)：VLM 输出认知特征后接 DiT 扩散动作头
 
-Diffusion Policy 每个任务单独训练，无跨任务泛化。推断延迟比简单方法高（虽然动作块弥补了部分问题）。完全依赖高质量示范，无法从次优轨迹中学习。CNN 版在高频动作变化的速度控制任务上表现偏弱；Transformer 版对超参敏感，训练稳定性差于 CNN 版。
+DP 是这一整条线的起点。它没有大规模预训练、没有跨任务泛化、每个任务单独训——这些短板都是后续工作补的。但**"扩散能建模多峰动作分布"这个核心观察**贯穿始终。
+
+## 8. 局限
+
+Diffusion Policy 每个任务单独训练，无跨任务泛化。推断延迟比简单方法高（虽然动作块弥补了部分问题）。完全依赖高质量示范，无法从次优轨迹中学习。CNN 版在高频动作变化的速度控制任务上表现偏弱，Transformer 版对超参敏感。
 
 代码见 [columbia-ai-robotics/diffusion_policy](https://github.com/columbia-ai-robotics/diffusion_policy)。
 

@@ -1,0 +1,129 @@
+import WordCount from '../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+# CogACT：把"认知"和"动作"拆成两个模块
+
+论文：[CogACT: A Foundational Vision-Language-Action Model for Synergizing Cognition and Action in Robotic Manipulation](https://arxiv.org/abs/2411.19650)（MSRA + 清华，2024）。CogACT 的观察是：VLA 模型里 VLM 骨干和动作预测其实是两种性质完全不同的任务——VLM 处理离散语言 token 和图像 patch，动作预测处理连续时序信号。用同一个 Transformer 同时做这两件事（RT-2、OpenVLA 的路子）等于逼一个网络在两种数据分布之间切换，训练难度大且互相干扰。CogACT 把它们显式拆开：VLM 只负责"理解世界并输出一个高层认知特征"，然后交给一个专门的动作扩散模块生成动作。
+
+## 1. 为什么要拆开
+
+RT-2 和 OpenVLA 是"一体化 VLA"：VLM 直接输出动作 token，前向传播里同一份权重既在处理语言又在处理动作。这样做有几个隐性代价：
+
+- **训练目标冲突**：动作 token 的交叉熵和 VLM 保留的语言能力是两种不同的信号。为了不忘掉语言能力要做协同微调（RT-2）或者靠预训练锚定（OpenVLA），都是折中方案。
+- **动作表达受限**：VLM 的输出必须是 token 序列。这就限制了动作只能用离散化（RT-2）或者 DCT-BPE（π0-FAST）这类 token 方案，很难直接用扩散或流匹配。
+- **表达带宽不对称**：VLM 有 7B 参数，动作头（如果显式加）只有几十 M。但对精细操作来说，动作预测的容量需求可能不小于视觉理解。
+
+CogACT 把 VLM 定位成"认知模块"——它只负责看图、读指令，输出一个固定长度的**认知特征向量** $z$，不直接生成动作。然后一个独立的**动作模块**用扩散生成动作序列，条件就是 $z$。
+
+拆开的直接好处是**两个模块可以独立设计**：VLM 可以用现成的 OpenVLA 权重，动作模块可以选任意的连续动作生成方案（扩散、流匹配、DiT）。它们通过认知特征 $z$ 松耦合。
+
+## 2. 架构
+
+```
+[图像 + 指令]  →  VLM (Prismatic-7B)  →  Cognition Feature z (D=4096)
+                                              ↓
+                                        Action DiT (325M)
+                                              ↓
+                                        动作块 A_t (16 步 × 7 维)
+```
+
+**认知模块（VLM）**：直接用 [OpenVLA](./05-OpenVLA.mdx) 的 Prismatic-7B 骨干，双路 SigLIP + DINOv2 视觉编码器加 Llama 2。跟 OpenVLA 的区别是：输出不再是动作 token，而是在最后一层加一个特殊的 `[COG]` 位置，取这个位置的隐藏状态作为认知特征 $z \in \mathbb{R}^{4096}$。
+
+**动作模块（Action DiT）**：一个 20 层的 [DiT](./19-RDT.mdx)，325M 参数，比 VLM 小 20 倍。DiT 输入是：
+
+- 噪声动作块 $A^k$（16 步 × 7 维）
+- 扩散时间步 $k$
+- 认知特征 $z$（通过 adaLN-Zero 注入）
+
+输出是去噪后的动作块 $A^{k-1}$。用标准 DDPM 训练目标：
+
+$$\mathcal{L} = \mathbb{E}\left\|\epsilon - \epsilon_\theta(A^k, z, k)\right\|^2$$
+
+推断时 DDIM 5 步。
+
+## 3. Adaptive Action Ensemble
+
+除了架构拆分，CogACT 还有一个专门针对推断时序稳定性的技巧，叫自适应动作集成。
+
+先说问题：动作分块（chunking）方案里，模型每次预测 $k$ 步动作，执行前 $m < k$ 步之后重新推断。这样相邻两次推断的预测块会**在时间上重叠**（第一次预测覆盖 $t \sim t+k$，第二次覆盖 $t+m \sim t+m+k$，重叠区是 $t+m \sim t+k$）。
+
+[ACT](./04-ACT.mdx) 用固定权重的指数加权集成来平滑这个重叠区（越新的预测权重越高）。CogACT 把这个权重做成**可学习的**——训练时增加一个小 MLP，输入当前时刻和重叠区的所有历史预测，输出每个预测的权重。这样模型可以学到"什么时候相信老预测、什么时候相信新预测"。
+
+具体公式：
+
+$$a_t = \sum_i w_i(z_t, \{A^{(j)}_t\}_j) \cdot A^{(i)}_t$$
+
+其中 $A^{(i)}_t$ 是第 $i$ 次推断给出的关于时刻 $t$ 的动作预测，$w_i$ 由认知特征和历史预测决定。
+
+作者做过消融，Adaptive Action Ensemble 在需要长时程一致性的任务（比如叠衣服、装订）上贡献约 5–8 分成功率。
+
+## 4. 训练
+
+**两阶段**：
+
+1. **VLM 阶段**：先用 OpenVLA 权重初始化认知模块，冻结不训。
+2. **联合微调**：解冻 VLM，用动作 loss 联合训 VLM 和 Action DiT。Adaptive Action Ensemble 的权重 MLP 也在这一步训。
+
+数据用 Open X-Embodiment 精选子集，跟 OpenVLA 一致，约 97 万条轨迹。批大小 512，学习率 5e-5，训 30 万步，硬件是 32× A100。
+
+## 5. 实验结果
+
+### SimplerEnv 仿真评估（Google Robot 平台）
+
+| 方法 | 拾取 | 移动到 | 打开抽屉 | 关闭抽屉 | 平均 |
+|---|---|---|---|---|---|
+| RT-1-X | 5% | 40% | 15% | 45% | 26% |
+| OpenVLA | 16% | 55% | 25% | 60% | 39% |
+| Octo | 6% | 3% | 0% | 1% | 3% |
+| CogACT | 47% | 87% | 55% | 87% | 69% |
+
+跟 OpenVLA（同样的 VLM 骨干）相比，CogACT 平均提升 30 分。核心贡献是把离散动作 token 换成 DiT 扩散——同样的视觉理解能力，动作输出精度更高。
+
+### 真实机器人（Franka + WidowX）
+
+| 任务 | OpenVLA | CogACT |
+|---|---|---|
+| 抓可乐 | 40% | 90% |
+| 放到盘子 | 30% | 80% |
+| 打开抽屉 | 20% | 70% |
+| 移动到 | 50% | 85% |
+
+真实机器人上差距和 SimplerEnv 一致，验证了仿真结果不是特例。
+
+### 消融
+
+| 配置 | 平均成功率 |
+|---|---|
+| 一体化（OpenVLA 基线） | 39% |
+| 拆分但共享参数（VLM 直接产生动作 token） | 44% |
+| CogACT（拆分 + DiT + 无集成） | 61% |
+| CogACT + Adaptive Action Ensemble | 69% |
+
+三个改动的独立贡献：**拆分本身 +5**，**换 DiT +17**，**自适应集成 +8**。换 DiT 是最大的收益——这印证了作者的判断：动作输出方式比"VLM 和动作头是否一体"更影响性能。
+
+## 6. 局限
+
+拆分后的 VLM 和动作模块通过一个 4096 维向量传递信息，这是一个信息瓶颈。作者做过实验，把 $z$ 的维度扩到 8192 收益微小，缩到 2048 有明显退化。4096 差不多是当前的经验最优，理论上没有解释。
+
+动作模块用的是 DDPM 扩散，推断 5 步 DDIM 在单卡 A100 上约 100ms。相比 π0 的流匹配（10 步 27ms）、OpenVLA 的 token 生成（自回归但单次前向），CogACT 的推断延迟不算最快。
+
+VLM 微调阶段仍然改动大量参数（Llama 2 7B 全量参数），显存需求不低。作者提供 LoRA 版本，但 LoRA 微调的成功率比全量差 5–10 分。
+
+代码和权重见 [microsoft/CogACT](https://github.com/microsoft/CogACT)。
+
+## 7. CogACT 和其他"模块化"VLA 的对比
+
+VLA 领域"是否要把 VLM 和动作解耦"是一个反复讨论的问题。几种代表方案：
+
+| 方法 | VLM 和动作的关系 |
+|---|---|
+| RT-2 / OpenVLA | 一体化，同一个 Transformer 同时输出语言和动作 token |
+| π0 | 一体化，但 VLM 和 Action Expert 通过共享注意力松耦合 |
+| Octo | 拆分，VLM 输出 readout token，扩散头独立 |
+| CogACT | 完全拆分，VLM 输出认知向量，DiT 独立 |
+| RDT | 无 VLM 骨干，SigLIP + T5 冻结后直接接 DiT |
+
+方向上是**动作模块的容量在增大，VLM 逐渐变成一个"感知前端"**。CogACT 是这条演化线上的一个中间点：VLM 还比动作模块大 20 倍，但两者已经完全解耦。
+
+</WordCount>

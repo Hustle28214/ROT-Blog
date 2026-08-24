@@ -181,7 +181,7 @@ $$
 $$
 \rho(k)=\phi^{|k|}.
 $$
-:::example[例 1：AR(1) 的长期水平]
+:::info[例 1：AR(1) 的长期水平]
 若
 $$
 X_t=2+0.6X_{t-1}+\varepsilon_t,
@@ -222,7 +222,7 @@ $$
 \theta(z)=1+\theta_1z+\cdots+\theta_qz^q=0
 $$
 的所有根都在单位圆之外。
-:::example[例 2：MA(1) 的 ACF]
+:::info[例 2：MA(1) 的 ACF]
 设
 $$
 X_t=\varepsilon_t+\theta\varepsilon_{t-1}.
@@ -332,7 +332,7 @@ $$
 3. 固定长度滑动窗口预测。
 常用误差指标有 MAE、RMSE 与 MASE。
 MAPE 在真实值接近 $0$ 时不稳定，也不适合允许负值的序列。
-:::example[例 3：一个简化工作流]
+:::info[例 3：一个简化工作流]
 对逐月销量序列，可先画图发现年度季节性与随水平增长的波动。
 取对数并做周期 $12$ 的季节差分后，检查 ACF/PACF，拟合若干 SARIMA 候选。
 根据 AICc 缩小范围，再用残差 ACF、Ljung--Box 检验和滚动预测误差选择模型。

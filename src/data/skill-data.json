@@ -51,6 +51,24 @@
       "tags": []
     },
     {
+      "id": "Computering-AI Infra-KVCache",
+      "title": "KVCache",
+      "category": "Computering",
+      "type": "topic",
+      "color": "#3B82F6",
+      "docPath": "Computering/AI Infra/KVCache",
+      "progress": 60
+    },
+    {
+      "id": "Computering-AI Infra-LLM",
+      "title": "LLM",
+      "category": "Computering",
+      "type": "topic",
+      "color": "#3B82F6",
+      "docPath": "Computering/AI Infra/LLM",
+      "progress": 60
+    },
+    {
       "id": "Computering-AI Infra-Pytorch基础",
       "title": "Pytorch基础",
       "category": "Computering",
@@ -58,6 +76,17 @@
       "color": "#3B82F6",
       "docPath": "Computering/AI Infra/Pytorch基础",
       "progress": 60
+    },
+    {
+      "id": "Computering-AI Infra-Pytorch基础-nnModule",
+      "title": "nnModule",
+      "category": "Computering",
+      "type": "skill",
+      "level": "intermediate",
+      "color": "#3B82F6",
+      "docPath": "Computering/AI Infra/Pytorch基础/nnModule",
+      "progress": 20,
+      "tags": []
     },
     {
       "id": "Computering-AI Infra-Pytorch基础-Pytorch张量",
@@ -199,6 +228,15 @@
       "tags": []
     },
     {
+      "id": "Computering-WEB开发-React",
+      "title": "React",
+      "category": "Computering",
+      "type": "topic",
+      "color": "#3B82F6",
+      "docPath": "Computering/WEB开发/React",
+      "progress": 60
+    },
+    {
       "id": "Computering-WEB开发-WebSocket",
       "title": "WebSocket",
       "category": "Computering",
@@ -332,6 +370,15 @@
       "tags": []
     },
     {
+      "id": "Computering-并发编程",
+      "title": "并发编程",
+      "category": "Computering",
+      "type": "subcategory",
+      "color": "#3B82F6",
+      "docPath": "Computering/并发编程",
+      "progress": 60
+    },
+    {
       "id": "Computering-并行计算与分布式系统",
       "title": "并行计算与分布式系统",
       "category": "Computering",
@@ -434,8 +481,8 @@
       "tags": []
     },
     {
-      "id": "Computering-并行计算与分布式系统-RLHF技术-RLHF",
-      "title": "RLHF",
+      "id": "Computering-并行计算与分布式系统-RLHF技术-Reward Model",
+      "title": "Reward Model",
       "category": "Computering",
       "type": "skill",
       "level": "intermediate",
@@ -445,8 +492,8 @@
       "tags": []
     },
     {
-      "id": "Computering-并行计算与分布式系统-RLHF技术-Reward Model",
-      "title": "Reward Model",
+      "id": "Computering-并行计算与分布式系统-RLHF技术-RLHF",
+      "title": "RLHF",
       "category": "Computering",
       "type": "skill",
       "level": "intermediate",
@@ -628,6 +675,7 @@
       "color": "#3B82F6",
       "docPath": "Computering/操作系统/Linux/Linux系统简介",
       "progress": 55,
+      "progress": 55,
       "tags": []
     },
     {
@@ -742,6 +790,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/操作系统/操作系统导论/进程API",
+      "progress": 65,
       "progress": 65,
       "tags": []
     },
@@ -929,7 +978,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/操作系统/操作系统导论/并发",
-      "progress": 97,
+      "progress": 76,
       "tags": []
     },
     {
@@ -1200,6 +1249,15 @@
       "progress": 60
     },
     {
+      "id": "Computering-数据库系统-SQL",
+      "title": "SQL",
+      "category": "Computering",
+      "type": "topic",
+      "color": "#3B82F6",
+      "docPath": "Computering/数据库系统/SQL",
+      "progress": 60
+    },
+    {
       "id": "Computering-数据库系统-数据库系统概念",
       "title": "数据库系统概念",
       "category": "Computering",
@@ -1457,6 +1515,7 @@
       "color": "#3B82F6",
       "docPath": "Computering/数据结构/ST表",
       "progress": 61,
+      "progress": 61,
       "tags": []
     },
     {
@@ -1498,6 +1557,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/数据结构/二叉搜索树和平衡树/红黑树",
+      "progress": 3,
       "progress": 3,
       "tags": []
     },
@@ -2012,6 +2072,15 @@
       "tags": []
     },
     {
+      "id": "Computering-机器学习-循环神经网络",
+      "title": "循环神经网络",
+      "category": "Computering",
+      "type": "topic",
+      "color": "#3B82F6",
+      "docPath": "Computering/机器学习/循环神经网络",
+      "progress": 60
+    },
+    {
       "id": "Computering-机器学习-推荐系统",
       "title": "推荐系统",
       "category": "Computering",
@@ -2173,6 +2242,24 @@
       "tags": []
     },
     {
+      "id": "Computering-机器学习-智能体系统-多智能体系统",
+      "title": "多智能体系统",
+      "category": "Computering",
+      "type": "topic",
+      "color": "#3B82F6",
+      "docPath": "Computering/机器学习/智能体系统/多智能体系统",
+      "progress": 60
+    },
+    {
+      "id": "Computering-机器学习-模式识别",
+      "title": "模式识别",
+      "category": "Computering",
+      "type": "topic",
+      "color": "#3B82F6",
+      "docPath": "Computering/机器学习/模式识别",
+      "progress": 60
+    },
+    {
       "id": "Computering-机器学习-深度学习",
       "title": "深度学习",
       "category": "Computering",
@@ -2257,6 +2344,15 @@
       "tags": []
     },
     {
+      "id": "Computering-机器学习-现代卷积神经网络",
+      "title": "现代卷积神经网络",
+      "category": "Computering",
+      "type": "topic",
+      "color": "#3B82F6",
+      "docPath": "Computering/机器学习/现代卷积神经网络",
+      "progress": 60
+    },
+    {
       "id": "Computering-机器学习-现代循环神经网络",
       "title": "现代循环神经网络",
       "category": "Computering",
@@ -2275,6 +2371,15 @@
       "docPath": "Computering/机器学习/现代循环神经网络/门控循环单元GRU",
       "progress": 89,
       "tags": []
+    },
+    {
+      "id": "Computering-机器学习-线性神经网络",
+      "title": "线性神经网络",
+      "category": "Computering",
+      "type": "topic",
+      "color": "#3B82F6",
+      "docPath": "Computering/机器学习/线性神经网络",
+      "progress": 60
     },
     {
       "id": "Computering-机器学习-迁移学习",
@@ -2443,8 +2548,8 @@
       "tags": []
     },
     {
-      "id": "Computering-算法-搜索-DFS",
-      "title": "DFS",
+      "id": "Computering-算法-搜索-DancingLink",
+      "title": "DancingLink",
       "category": "Computering",
       "type": "skill",
       "level": "intermediate",
@@ -2454,8 +2559,8 @@
       "tags": []
     },
     {
-      "id": "Computering-算法-搜索-DancingLink",
-      "title": "DancingLink",
+      "id": "Computering-算法-搜索-DFS",
+      "title": "DFS",
       "category": "Computering",
       "type": "skill",
       "level": "intermediate",
@@ -2551,6 +2656,15 @@
       "docPath": "Computering/算法/搜索/遗传算法",
       "progress": 87,
       "tags": []
+    },
+    {
+      "id": "Computering-算法-数学",
+      "title": "数学",
+      "category": "Computering",
+      "type": "topic",
+      "color": "#3B82F6",
+      "docPath": "Computering/算法/数学",
+      "progress": 60
     },
     {
       "id": "Computering-算法-算法基础",
@@ -3083,7 +3197,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/编程语言/C++/C++20/三路比较运算符",
-      "progress": 16,
+      "progress": 64,
       "tags": []
     },
     {
@@ -3264,7 +3378,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/编程语言/C++/STL/Containers/forwardLIst",
-      "progress": 60,
+      "progress": 89,
       "tags": []
     },
     {
@@ -3580,7 +3694,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/计算机图形学/光线追踪/光线追踪基本原理",
-      "progress": 8,
+      "progress": 39,
       "tags": []
     },
     {
@@ -4004,7 +4118,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/计算机组成原理/存储系统",
-      "progress": 30,
+      "progress": 57,
       "tags": []
     },
     {
@@ -4079,6 +4193,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/计算机网络/广域通信网",
+      "progress": 73,
       "progress": 73,
       "tags": []
     },
@@ -4364,6 +4479,7 @@
       "color": "#3B82F6",
       "docPath": "Computering/设计模式/代理模式",
       "progress": 78,
+      "progress": 78,
       "tags": []
     },
     {
@@ -4637,6 +4753,7 @@
       "color": "#3B82F6",
       "docPath": "Computering/软件测试/测试工具简介",
       "progress": 65,
+      "progress": 65,
       "tags": []
     },
     {
@@ -4908,12 +5025,39 @@
       "tags": []
     },
     {
+      "id": "Control-强化学习-多智能体强化学习",
+      "title": "多智能体强化学习",
+      "category": "Control",
+      "type": "topic",
+      "color": "#10B981",
+      "docPath": "Control/强化学习/多智能体强化学习",
+      "progress": 60
+    },
+    {
+      "id": "Control-强化学习-深度强化学习",
+      "title": "深度强化学习",
+      "category": "Control",
+      "type": "topic",
+      "color": "#10B981",
+      "docPath": "Control/强化学习/深度强化学习",
+      "progress": 60
+    },
+    {
       "id": "Control-微机原理",
       "title": "微机原理",
       "category": "Control",
       "type": "subcategory",
       "color": "#10B981",
       "docPath": "Control/微机原理",
+      "progress": 60
+    },
+    {
+      "id": "Control-微机原理-汇编语言",
+      "title": "汇编语言",
+      "category": "Control",
+      "type": "topic",
+      "color": "#10B981",
+      "docPath": "Control/微机原理/汇编语言",
       "progress": 60
     },
     {
@@ -4955,6 +5099,7 @@
       "level": "intermediate",
       "color": "#10B981",
       "docPath": "Control/机电传动控制/机电传动系统的动力学基础",
+      "progress": 31,
       "progress": 31,
       "tags": []
     },
@@ -5588,6 +5733,15 @@
       "tags": []
     },
     {
+      "id": "Control-过程控制仪表与装置",
+      "title": "过程控制仪表与装置",
+      "category": "Control",
+      "type": "subcategory",
+      "color": "#10B981",
+      "docPath": "Control/过程控制仪表与装置",
+      "progress": 60
+    },
+    {
       "id": "Control-高阶控制理论",
       "title": "高阶控制理论",
       "category": "Control",
@@ -5615,6 +5769,15 @@
       "docPath": "Control/高阶控制理论/柔顺控制/柔顺控制",
       "progress": 10,
       "tags": []
+    },
+    {
+      "id": "Control-高阶控制理论-柔顺控制-Paper",
+      "title": "Paper",
+      "category": "Control",
+      "type": "topic",
+      "color": "#10B981",
+      "docPath": "Control/高阶控制理论/柔顺控制/Paper",
+      "progress": 60
     },
     {
       "id": "Electronic",
@@ -6488,6 +6651,15 @@
       "tags": []
     },
     {
+      "id": "Electronic-元器件设计-电源设计-电源分配网络PDN",
+      "title": "电源分配网络PDN",
+      "category": "Electronic",
+      "type": "topic",
+      "color": "#EF4444",
+      "docPath": "Electronic/元器件设计/电源设计/电源分配网络PDN",
+      "progress": 60
+    },
+    {
       "id": "Electronic-元器件设计-电源设计-稳压直流电源设计",
       "title": "稳压直流电源设计",
       "category": "Electronic",
@@ -6506,6 +6678,15 @@
       "docPath": "Electronic/元器件设计/电源设计/稳压直流电源设计/相控整流电源",
       "progress": 34,
       "tags": []
+    },
+    {
+      "id": "Electronic-元器件设计-运算放大器",
+      "title": "运算放大器",
+      "category": "Electronic",
+      "type": "topic",
+      "color": "#EF4444",
+      "docPath": "Electronic/元器件设计/运算放大器",
+      "progress": 60
     },
     {
       "id": "Electronic-元器件设计-隔离电路设计",
@@ -8316,6 +8497,15 @@
       "tags": []
     },
     {
+      "id": "Mathematics-数值分析",
+      "title": "数值分析",
+      "category": "Mathematics",
+      "type": "subcategory",
+      "color": "#8B5CF6",
+      "docPath": "Mathematics/数值分析",
+      "progress": 60
+    },
+    {
       "id": "Mathematics-数论基础",
       "title": "数论基础",
       "category": "Mathematics",
@@ -8460,8 +8650,8 @@
       "progress": 60
     },
     {
-      "id": "Mathematics-概率论与数理统计-R的应用",
-      "title": "R的应用",
+      "id": "Mathematics-概率论与数理统计-bootstrap方法",
+      "title": "bootstrap方法",
       "category": "Mathematics",
       "type": "skill",
       "level": "intermediate",
@@ -8471,8 +8661,8 @@
       "tags": []
     },
     {
-      "id": "Mathematics-概率论与数理统计-bootstrap方法",
-      "title": "bootstrap方法",
+      "id": "Mathematics-概率论与数理统计-R的应用",
+      "title": "R的应用",
       "category": "Mathematics",
       "type": "skill",
       "level": "intermediate",
@@ -8781,6 +8971,33 @@
       "tags": []
     },
     {
+      "id": "Mechanics-材料力学",
+      "title": "材料力学",
+      "category": "Mechanics",
+      "type": "subcategory",
+      "color": "#6B7280",
+      "docPath": "Mechanics/材料力学",
+      "progress": 60
+    },
+    {
+      "id": "Mechanics-理论力学",
+      "title": "理论力学",
+      "category": "Mechanics",
+      "type": "subcategory",
+      "color": "#6B7280",
+      "docPath": "Mechanics/理论力学",
+      "progress": 60
+    },
+    {
+      "id": "Mechanics-飞行器结构力学",
+      "title": "飞行器结构力学",
+      "category": "Mechanics",
+      "type": "subcategory",
+      "color": "#6B7280",
+      "docPath": "Mechanics/飞行器结构力学",
+      "progress": 60
+    },
+    {
       "id": "Optics",
       "title": "Optics",
       "category": "Optics",
@@ -8818,7 +9035,7 @@
       "level": "intermediate",
       "color": "#CCCCCC",
       "docPath": "Optics/工程光学/理想光学系统",
-      "progress": 8,
+      "progress": 41,
       "tags": []
     },
     {
@@ -8842,6 +9059,15 @@
       "docPath": "Optics/工程光学/光学系统中的光阑与光束限制",
       "progress": 17,
       "tags": []
+    },
+    {
+      "id": "Optics-应用光学",
+      "title": "应用光学",
+      "category": "Optics",
+      "type": "subcategory",
+      "color": "#CCCCCC",
+      "docPath": "Optics/应用光学",
+      "progress": 60
     },
     {
       "id": "Paper",
@@ -8896,6 +9122,15 @@
       "tags": []
     },
     {
+      "id": "Paper-论文调研",
+      "title": "论文调研",
+      "category": "Paper",
+      "type": "subcategory",
+      "color": "#F97316",
+      "docPath": "Paper/论文调研",
+      "progress": 60
+    },
+    {
       "id": "Robotics",
       "title": "Robotics",
       "category": "Robotics",
@@ -8926,6 +9161,92 @@
       "tags": []
     },
     {
+      "id": "Robotics-Robotic RL",
+      "title": "Robotic RL",
+      "category": "Robotics",
+      "type": "subcategory",
+      "color": "#06B6D4",
+      "docPath": "Robotics/Robotic RL",
+      "progress": 60
+    },
+    {
+      "id": "Robotics-Robotic RL-01-RL项目复现计划",
+      "title": "RL项目复现计划",
+      "category": "Robotics",
+      "type": "skill",
+      "level": "intermediate",
+      "color": "#06B6D4",
+      "docPath": "Robotics/ROS/ROS基本操作",
+      "progress": 68,
+      "tags": []
+    },
+    {
+      "id": "Robotics-Robotic RL-02-HumanoidGym",
+      "title": "HumanoidGym",
+      "category": "Robotics",
+      "type": "skill",
+      "level": "intermediate",
+      "color": "#06B6D4",
+      "docPath": "Robotics/ROS/话题通信机制",
+      "progress": 28,
+      "tags": []
+    },
+    {
+      "id": "Robotics-Robotic RL-03-GMR",
+      "title": "GMR",
+      "category": "Robotics",
+      "type": "skill",
+      "level": "intermediate",
+      "color": "#06B6D4",
+      "docPath": "Robotics/ROS/ROS安装流程",
+      "progress": 88,
+      "tags": []
+    },
+    {
+      "id": "Robotics-Robotic RL-04-ASAP",
+      "title": "ASAP",
+      "category": "Robotics",
+      "type": "skill",
+      "level": "intermediate",
+      "color": "#06B6D4",
+      "docPath": "Robotics/Robotic RL/ASAP",
+      "progress": 61,
+      "tags": []
+    },
+    {
+      "id": "Robotics-Robotic RL-05-Human2Humanoid",
+      "title": "Human2Humanoid",
+      "category": "Robotics",
+      "type": "skill",
+      "level": "intermediate",
+      "color": "#06B6D4",
+      "docPath": "Robotics/ROS/roscpp/源码结构与初始化",
+      "progress": 23,
+      "tags": []
+    },
+    {
+      "id": "Robotics-Robotic RL-06-EmbraceCollisions",
+      "title": "EmbraceCollisions",
+      "category": "Robotics",
+      "type": "skill",
+      "level": "intermediate",
+      "color": "#06B6D4",
+      "docPath": "Robotics/ROS/roscpp/话题发布路径",
+      "progress": 59,
+      "tags": []
+    },
+    {
+      "id": "Robotics-Robotic RL-07-RMA",
+      "title": "RMA",
+      "category": "Robotics",
+      "type": "skill",
+      "level": "intermediate",
+      "color": "#06B6D4",
+      "docPath": "Robotics/ROS/roscpp/订阅、回调队列与Spinner",
+      "progress": 39,
+      "tags": []
+    },
+    {
       "id": "Robotics-ROS",
       "title": "ROS",
       "category": "Robotics",
@@ -8941,8 +9262,8 @@
       "type": "skill",
       "level": "intermediate",
       "color": "#06B6D4",
-      "docPath": "Robotics/ROS/ROS基本操作",
-      "progress": 68,
+      "docPath": "Robotics/ROS/roscpp/连接协商与传输层",
+      "progress": 64,
       "tags": []
     },
     {
@@ -8953,18 +9274,7 @@
       "level": "intermediate",
       "color": "#06B6D4",
       "docPath": "Robotics/ROS/话题通信机制",
-      "progress": 28,
-      "tags": []
-    },
-    {
-      "id": "Robotics-ROS-ROS安装流程",
-      "title": "ROS安装流程",
-      "category": "Robotics",
-      "type": "skill",
-      "level": "intermediate",
-      "color": "#06B6D4",
-      "docPath": "Robotics/ROS/ROS安装流程",
-      "progress": 88,
+      "progress": 33,
       "tags": []
     },
     {
@@ -8983,8 +9293,8 @@
       "type": "skill",
       "level": "intermediate",
       "color": "#06B6D4",
-      "docPath": "Robotics/ROS/roscpp/源码结构与初始化",
-      "progress": 23,
+      "docPath": "Robotics/ROS/rospy/源码结构与初始化",
+      "progress": 50,
       "tags": []
     },
     {
@@ -8994,8 +9304,8 @@
       "type": "skill",
       "level": "intermediate",
       "color": "#06B6D4",
-      "docPath": "Robotics/ROS/roscpp/话题发布路径",
-      "progress": 59,
+      "docPath": "Robotics/ROS/rospy/话题实现与线程模型",
+      "progress": 68,
       "tags": []
     },
     {
@@ -9005,8 +9315,8 @@
       "type": "skill",
       "level": "intermediate",
       "color": "#06B6D4",
-      "docPath": "Robotics/ROS/roscpp/订阅、回调队列与Spinner",
-      "progress": 39,
+      "docPath": "Robotics/ROS/rospy/TCPROS传输与握手",
+      "progress": 60,
       "tags": []
     },
     {
@@ -9016,8 +9326,8 @@
       "type": "skill",
       "level": "intermediate",
       "color": "#06B6D4",
-      "docPath": "Robotics/ROS/roscpp/连接协商与传输层",
-      "progress": 64,
+      "docPath": "Robotics/ROS/rospy/服务、参数、时间与定时器",
+      "progress": 52,
       "tags": []
     },
     {
@@ -9027,8 +9337,8 @@
       "type": "skill",
       "level": "intermediate",
       "color": "#06B6D4",
-      "docPath": "Robotics/ROS/roscpp/服务、参数、时间与定时器",
-      "progress": 65,
+      "docPath": "Robotics/ROS/rospy/与roscpp的实现差异",
+      "progress": 63,
       "tags": []
     },
     {
@@ -9047,8 +9357,8 @@
       "type": "skill",
       "level": "intermediate",
       "color": "#06B6D4",
-      "docPath": "Robotics/ROS/rospy/源码结构与初始化",
-      "progress": 50,
+      "docPath": "Robotics/Robotic RL/RL项目复现计划",
+      "progress": 39,
       "tags": []
     },
     {
@@ -9058,8 +9368,8 @@
       "type": "skill",
       "level": "intermediate",
       "color": "#06B6D4",
-      "docPath": "Robotics/ROS/rospy/话题实现与线程模型",
-      "progress": 68,
+      "docPath": "Robotics/Robotic RL/HumanoidGym",
+      "progress": 39,
       "tags": []
     },
     {
@@ -9069,8 +9379,8 @@
       "type": "skill",
       "level": "intermediate",
       "color": "#06B6D4",
-      "docPath": "Robotics/ROS/rospy/TCPROS传输与握手",
-      "progress": 60,
+      "docPath": "Robotics/Robotic RL/GMR",
+      "progress": 62,
       "tags": []
     },
     {
@@ -9080,8 +9390,8 @@
       "type": "skill",
       "level": "intermediate",
       "color": "#06B6D4",
-      "docPath": "Robotics/ROS/rospy/服务、参数、时间与定时器",
-      "progress": 52,
+      "docPath": "Robotics/Robotic RL/ASAP",
+      "progress": 15,
       "tags": []
     },
     {
@@ -9091,77 +9401,13 @@
       "type": "skill",
       "level": "intermediate",
       "color": "#06B6D4",
-      "docPath": "Robotics/ROS/rospy/与roscpp的实现差异",
-      "progress": 63,
-      "tags": []
-    },
-    {
-      "id": "Robotics-Robotic RL",
-      "title": "Robotic RL",
-      "category": "Robotics",
-      "type": "subcategory",
-      "color": "#06B6D4",
-      "docPath": "Robotics/Robotic RL",
-      "progress": 60
-    },
-    {
-      "id": "Robotics-Robotic RL-01-RL项目复现计划",
-      "title": "RL项目复现计划",
-      "category": "Robotics",
-      "type": "skill",
-      "level": "intermediate",
-      "color": "#06B6D4",
-      "docPath": "Robotics/Robotic RL/RL项目复现计划",
-      "progress": 39,
-      "tags": []
-    },
-    {
-      "id": "Robotics-Robotic RL-02-HumanoidGym",
-      "title": "HumanoidGym",
-      "category": "Robotics",
-      "type": "skill",
-      "level": "intermediate",
-      "color": "#06B6D4",
-      "docPath": "Robotics/Robotic RL/HumanoidGym",
-      "progress": 39,
-      "tags": []
-    },
-    {
-      "id": "Robotics-Robotic RL-03-GMR",
-      "title": "GMR",
-      "category": "Robotics",
-      "type": "skill",
-      "level": "intermediate",
-      "color": "#06B6D4",
-      "docPath": "Robotics/Robotic RL/GMR",
-      "progress": 62,
-      "tags": []
-    },
-    {
-      "id": "Robotics-Robotic RL-04-ASAP",
-      "title": "ASAP",
-      "category": "Robotics",
-      "type": "skill",
-      "level": "intermediate",
-      "color": "#06B6D4",
-      "docPath": "Robotics/Robotic RL/ASAP",
-      "progress": 15,
-      "tags": []
-    },
-    {
-      "id": "Robotics-Robotic RL-05-Human2Humanoid",
-      "title": "Human2Humanoid",
-      "category": "Robotics",
-      "type": "skill",
-      "level": "intermediate",
-      "color": "#06B6D4",
       "docPath": "Robotics/Robotic RL/Human2Humanoid",
       "progress": 20,
       "tags": []
     },
     {
-      "id": "Robotics-Robotic RL-06-EmbraceCollisions",
-      "title": "EmbraceCollisions",
+      "id": "Robotics-ROS-ROS安装流程",
+      "title": "ROS安装流程",
       "category": "Robotics",
       "type": "skill",
       "level": "intermediate",
@@ -9324,7 +9570,7 @@
       "level": "intermediate",
       "color": "#06B6D4",
       "docPath": "Robotics/SLAM/点云配准/端到端配准/Deep Closest Point",
-      "progress": 86,
+      "progress": 32,
       "tags": []
     },
     {
@@ -9346,6 +9592,7 @@
       "level": "intermediate",
       "color": "#06B6D4",
       "docPath": "Robotics/SLAM/点云配准/迭代最近点ICP",
+      "progress": 20,
       "progress": 20,
       "tags": []
     },
@@ -9428,7 +9675,7 @@
       "level": "intermediate",
       "color": "#06B6D4",
       "docPath": "Robotics/SLAM/视觉惯性里程计VIO/基于优化的VIO/OKVIS",
-      "progress": 88,
+      "progress": 98,
       "tags": []
     },
     {
@@ -9922,7 +10169,7 @@
       "level": "intermediate",
       "color": "#06B6D4",
       "docPath": "Robotics/WAM/JEPA/V-JEPA",
-      "progress": 7,
+      "progress": 97,
       "tags": []
     },
     {
@@ -9987,6 +10234,7 @@
       "color": "#06B6D4",
       "docPath": "Robotics/WAM/Latent动力学与想象训练/DreamerV2",
       "progress": 28,
+      "progress": 28,
       "tags": []
     },
     {
@@ -10028,6 +10276,7 @@
       "level": "intermediate",
       "color": "#06B6D4",
       "docPath": "Robotics/WAM/Video-Action Model/DiT4DiT",
+      "progress": 38,
       "progress": 38,
       "tags": []
     },
@@ -10405,8 +10654,8 @@
       "tags": []
     },
     {
-      "id": "Robotics-机器人学状态估计-IMU-Mahony 非线性互补滤波器",
-      "title": "Mahony 非线性互补滤波器",
+      "id": "Robotics-机器人学状态估计-IMU-madgwick算法",
+      "title": "madgwick算法",
       "category": "Robotics",
       "type": "skill",
       "level": "intermediate",
@@ -10416,8 +10665,8 @@
       "tags": []
     },
     {
-      "id": "Robotics-机器人学状态估计-IMU-UKF",
-      "title": "UKF",
+      "id": "Robotics-机器人学状态估计-IMU-Mahony 非线性互补滤波器",
+      "title": "Mahony 非线性互补滤波器",
       "category": "Robotics",
       "type": "skill",
       "level": "intermediate",
@@ -10427,8 +10676,8 @@
       "tags": []
     },
     {
-      "id": "Robotics-机器人学状态估计-IMU-madgwick算法",
-      "title": "madgwick算法",
+      "id": "Robotics-机器人学状态估计-IMU-UKF",
+      "title": "UKF",
       "category": "Robotics",
       "type": "skill",
       "level": "intermediate",
@@ -10458,6 +10707,15 @@
       "docPath": "Robotics/机器人学状态估计/IMU/四阶龙格库塔法",
       "progress": 7,
       "tags": []
+    },
+    {
+      "id": "Robotics-高等机器人控制",
+      "title": "高等机器人控制",
+      "category": "Robotics",
+      "type": "subcategory",
+      "color": "#06B6D4",
+      "docPath": "Robotics/高等机器人控制",
+      "progress": 60
     },
     {
       "id": "Sensor",
@@ -10611,7 +10869,22 @@
     },
     {
       "source": "Computering-AI Infra",
+      "target": "Computering-AI Infra-KVCache",
+      "type": "contains"
+    },
+    {
+      "source": "Computering-AI Infra",
+      "target": "Computering-AI Infra-LLM",
+      "type": "contains"
+    },
+    {
+      "source": "Computering-AI Infra",
       "target": "Computering-AI Infra-Pytorch基础",
+      "type": "contains"
+    },
+    {
+      "source": "Computering-AI Infra-Pytorch基础",
+      "target": "Computering-AI Infra-Pytorch基础-nnModule",
       "type": "contains"
     },
     {
@@ -10637,11 +10910,6 @@
     {
       "source": "Computering-AI Infra-Pytorch基础",
       "target": "Computering-AI Infra-Pytorch基础-SwiGLU激活",
-      "type": "contains"
-    },
-    {
-      "source": "Computering-AI Infra-Pytorch基础",
-      "target": "Computering-AI Infra-Pytorch基础-nnModule",
       "type": "contains"
     },
     {
@@ -10677,6 +10945,11 @@
     {
       "source": "Computering-WEB开发-Docusaurus",
       "target": "Computering-WEB开发-Docusaurus-Vercel联合部署",
+      "type": "contains"
+    },
+    {
+      "source": "Computering-WEB开发",
+      "target": "Computering-WEB开发-React",
       "type": "contains"
     },
     {
@@ -10746,6 +11019,11 @@
     },
     {
       "source": "Computering",
+      "target": "Computering-并发编程",
+      "type": "contains"
+    },
+    {
+      "source": "Computering",
       "target": "Computering-并行计算与分布式系统",
       "type": "contains"
     },
@@ -10796,12 +11074,12 @@
     },
     {
       "source": "Computering-并行计算与分布式系统-RLHF技术",
-      "target": "Computering-并行计算与分布式系统-RLHF技术-RLHF",
+      "target": "Computering-并行计算与分布式系统-RLHF技术-Reward Model",
       "type": "contains"
     },
     {
       "source": "Computering-并行计算与分布式系统-RLHF技术",
-      "target": "Computering-并行计算与分布式系统-RLHF技术-Reward Model",
+      "target": "Computering-并行计算与分布式系统-RLHF技术-RLHF",
       "type": "contains"
     },
     {
@@ -11152,6 +11430,11 @@
     {
       "source": "Computering",
       "target": "Computering-数据库系统",
+      "type": "contains"
+    },
+    {
+      "source": "Computering-数据库系统",
+      "target": "Computering-数据库系统-SQL",
       "type": "contains"
     },
     {
@@ -11536,6 +11819,11 @@
     },
     {
       "source": "Computering-机器学习",
+      "target": "Computering-机器学习-循环神经网络",
+      "type": "contains"
+    },
+    {
+      "source": "Computering-机器学习",
       "target": "Computering-机器学习-推荐系统",
       "type": "contains"
     },
@@ -11610,6 +11898,16 @@
       "type": "contains"
     },
     {
+      "source": "Computering-机器学习-智能体系统",
+      "target": "Computering-机器学习-智能体系统-多智能体系统",
+      "type": "contains"
+    },
+    {
+      "source": "Computering-机器学习",
+      "target": "Computering-机器学习-模式识别",
+      "type": "contains"
+    },
+    {
       "source": "Computering-机器学习",
       "target": "Computering-机器学习-深度学习",
       "type": "contains"
@@ -11651,12 +11949,22 @@
     },
     {
       "source": "Computering-机器学习",
+      "target": "Computering-机器学习-现代卷积神经网络",
+      "type": "contains"
+    },
+    {
+      "source": "Computering-机器学习",
       "target": "Computering-机器学习-现代循环神经网络",
       "type": "contains"
     },
     {
       "source": "Computering-机器学习-现代循环神经网络",
       "target": "Computering-机器学习-现代循环神经网络-门控循环单元GRU",
+      "type": "contains"
+    },
+    {
+      "source": "Computering-机器学习",
+      "target": "Computering-机器学习-线性神经网络",
       "type": "contains"
     },
     {
@@ -11741,12 +12049,12 @@
     },
     {
       "source": "Computering-算法-搜索",
-      "target": "Computering-算法-搜索-DFS",
+      "target": "Computering-算法-搜索-DancingLink",
       "type": "contains"
     },
     {
       "source": "Computering-算法-搜索",
-      "target": "Computering-算法-搜索-DancingLink",
+      "target": "Computering-算法-搜索-DFS",
       "type": "contains"
     },
     {
@@ -11787,6 +12095,11 @@
     {
       "source": "Computering-算法-搜索",
       "target": "Computering-算法-搜索-遗传算法",
+      "type": "contains"
+    },
+    {
+      "source": "Computering-算法",
+      "target": "Computering-算法-数学",
       "type": "contains"
     },
     {
@@ -12885,8 +13198,23 @@
       "type": "contains"
     },
     {
+      "source": "Control-强化学习",
+      "target": "Control-强化学习-多智能体强化学习",
+      "type": "contains"
+    },
+    {
+      "source": "Control-强化学习",
+      "target": "Control-强化学习-深度强化学习",
+      "type": "contains"
+    },
+    {
       "source": "Control",
       "target": "Control-微机原理",
+      "type": "contains"
+    },
+    {
+      "source": "Control-微机原理",
+      "target": "Control-微机原理-汇编语言",
       "type": "contains"
     },
     {
@@ -13206,6 +13534,11 @@
     },
     {
       "source": "Control",
+      "target": "Control-过程控制仪表与装置",
+      "type": "contains"
+    },
+    {
+      "source": "Control",
       "target": "Control-高阶控制理论",
       "type": "contains"
     },
@@ -13217,6 +13550,11 @@
     {
       "source": "Control-高阶控制理论-柔顺控制",
       "target": "Control-高阶控制理论-柔顺控制-02-柔顺控制",
+      "type": "contains"
+    },
+    {
+      "source": "Control-高阶控制理论-柔顺控制",
+      "target": "Control-高阶控制理论-柔顺控制-Paper",
       "type": "contains"
     },
     {
@@ -13626,12 +13964,22 @@
     },
     {
       "source": "Electronic-元器件设计-电源设计",
+      "target": "Electronic-元器件设计-电源设计-电源分配网络PDN",
+      "type": "contains"
+    },
+    {
+      "source": "Electronic-元器件设计-电源设计",
       "target": "Electronic-元器件设计-电源设计-稳压直流电源设计",
       "type": "contains"
     },
     {
       "source": "Electronic-元器件设计-电源设计-稳压直流电源设计",
       "target": "Electronic-元器件设计-电源设计-稳压直流电源设计-相控整流电源",
+      "type": "contains"
+    },
+    {
+      "source": "Electronic-元器件设计",
+      "target": "Electronic-元器件设计-运算放大器",
       "type": "contains"
     },
     {
@@ -14466,6 +14814,11 @@
     },
     {
       "source": "Mathematics",
+      "target": "Mathematics-数值分析",
+      "type": "contains"
+    },
+    {
+      "source": "Mathematics",
       "target": "Mathematics-数论基础",
       "type": "contains"
     },
@@ -14536,12 +14889,12 @@
     },
     {
       "source": "Mathematics-概率论与数理统计",
-      "target": "Mathematics-概率论与数理统计-R的应用",
+      "target": "Mathematics-概率论与数理统计-bootstrap方法",
       "type": "contains"
     },
     {
       "source": "Mathematics-概率论与数理统计",
-      "target": "Mathematics-概率论与数理统计-bootstrap方法",
+      "target": "Mathematics-概率论与数理统计-R的应用",
       "type": "contains"
     },
     {
@@ -14680,6 +15033,21 @@
       "type": "contains"
     },
     {
+      "source": "Mechanics",
+      "target": "Mechanics-材料力学",
+      "type": "contains"
+    },
+    {
+      "source": "Mechanics",
+      "target": "Mechanics-理论力学",
+      "type": "contains"
+    },
+    {
+      "source": "Mechanics",
+      "target": "Mechanics-飞行器结构力学",
+      "type": "contains"
+    },
+    {
       "source": "Optics",
       "target": "Optics-工程光学",
       "type": "contains"
@@ -14705,6 +15073,11 @@
       "type": "contains"
     },
     {
+      "source": "Optics",
+      "target": "Optics-应用光学",
+      "type": "contains"
+    },
+    {
       "source": "Paper",
       "target": "Paper-论文复现",
       "type": "contains"
@@ -14725,6 +15098,11 @@
       "type": "contains"
     },
     {
+      "source": "Paper",
+      "target": "Paper-论文调研",
+      "type": "contains"
+    },
+    {
       "source": "Robotics",
       "target": "Robotics-MCAP",
       "type": "contains"
@@ -14732,6 +15110,46 @@
     {
       "source": "Robotics-MCAP",
       "target": "Robotics-MCAP-MCAP",
+      "type": "contains"
+    },
+    {
+      "source": "Robotics",
+      "target": "Robotics-Robotic RL",
+      "type": "contains"
+    },
+    {
+      "source": "Robotics-Robotic RL",
+      "target": "Robotics-Robotic RL-01-RL项目复现计划",
+      "type": "contains"
+    },
+    {
+      "source": "Robotics-Robotic RL",
+      "target": "Robotics-Robotic RL-02-HumanoidGym",
+      "type": "contains"
+    },
+    {
+      "source": "Robotics-Robotic RL",
+      "target": "Robotics-Robotic RL-03-GMR",
+      "type": "contains"
+    },
+    {
+      "source": "Robotics-Robotic RL",
+      "target": "Robotics-Robotic RL-04-ASAP",
+      "type": "contains"
+    },
+    {
+      "source": "Robotics-Robotic RL",
+      "target": "Robotics-Robotic RL-05-Human2Humanoid",
+      "type": "contains"
+    },
+    {
+      "source": "Robotics-Robotic RL",
+      "target": "Robotics-Robotic RL-06-EmbraceCollisions",
+      "type": "contains"
+    },
+    {
+      "source": "Robotics-Robotic RL",
+      "target": "Robotics-Robotic RL-07-RMA",
       "type": "contains"
     },
     {
@@ -14747,11 +15165,6 @@
     {
       "source": "Robotics-ROS",
       "target": "Robotics-ROS-02-话题通信机制",
-      "type": "contains"
-    },
-    {
-      "source": "Robotics-ROS",
-      "target": "Robotics-ROS-ROS安装流程",
       "type": "contains"
     },
     {
@@ -15431,6 +15844,11 @@
     },
     {
       "source": "Robotics-机器人学状态估计-IMU",
+      "target": "Robotics-机器人学状态估计-IMU-madgwick算法",
+      "type": "contains"
+    },
+    {
+      "source": "Robotics-机器人学状态估计-IMU",
       "target": "Robotics-机器人学状态估计-IMU-Mahony 非线性互补滤波器",
       "type": "contains"
     },
@@ -15441,17 +15859,17 @@
     },
     {
       "source": "Robotics-机器人学状态估计-IMU",
-      "target": "Robotics-机器人学状态估计-IMU-madgwick算法",
-      "type": "contains"
-    },
-    {
-      "source": "Robotics-机器人学状态估计-IMU",
       "target": "Robotics-机器人学状态估计-IMU-四元数",
       "type": "contains"
     },
     {
       "source": "Robotics-机器人学状态估计-IMU",
       "target": "Robotics-机器人学状态估计-IMU-四阶龙格库塔法",
+      "type": "contains"
+    },
+    {
+      "source": "Robotics",
+      "target": "Robotics-高等机器人控制",
       "type": "contains"
     },
     {

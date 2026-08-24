@@ -1,5 +1,6 @@
 {
   "label": "Benchmarks & Datasets",
+  "key": "robotic-rl-benchmarks",
   "position": 20,
   "link": {
     "type": "generated-index",

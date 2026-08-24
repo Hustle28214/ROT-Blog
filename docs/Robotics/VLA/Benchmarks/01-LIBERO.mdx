@@ -1,0 +1,82 @@
+import WordCount from '../../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+# LIBERO：终身机器人操作学习基准
+
+论文：[LIBERO: Benchmarking Knowledge Transfer for Lifelong Robot Learning](https://arxiv.org/abs/2306.03310)（Liu 等，NeurIPS 2023 D&B）。LIBERO 想回答一个被此前 benchmark 回避的问题：在**终身机器人学习（Lifelong Robot Learning, LLDM）**中，究竟哪些知识需要迁移、以什么方式迁移？作者把机器人所需知识拆成两类——**声明性知识**（物体身份、空间关系）与**程序性知识**（技能与运动），并围绕这两类构造了系统化的评测套件。
+
+## 1. 为什么需要 LIBERO
+
+先前的操作 benchmark（Meta-World、RLBench、CALVIN 等）各测一点：要么关注多任务并行，要么关注语言条件，要么关注长时程组合，但都**没有把"知识随任务序列增量到来"这一 lifelong 设定当作一等公民**。结果是：
+
+- 无法区分性能下降到底来自表征坍缩还是策略遗忘。
+- 无法定位是**"物体/空间"这类静态知识**难迁移，还是**"技能序列"这类动态知识**难迁移。
+- 缺乏统一的 FWT/NBT/AUC 报告约定，跨论文的 lifelong 数字几乎不可比。
+
+LIBERO 用四个任务族 + 三算法 × 三架构的正交设计，把这些混杂因素解耦。
+
+## 2. 四个任务族
+
+每个任务族固定 **10 个任务、每任务 50 条人类遥操作示范**（共 500 条），任务族之间的差异被刻意压到只保留"要迁移的那一类知识"。
+
+| 任务族 | 变化维度 | 目标知识 | 例子 |
+|---|---|---|---|
+| **LIBERO-Spatial** | 同一组物体，摆放位置不同 | 声明性 · 空间关系 | "把碗放到**盘子左侧**的托盘上" vs "**右侧**" |
+| **LIBERO-Object** | 场景布局固定，物体身份变化 | 声明性 · 物体 | 把 10 种不同物体各自放入篮子 |
+| **LIBERO-Goal** | 场景/物体固定，目标动词变化 | 程序性 · 技能 | 打开/关闭、推/拉、放入/取出 |
+| **LIBERO-100** | 组合分布（LIBERO-90 预训练 + LIBERO-10 评测） | 混合 + 长时程 | LIBERO-10 全为 long-horizon 多阶段任务 |
+
+LIBERO-90 用作大规模多任务预训练池，LIBERO-10 用作衡量**下游 few-shot 适配**的保留集——这正是后来 VLA 论文最常引用的"LIBERO-Long"子集。
+
+## 3. 任务与观测
+
+- **硬件仿真**：Franka Emika Panda 7-DoF + parallel-jaw gripper，MuJoCo 后端（基于 robosuite）。
+- **观测**：`agentview` 第三人称 RGB + `in-hand wristview` RGB（均 128×128）+ 本体感觉（关节角、夹爪状态），控制频率 20 Hz，末端执行器 delta pose 动作空间。
+- **语言指令**：每个任务先由 **PDDL** 描述初始/目标谓词，自动模板化生成粗指令，再交 LLM 润色为自然语句。这保证了指令**语义可验证**、同时读起来像人写的。
+- **重置分布**：每次 episode 随机化物体位姿于给定支撑面，成功由 PDDL 目标谓词判定，无奖励塑形。
+
+## 4. 评测协议
+
+流水线为：把 10 个任务顺序呈现给 agent，每完成一个再进入下一个。作者在 **3 种终身学习算法 × 3 种策略骨干** 的 3×3 网格上跑同一份数据。
+
+| 维度 | 选项 |
+|---|---|
+| Lifelong 算法 | Sequential Fine-Tuning（SeqFT）· EWC · PackNet |
+| 视觉-时序架构 | ResNet-RNN · ResNet-Transformer · ViT-Transformer |
+| 语言接入 | FiLM 于视觉主干（可开可关，作为消融） |
+
+三项指标（记 $a_{i,j}$ 为任务 $j$ 训练到阶段 $i$ 时在任务 $j$ 上的成功率，$T$ 为任务总数）：
+
+**Forward Transfer (FWT)**——学一个新任务时的启动速度，越大越好：
+
+$$\text{FWT} = \frac{1}{T}\sum_{i=1}^{T} a_{i,i}$$
+
+**Negative Backward Transfer (NBT)**——学后续任务时对旧任务的遗忘，越小越好：
+
+$$\text{NBT} = \frac{1}{T-1}\sum_{i=1}^{T-1}\bigl(a_{i,i} - a_{T,i}\bigr)$$
+
+**Area Under the success Curve (AUC)**——综合稳定性与可塑性：
+
+$$\text{AUC} = \frac{1}{T}\sum_{i=1}^{T}\frac{1}{i}\sum_{j=1}^{i} a_{i,j}$$
+
+三指标一起看，避免"只不遗忘但学不动"或"学得快却全忘光"两类退化解被高估。
+
+## 5. 关键发现
+
+- **架构 > 算法**。在 lifelong 设定下，把 ResNet-RNN 换成 ResNet-Transformer 或 ViT-T 带来的 FWT/AUC 增益，**远大于**把 SeqFT 换成 EWC / PackNet 的收益。也就是说，序列建模能力才是当前瓶颈。
+- **语言条件效果任务族相关**。FiLM 语言注入显著抬高 LIBERO-Spatial 和 LIBERO-Goal（这两族本就靠指令区分意图），但对 LIBERO-Object 帮助有限——物体身份从视觉里已能读出。
+- **Long-horizon 全面崩溃**。LIBERO-10 上所有 3×3 组合的绝对成功率都很低（个位到二十几），暴露出短程模仿学习对多阶段任务的根本弱点，这也是后续 diffusion policy / VLA 反复攻击的靶心。
+- **预训练视觉主干未必更好**。用 R3M / MVP 等机器人预训练权重初始化 ResNet，在部分族上**不如**从头训或 ImageNet 权重——预训练分布与仿真观测的 gap 会反噬迁移。
+
+## 6. 在 VLA 时代的地位
+
+LIBERO 在 2023 年发布后迅速溢出其原本的 lifelong 语境，成为 **VLA 微调能力**的事实标准评测：
+
+- **π0 / π0.5 / π0.6**、**OpenVLA**、**SmolVLA**、**Octo**、**RDT-1B**、**Diffusion Policy** 都用 LIBERO 四族报数，形成可以横向对齐的雷达图。
+- **LIBERO-Long（即 LIBERO-10）** 因为对多阶段规划极其苛刻，成了衡量**"预训练大模型能否用少量演示适配"**的默认套件——OpenVLA 和 π0 系列的 few-shot 微调曲线几乎都以它为主坐标。
+- PDDL 谓词化的成功判定 + 稳定的仿真接口，使其可复现性明显好于真机 benchmark，也方便社区叠加新算法而不必重跑硬件。
+
+一句话：LIBERO 最初是为 lifelong learning 造的秤，如今是 VLA 圈**衡量语言条件操作策略成色的标准砝码**，尤其在需要跨任务泛化与长时程组合的场景里，它仍是最快能暴露方法弱点的那把尺子。
+
+</WordCount>

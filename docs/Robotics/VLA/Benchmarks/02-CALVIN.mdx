@@ -1,0 +1,119 @@
+import WordCount from '../../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+# CALVIN：长程语言条件操作基准
+
+论文：[CALVIN: A Benchmark for Language-Conditioned Policy Learning for Long-Horizon Robot Manipulation Tasks](https://arxiv.org/abs/2112.03227)（Mees 等，RA-L 2022）。
+
+CALVIN 要评测的核心能力，可以用一句话概括：**在完全没见过的环境里，把一句自由文本指令拆成 5 步连续技能并稳定执行**。它把"语言 → 动作"这件事从单条指令的成功率，抬升到了长程链条上的复合成功率，同时叠加了跨环境的零样本泛化协议。这一设定成为 2023 年之后几乎所有 VLA 论文（RoboFlamingo、3D Diffuser Actor、GR-1/GR-2、OpenVLA 等）必刷的对照基准。
+
+## 1. 数据构成
+
+CALVIN 使用一个 7-DoF Franka Panda 加平行夹爪，桌面上摆放一个带有滑门、抽屉、按钮、开关、LED 与彩色积木的模块化 workspace。作者用 tele-operation 采集了 **4 个环境 A / B / C / D**，每个环境约 **6 小时**的自由 play 数据，累计约 24 小时、超过 200 万帧的时间步。
+
+四个环境的差异集中在纹理、桌面颜色、物体位姿以及部分交互模块的位置上，几何结构保持相似，从而支持"看起来相似但分布不同"的泛化测试。
+
+传感器与标注情况如下表：
+
+| 模态 | 说明 |
+| --- | --- |
+| Proprioceptive state | 末端位姿、夹爪开合、关节角 |
+| RGB static | 固定第三人称相机，200×200 |
+| RGB gripper | 腕部相机，84×84 |
+| Tactile | 夹爪指端触觉图像（可选，多数方法未用） |
+| Depth | static / gripper 深度图（可选） |
+
+语言方面，CALVIN 定义了 **34 个原子 task**，覆盖 push / pull / lift / stack / rotate / turn on-off / open-close 等。作者从整段 play 中剪出短片段，通过众包为其中约 **1% 的窗口**打上自然语言标注，得到约 **24k 条 crowdsourced language annotations**；剩余约 99% 数据保持 **unlabeled play**，用于 goal-conditioned / hindsight relabeling 类方法。
+
+这种"少量语言 + 大量无标注 play"的结构是 CALVIN 的一大特色，它天然鼓励 MCIL / HULC 这类同时利用 image goal 与 language goal 的算法。
+
+## 2. 环境切分与泛化协议
+
+CALVIN 官方提供四种训练/测试切分，用来解耦"环境泛化"与"语言泛化"：
+
+| 切分 | 训练环境 | 测试环境 | 主要考察 |
+| --- | --- | --- | --- |
+| **D → D** | D | D | 单环境内 in-distribution 表现 |
+| **ABCD → D** | A + B + C + D | D | 多环境联合训练下的 in-distribution 表现 |
+| **ABCD → ABCD** | A + B + C + D | A + B + C + D | 多环境覆盖下的整体表现 |
+| **ABC → D** | A + B + C | D | **零样本环境泛化**：D 完全未见 |
+
+其中 **ABC → D** 是最难、也是当前 VLA 论文最看重的一个 setting。它要求模型仅从 A/B/C 三个训练环境中学到与纹理、桌面外观解耦的操作知识，直接迁移到 D。D 的桌面颜色、物体贴图、部分模块位置都与训练集不同，因此一切依赖记忆化外观 shortcut 的策略都会显著掉分。
+
+D → D 常被视为一个"上界参考"：因为训练和测试来自同一环境的不同 episode，模型只需处理初始位姿的随机化。ABCD → D 与 ABCD → ABCD 则用来观察模型能否从更大规模的多环境数据中获益，而不是被 domain 冲突拖累。
+
+## 3. Task chains 评测
+
+CALVIN 的评测协议不是单条指令成功率，而是 **长程任务链**：
+
+1. 从测试环境采样一个初始状态；
+2. 按照 34 个原子 task 的组合规则，采样一条包含 **5 个 sub-task** 的指令序列，每一步都以自然语言给出；
+3. 策略执行第 1 条指令，若在时限内被判定为成功，则**在当前物理状态基础上**继续下达第 2 条指令，以此类推；
+4. 一旦某一步失败，本条 chain 终止，后续 sub-task 记为 0。
+
+官方主要报告两个量：
+
+- **Task success rate**：每一步的成功率 $p(i)$，即前 $i-1$ 步都成功之后，第 $i$ 步也成功的联合概率；
+- **Average rollout length**（简称 **avg-length**）：一条 chain 中成功执行的 sub-task 数量的期望。
+
+记 $p_k$ 为"至少成功完成前 $k$ 步"的联合概率（$p_0 = 1$），则
+
+$$
+L \;=\; \sum_{i=1}^{5} i \cdot \bigl[p_i - p_{i+1}\bigr] \;=\; \sum_{k=1}^{5} p_k,
+$$
+
+其中 $p_6 \equiv 0$。等价地，可以写成"第 $i$ 步成功且第 $i+1$ 步失败"的分布形式：
+
+$$
+L \;=\; \sum_{i=1}^{5} i \cdot p\bigl(\text{step } i \text{ succeed},\; \text{step } i+1 \text{ fail}\bigr).
+$$
+
+avg-length 的取值范围是 $[0, 5]$：链条越长越难，因为每一步都会把状态带入训练分布中相对稀有的区域，误差在时间轴上累积。经验上，单步成功率 0.9 的策略在 5-chain 上的 avg-length 也只有约 $\sum_{k=1}^{5} 0.9^k \approx 3.72$；这解释了为什么 CALVIN 上早期方法的 avg-length 长期停留在 1 附近。
+
+评测时通常采样 **1000 条 chain**（官方 500 或 1000 两种规模都在使用），以稳定平均值。
+
+## 4. 关键 baseline
+
+原论文与后续跟进工作里，几组基线在社区中被反复引用：
+
+| 方法 | 核心思路 | ABC → D avg-length（近似） |
+| --- | --- | --- |
+| **MCIL** | Multi-Context Imitation Learning，goal 可以是 image 也可以是 language，共享 latent plan | ~0.4 |
+| **HULC** | 分层：高层从 language 采 discrete latent plan，低层做 closed-loop control，配合 play 数据的对比学习 | ~2.6 |
+| **RT-1 风格** | 大容量 Transformer + tokenized 动作，端到端从 image + language 到 action | ~1.0–1.5（视复现） |
+
+**MCIL** 是 CALVIN 论文自带的强 baseline，代表"latent plan + 多模态 goal"这条路线；它在 ABCD→D 上尚可，但一到 ABC→D 就迅速塌陷。
+
+**HULC** 的关键跃迁来自于分层：把长程语言指令映射到一个 **离散的 skill / plan 编码**，然后由低层 policy 在若干步内实现该 plan。这种"language 决定 plan，plan 决定 action"的结构，使得语言侧只需负责相对稀疏的决策点，动作侧则可以充分利用大量 unlabeled play。HULC 也是第一个把 ABC→D 的 avg-length 明显推过 2 的方法。
+
+**RT-1 风格**的稠密 Transformer 在 CALVIN 原尺度上并不占优，但它奠定了后来 VLA 的动作 tokenization 范式。
+
+## 5. 在 VLA 时代
+
+2023 年之后，CALVIN 的 5-chain 指标成了 VLA 论文默认的"通用 IL 泛化能力"读数。几个代表性工作在 **ABC → D** 上的 avg-length 大致如下：
+
+| 方法 | 关键要素 | avg-length（ABC→D，5-chain） |
+| --- | --- | --- |
+| HULC | 分层 + play 数据 | ~2.6 |
+| RoboFlamingo | 冻结 OpenFlamingo VLM，加动作头微调 | ~2.5–2.9 |
+| GR-1 | 视频预训练 + causal transformer 预测未来帧与动作 | ~3.0 |
+| 3D Diffuser Actor | 3D scene tokens + diffusion policy | ~3.5–3.8 |
+| GR-2 | 更大规模视频预训练 + 更好的 action head | **4.0+** |
+
+从 HULC 的 2 附近一路推到 GR-2 的 4+，代表着两个技术趋势的叠加：一是**大规模视频/图文预训练**为策略提供更好的视觉与语言先验；二是**更强的动作解码器**（diffusion / flow matching / chunked transformer）缓解了 5-chain 上的误差累积。
+
+值得注意的是，D → D 与 ABCD → D 上这些方法的 avg-length 大多已在 4.5 以上，头部结果甚至逼近 5，指标的分辨率主要靠 ABC → D 维持。
+
+## 6. 局限
+
+尽管 CALVIN 至今仍是最常用的长程语言条件操作基准，它也有几个逐渐显现的短板：
+
+- **单机械臂、tabletop**：只有一个 Franka + 平行夹爪、一个固定视角的桌面，无法评测双臂协作、移动底盘或从地面/柜子等大工作空间的操作；
+- **物体多样性有限**：核心交互围绕滑门、抽屉、按钮、开关和几块彩色积木展开，物体几何与物理属性同质化明显；
+- **语言指令的组合复杂度有限**：34 个原子 task 的模板化组合，覆盖不到自由文本指令的长尾语义；
+- **对大规模 pretraining 收益趋于饱和**：ABCD→D 上头部方法的 avg-length 已接近 5，进一步的模型规模投入很难在这一 setting 上体现出来，社区的注意力正逐步转向 LIBERO、SimplerEnv、RoboCasa、以及真实机器人 evaluation。
+
+即便如此，CALVIN 的 5-chain 协议在方法论上仍是一份优秀模板：**长程 + 语言 + 零样本环境泛化**这三者的组合，直接决定了一个操作策略是否具备被称为"通用"的资格，而不仅仅是记住了单条指令的执行轨迹。
+
+</WordCount>

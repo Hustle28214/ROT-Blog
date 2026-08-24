@@ -1,0 +1,140 @@
+import WordCount from '../../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+# RoboCasa：大规模程序化厨房仿真基准
+
+论文：[RoboCasa: Large-Scale Simulation of Everyday Tasks for Generalist Robots](https://arxiv.org/abs/2406.02523)（Nasiriany 等，RSS 2024）。RoboCasa 是一个面向通用机器人策略学习的大规模仿真基准，聚焦厨房这一高度结构化又高度多样化的日常场景，通过生成式内容管线把传统 sim benchmark 中"十几个场景、几百个物体"的规模扩大了两个数量级以上。它已经成为 π0.5、GR00T、OpenVLA-OFT 等新一代 VLA 系统的默认仿真评测平台之一。
+
+## 1. 动机
+
+在 RoboCasa 之前，机器人操作的主流 sim benchmark（RoboSuite、Meta-World、LIBERO、CALVIN 等）普遍存在几个瓶颈：
+
+- **场景太少**：几十个手工搭建的桌面/厨房，几乎没有场景级泛化的余地。
+- **物体太少**：常见资产集合在数百件量级，纹理与几何变化有限。
+- **任务太浅**：以 pick-and-place、按按钮、开抽屉等 atomic 任务为主，缺乏长时组合任务。
+- **视觉 gap**：程序化贴图与真实厨房差距大，训练好的 sim policy 迁到真机往往需要大量真机数据补齐。
+
+在 VLA 出现之后，问题被放大：一个通用策略需要面对海量物体、海量场景、语言指令、多相机输入。若仿真侧无法提供匹配规模的数据与评测，sim-to-real co-training 与大规模消融就无从谈起。RoboCasa 的目标就是把"厨房"这一子领域做到近似真实的规模——**120 个厨房布局、数千件带材质的物体、100 个可脚本化任务、~1M 条合成 demo**——同时保持 MuJoCo 级的仿真速度。
+
+## 2. 生成式内容管线
+
+RoboCasa 底层基于 **MuJoCo + robosuite**，在此之上叠加了一套围绕生成式模型的内容管线，用于自动扩充资产与任务。
+
+```
+LLM (GPT-4)                Diffusion (Text2Tex / DALL·E-3)         Human
+   │                              │                                  │
+   ▼                              ▼                                  ▼
+布局采样 / 任务描述 / 语言指令   物体贴图 / 材质 / 环境纹理         关键任务脚本 & 校验
+   │                              │                                  │
+   └────────────┬─────────────────┴──────────────┬───────────────────┘
+                ▼                                ▼
+        程序化厨房生成器 (fixtures + layouts)   资产库 (~2500 objects × 多材质)
+                            │
+                            ▼
+                RoboCasa 仿真环境（robosuite / MuJoCo）
+                            │
+                            ▼
+                人工 teleop + MimicGen 数据扩增
+```
+
+管线的几个关键点：
+
+- **Fixtures 与 layouts**：橱柜、水槽、灶台、微波炉、冰箱等固定件由艺术家建模，Python 侧脚本按语义规则（灶台旁必须有抽油烟机、冰箱靠墙等）程序化拼装出 120 个 kitchen scenes，每个 scene 又有多种小改动。
+- **物体材质生成**：使用 Text2Tex 对 3D mesh 生成 PBR 材质；对平面/贴图类物件使用 DALL·E-3 生成图像贴图，再回投到 mesh，得到几千件带真实感纹理的常见厨房物品（餐具、食材、包装、家电等）。
+- **任务与语言**：用 GPT-4 根据当前 scene 与物体上下文生成任务描述、成功条件草稿、初始布局约束，再由人工审阅/修正为可脚本化的评测环境。
+- **随机化**：每个 episode 随机采样场景、家具样式、物体子集、初始位姿、光照、相机偏移，确保训练分布足够广。
+
+## 3. 场景与任务
+
+RoboCasa 提供 **120 个厨房布局 × 数千件物体**，脚本化了 **100 个任务**，分成两大类：
+
+- **25 个 atomic tasks**：单一操作原语，覆盖 pick-place、开合、按压、倾倒、扭转、擦拭等基本技能。
+- **75 个 composite tasks**：由多个 atomic 组成的长时任务，如"泡一杯咖啡"、"热一份餐"、"整理餐后台面"等。
+
+代表性 atomic tasks：
+
+| 类别 | 任务示例 | 描述 |
+| --- | --- | --- |
+| Pick-Place | PnPCounterToSink / PnPSinkToCounter | 把物体在台面与水槽之间移动 |
+| Pick-Place | PnPCabinetToCounter | 从橱柜里取物到台面 |
+| Pick-Place | PnPStoveToCounter | 从灶台移到台面 |
+| Open/Close | OpenDoor / CloseDoor | 打开/关闭橱柜或冰箱门 |
+| Open/Close | OpenDrawer / CloseDrawer | 抽屉开合 |
+| Press | TurnOnMicrowave / TurnOffMicrowave | 按下微波炉按钮 |
+| Twist | TurnOnStove / TurnOffStove | 旋转灶台旋钮 |
+| Twist | TurnOnSinkFaucet / TurnOffSinkFaucet | 开合水龙头 |
+| Pour | PourFromKettle | 从水壶倒液体 |
+| Wipe | WipeCounter | 擦拭台面污渍 |
+
+Composite tasks 由 LLM 提议、脚本编排 atomic 序列达成，例如：
+
+| Composite 任务 | 组成的 atomic 步骤 |
+| --- | --- |
+| MakeCoffee | OpenCabinet → PickCup → PlaceUnderMachine → PressButton → CloseCabinet |
+| WarmMeal | OpenMicrowave → PickBowl → PlaceInMicrowave → CloseMicrowave → PressStart |
+| PrepareToast | OpenDrawer → PickBread → PlaceInToaster → PressButton |
+| SetTable | 多次 PnPCabinetToCounter，摆放餐具 |
+| RestockPantry | 反复 PnPCounterToCabinet |
+
+## 4. 数据规模
+
+RoboCasa 的数据规模是它区别于早期 benchmark 的关键：
+
+| 来源 | 规模 | 说明 |
+| --- | --- | --- |
+| 人工 teleop demos | ~100k | 覆盖 25 个 atomic tasks，多场景/多物体采样 |
+| MimicGen 合成 demos | ~1M | 基于人工 demo 用 MimicGen 自动扩增到新的场景/物体/位姿 |
+| 语言指令 | 每个 episode 多条 | GPT-4 生成的自然语言变体 |
+
+MimicGen 的做法是把每条人工 demo 切成以物体为参照的子段，然后在新的初始状态下把子段变换、拼接、重放，遇到失败自动丢弃。这种方式让"1 条真人示范 → 100 条合成示范"成为常规操作，从而在不增加人力成本的前提下把训练数据推到百万级。
+
+## 5. 支持的评测
+
+RoboCasa 明确支持四类评测协议，覆盖从单任务到长时组合、从场景内到跨场景的多个泛化维度：
+
+| 评测协议 | 训练/评测划分 | 主要考察 |
+| --- | --- | --- |
+| Single-task imitation | 同任务、同场景子集 | 基础模仿学习性能 |
+| Multi-task learning | 25 atomic 联合训练 | 任务间干扰与共享表征 |
+| Cross-scene generalization | 训练/评测使用不同 scenes 与物体实例 | 视觉与几何泛化 |
+| Long-horizon composite | 75 composite 任务 | 序列决策、错误恢复、语言 grounding |
+
+评测统一采用成功率（success rate），并在每个 task 上按 scenes × object instances × poses 做大量随机化，避免过拟合到单一初始条件。
+
+## 6. Baseline 结果
+
+论文给出的核心 baseline 包括 **BC-Transformer** 与 **Diffusion Policy**。总体结论：
+
+| Baseline | 训练数据 | Atomic 平均成功率 | Composite 平均成功率 |
+| --- | --- | --- | --- |
+| BC-Transformer | 100k 人工 demo | 中等 | 低 |
+| BC-Transformer | 100k + MimicGen ~1M | 明显提升 | 中等 |
+| Diffusion Policy | 100k 人工 demo | 较高 | 低 |
+| Diffusion Policy | 100k + MimicGen ~1M | 最高 | 最高 |
+
+关键观察：
+
+- **数据规模主导**：MimicGen 扩增后的 ~1M demos 相比原始 100k demos 在几乎所有 atomic 任务上都有两位数百分点的提升。
+- **Diffusion Policy > BC-Transformer**：在需要精细连续控制的任务（如 Pour、Twist）上尤其明显。
+- **Composite 仍是瓶颈**：即使用最强 baseline，长时组合任务的成功率也远低于 atomic，说明这条 benchmark 留下了充分的算法研究空间。
+- **跨场景泛化损失**：从 train scenes 迁到 held-out scenes，成功率普遍下降 10 个百分点以上，视觉泛化仍未解决。
+
+## 7. 在 VLA 时代的位置
+
+RoboCasa 发布后迅速成为大规模仿真评测的"默认选项"，在多个近期 VLA 工作中出现：
+
+- **π0.5**：在博客与技术报告中把 RoboCasa 作为长时厨房任务的仿真评测平台之一，用于对比 flow-matching action expert 与其他 decoder 的收敛与鲁棒性。
+- **NVIDIA GR00T / Isaac GR00T**：在其数据金字塔中把 RoboCasa 归入"仿真数据层"，与真实 teleop 数据一起做 co-training；GR00T-Dreams、GR00T-Mimic 等数据引擎也以 RoboCasa 场景为模板。
+- **OpenVLA-OFT / OpenVLA-OFT+**：使用 RoboCasa 的 atomic + composite 任务作为大规模仿真评测，用于比较 parallel decoding、L1 回归头、continuous action 表征等改动带来的收益。
+- **Sim-to-real co-training**：多篇工作把 RoboCasa 的百万级 demo 与真机 teleop 混合训练，验证仿真数据对真机长时任务的正向增益。
+
+从更宏观的角度看，RoboCasa 提供了几件对整个领域都重要的东西：
+
+1. 一条**生成式内容 + 程序化场景 + MimicGen 数据扩增**的完整管线，可复用到浴室、书房等其他日常场景。
+2. 一个**同时支持 atomic 与 composite 的评测集**，让研究者不必只盯着单步任务，也不必花巨大成本自建长时基准。
+3. 一个**明确暴露泛化瓶颈的测试床**：跨场景、跨物体、长时组合，都是当前 VLA 尚未打赢的战场。
+
+也正因如此，RoboCasa 在 LIBERO、Meta-World 之后，逐渐成为"新一代通用机器人策略"报告中出现频率最高的仿真名字之一。
+
+</WordCount>

@@ -1,0 +1,131 @@
+import WordCount from '../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+# RT-1：把 Transformer 装进真实机器人
+
+论文：[RT-1: Robotics Transformer for Real-World Control at Scale](https://arxiv.org/abs/2212.06817)（Google Robotics，2022）。RT-1 是 [RT-2](./06-RT2.mdx) 和 [OpenVLA](./05-OpenVLA.mdx) 的前身，也是用一个通用 Transformer 端到端做机器人控制的起点。它想说明的事情是：在 NLP 里 Transformer 靠"更多数据 + 更大模型"打败了很多手工设计的结构，那这套思路能不能搬到机器人上。作者的答案是可以，代价是花 17 个月用 13 台机器人在真实厨房里采了 13 万条示范。
+
+## 1. 问题设定
+
+机器人控制的目标是学一个策略：给一段自然语言指令 $\ell$（比如"把可乐罐从桌上拿到抽屉里"）和当前观测 $o_t$（相机图像加本体感知），输出下一步动作 $a_t$。写成条件概率就是：
+
+$$\pi(a_t \mid o_t, \ell)$$
+
+RT-1 之前的常见做法是把这个策略拆成两层：底层训一堆小的技能网络，每个技能一个模型；高层用一个规划器（LLM 或者经典搜索）从指令挑技能。这样做有两个问题：
+
+- 技能之间不共享参数，抓可乐学到的东西对抓橘子没有帮助，每个新任务都要重训一次
+- 高层规划器只看指令，不看像素。它决定"抓可乐"的时候不知道当前场景可乐在哪、够不够得着，执行经常失败
+
+RT-1 想验证的是：如果直接用一个 Transformer 学 $\pi(a_t \mid o_t, \ell)$，同一个网络看过几百个任务之后，会不会自己学到把"抓"这个动作跟具体物体解耦。这在 NLP 里已经发生过，但机器人动作是连续、多维、时序相关的，跟离散文本 token 不一样，能不能迁移并不显然。
+
+## 2. 数据
+
+数据规模是这篇文章的重要贡献，也是后续 VLA 工作参照的基准。
+
+| 指标 | 数值 |
+|---|---|
+| 采集周期 | 17 个月 |
+| 机器人数量 | 13 台 Everyday Robots 移动机械臂 |
+| 示范轨迹总数 | ~130,000 |
+| 独立指令数 | 744 |
+| 场景 | 3 个真实厨房 + 办公室环境 |
+
+指令按动词分成 8 类：Pick、Place、Move Near、Open/Close Drawer、Place Into/Retrieve From Drawer、Manipulate Objects、Knock Over。每类下面按物体名字组合出多样化子任务。这个数据集后来变成 [Open X-Embodiment](./Benchmarks/04-OpenX-Embodiment.mdx) 里的 Fractal 子集，也是 OpenVLA 训练数据的一部分。
+
+13 万条听起来不少，但对 Transformer 其实偏小——GPT-3 训练时看的 token 大约在 $3 \times 10^{11}$ 量级。所以 RT-1 更多是在验证"用 Transformer 做机器人策略这条路有没有走通的可能"，不是在最终数据规模上给出答案。
+
+## 3. 动作离散化
+
+RT-1 的动作是 11 维连续向量：
+
+```
+Arm:  Δx, Δy, Δz, Δroll, Δpitch, Δyaw, gripper_open    (7D 手臂)
+Base: Δx, Δy, Δyaw                                       (3D 底盘)
+Mode: {control_arm, control_base, terminate}             (1D 模式)
+```
+
+网络怎么输出这个向量？有两种常见方式：
+
+1. 回归。网络输出实数向量，用 MSE 损失。这样训练稳定，但 MSE 只能表达单峰分布——同一场景下如果"从左边绕"和"从右边绕"都是合理动作，MSE 学到的会是两者的平均值，物理上往往无效。
+2. 概率密度模型（GMM、Normalizing Flow）。可以表达多模态，但训练不太稳定，也不好和 Transformer 的交叉熵损失统一。
+
+RT-1 选了第三条路：把每一维单独离散化成 256 个 bin，动作变成 11 个 0–255 的整数，用分类交叉熵训练。这样每一维的分布可以是 256 个 bin 上的任意 softmax，多模态不是问题。写成概率就是：
+
+$$\pi(a_t \mid o_t, \ell) = \prod_{d=1}^{11} P(a_t^{(d)} \mid o_t, \ell, a_t^{(1:d-1)})$$
+
+代价是 256 bin 有量化误差。对 30cm 的位移范围来说一个 bin 大约 1.2mm，做抓放够用，做亚毫米插件装配就不够——这个问题后来 [π0](./03-π0.mdx) 用流匹配换掉了。
+
+## 4. 架构
+
+```
+[语言指令 ℓ]  →  Universal Sentence Encoder  →  语言嵌入 z_ℓ (512D)
+                                                    ↓
+[6 张历史图像] → EfficientNet-B3 → FiLM(z_ℓ) → TokenLearner → 48 tokens
+                                                    ↓
+                                          Transformer Decoder (8 层)
+                                                    ↓
+                                          11 个动作 token (0-255)
+```
+
+**语言编码器**用 Universal Sentence Encoder，冻结不训练。这是 Google 2018 年的一个 512 维句嵌入器。2022 年当时用 USE 比 BERT/T5 轻，但表达能力有限，处理不了太复杂的指令。RT-2 把它换成了完整的语言模型。
+
+**视觉编码器**是 EfficientNet-B3，处理过去 6 帧图像，每帧 300×300，输出 9×9×512 的特征图。用 B3 是精度和推断速度的折中，B0 太弱、B5 太慢。
+
+**FiLM 层**用来把语言注入视觉。做法是用 $z_\ell$ 生成两个向量 $\gamma, \beta$，对视觉特征图逐通道做仿射变换：
+
+$$\text{FiLM}(F, z_\ell) = \gamma(z_\ell) \odot F + \beta(z_\ell)$$
+
+直觉上是语言在告诉视觉"关注什么颜色和形状"。相比后来把语言 token 和视觉 token 拼起来喂 Transformer 的做法，FiLM 参数更少，在小数据集上更容易训练。
+
+**TokenLearner** 用来降序列长度。每帧 EfficientNet 输出 9×9=81 个位置向量，6 帧就是 486 个。Transformer 的注意力计算是 $O(N^2)$ 的，直接算太慢。TokenLearner 用注意力池化把每帧压到 8 个 token，总共 48 个进 Transformer。这样 3 Hz 实时控制才能跑得动。
+
+**Transformer Decoder** 有 8 层，8 头注意力，隐藏维 512，FFN 2048。总参数约 35M——按今天的标准很小。
+
+## 5. 训练和推断
+
+训练用交叉熵损失，对所有动作维度平均。批大小 1024，Adam，学习率 1e-4，训练约 100K 步，硬件是 TPU 集群。
+
+推断要在真机上跑 3 Hz。视觉编码器每帧只算一次并缓存；Transformer 每次生成 11 个 token，用 KV 缓存把每步成本压到毫秒级；图像用 300×300 而不是 ImageNet 常用的 224×224，因为机器人视角需要保留更多细节。
+
+## 6. 实验结果
+
+真实机器人上的四维评估：
+
+| 任务类型 | RT-1 | Gato | BC-Z |
+|---|---|---|---|
+| 已见任务 | 97% | 65% | 72% |
+| 未见任务 | 76% | 52% | 19% |
+| 干扰物鲁棒性 | 83% | 43% | 47% |
+| 未见背景 | 59% | 35% | 41% |
+
+已见任务差别不大，未见任务、干扰物和背景变化上 RT-1 领先比较明显。76% 的未见任务成功率是当时"任务泛化"的一个较好结果。
+
+**长时程组合**（把 RT-1 作为 SayCan 的底层执行器）：
+
+| 组合 | 长任务成功率 |
+|---|---|
+| SayCan + Gato | 0% |
+| SayCan + BC-Z | 0% |
+| SayCan + RT-1 | 50% |
+
+底层技能的可靠性决定了链式任务能不能跑完。
+
+**数据混合消融**：论文把 Kuka 抓取数据（另一个平台）加进 RT-1 训练集，看会不会伤到主任务。结果是跨平台数据轻微提升泛化，不损害原任务。这个发现直接推动了后来 Open X-Embodiment 的组合。
+
+**数据量 vs 任务多样性**：
+
+| 变量 | 相对性能变化 |
+|---|---|
+| 减半数据量 | -8% |
+| 减半任务多样性 | -22% |
+
+任务多样性比数据量重要。这个结论后来被 π0 和 OpenVLA 采用——它们收集数据时优先扩任务，而不是重复同一任务采更多轨迹。
+
+## 7. 局限
+
+RT-1 只在训练分布内的 700 多个任务上泛化，动词或物体类别彻底没见过就会失败。语言编码器 USE 表达能力不够，处理不了复杂多步指令。3 Hz 对慢速厨房任务够用，对高频精细任务偏慢。所有数据来自同一个 Google 机器人平台，跨机器人迁移没有验证——这是后来 Octo 和 Open X-Embodiment 要处理的方向。
+
+代码和数据见 [google-research/robotics_transformer](https://github.com/google-research/robotics_transformer)。
+
+</WordCount>

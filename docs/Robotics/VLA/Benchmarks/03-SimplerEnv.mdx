@@ -1,0 +1,130 @@
+import WordCount from '../../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+# SimplerEnv：让仿真评测真实反映真机排名
+
+论文：[Evaluating Real-World Robot Manipulation Policies in Simulation](https://arxiv.org/abs/2405.05941)（Li 等，2024）。SimplerEnv 想解决一个非常实际的痛点：**真机跑 VLA 对比实验成本极高，但普通仿真评测和真机排名往往不一致**。它给出了一套把两者拉齐的方法。
+
+## 1. Sim-vs-real 相关性差在哪
+
+在 VLA / 机器人操作研究里，一次严格的真机对比实验往往意味着：搭建统一的场景、校准相机、人工重置几十上百次、录制视频复核成功率。一个 baseline 就要几天，做一次 ablation 更是奢侈。因此大家都想用仿真"代替"真机评测，但直接把 policy 丢进 Sapien / MuJoCo / Isaac 常常得到一个和真机完全对不上的排名。
+
+论文观察到两类主要偏差：
+
+- **视觉捷径 (visual exploit)**：仿真渲染的纹理、光照、阴影、背景与真机差异极大。VLM/VLA 会隐式依赖某些视觉线索（例如可乐罐的高光、桌面反射），一旦仿真里这些线索缺失或被替换，成功率会剧烈波动。有些 policy 在仿真里"意外"表现很好，只是因为背景太干净。
+- **物理捷径 (dynamics exploit)**：controller 的响应延迟、gripper 摩擦系数、物体质量分布、接触求解器的稳定阈值都可能被 policy 利用。RT-1 类基于末端执行器增量控制的策略，对 controller PID 参数极其敏感；如果仿真里 gripper 闭合过于顺滑，policy 会显得"抓得比真机稳"。
+
+结果就是：**同一批 policy 在原始仿真环境下的相对排名，与真机排名经常翻转**。这让"用仿真选 baseline"这件事变得不可信。SimplerEnv 的目标不是造一个"更真实"的仿真器，而是让**仿真下的排名与真机排名高度一致**——即使绝对成功率有偏差，只要能选出真正更强的 policy，就足以作为低成本评测。
+
+## 2. 两个技术支柱
+
+SimplerEnv 用两条互补的路径缩小 sim-real gap：一条针对视觉，一条针对物理。
+
+### 2.1 Real-to-Sim Visual Matching（视觉对齐）
+
+核心思想是**绿幕合成**：真机场景的背景由真实照片提供，只在仿真里渲染前景物体，然后把两者按 mask 合成。这样 policy 看到的绝大多数像素都是真实分布，视觉捷径无从被利用。
+
+流程可以粗略写成：
+
+```python
+def render_visual_matched(sim_state, real_bg_image, camera_pose):
+    # 1) 在仿真里只渲染前景物体 + 机械臂
+    fg_rgb, fg_mask = renderer.render_foreground(
+        sim_state, camera=camera_pose, bg="green")
+    # 2) 把真实拍摄的空场景作为背景
+    bg_rgb = warp_to_camera(real_bg_image, camera_pose)
+    # 3) 用前景 mask 合成
+    obs = fg_mask[..., None] * fg_rgb + (1 - fg_mask[..., None]) * bg_rgb
+    return obs
+```
+
+真实背景来自与真机相同视角、相同相机内参下拍摄的"空场景"照片；仿真前景则是尽量匹配真实物体几何与外观的资产。相机内外参也按真机标定填入，以保证透视一致。
+
+### 2.2 System Identification（系统辨识）
+
+针对物理捷径，SimplerEnv 手动 / 半自动匹配以下量：
+
+| 参数 | 说明 |
+| --- | --- |
+| Controller 增益 | 匹配真机 EE / joint controller 的响应曲线 |
+| Action 延迟 | 仿真中人为加入与真机接近的控制延迟 |
+| Gripper 摩擦 | 校准闭合力与摩擦系数，保证抓取"松紧"接近 |
+| 物体质量 / 惯量 | 匹配拾取时的下垂与滑动 |
+| 接触求解容差 | 避免"过于粘"或"过于滑"的接触 |
+
+辨识目标可以看作最小化仿真轨迹与真机轨迹在同一动作序列下的偏差：
+
+$$
+\theta^* = \arg\min_{\theta} \; \mathbb{E}_{(a_{1:T}, \tau^{\text{real}})}\Big[\; \| \tau^{\text{sim}}_\theta(a_{1:T}) - \tau^{\text{real}}(a_{1:T}) \|^2 \;\Big]
+$$
+
+其中 $\theta$ 是可调物理参数，$\tau$ 是末端位姿 / 物体位姿轨迹。真正的实现是分模块的：先拟合空载运动，再拟合抓取接触，再拟合物体动力学。
+
+## 3. 覆盖的真机套件
+
+SimplerEnv 目前覆盖两个被 VLA 社区广泛使用的真机平台：
+
+- **Google Robot**：对应 RT-1 / RT-1-X 的原始场景，桌面 + 一系列日常小物件。
+- **WidowX + BridgeData V2 场景**：对应 Octo / OpenVLA / RT-2-X 在 Bridge 数据上的评测配置。
+
+任务清单（节选，与论文和官方仓库一致）：
+
+| 平台 | Task | 描述 |
+| --- | --- | --- |
+| Google Robot | pick coke can | 抓起可乐罐 |
+| Google Robot | move near | 把物体移动到目标物体附近 |
+| Google Robot | open / close drawer | 开关抽屉 |
+| Google Robot | place object in drawer | 抽屉内放置 |
+| WidowX | put spoon on towel | 把勺子放到毛巾上 |
+| WidowX | put carrot on plate | 把胡萝卜放到盘子上 |
+| WidowX | stack green block on yellow | 叠积木 |
+| WidowX | put eggplant in basket | 把茄子放进篮子 |
+
+每个任务都提供了"visual matching"版本和"variant aggregation"版本：前者是与真机严格视觉对齐的单一场景，后者会在光照、背景、物体位姿上做扰动，用于评估鲁棒性。
+
+## 4. 评测指标
+
+除了标准的 Success Rate，SimplerEnv 特别强调 **sim-real 相关性** 本身作为一个可以被优化的量。给定 $N$ 个 policy，记它们的仿真成功率为 $s^{\text{sim}}_i$，真机成功率为 $s^{\text{real}}_i$。
+
+**Pearson 相关系数**：
+
+$$
+r = \frac{\sum_i (s^{\text{sim}}_i - \bar{s}^{\text{sim}})(s^{\text{real}}_i - \bar{s}^{\text{real}})}{\sqrt{\sum_i (s^{\text{sim}}_i - \bar{s}^{\text{sim}})^2} \sqrt{\sum_i (s^{\text{real}}_i - \bar{s}^{\text{real}})^2}}
+$$
+
+**Mean Maximum Rank Violation (MMRV)**：更关心"排名有没有翻"。对每一对 policy $(i, j)$，如果它们在仿真里的相对顺序与真机相反，就记一次 rank violation，并按二者真机成功率差距加权：
+
+$$
+\text{MMRV} = \frac{1}{N} \sum_i \max_{j} \; \mathbb{1}\!\big[(s^{\text{sim}}_i - s^{\text{sim}}_j)(s^{\text{real}}_i - s^{\text{real}}_j) < 0\big] \cdot |s^{\text{real}}_i - s^{\text{real}}_j|
+$$
+
+为什么用 rank-based 指标？因为绝对成功率在仿真和真机之间几乎不可能完全一致——渲染差异、reset 差异、评估集大小差异都会造成 offset。但只要 **排名一致**，仿真就足以承担"选 baseline / 做 ablation"的职责。MMRV 直接惩罚"选错更强 policy"的情况，比 Pearson $r$ 更贴近使用者的实际需求。
+
+## 5. 代表结果
+
+论文用 RT-1、RT-1-X、RT-2-X、Octo、OpenVLA 这几个当时代表性的 VLA / 通用 policy 做了 sim-vs-real 对比。主要结论：
+
+- 在原始仿真（不做视觉/物理对齐）下，若干 policy 的仿真成功率与真机差距巨大，MMRV 明显偏高，甚至出现"仿真里最强 = 真机里较弱"的翻转。
+- 打开 Real-to-Sim Visual Matching 之后，Pearson $r$ 显著提高；再叠加 System Identification，Google Robot 与 WidowX 两个套件上的 Pearson $r$ 都能推到接近 $0.9$，MMRV 降到接近于 $0$。
+- 对 RT-1 系列（增量 EE 控制、对物理敏感）来说，System Identification 的贡献更大；对 Octo / OpenVLA 这种视觉输入更重的 policy 来说，Visual Matching 的贡献更大。这也从侧面验证了"视觉捷径"和"物理捷径"两条通路是互补的。
+
+因为这套评测的门槛很低（一张 GPU + 若干小时），SimplerEnv 很快成为 **VLA 论文的默认低成本评测**：新方法在投稿之前先在 SimplerEnv 上把 RT-1-X / Octo / OpenVLA 全跑一遍，已经是社区的隐性规范。
+
+## 6. 使用建议与坑
+
+真正上手时几件事需要注意：
+
+- **Green-screen 依赖真实图像资产**。SimplerEnv 之所以视觉一致，是因为背景来自真机相机拍摄的照片。如果你要在一个全新场景（新桌面、新相机、新灯光）里评测，就必须重新采集一批空场景照片并做相机标定，否则合成图会露馅。
+- **新任务扩展需要手工**。加一个新任务不仅要新的仿真物体资产（几何 + 纹理），还要重新做一次 System Identification：controller 匹配可以复用，但物体质量/摩擦通常要重新测。
+- **Variant aggregation 不能替代 visual matching**。前者用于鲁棒性诊断，会故意扰动光照/位姿；如果直接把它当作 sim-real 对齐的评测，Pearson $r$ 会掉下来。报数时要明确用的是哪一个 track。
+- **注意 action space 一致性**。SimplerEnv 提供了 Google Robot 与 WidowX 的官方 action 接口；如果你的 policy 输出与之不同（比如输出 joint 而非 EE delta），要自己实现一层适配，并保证与真机一致，否则辨识就白做了。
+- **Success 判定要看官方脚本**。不同任务有不同的成功阈值（物体是否进入目标区域、是否维持一段时间），自己重写判定容易和论文数字对不上。
+
+## 总结
+
+SimplerEnv 的贡献不是"更真实的仿真器"，而是**把仿真评测重新定义为 sim-real 相关性问题**：只要 Pearson $r$ 高、MMRV 低，仿真就可以作为可信的 baseline 选择器。Real-to-Sim Visual Matching 消除视觉捷径，System Identification 消除物理捷径，两者叠加让 RT-1 / RT-1-X / RT-2-X / Octo / OpenVLA 的排名在仿真和真机之间高度一致。
+
+对做 VLA 的团队来说，这意味着一件很实际的事：**发一篇新方法之前，先在 SimplerEnv 上把主流 baseline 跑齐**，用极低的成本得到一个可信的相对排名，再决定要不要投入真机资源。这也是 SimplerEnv 迅速成为 VLA 论文标配评测的原因。
+
+</WordCount>

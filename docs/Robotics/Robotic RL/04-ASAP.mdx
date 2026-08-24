@@ -2,4 +2,107 @@ import WordCount from '../../../src/components/WordCount/WordCount';
 
 <WordCount>
 
+# ASAP：用真实数据回填 sim-to-real 动力学鸿沟
+
+论文：[ASAP: Aligning Simulation and Real-World Physics for Learning Agile Humanoid Whole-Body Skills](https://arxiv.org/abs/2502.01143)（He 等，CMU + NVIDIA，CoRL 2024）。ASAP 面向的是 humanoid 全身敏捷技能（跳跃、旋转、单脚平衡、庆祝动作）在 sim-to-real 迁移中反复出现的"表演型退化"：仿真里能空翻、上真机变成软脚蟹。ASAP 的思路不是继续堆 domain randomization，也不是拼命拟合仿真参数，而是从真机上收几分钟数据，学一个作用在 **动作层** 的残差模型 $\Delta \pi_\theta$，把仿真下一步的状态"拽"到真机下一步应该到的位置，然后再回到仿真里 fine-tune 策略。整个流程可以被理解成"用真数据在动作空间里做一次动力学校正"。
+
+## 1. 动机
+
+Humanoid 双足机器人做敏捷动作时对动力学非常敏感：一个电机温度上升导致的减速比漂移、一段柔性传动带来的时延、一次接触打滑，都会让 sim 中训好的 tracking policy 在真机上错过关键相位。已有的三类做法都留下了缺口：
+
+- **纯 Domain Randomization（DR）**：靠"广撒网"把 policy 训到对所有可能的动力学都保守。结果是保守到能站，但很难跳。
+- **Real2Sim / System Identification**：估计一组更真实的仿真参数。参数化不够表达真实非线性时，估计出的 sim 仍然差一截；同时对每个新机器人都要重跑辨识。
+- **RMA、Adaptation Module**：在 policy 内部塞一个 latent 让它在部署时自适应。潜变量能补一部分，但对全身高动态动作依旧有肉眼可见的相位差。
+
+ASAP 认为差距的核心是 **仿真的一步动力学** $f^{\text{sim}}(s,a)$ 与真实 $f^{\text{real}}(s,a)$ 存在系统性偏差。既然直接改 $f^{\text{sim}}$ 太贵，就在 **输入 action** 上加一个可学的偏置 $\Delta \pi_\theta(s)$，让仿真在同一初值下预测到的下一状态尽量匹配真实数据。这样做的好处是：模型无关、仿真器无关，几分钟真机数据就能显著改善。
+
+## 2. 方法总览
+
+ASAP 的整体流水线分三个阶段：
+
+1. **Sim 预训练**：在 IsaacGym / MuJoCo MJX 之类的仿真里，使用大规模 domain randomization + PPO，训练一个基于运动学参考的 whole-body tracking policy $\pi_{\text{sim}}(a\mid s, \hat s)$，其中 $\hat s$ 是参考动作片段（例如从 AMASS / SMPL 重定向到 Unitree G1 的动作）。
+2. **真机数据采集**：把 $\pi_{\text{sim}}$ 直接部署到真机，记录 5–10 分钟包含目标技能与失败前若干秒的 $(s_t^{\text{real}}, a_t, s_{t+1}^{\text{real}})$ 三元组。为了安全，动作幅值受限、任务从简单开始（例如 half-squat、in-place turn 再到 backflip attempt）。
+3. **Delta Action Model 学习 + 策略回炉**：用真机数据训练 $\Delta \pi_\theta$；把 $\Delta \pi_\theta$ 作为固定的仿真"补丁"注入，然后在带补丁的仿真里继续 fine-tune tracking policy。fine-tune 完成后再部署，此时真机行为与仿真轨迹接近对齐。
+
+用一张表概括三阶段的角色分工：
+
+| 阶段 | 输入 | 学习目标 | 是否需要真机数据 |
+| --- | --- | --- | --- |
+| Sim 预训练 | 参考动作 + 广 DR | 追踪奖励 + 存活奖励 | 否 |
+| 真机采集 | 已训 policy | 只记录 rollout | 是（数分钟） |
+| Delta + Fine-tune | 真机 (s,a,s') | 拟合 $\Delta\pi_\theta$、再优化 policy | 否（重新回仿真） |
+
+## 3. Delta Action Model 的形式
+
+设仿真一步转移函数为 $s^{\text{sim}}_{t+1}(a) = f^{\text{sim}}(s_t, a)$，真实下一状态为 $s^{\text{real}}_{t+1}$。ASAP 定义作用在 action 上的残差策略：
+
+$$
+a^{\ast}_t = a_t + \Delta \pi_\theta(s_t, a_t)
+$$
+
+并在真机采集的数据集 $\mathcal{D}^{\text{real}}$ 上最小化
+
+$$
+\min_{\theta}\; \mathbb{E}_{(s_t,a_t,s_{t+1}^{\text{real}})\sim\mathcal{D}^{\text{real}}}\left[\big\| f^{\text{sim}}\!\big(s_t,\; a_t + \Delta \pi_\theta(s_t, a_t)\big) - s^{\text{real}}_{t+1} \big\|_2^2\right]
+$$
+
+也就是说，学一个动作偏置，使得"在真状态 $s_t$、施加 $a_t + \Delta$ 后仿真跑一步"，落到与真机同样的 $s^{\text{real}}_{t+1}$ 附近。
+
+为什么在 action 上加 delta，而不是在下一状态上直接学一个残差 $\Delta s$，也不是回头修 sim 参数？
+
+- **相较 System Identification**：sim 参数化通常是刚体质量、摩擦、电机 PD 增益等有限几十维；难以表达柔性传动、控制板延迟、非线性摩擦等真实效应。$\Delta \pi_\theta$ 是任意函数逼近器（MLP / GRU），表达力更强。
+- **相较 $\Delta s$ 残差**：残差状态模型会让 policy 在 fine-tune 时"看到"一个与真物理不一致的过渡（例如接触突变），容易训崩。加在 action 上则保留了仿真的接触约束与硬件限位。
+- **相较 direct policy adaptation**：$\Delta \pi_\theta$ 与 policy 解耦，可作为**插件**服务于任何后续策略、任何仿真器；换一个 skill 也无需重新采集。
+
+实现层面通常把 $\Delta \pi_\theta$ 设为一个小型 MLP（几层、隐藏 256），输入 $(s_t, a_t)$，输出与 action 同维、经过 tanh 后再乘上一个较小的幅值上限，以避免 delta 逃出真机安全域。
+
+## 4. Policy 微调
+
+拿到 $\Delta \pi_\theta$ 之后，ASAP 把它**冻结**并作为仿真环境的一部分：每当 policy 在仿真中输出 $a_t$，仿真器实际用 $a_t + \Delta \pi_\theta(s_t, a_t)$ 去推进物理。接下来继续用 PPO fine-tune $\pi_{\text{sim}}$。此时的关键点：
+
+- 不需要再采真机数据，fine-tune 全在仿真中完成，可以并行数千 env。
+- DR 依旧开启但幅度收窄：delta 已经吸收了主要偏差，过大的 DR 反而会让 policy 又回到过度保守。
+- Reward 保持与预训练一致（tracking + 存活 + energy），无需重新设计。
+
+得到的新 policy 再次上真机时，等价于在训练时看过"接近真机动力学"的仿真，因此敏捷动作的相位、力矩曲线都更接近参考。
+
+## 5. 实验
+
+论文在 Unitree G1 上验证：
+
+| 技能 | Baseline (DR + PPO) 成功率 | ASAP 成功率 | 相对力矩跟踪误差下降 |
+| --- | --- | --- | --- |
+| 单脚跳 (single-leg jump) | 低，落地易失衡 | 明显提升 | ~53% |
+| 侧向旋转 / 空翻式转体 | 大量失败 | 稳定完成 | 显著 |
+| Cristiano 庆祝动作 | 相位漂移 | 相位对齐 | 显著 |
+| 半蹲 + 恢复 | 已经不错 | 微幅提升 | 有限 |
+
+几个可复现的观察：
+
+- 真机数据只需 5–10 分钟，且不需要覆盖全部技能；delta 具备一定跨技能泛化，尤其当技能共享类似的下肢摆动模式。
+- Ablation 中若把 $\Delta$ 改为作用在 next-state 上，fine-tune 常常发散，验证了 action-space 残差的稳定性。
+- 关闭 fine-tune、只在部署时把 $\Delta$ 加到策略输出（即"部署侧补偿"），效果差于把 $\Delta$ 灌回仿真再训策略——因为策略需要在**看得到 delta** 的动力学下重新做长期决策。
+
+## 6. 与相关工作对比
+
+| 方法 | 是否改 sim 参数 | 是否需要真机数据 | 表达力 | 与 policy 是否耦合 |
+| --- | --- | --- | --- | --- |
+| DR-only | 否 | 否 | 低（靠保守） | 与 policy 一起训 |
+| System ID / Real2Sim | 是 | 是 | 受参数化限制 | 需要重训 |
+| RMA / Adaptation module | 否 | 少量 | 中 | 强耦合到 policy |
+| **ASAP (Delta Action)** | 否 | 少量 | 高（任意 NN） | 解耦，可插拔 |
+
+从工程角度看，ASAP 更像一个"动力学补丁层"：它不假设仿真参数正确，也不修改 policy 架构，只在动作输入处拉一根偏置线。这种解耦对多机器人、多任务、多仿真器的场景非常友好。
+
+## 7. 局限与启示
+
+ASAP 也不是万灵药：
+
+- **数据分布依赖**：$\Delta \pi_\theta$ 只在采集轨迹覆盖的状态-动作分布内可靠；策略 fine-tune 后如果状态分布明显外推，需要再采一轮真机数据迭代（论文中提到可迭代 2–3 轮）。
+- **硬件损耗**：为采样 agile skill 的失败/边界数据，真机会经历跌倒、冲击；这对 G1 这种带保护结构的机器人可行，对更脆弱的平台需要更强的安全护栏。
+- **接触事件**：$\Delta$ 是一个连续函数，难以完美表达接触瞬间的离散变化；未来工作可以把接触相位作为条件输入，或采用 event-conditioned delta。
+- **奖励与参考质量**：ASAP 依赖高质量参考动作（motion retargeting from AMASS 等），参考本身不合理时 delta 无法救场。
+
+对做具身智能的读者，ASAP 给出的两条工程启示是：第一，与其无限扩大 DR，不如把有限的真机预算花在 **动力学层的残差学习** 上；第二，把 sim-to-real 修正做成 **可插拔的中间层**（作用在 action 或 observation 上）比修改 policy 更利于组合与迁移。
+
 </WordCount>

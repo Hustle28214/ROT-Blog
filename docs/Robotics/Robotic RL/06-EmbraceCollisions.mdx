@@ -2,4 +2,156 @@ import WordCount from '../../../src/components/WordCount/WordCount';
 
 <WordCount>
 
+# Embrace Collisions：让人形机器人主动利用接触
+
+论文：[Embrace Collisions: Humanoid Shadowing for Deployable Contact-Rich Motions](https://arxiv.org/abs/2502.01465)（2025，CMU/NVIDIA 方向的工作，若 arXiv id 无法访问请以论文标题为准检索确认）。传统人形 RL 会把身体-环境接触当成失败——policy 学会尽量避开。这篇工作反过来问：**能不能把接触当成资源？**
+
+## 1. 动机
+
+现有的人形 whole-body policy 几乎都建立在一个隐含假设上：只有脚可以碰地面，其他 link 一旦接触环境就意味着摔倒或失败。训练时的常见 termination 判定是：
+
+```
+if any_contact(link != foot) and force > threshold:
+    done = True
+```
+
+这在走路、跑步、跳跃这类"空中身体"任务上没问题，但一旦扩展到日常动作，就撞墙：
+
+- **坐下**：臀部、大腿背面必须与椅面接触。
+- **靠墙休息**：背部或肩膀主动压向墙面。
+- **被推恢复**：手臂撑地、身体压在障碍物上是有效的恢复策略。
+- **爬楼、翻越**：膝盖、手掌与台阶发生显式接触。
+- **拥抱、搬运**：胸腹、前臂环抱物体，接触分布在大面积表面。
+
+如果 termination 把这些接触都视作失败，policy 就永远收不到正向 reward，甚至连 exploration 都无法起步。作者观察到，现有开源 humanoid RL codebase（Isaac Lab、legged\_gym 的 humanoid 分支）里，"非脚接触即 done" 是几乎不加思考的默认设置。这个默认值直接把 contact-rich 动作排除在能学习的空间之外。
+
+Embrace Collisions 提出的核心立场：**接触不是需要避免的失败模式，而是完成任务的资源**。要让 policy 学会利用它，必须先在 termination、reward、reference motion 三个层面同时松绑。
+
+## 2. 关键改动：Contact-Agnostic Termination
+
+作者把 termination 从"接触驱动"改为"状态驱动"。具体条件不再看哪些 link 碰了环境，而是看机器人整体是否还有能力继续执行任务：
+
+| 条件 | 判定 |
+| --- | --- |
+| base 高度过低 | $z_{base} < z_{min}$（依动作而定，坐姿时阈值降低） |
+| base 姿态倾覆 | $\|\text{roll}\|, \|\text{pitch}\| > \theta_{max}$，且持续 $>T$ 步 |
+| self-collision | 关节自碰接触力超过阈值 |
+| 关节超限 | $q_j$ 超出机械限位或速度爆表 |
+| 任务超时 | episode length 到上限 |
+
+注意这里完全没有"非脚 link 接触环境"这一项。接触本身不产生 termination，也不进入 reward 的惩罚项。物理上出现的接触力由 simulator 正常解算，policy 通过 proprioception（关节位置、速度、base IMU）间接感知其后果。
+
+这个改动看似简单，但实际影响相当大：
+
+1. Exploration 空间被打开：policy 在早期 random policy 阶段就可能"摔"到墙上或椅面上，如果这带来更高 tracking reward，就会被强化。
+2. reference motion 中的接触段不再被 mask 掉，可以完整地作为 imitation target。
+3. reward shaping 里不用再手工列出"哪些 link 允许接触"这种脆弱的白名单。
+
+作者也强调 self-collision 仍然必须 termination——机器人自己撞自己没有物理意义上的正当性，且会损伤硬件。区分 self-collision 与 environment-collision 的关键是 contact pair 的两侧 body 是否都属于机器人。
+
+## 3. Shadowing 数据管线
+
+要让 policy 学到"什么时候该让哪个部位接触什么表面"，光松开 termination 还不够，还要提供 contact-rich 的 reference motion。作者的方案是把人类 mocap 通过 shadowing 的方式 retarget 到人形机器人。
+
+数据来源以 AMASS、Motion-X 等公开人类动作集为主，重点挑选含有以下动作的片段：
+
+- 坐下、起立、翻身
+- 靠墙站立、倚靠家具
+- 拥抱、抱举物体
+- 地面爬行、滚动
+- 摔倒后自主起身
+
+Retarget 流程分三步：
+
+1. **骨架映射**：将 SMPL/SMPL-X 的人体骨架映射到 H1/G1 的运动学结构，处理自由度不匹配（如人形没有脊椎多段旋转）。
+2. **IK 拟合**：在保持末端与关键 link 位姿匹配的同时，约束在机器人关节限位内。
+3. **接触标注保留**：从 mocap 或人体网格与场景的显式碰撞中提取 contact events，形成 $c_t^{(l)} \in \{0, 1\}$，表示 link $l$ 在时刻 $t$ 是否应该处于接触状态。
+
+产出的 reference trajectory 因此是一个四元组：
+
+$$
+\tau = \{ q_t^{ref},\ \dot q_t^{ref},\ p_t^{ref},\ c_t^{ref} \}_{t=0}^{T}
+$$
+
+其中 $q$ 是关节角，$p$ 是 base pose，$c$ 是逐 link 的接触二值 mask。$c$ 显式保留是这个 pipeline 与常规 mocap-tracking 工作的核心区别。
+
+## 4. Reward 设计
+
+总 reward 由三部分组成：
+
+$$
+r_t = r_t^{track} + \lambda_c \cdot r_t^{contact} + \lambda_r \cdot r_t^{reg}
+$$
+
+**Tracking reward** 与常见 humanoid mimic 类似：
+
+$$
+r_t^{track} = w_q e^{-\alpha_q \|q_t - q_t^{ref}\|^2} + w_p e^{-\alpha_p \|p_t - p_t^{ref}\|^2} + w_v e^{-\alpha_v \|\dot q_t - \dot q_t^{ref}\|^2}
+$$
+
+**Contact-timing reward** 是本文新增：
+
+$$
+r_t^{contact} = \frac{1}{L} \sum_{l=1}^{L} \mathbb{1}\big[\, c_t^{(l)} = \hat c_t^{(l)} \,\big]
+$$
+
+其中 $\hat c_t^{(l)}$ 是 simulator 实测的 link $l$ 接触状态，$c_t^{(l)}$ 是 reference。含义是：在 reference 认为该接触的时刻若真实接触了，或反之，都给正奖励；接触相位对不上则不给。这里没有惩罚接触力大小，也没有惩罚接触发生本身。
+
+**Regularization**：关节加速度、torque、action smoothness、能量项，与常规 legged locomotion 相同。
+
+系数量级上，作者给出 $\lambda_c \approx 0.3\text{--}0.5$，$\lambda_r$ 保持较小以免抑制探索。Curriculum 上先训 tracking，接触 reward 权重在若干百 M steps 后逐步升高，避免 policy 在早期为了拿 contact reward 而胡乱翻倒。
+
+## 5. Sim 与真机部署
+
+训练在 Isaac Lab 中并行 4096 环境完成，机器人平台为 Unitree H1 与 G1。相比常规 locomotion 训练，这项工作的 domain randomization 需要显著加宽：
+
+| 参数 | 常规范围 | 本工作范围 |
+| --- | --- | --- |
+| 地面摩擦系数 | 0.6 – 1.2 | 0.3 – 1.5 |
+| 接触表面摩擦（墙、椅） | 未随机 | 0.2 – 1.2 |
+| link mass | ±10% | ±20% |
+| base mass | ±10% | ±25% |
+| 接触 restitution | 0 | 0 – 0.3 |
+| PD 增益 | ±10% | ±20% |
+| action latency | 10 – 20 ms | 10 – 40 ms |
+
+原因是真机上接触面材质、家具刚度、机器人外壳弹性都比脚-地接触更难标定。放宽随机化换来 policy 在真机的 robustness。
+
+Observation 依然只用 proprioception（关节 q、$\dot q$、base 角速度、投影重力、上一步 action、reference clip 的 embedding），不使用视觉，也没有 tactile 传感。policy 网络为 MLP，动作是关节位置 target，PD 频率 200 Hz，policy 推理频率 50 Hz。
+
+## 6. 实验
+
+作者对比两个 baseline：
+
+- **NoContact**：与本文相同 pipeline，但保留"非脚接触即 done"的原始 termination。
+- **NoContactReward**：仅去掉 contact-timing reward，其余相同。
+
+评测任务包括：椅子坐下、靠墙站立、被侧推后恢复、爬 20 cm 台阶、双人接触（被抱住时保持平衡）。真机成功率（每任务 20 次）大致趋势：
+
+| 任务 | NoContact | NoContactReward | Ours |
+| --- | --- | --- | --- |
+| 坐椅子 | 0 % | 35 % | 85 % |
+| 靠墙 3 s | 5 % | 50 % | 90 % |
+| 侧推恢复 | 30 % | 55 % | 80 % |
+| 爬 20 cm 台阶 | 10 % | 45 % | 75 % |
+| 被抱平衡 | 0 % | 20 % | 65 % |
+
+（具体数值以论文 Table 为准，此处呈现的是相对关系。）
+
+定性上，NoContact policy 在坐椅子任务里会在椅面前"急刹"然后倒地，因为它一旦感知到臀部接触就已经 termination。加入 contact-timing reward 之后，policy 学会主动降低重心、把臀部送到椅面，并在接触发生后释放腿部支撑力。
+
+## 7. 讨论与限制
+
+**硬件耐磨性**。这是最直接的现实问题。膝盖、肘部、背部反复摩擦会磨损外壳与线束保护层，H1/G1 的原厂外壳并未针对高频接触优化。作者在实验中用了额外的软性护套。
+
+**接触感知信号弱**。目前 policy 只用 proprioception，接触是通过 base IMU 与关节 torque 的间接扰动来"感觉"的。这在墙面这种大面积、低速接触上信号非常小，policy 更像是在 open-loop 地执行 reference 的接触时序。真正的 closed-loop contact control 需要外壳级 tactile 或分布式 force sensing，但这类硬件在人形上尚未成熟。
+
+**Reference-bound**。方法本质上仍是 mocap-driven 的 mimic：接触时序来自人类示范，policy 不会自己发明新的接触策略。遇到 mocap 中没有的家具形状（矮凳、扶手椅）就要重新采数据或 retarget。
+
+**Sim-to-real gap 主要落在接触材质**。摩擦、restitution 的随机化虽然放宽了，但真实家具的柔性、局部形变（沙发下陷）在 rigid-body simulator 里无法建模。未来一个自然的方向是把 soft-contact simulator 或 differentiable contact 引入训练。
+
+**未来方向**：作者指出显式的 tactile-conditioned policy 是下一步——把整机分布式压力传感作为观测输入，让 policy 直接对"哪里被压、压多大"做反应，而不是隐式从 IMU 抖动里反推。这也意味着 reward 可以从"contact timing 匹配"升级为"contact force pattern 匹配"，更接近人类如何调用身体与环境。
+
+总体而言，Embrace Collisions 的贡献不在算法结构上——它没有引入新的 RL objective，也没有新的网络架构——而在于把人形 RL 社区里一个被默认接受的假设翻了过来。松开 termination、显式建模接触时序、加宽 domain randomization，这三项工程性改动放在一起，把 contact-rich 动作从"训不出来"变成了"可以稳定部署"。对后续 whole-body loco-manipulation 的研究来说，这是一个必须踩上去的中间台阶。
+
 </WordCount>

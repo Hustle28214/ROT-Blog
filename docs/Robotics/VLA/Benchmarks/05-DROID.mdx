@@ -1,0 +1,156 @@
+import WordCount from '../../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+# DROID：大规模真实场景 Franka 数据集
+
+论文：[DROID: A Large-Scale In-The-Wild Robot Manipulation Dataset](https://arxiv.org/abs/2403.12945)（Stanford/UC Berkeley/TRI 等 18 机构，2024）。DROID（Distributed Robot Interaction Dataset）通过将同一套硬件配置分发至全球 86 家机构，以分布式方式采集了迄今规模最大、场景最丰富的单形态操作数据集。它与 Open X-Embodiment（OXE）走了完全相反的路线：OXE 追求形态多样性，DROID 追求硬件一致性下的场景多样性。这一取舍使 DROID 成为当今 VLA（π0、OpenVLA、Octo 等）训练管线中最重要的高质量监督语料之一。
+
+## 1. 数据规模
+
+DROID 的核心统计如下：
+
+| 维度 | 数值 |
+| --- | --- |
+| 演示轨迹数 | 76,000 |
+| 累计时长 | 350 小时 |
+| 唯一场景数 | 564 |
+| 采集机构 | 86 |
+| 覆盖国家 | 13 |
+| 采集周期 | 12 个月 |
+| 任务种类（skill） | 86 类 |
+| 涉及物体 | 数千种日常物品 |
+
+硬件平台严格统一：
+
+- **机械臂**：Franka Emika Panda（7-DoF）。
+- **末端执行器**：Robotiq 2F-85 平行夹爪。
+- **相机**：两台外置 ZED 2 立体相机（可自由摆放），一台腕部 ZED Mini 立体相机。
+- **控制器**：Meta Oculus Quest 2，用于 VR 遥操作。
+- **控制频率**：15 Hz（策略输出），底层 1 kHz 阻抗控制。
+
+相比 RT-1（130k demos / 单一 Google 厨房 / EDR 机器人）与 BridgeData V2（60k demos / WidowX / 24 环境），DROID 在**环境多样性**这一维上把数量级拉到了 500+ 场景。
+
+## 2. 为什么统一硬件
+
+DROID 与 Open X-Embodiment 的哲学分野可以概括为一句话：**"跨形态的脏数据" vs "单形态的干净数据"**。
+
+| 维度 | Open X-Embodiment | DROID |
+| --- | --- | --- |
+| 形态 | 22 种机器人 | 1 种（Franka） |
+| Action space | 各不相同 | 统一 delta EE + gripper |
+| 控制频率 | 3–30 Hz 混杂 | 严格 15 Hz |
+| 相机内参 | 未标定/未统一 | ZED 标定，含深度与外参 |
+| 相机视角 | 无约束 | 2 static + 1 wrist |
+| 语言标注 | 部分数据集有 | 100% 覆盖 |
+
+统一硬件带来的三个直接收益：
+
+1. **Action space 无需重归一化**：所有轨迹都是 6-D delta 末端位姿 + 1-D 夹爪开合，可直接喂入 policy 而不必像 OXE 那样按 dataset 做 normalizer。
+2. **相机几何自洽**：ZED 提供已标定的立体深度和相机外参，训练带深度或 3D-aware 的 policy（如 3D Diffuser Actor）不需要额外校准。
+3. **控制频率一致**：15 Hz 使 action chunking / temporal ensembling 的窗口选择在整个数据集上语义一致，避免了 OXE 里 3 Hz 与 30 Hz 混训导致的时序错位。
+
+代价是失去形态泛化的天然监督——但作者认为，与其在跨形态噪声中挣扎，不如先把单形态跨场景的能力做扎实。
+
+## 3. 采集协议
+
+**遥操作方式**：操作员戴 Oculus Quest 2 VR 头显，用手柄进行 6-DoF 末端位姿控制，扳机键控制夹爪。相比 3D SpaceMouse 或 kinesthetic teaching，VR 遥操作在**灵巧度**与**采集速度**上取得较好折中。
+
+**每条 demo 的必要字段**：
+
+```yaml
+observation:
+  exterior_image_1_left:  (H, W, 3)   # ZED cam 1 左目
+  exterior_image_2_left:  (H, W, 3)   # ZED cam 2 左目
+  wrist_image_left:       (H, W, 3)   # ZED Mini 左目
+  cartesian_position:     (6,)        # 末端位姿 (xyz + euler)
+  gripper_position:       (1,)        # 夹爪开度
+  joint_position:         (7,)        # 关节角
+action:
+  cartesian_velocity:     (6,)        # delta EE
+  gripper_position:       (1,)        # 目标夹爪
+language_instruction:     str          # 自然语言指令（每 demo 一句）
+```
+
+**语言标注**：每条 demo 由操作员在开始录制前**用自然语言写下任务描述**（如 "put the sponge into the sink"），保证语言分布贴近真实用户意图，而不是事后由标注员补写的机械模板。
+
+**场景覆盖**：区别于实验室"桌面 + 白背景"的经典设置，DROID 把机器人推入了真实的 in-the-wild 环境：
+
+- **Kitchen**：切菜台、水槽、冰箱、微波炉、抽屉、餐具柜。
+- **Office**：办公桌、键盘、文件柜、显示器、抽屉。
+- **Bathroom**：洗手台、毛巾架、洗漱用品。
+- **Bedroom**：床头柜、书架、衣柜。
+- **Lab**：常规实验室桌面。
+
+背景光照、桌面材质、干扰物均自然存在，构成了目前最贴近"消费场景"的机器人数据分布。
+
+## 4. 数据分布分析
+
+论文附录中给出了 skill / object / scene 三个维度的分布统计：
+
+**Skill 长尾**（top-5 vs tail）：
+
+| Skill | 占比 |
+| --- | --- |
+| pick and place | ~35% |
+| open / close | ~12% |
+| push / pull | ~8% |
+| pour | ~5% |
+| stack | ~4% |
+| ... | ... |
+| 其余 80 类 | ~36% |
+
+**Object 长尾**：出现频次前 20 的物体（cup、bowl、towel、drawer、sponge 等）占据约 40% 的 demo；剩余数千种物体构成典型 Zipf 尾。
+
+**Scene 分布**：564 个场景中，约 60% 出现在 ≤ 100 条 demo 中，构成"薄场景"长尾——这对 policy 的场景泛化是关键挑战，也是 DROID 相比 RT-1（单一厨房）最本质的价值。
+
+数学上，若记 skill 频次为 $f_i$，则近似满足
+
+$$
+f_i \propto i^{-\alpha}, \quad \alpha \approx 1.1.
+$$
+
+这一尾部斜率显示 DROID 尚未进入饱和区，继续加数据仍能改善罕见 skill 的覆盖。
+
+## 5. 基线与发现
+
+论文报告了两组主要基线：
+
+**Diffusion Policy (DP)**：以 ResNet-18 视觉编码器 + 1D U-Net action head，训练目标为 8 步 action chunk 的去噪。
+
+**RT-1-style Transformer**：把图像 tokens + language tokens 送入 Transformer，autoregressive 输出离散化 action tokens。
+
+**关键发现**：
+
+1. **跨场景 fine-tune 提升显著**：在 DROID 上 pretrain，再用目标场景 10–50 条 demo fine-tune，成功率相比"仅目标场景从零训"平均提升 **20–30 个百分点**。
+2. **Wrist camera 是关键**：消融显示去掉腕部 ZED Mini 后，抓取类任务成功率下降约 15%，远大于去掉某个外置相机的影响。
+3. **Scaling 未饱和**：作者做了 25% / 50% / 75% / 100% 数据量的 scaling 实验，log-linear 曲线仍在上升，未见拐点，暗示 DROID 之后继续加数据仍有收益。
+4. **Language conditioning 有效**：语言条件模型在多任务场景下的选择正确率显著高于任务 one-hot 版本，尤其在同一场景多个候选任务并存时。
+
+## 6. 在 VLA 中的角色
+
+DROID 已成为主流 VLA 训练的**默认高质量子集**：
+
+- **π0 / π0-FAST（Physical Intelligence, 2024）**：DROID 是其"高质量单臂 Franka 语料"的主体来源之一，负责提供干净的 delta-EE action 分布。π0 的 flow-matching action expert 在 DROID 上表现出很强的抓取/放置能力。
+- **OpenVLA（Stanford, 2024）**：在 OXE 混合训练时，DROID 作为高权重子集参与；其 Franka 部分能力（如 Franka-Tabletop 评测）主要由 DROID 提供。
+- **Octo（Berkeley, 2024）**：Octo-Base / Octo-Small 的训练混合中，DROID 权重高于多数 OXE 子集，因为其 action space 已经与 Octo 的 6-D delta EE 对齐。
+- **3D Diffuser Actor / RVT-2 等 3D 方法**：直接利用 DROID 附带的 ZED 深度图，绕过了 OXE "无深度"的限制。
+- **RDT-1B、GR00T N1 等后续工作**：在 pretraining 阶段将 DROID 与 OXE、Bridge、RT-1 混合，通常给 DROID 分配显式高权重。
+
+可以说，DROID 补齐了 OXE 数据的"最后一公里"：形态多样性由 OXE 负责，场景多样性由 DROID 负责。
+
+## 7. 使用建议
+
+面向下游 VLA / policy 训练的实操建议：
+
+1. **视觉输入**：优先使用 `wrist_image_left + exterior_image_1_left` 双视角组合。腕部视角在最后 20 cm 的精细抓取阶段几乎不可替代；单一 static RGB 会显著劣化 pick-place 成功率。
+2. **Action 归一化**：DROID 的原生 action 是 `cartesian_velocity`（6-D delta EE，单位 m/s 与 rad/s）+ `gripper_position`（[0, 1]）。归一化按 1%/99% 分位数裁剪即可，不建议做 z-score，因为动作分布高度非高斯。
+3. **控制频率对齐**：训练时保持 15 Hz。若下游任务需要 30 Hz，建议用 action chunking（例如输出 4 步 chunk，异步执行）而非重采样，以保留原始时序结构。
+4. **语言 tokenizer**：DROID 的 language instruction 平均 8–12 token，短小口语化。使用 T5-base / SigLIP text encoder 即可，无需大 LLM。
+5. **深度是否启用**：ZED 立体深度噪声较大（尤其在反光/透明物体上），若 policy 不显式利用几何，建议只用 RGB；若采用 3D-aware 方法，务必做深度滤波与外参对齐。
+6. **数据混合权重**：与 OXE 混训时，DROID 建议权重 0.3–0.5，高于多数 OXE 子集但低于 RT-1（因为 RT-1 在 skill 覆盖上更集中于 pick-place）。
+7. **场景切分**：由于 564 个场景独立，train/val split 建议**按场景**而非按 episode 划分，才能真实评估场景泛化。
+
+一句话总结：DROID 是目前"单形态、跨场景、带语言、带立体视觉"这一象限中**最优的公开数据集**，是任何认真训练 Franka policy 或通用 VLA 的项目都不应绕开的基础语料。
+
+</WordCount>

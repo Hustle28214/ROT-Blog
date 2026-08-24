@@ -1,0 +1,141 @@
+import WordCount from '../../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+# HumanoidBench：人形全身控制的高维 RL 基准
+
+论文：[HumanoidBench: Simulated Humanoid Benchmark for Whole-Body Locomotion and Manipulation](https://arxiv.org/abs/2403.10506)（Sferrazza 等，RSS 2024）。这是首个系统性覆盖**全身运动 + 灵巧操作**的仿真人形基准，用统一的 Unitree H1 + Shadow Hand 平台承载了 31 个任务，把 locomotion 社区和 manipulation 社区拉到同一张评测表上。本文按机器人配置、任务分类、层次接口、基线结果、后续影响与已知限制展开。
+
+## 1. 为什么需要
+
+过去几年，人形（humanoid）领域的强化学习 benchmark 存在明显割裂：
+
+- **Locomotion 端**：DeepMind Control Suite 的 `Humanoid-v4`、`humanoid_CMU`、Isaac Gym 的 H1/G1 walking，只考察站立、行走、奔跑等下肢周期步态，上肢往往被固定或简化为 stick arms。
+- **Manipulation 端**：Meta-World、RLBench、ManiSkill 假设一个固定底座 + 单臂 + 简单 gripper，机器人本体不需要维持平衡，忽略了动量耦合。
+- **Loco-manip 空白**：真实人形任务（抱箱走路、上台阶开门、翻越栏杆再按按钮）需要**同时**处理平衡和末端接触，缺乏统一 benchmark 意味着方法难以横向比较。
+
+HumanoidBench 的设计动机就是补上这个空白：一个机器人（H1 全尺寸 + 双 Shadow Hand）、一个物理引擎（MuJoCo MJX）、一套观测/奖励接口，覆盖从纯 locomotion 到纯 dexterous manipulation 的全谱系。
+
+## 2. 机器人与观测
+
+平台选用宇树 **Unitree H1**（1.8 m、约 47 kg），并在两只手腕上安装了 **Shadow Dexterous Hand**：
+
+| 部件 | DoF | 说明 |
+| --- | --- | --- |
+| H1 下肢 | 10 | 左右各 5：hip yaw/roll/pitch、knee、ankle |
+| H1 躯干 | 1 | waist yaw |
+| H1 上肢 | 8 | 左右各 4：shoulder pitch/roll/yaw、elbow |
+| Shadow Hand ×2 | 24 × 2 = 48（含耦合） | 每只 20 主动 DoF + 4 被动，论文按 24 计 |
+| **合计** | **~51** | 也提供简化 gripper 版（无 Shadow Hand，约 19 DoF）以降低门槛 |
+
+观测接口：
+
+| 通道 | 维度 / 形态 | 是否默认开启 |
+| --- | --- | --- |
+| Proprioception | 关节位置/速度、根节点姿态与线角速度 | 是 |
+| Task state | 目标位置、物体位姿、地形高度等 | 视任务 |
+| Egocentric RGB | 头部相机 64×64 或 128×128 | 可选（visual variant） |
+| Touch / tactile | Shadow Hand 指尖接触力 | 可选 |
+
+动作空间为关节 PD 目标（`torque` 或 `position` 模式）；控制频率 50 Hz，物理 500 Hz。
+
+## 3. 任务清单
+
+共 **31 个任务**，分成 loco 和 manipulation 两大族。奖励均为 dense，成功率使用统一的 `success` 判据。
+
+### 3.1 Locomotion（14 个）
+
+| ID | 任务 | 核心难点 |
+| --- | --- | --- |
+| `walk` | 平地行走到目标速度 | 基础步态 |
+| `run` | 高速奔跑 | 动量控制 |
+| `stand` | 站立不倒 | 平衡 |
+| `sit` | 坐到椅子上 | 接触过渡 |
+| `stair` | 上下楼梯 | 落脚点规划 |
+| `slide` | 斜坡下滑 | 摩擦利用 |
+| `crawl` | 低矮隧道爬行 | 姿态受限 |
+| `maze` | 迷宫导航 | 高层规划 |
+| `pole` | 抓竿保持平衡 | 双手闭链 |
+| `hurdle` | 跨越栏杆 | 跳跃时机 |
+| `balance_simple` | 平衡木缓慢通过 | 侧向稳定 |
+| `balance_hard` | 平衡木快速通过 | 高精度落脚 |
+| `reach` | 头顶目标 reach | 全身协同 |
+| `stand_up` | 从地面站起 | 大范围姿态切换 |
+
+### 3.2 Manipulation（17 个）
+
+| ID | 任务 | 核心难点 |
+| --- | --- | --- |
+| `push` | 单手推箱 | 力/位置切换 |
+| `cabinet` | 开柜门 | 长时接触 |
+| `cube` | 双手立方体重定向 | 灵巧 in-hand |
+| `door` | 开推拉门 | 抓握 + 全身位移 |
+| `basketball` | 投篮 | 弹道控制 |
+| `window` | 擦玻璃 | 平面轨迹跟踪 |
+| `spoon` | 舀勺子 | 液体/颗粒（软接触） |
+| `kitchen` | 微波炉/水龙头组合 | 多子任务 |
+| `package` | 抱箱走 | loco + manip 耦合 |
+| `powerlift` | 举杠铃 | 大负载全身 |
+| `truck` | 搬运到卡车 | 长距离 loco-manip |
+| `bookshelf_simple` | 单本上架 | 精细定位 |
+| `bookshelf_hard` | 复杂上架 | 干扰物 |
+| `insert_small` | 小件插孔 | 高精度 |
+| `insert_normal` | 常规插孔 | 中等精度 |
+| `highbar_simple` | 单杠悬垂 | 抓握持续 |
+| `highbar_hard` | 单杠翻上 | 动力学切换 |
+
+## 4. 层次策略接口
+
+HumanoidBench 显式提供了一套 **hierarchical control API**，鼓励把 loco 和 task decision 解耦：
+
+- **低层控制器**：预训练的 walking / reaching 策略，输入根节点/末端目标，输出关节 PD 目标。论文提供了基于 DreamerV3 训练的 `low_level_walker` 和 `low_level_reacher` checkpoint。
+- **高层任务策略**：只需输出末端目标或行走方向，动作维度从 51 降到 ~6，显著缓解探索难度。
+- **接口**：环境暴露 `low_level_action_space`（joint）与 `high_level_action_space`（cartesian），研究者可自由切换以研究 hierarchical RL、skill reuse、options framework。
+
+这一设计使得后续 skill-based RL（如 HSD、H-GAP）能直接在同一环境上做公平比较。
+
+## 5. 基线
+
+作者用统一超参跑了四类主流算法（1e7 步，5 seed）：
+
+| 算法 | Locomotion 平均成功率 | Manipulation 平均成功率 |
+| --- | --- | --- |
+| PPO | 0.28 | 0.05 |
+| SAC | 0.41 | 0.09 |
+| TD3 | 0.35 | 0.08 |
+| **DreamerV3** | **0.63** | **0.11** |
+
+关键结论：
+
+1. **DreamerV3 在 loco 上碾压**：world-model based 方法对高维 proprio 观测明显更 sample-efficient，`walk` / `run` / `stand` 均能收敛到 >0.9 success。
+2. **Manipulation 全体崩溃**：所有 baseline 在 17 个 manip 任务上平均成功率都低于 **20%**，尤其是 `cube` in-hand reorientation、`insert_small`、`highbar_hard` 长期为 0。作者据此指出 dexterous whole-body 仍是 open problem。
+3. **层次接口能救命**：使用预训练 low-level walker 后，`package`、`truck` 等 loco-manip 任务成功率提升 3-5 倍，但仍未达 50%。
+
+## 6. 影响
+
+发布不到一年，HumanoidBench 已成为人形 RL 的默认试金石，后续代表性工作包括：
+
+| 工作 | 使用方式 |
+| --- | --- |
+| **ASAP** (Guo et al., 2024) | 基于 HumanoidBench 环境做 residual policy learning，实现 sim2real |
+| **Embrace Collisions** (He et al., 2024) | 复用 H1 + Shadow Hand 模型做 whole-body contact-rich manip |
+| **H2O / OmniH2O** (He et al., 2024) | 拿 HumanoidBench 的 loco 子集当预训练场，再迁移到 teleop |
+| **HumanPlus** (Fu et al., 2024) | 用 HumanoidBench 的评测协议对比 shadowing policy |
+| **HOVER**, **ExBody2** 等 | 在派生环境上做多任务 whole-body tracking |
+
+社区已经形成了默认对比模式：新算法先在 HumanoidBench 的 loco 子集上跑通，再讨论 manip 子集或 sim2real 扩展。
+
+## 7. 限制
+
+尽管应用广泛，HumanoidBench 仍有明确边界：
+
+- **单一物理引擎**：只支持 MuJoCo MJX，无 IsaacLab / Genesis 版本，GPU 并行度不如 Isaac 系。
+- **接触保真度**：MuJoCo 软接触模型对 Shadow Hand 指尖-物体交互仍偏理想化，缺少接触噪声与摩擦漂移。
+- **Shadow Hand sim-to-real gap**：实机 Shadow Hand 的腱驱耦合、迟滞、传感噪声在仿真中未建模；策略迁移到真机需要显著 domain randomization。
+- **无视觉真实感**：egocentric RGB 使用默认 MuJoCo 渲染，无 PBR / ray tracing，视觉策略难以直接迁移。
+- **奖励工程重**：31 个任务均使用手工 dense reward，尚不适合评测 reward-free / language-conditioned 方法（尽管后续工作已在补齐）。
+- **单机器人绑定**：所有任务只在 H1 上定义，缺少 G1 / Digit / Atlas 等异构对比，morphology transfer 研究需要自行迁移。
+
+即便如此，HumanoidBench 依然是当前唯一同时覆盖 whole-body loco 和 dexterous manip 的公开人形 RL benchmark，是 2024 年之后人形 RL 论文几乎绕不开的一站。
+
+</WordCount>

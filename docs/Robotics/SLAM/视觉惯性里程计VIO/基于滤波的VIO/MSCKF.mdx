@@ -2,4 +2,154 @@ import WordCount from '../../../../../src/components/WordCount/WordCount';
 
 <WordCount>
 
+# MSCKF：把地图点从状态里请出去
+
+论文：[A Multi-State Constraint Kalman Filter for Vision-aided Inertial Navigation](https://intra.ece.ucr.edu/~mourikis/papers/MourikisRoumeliotis-ICRA07.pdf)（Mourikis & Roumeliotis，UCR，2007）。MSCKF 想说的事情不复杂：EKF 做 VIO 卡在状态维度爆炸——每加一个地图点就多三个变量，跑几秒钟状态向量长到几千维、协方差矩阵变几百万格，实时算不动。MSCKF 的答案是：**根本不把地图点放进状态**，只保留最近若干帧相机位姿的克隆，让同一个特征点在多帧的观测通过一个几何约束参与更新。
+
+## 1. 为什么滤波 VIO 之前不 work
+
+在 MSCKF（2007）之前，视觉-惯性融合主要两条路：
+
+**EKF-SLAM 路线**：把 IMU 状态 + 所有地图点都放进 EKF 状态向量。问题是维度 $O(N)$，协方差更新 $O(N^2)$，跑一分钟就得几十上百个点，实时就没法维持。而且 EKF-SLAM 有个经典的**一致性问题**——线性化点错了协方差会持续变小，导致过度自信。
+
+**松耦合视觉+IMU**：视觉里程计单独跑，IMU 结果再融合。缺点是视觉端的不确定性传不进 IMU 更新，快速运动下容易崩。
+
+MSCKF 提出的是第三条路：EKF 的状态里**只有 IMU 状态和相机位姿滑窗**，地图点根本不进状态，但仍然是紧耦合。
+
+## 2. 状态定义
+
+状态向量分两部分：
+
+$$
+X = \begin{bmatrix} X_{IMU} \\ X_{cam} \end{bmatrix}
+$$
+
+**IMU 部分**（16 维）：
+
+$$
+X_{IMU} = [q_{IG}^T, b_g^T, v_G^T, b_a^T, p_G^T]^T
+$$
+
+四元数、陀螺 Bias、速度、加计 Bias、位置。
+
+**相机克隆部分**：最近 $N$ 帧相机位姿的克隆，每帧 7 维（四元数 + 位置），$N$ 一般取 15–30：
+
+$$
+X_{cam} = [q_{C_1}^T, p_{C_1}^T, ..., q_{C_N}^T, p_{C_N}^T]^T
+$$
+
+总状态维度 $16 + 7N$，取 $N=20$ 时约 156 维，无论跑多久都保持这个大小。
+
+## 3. 状态克隆
+
+每当有新图像来（不是每次 IMU 采样，而是相机采样），MSCKF 做一件很像 SLAM 里"关键帧"操作的事：**克隆当前 IMU 位姿到 cam 状态里**。
+
+克隆过程：
+
+1. 用外参 $T_{IC}$ 把当前 IMU 位姿转成相机位姿
+2. 把这个位姿加到 $X_{cam}$ 末尾
+3. 相应地扩展协方差矩阵（Jacobian 是单位矩阵形式的映射）
+4. 如果克隆数超过 $N$，把最老的一帧弹出去，边缘化对应的协方差块
+
+克隆本身不带来新信息，只是把当前时刻的位姿"冻结"下来供以后的更新使用。
+
+## 4. 视觉更新：Null Space Projection
+
+这是 MSCKF 最漂亮的一步，也是它区别于其他滤波 VIO 的关键。
+
+假设某个特征点 $f$ 在克隆窗口里被 $M$ 帧观测到。每帧观测都是一个 2D 像素坐标 $z_i \in \mathbb{R}^2$：
+
+$$
+z_i = \pi(R_{C_i}(f - p_{C_i})) + n_i
+$$
+
+$\pi$ 是投影函数，$n_i$ 是像素噪声。$M$ 帧总共给出 $2M$ 个残差方程，但残差表达式里既有相机位姿 $(R_{C_i}, p_{C_i})$（在状态里）也有 3D 点 $f$（不在状态里）。
+
+朴素做法是先三角化 $f$，再把它代进残差。但三角化的误差会污染更新。
+
+MSCKF 的做法是：先线性化残差，得到
+
+$$
+r_i = H_{X,i} \delta X + H_{f,i} \delta f + n_i
+$$
+
+把所有 $M$ 帧堆起来：
+
+$$
+r = H_X \delta X + H_f \delta f + n
+$$
+
+然后找一个矩阵 $A$，使 $A^T H_f = 0$（即 $A$ 张成 $H_f$ 的**左零空间**）。左乘 $A^T$：
+
+$$
+A^T r = A^T H_X \delta X + A^T n
+$$
+
+$\delta f$ 项消失了。剩下的方程只关于状态 $\delta X$，可以直接用 EKF 更新。3D 点被"投影出去"，它的估计误差不进入状态协方差。
+
+维度上：$H_f$ 是 $2M \times 3$，左零空间维度是 $2M - 3$。也就是说一个被 $M$ 帧观测到的点带来 $2M - 3$ 个独立的几何约束（就是"多视图几何约束"，去掉重建那 3 个自由度）。$M \geq 2$ 才有约束（$M=2$ 时只有 1 个约束——极线约束）；$M=3$ 时有 3 个；$M=5$ 时有 7 个。
+
+这个技巧的实质是：**只把"这些帧看到同一个点"这个几何事实用起来，不 care 那个点到底在哪**。
+
+## 5. 什么时候触发更新
+
+MSCKF 不是每帧都更新，而是等一个特征"用完了"再触发更新：
+
+- 特征跟丢（跟踪线程 KLT 断了）
+- 或者特征所在的最老克隆帧滑出窗口
+
+这时候把该特征的所有观测收集起来，做一次上面那种 null space projection 更新。多个特征同时用完就 stack 起来一起更新。
+
+这个"延迟更新"策略的好处：
+
+- 每个特征参与的帧数越多，约束越强
+- 减少 EKF 更新频率（几十 Hz IMU 采样对应几 Hz 视觉更新），CPU 友好
+- 短暂遮挡的特征只要还没滑出窗口就不算失效
+
+## 6. 一致性问题与 OC-EKF
+
+MSCKF 原版有个隐藏 bug：**可观性错误导致 yaw 方向协方差过度收缩**。理论上单目 VIO 有 4 个不可观维度（3 维绝对位置 + yaw），yaw 方向的不确定性只能被视觉 loop 缩小。但 MSCKF 因为在两个不同的线性化点算 Jacobian，yaw 变得"人为可观"，滤波器越跑越自信直到崩掉。
+
+Huang 等提出 **First Estimate Jacobian（FEJ）** 和后来的 **Observability-Constrained EKF（OC-EKF）** 修正这个问题：把跟不可观方向相关的所有 Jacobian 都在第一次估计的位姿处计算，之后不再更新。这个改动让 MSCKF 的可观性和真实系统一致，长时间跑不再发散。
+
+现代工程实现（如 [OpenVINS](https://github.com/rpng/open_vins)）默认打开 FEJ。
+
+## 7. 实验结果
+
+MSCKF 及其变体在 EuRoC 上的表现：
+
+| 方法 | 类型 | MH_03 RMSE (m) | V2_03 RMSE (m) | CPU (相对) |
+|---|---|---|---|---|
+| MSCKF (2007 原版) | Filter | 0.28 | 0.45 | 1× |
+| MSCKF + FEJ | Filter | 0.19 | 0.31 | 1× |
+| S-MSCKF (Stereo) | Filter | 0.15 | 0.24 | 1.5× |
+| OpenVINS | Filter | 0.10 | 0.17 | 2× |
+| [VINS-Mono](../基于优化的VIO/VINS-Mono.mdx) | Optim | 0.16 | 0.27 | 4× |
+| [ORB-SLAM3](../基于优化的VIO/ORB-SLAM3.mdx) | Optim | 0.035 | 0.024 | 8× |
+
+滤波路线精度普遍不如优化路线，但**CPU 占用小一个数量级**——这就是为什么 MSCKF 至今仍是资源受限平台（无人机、AR 眼镜、SpaceX 星舰内导）的首选：
+
+- Google Tango（一代 AR 手机）用的就是 MSCKF
+- SpaceX Dragon 舱内视觉导航用 MSCKF 变种
+- 大疆早期无人机避障也是 MSCKF
+
+## 8. 局限
+
+- **精度天花板低于优化路线**：一次线性化不能反复重新收敛
+- **对外点敏感**：一个错匹配进入更新会污染整个状态，需要额外的卡方检验做门控
+- **初始化仍然痛苦**：单目尺度问题不比优化派好解
+- **不适合回环**：滤波无法方便地"改写过去"，需要额外挂位姿图或者做 delayed relinearization
+
+## 9. MSCKF 在 VIO 家谱里的位置
+
+往前看，MSCKF 站在 EKF-SLAM 和 VO 的交叉点上，2007 年的这个 idea 早于所有滑窗优化 VIO 十年，至今仍是滤波路线的标杆。往后看：
+
+- **S-MSCKF**（Delmerico & Scaramuzza，2018）：双目扩展
+- [ROVIO](./ROVIO.mdx)：不用特征点，用 patch 光度残差直接进 EKF
+- **OpenVINS**（RPNG 组）：MSCKF + FEJ + 各种模块化选项，社区参考实现
+- **Xivo**（UCLA）：MSCKF 思路的稀疏优化重写
+- **VIO 商业化**：Facebook Reality Labs、Apple AR、Magic Leap 大概率都用 MSCKF 派生系统
+
+在算力受限的嵌入式和 AR 场景里，MSCKF 一族到今天都没有被更好的方案取代。
+
 </WordCount>

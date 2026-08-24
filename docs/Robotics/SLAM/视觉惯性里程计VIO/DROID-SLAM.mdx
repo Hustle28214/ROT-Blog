@@ -2,4 +2,134 @@ import WordCount from '../../../../src/components/WordCount/WordCount';
 
 <WordCount>
 
+# DROID-SLAM：把整个 SLAM 塞进一个可微分优化器
+
+论文：[DROID-SLAM: Deep Visual SLAM for Monocular, Stereo, and RGB-D Cameras](https://arxiv.org/abs/2108.10869)（Teed & Deng，Princeton，NeurIPS 2021）。DROID-SLAM 想说的事情不复杂：传统 SLAM 前端（特征检测、匹配、光流）和后端（BA、边缘化）是两套完全独立的东西，各自都需要精心手工调参。既然 [RAFT](https://arxiv.org/abs/2003.12039)（同一作者的光流网络）已经证明"迭代式的稠密光流预测"效果好过所有手工方法，那能不能把 BA 也写成一个可微分的更新层，跟 RAFT 一起端到端训练？答案就是 DROID-SLAM——一个用**稠密光流 + 可微 Dense BA**替代整个 SLAM 前后端流水线的系统。
+
+## 1. 传统 SLAM 的两个痛点
+
+先说清楚 DROID-SLAM 之前 SLAM 面临的两个长期问题，才能理解它为什么在 2021 年成为 SLAM 圈的地震。
+
+**痛点一：前端脆弱。** [ORB-SLAM3](./基于优化的VIO/ORB-SLAM3.mdx)、[VINS-Mono](./基于优化的VIO/VINS-Mono.mdx) 这些系统在白墙、反光、动态物体、快速旋转下都会跟丢。原因是它们依赖手工特征（ORB、KLT），特征点稀疏且局部，缺乏全局上下文。
+
+**痛点二：调参费劲。** 特征数、关键帧阈值、边缘化策略、外点剔除阈值——每个参数都对精度影响巨大，换个数据集就要重新调。传统 SLAM 系统很难做到"训练一次跨场景通用"。
+
+深度学习进入 SLAM 领域的早期尝试（DeepVO、DeepSLAM）大多是把整个位姿预测端到端交给 CNN，效果反而不如传统 SLAM——因为放弃了几何约束这个强先验。DROID-SLAM 的关键洞察：**保留 BA 的几何结构，但把它变成可微分的迭代层，用网络学习"BA 该往哪个方向走"**。
+
+## 2. 架构
+
+DROID-SLAM 借鉴 [RAFT](https://arxiv.org/abs/2003.12039) 的迭代更新范式，整个系统由几个组件组成：
+
+```
+输入图像流
+   │
+   ▼
+特征编码器（CNN）─► 特征金字塔
+   │
+   ▼
+关键帧图（视图之间的边表示共视关系）
+   │
+   ▼
+GRU 迭代更新层 ──┐
+   │            │
+   ▼            │
+稠密光流预测 ──┐ │
+   │          │ │
+   ▼          ▼ ▼
+Dense Bundle Adjustment Layer（可微）
+   │
+   ▼
+更新后的位姿 + 逆深度图
+```
+
+每次迭代做三件事：（1）用 GRU 更新每条边上的光流预测；（2）把光流当"观测"扔进 Dense BA 层；（3）Dense BA 输出更新过的位姿和逆深度，反过来作为下一次 GRU 的输入。整个过程迭代 10–15 次收敛。
+
+## 3. Dense BA Layer
+
+DROID-SLAM 最核心的贡献。传统 BA 的残差是稀疏 3D 点的重投影误差：
+
+$$
+r_{i,j}^k = \pi(T_j \cdot X_k) - u_{i,j}^k
+$$
+
+DROID-SLAM 换成**稠密光流残差**——每张关键帧上的**每一个像素**都有残差：
+
+$$
+r_{ij}(u) = \pi(T_{ij} \cdot \pi^{-1}(u, d_i(u))) - (u + f_{ij}(u))
+$$
+
+其中 $f_{ij}(u)$ 是网络预测的从帧 $i$ 到帧 $j$ 的光流，$d_i(u)$ 是帧 $i$ 在像素 $u$ 处的逆深度。
+
+优化变量：所有关键帧位姿 $\{T_i\}$ 和所有像素逆深度 $\{d_i(u)\}$。目标函数最小化上面所有边、所有像素的残差平方和，还带一个像素置信度权重 $w_{ij}(u)$（网络也预测）。
+
+这个非线性最小二乘问题用**高斯-牛顿一步**求解——不是迭代到收敛，而是只走一步。Schur complement 把稠密逆深度消掉（利用其块稀疏结构），只留下位姿变量的方程一次解出来。这一步的关键工程是稀疏矩阵结构 + CUDA 加速，让 Dense BA 能在 GPU 上跑到亚秒级。
+
+**为什么 Dense BA 是可微分的？** 因为高斯-牛顿的每一步就是矩阵求逆 + 矩阵乘法——都是可微操作。梯度可以从最终位姿反传回 GRU 的光流预测和权重预测，让网络学到"什么样的光流置信度让 BA 收敛得最好"。
+
+## 4. 关键帧图管理
+
+DROID-SLAM 不是把所有帧都放进 BA。它维护一个**共视图**（co-visibility graph）：节点是关键帧，边是共视的帧对。GRU 和 BA 只在边上跑。
+
+关键帧选择策略：光流距离超过阈值时加新关键帧。距离用平均光流大小衡量，比传统的"位姿差 + 视差"更贴合网络训练分布。
+
+边管理：新关键帧加入时对所有旧关键帧做光流查询，光流小（说明有共视）的加边。老边如果对应帧对已经很远（漂出视野）就删边。整个图维持在 20–50 帧规模，实时可控。
+
+## 5. 训练
+
+DROID-SLAM 在 [TartanAir](https://theairlab.org/tartanair-dataset/) 上训练。TartanAir 是虚幻引擎生成的合成数据集，包含 30 个场景、上百万张图像的位姿真值、深度真值。合成数据的好处是免费大量、真值精确；坏处是有 sim-to-real gap。DROID-SLAM 的做法是：**只在 TartanAir 上训练，然后 zero-shot 迁移到所有真实数据集**（EuRoC、TUM、KITTI、ETH3D）。
+
+损失函数分两部分：
+
+- **位姿损失**：预测位姿和 GT 的 SE(3) 距离
+- **光流损失**：GRU 的最后一次光流预测和真值的 L1 差
+
+关键 trick：训练时随机取 7 帧子序列做端到端 BPTT（时间反向传播），让网络学到"如何在小窗口里逐步收敛"。
+
+## 6. 实验结果
+
+**EuRoC 数据集**（单目 SLAM 模式，无 IMU）：
+
+| 序列 | ORB-SLAM3 (mono) | DROID-SLAM (mono) |
+|---|---|---|
+| MH_01 | 0.016 | 0.013 |
+| MH_02 | 0.027 | 0.014 |
+| MH_04 | 0.077 | 0.038 |
+| V1_02 | X (失败) | 0.021 |
+| V2_02 | X (失败) | 0.021 |
+| V2_03 | X (失败) | 0.043 |
+
+ORB-SLAM3 在多个"难度高"序列上直接失败（跟丢），DROID-SLAM 从头到尾没掉过。这是深度学习方法相对传统 SLAM 最直观的优势——**鲁棒性**。
+
+**TUM RGB-D**：DROID-SLAM 平均 ATE 0.013m，超过所有传统 SLAM。
+
+**ETH3D**（大规模室外/室内）：DROID-SLAM 在很多序列上是唯一没崩的方法。
+
+## 7. 加上 IMU：DROID-VIO
+
+原版 DROID-SLAM 是纯视觉的，作者后来发了 [iSLAM](https://arxiv.org/abs/2306.07894) 和 [DPVO](https://arxiv.org/abs/2208.04726) 扩展。社区里也有直接把 IMU 项加进 Dense BA 的实现——把 IMU 预积分残差和光流残差一起放进目标函数，只是 IMU 项是稀疏的，工程上加一个块稀疏矩阵就行。
+
+加了 IMU 之后 DROID-VIO 在 EuRoC 上比纯视觉版又低了一个量级，接近 [ORB-SLAM3](./基于优化的VIO/ORB-SLAM3.mdx) 的水平，但鲁棒性依然远超它。
+
+## 8. 局限
+
+- **GPU 依赖**：Dense BA 层需要 GPU 才能实时，CPU 版无法保证 30 Hz。这限制了 DROID-SLAM 在嵌入式（无人机、AR 眼镜）上的部署
+- **训练数据分布相关**：TartanAir 主要是室内/城市场景，水下、SAR、医学内窥镜等特殊场景需要重新训练
+- **回环相对弱**：靠共视图长距离连接，没有专门的词袋回环检测。大尺度回环性能不如 [ORB-SLAM3](./基于优化的VIO/ORB-SLAM3.mdx)
+- **显存占用大**：一次 Dense BA 需要 8GB+ 显存（分辨率越高越夸张），移动端不现实
+- **推理延迟高**：单次 GRU + BA 迭代约 30ms，10 次迭代 300ms，实时性靠关键帧稀疏化维持
+
+## 9. DROID-SLAM 在 VIO 家谱里的位置
+
+往前看，DROID-SLAM 继承了两条线：几何 SLAM 的 BA 框架（[OKVIS](./基于优化的VIO/OKVIS.mdx)、ORB-SLAM 系）、和深度光流网络的迭代范式（RAFT）。它把二者揉进一个可微分系统，是 SLAM 领域第一个真正**端到端可训练**的完整系统。
+
+往后看，DROID-SLAM 直接催生了一波 learning-based SLAM 复兴：
+
+- **DPVO**（Deep Patch VO，2023）：稀疏 patch 版，速度快 10 倍，精度接近
+- **iSLAM**：可微分 SLAM，能通过策略梯度做 SLAM-aware 主动感知
+- **GO-SLAM**：把 3DGS 场景表示塞进 DROID 骨架
+- **NICER-SLAM**、**Nice-SLAM**、**Vox-Fusion**：DROID 思路 + 神经场景表示
+- **GLIM**、**MASt3R-SLAM**（2025）：借用 DROID 的迭代 BA 思想 + 预训练视觉基础模型
+
+在 [DROID-SLAM](./DROID-SLAM.mdx) 之前，"深度学习做 SLAM"要么效果不如传统方法要么只能做单点替换（如深度估计、位姿回归）。DROID-SLAM 之后，端到端可微分 SLAM 才成为一个真正的研究方向。到 2024–2025 年，几乎所有新的 SLAM 论文都或多或少借鉴了 DROID-SLAM 的架构。
+
 </WordCount>

@@ -2,4 +2,120 @@ import WordCount from '../../../../../src/components/WordCount/WordCount';
 
 <WordCount>
 
+# ROVIO：把光度残差直接塞进 EKF
+
+论文：[Robust Visual Inertial Odometry Using a Direct EKF-Based Approach](https://ieeexplore.ieee.org/document/7353389)（Bloesch 等，ETH，2015）。ROVIO 想说的事情不复杂：视觉 VIO 前端流水线太长——检测特征、算描述子、匹配、剔外点、三角化、再进后端——每一步都可能出错。既然 EKF 更新只需要"预测像素 vs 实测像素"，为什么不跳过所有中间环节，直接把 patch 的**光度差**（灰度残差）扔进 EKF？这就是所谓的**直接法** VIO。
+
+## 1. 直接法 vs 特征法在 VIO 里的意义
+
+**特征法**（[MSCKF](./MSCKF.mdx)、[VINS-Mono](../基于优化的VIO/VINS-Mono.mdx)、[ORB-SLAM3](../基于优化的VIO/ORB-SLAM3.mdx)）：先把图像抽成一堆稀疏点，用点做残差。优点是几何清晰、外点好剔除；缺点是抽点过程本身就要花算力，且低纹理场景抽不出足够的点。
+
+**直接法**（DSO、LSD-SLAM、ROVIO）：直接用像素灰度做残差，不抽点。优点是能利用图像中所有有梯度的地方（不只是角点），弱纹理下比特征法更抗；缺点是光度模型（曝光、相机响应）必须准，且残差非凸性更强。
+
+ROVIO 是**第一个把直接法和 EKF 融合的 VIO 系统**——之前直接法都跟优化后端配对，ROVIO 证明了直接法也能进滤波器。
+
+## 2. 状态定义
+
+ROVIO 的状态和 [MSCKF](./MSCKF.mdx) 有本质区别：MSCKF 不把地图点放进状态，ROVIO 把地图点**紧紧钉在状态里**：
+
+$$
+X = [r^T, v^T, q^T, b_g^T, b_a^T, c^T, z^T, \mu_1^T, \rho_1, ..., \mu_N^T, \rho_N]^T
+$$
+
+- $(r, v, q)$：位置、速度、姿态
+- $(b_g, b_a)$：IMU Bias
+- $(c, z)$：相机-IMU 外参（可选在线标定）
+- $(\mu_i, \rho_i)$：第 $i$ 个 patch 特征的**方位向量 + 逆深度**（3 维方位 + 1 维深度）
+
+每个 patch 用一个"归一化方位向量 $\mu_i \in S^2$ + 逆深度 $\rho_i$"来参数化。这个表示的好处是深度不确定时用 $\rho_i = 0$（对应无穷远）表示，避免朴素 $(x,y,z)$ 参数化下远点 Jacobian 病态。
+
+$N$ 一般取 15–25 个 patch，每个 patch 是 $8\times 8$ 或 $16\times 16$ 灰度块。总状态维度 $\approx 24 + 4N$。
+
+## 3. Patch Feature：不是特征点是"灰度块"
+
+传统特征法里的"特征"是一个 2D 像素坐标 + 描述子。ROVIO 里的"特征"是：
+
+- 一个方位向量 $\mu$（说明它在哪个方向上）
+- 一个逆深度 $\rho$（说明它多远）
+- 一个 8×8 或更大的**光度模板** patch（说明它长什么样）
+
+模板初始化时从图像里剪一块，之后每次 EKF 更新时预测它现在应该在哪、长什么样，跟当前图像做光度比较。
+
+**光度残差**：
+
+$$
+r_{photo}(u, v) = I_{cur}(u + \delta u, v + \delta v) - I_{ref}(u, v)
+$$
+
+$\delta u, \delta v$ 是根据状态预测的 patch 中心位移。EKF 用这个残差和它对状态的 Jacobian 做更新。
+
+关键假设：**同一个 patch 在不同视角下亮度接近不变**（Brightness Constancy Assumption）。这个假设在小基线、光照稳定、无强反射的场景成立；大基线（大幅度视角变化）、HDR 场景、镜面反射下就会失效。ROVIO 的应用场景决定了它更适合无人机室内、慢速移动机器人，不太适合车载。
+
+## 4. Iterated EKF
+
+朴素 EKF 只做一次线性化。但光度残差非凸性强（一个 patch 平移一个像素灰度可能变化剧烈），一次线性化不够精。ROVIO 用 **Iterated EKF (IEKF)**：在同一次更新步内迭代 3–5 次线性化，每次都在最新估计处重新算 Jacobian，直到收敛。
+
+IEKF 数学上等价于对当前测量做一次高斯-牛顿优化，只是保留了 EKF 的常数时间结构。这个技巧让 ROVIO 在近似线性时和 EKF 一样快，非线性重时又能达到接近优化路线的精度。
+
+## 5. Patch Warping
+
+预测 patch 长什么样时不能只做平移——相机移动 patch 会**变形**（透视变形、旋转、缩放）。ROVIO 用仿射 warp：
+
+$$
+I_{cur}(A \cdot [u; v] + t) \approx I_{ref}(u, v)
+$$
+
+$A$ 是从当前和参考帧位姿差算出来的 2×2 仿射矩阵。这个 warp 大概能扛住 15° 视角变化，再大就得重新初始化 patch。
+
+作者报告 warp 是 ROVIO 相对早期直接法（如朴素 patch tracking）的关键改进——不做 warp 的话大转弯直接跟丢。
+
+## 6. Patch 生命周期
+
+ROVIO 的 patch 是动态维护的：
+
+- **初始化**：新 patch 从 FAST 角点位置选取，深度设为 $\rho = 0.1$（假设 10 米远），协方差大
+- **收敛**：随着更新，patch 位置和深度协方差缩小
+- **淘汰**：跟丢（光度残差过大）、跑出视野、协方差超阈值都会剔除
+- **补充**：状态里 patch 数少于阈值时从当前帧补新的
+
+这个流程和 [MSCKF](./MSCKF.mdx) 的"用完就丢"截然不同——ROVIO 的 patch 会**长期存活并优化**，成为一张持续更新的稀疏地图。因此 ROVIO 严格说不算纯 VIO，它带了个小地图（几十个持续追踪的 3D 点）。
+
+## 7. 实验结果
+
+EuRoC 数据集，ROVIO 及可比方法：
+
+| 方法 | MH_03 RMSE (m) | V1_02 RMSE (m) | V2_03 RMSE (m) | 备注 |
+|---|---|---|---|---|
+| [MSCKF](./MSCKF.mdx) | 0.28 | 0.09 | 0.45 | 特征法滤波 |
+| ROVIO | 0.25 | 0.07 | 0.55 | 直接法滤波 |
+| [OKVIS](../基于优化的VIO/OKVIS.mdx) | 0.20 | 0.13 | 0.29 | 特征法优化 |
+| [VINS-Mono](../基于优化的VIO/VINS-Mono.mdx) | 0.16 | 0.11 | 0.27 | 特征法优化 |
+
+ROVIO 精度和 MSCKF 差不多，比优化路线略差。它的**真正优势**在低纹理场景：
+
+- 白墙前 SLAM 试验：VINS-Mono 跟丢，ROVIO 靠残余梯度继续走
+- 夜间照明：ORB 特征几乎抽不出来，ROVIO 用像素直接残差
+- 强抖动：滤波路线相对不容易崩，且 patch 数量少 CPU 占用低
+
+作者把 ROVIO 部署在瑞士的 Wingtra 无人机上，商业化跑了很多年，主要卖点就是"直接法在户外阴影/反光下比特征法更鲁棒"。
+
+## 8. 局限
+
+- **光度不变假设**：曝光变化、白平衡跳变、镜面反射会打破这个假设，ROVIO 需要外部光度标定
+- **patch 上限**：$N$ 一般不能超过 30，否则 EKF 协方差矩阵变大跑不动
+- **无回环**：滤波结构无法自然支持回环
+- **单目尺度依然依赖 IMU 激励**：所有单目 VIO 通病
+- **对高频振动的相机敏感**：patch 光度变化太快 warp 失效
+
+## 9. ROVIO 在 VIO 家谱里的位置
+
+往前看，ROVIO 站在直接法（LSD-SLAM、DSO 这一支）和滤波 VIO（[MSCKF](./MSCKF.mdx)）的交叉点，第一次把两者拼起来。往后看：
+
+- **DM-VIO**（TUM，2022）：直接法 + 优化后端 + 延迟边缘化，精度超过 [VINS-Mono](../基于优化的VIO/VINS-Mono.mdx) 和 [ORB-SLAM3](../基于优化的VIO/ORB-SLAM3.mdx)
+- **BASALT**：混合直接法和特征法
+- **BASALT-VIO**：把 ROVIO 的 patch 思路和优化滑窗结合
+- **DPVO**（Deep Patch VO，2023）：用神经网络学 patch 匹配，思想上是 ROVIO 的深度学习版
+
+ROVIO 至今仍是**直接法 VIO 的开山标杆**——精度可能不再最强，但每一篇直接法 VIO 论文都要先跟它对比。
+
 </WordCount>

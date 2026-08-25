@@ -1,0 +1,208 @@
+import WordCount from '../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+# 粒子系统基础：用一堆小点子模拟一切模糊的东西
+
+烟、火、爆炸、水花、灰尘、雨、雪、魔法、血迹、能量光柱——这些东西的共同点是**没有明确的几何形状、随时间变化、由很多小元素组成**。用多边形网格建模这些东西是噩梦（形状每帧都变、拓扑不固定），用体积密度场也太贵。1982 年 William Reeves 在 Star Trek II 的 Genesis Effect 里首次提出**粒子系统**（particle system），思路简单粗暴：**用几千个乃至几百万个独立小点来近似一片模糊物质**。
+
+粒子系统的成功之处在于它把一个宏观的复杂现象拆成了一堆微观独立单元。每个粒子是傻瓜——只知道自己的位置、速度、生命剩余多少。宏观效果从统计上涌现。这套思路后来延伸到了 SPH 流体、布料质点、群体模拟——**离散化的功力**。
+
+## 1. 粒子的最小状态
+
+一个粒子至少需要：
+
+```c
+struct Particle {
+    vec3  position;      // 当前位置
+    vec3  velocity;      // 当前速度
+    float age;           // 已存活时间
+    float lifetime;      // 总寿命
+    float size;          // 视觉尺寸
+    vec4  color;         // 颜色 + alpha
+    // 可选:
+    vec3  angular_velocity;  // 自转
+    float rotation;
+    int   texture_index;     // atlas 索引
+    vec3  user_data;         // 关联的自定义状态
+};
+```
+
+单个粒子 60-80 字节，一百万粒子约 80MB。GPU 端还要考虑 SoA vs AoS：CPU 端常用 AoS（连续 struct 数组），GPU compute shader 用 SoA（分开的浮点数组）以便向量化访存。
+
+粒子的生命周期是核心时间轴：$\text{age} \in [0, \text{lifetime}]$。所有随时间变化的属性（大小、颜色、透明度）都是关于 age 的曲线，本质是关键帧动画（参见 [关键帧动画与插值](./关键帧动画与插值.mdx)）。生命结束时粒子回收，别的地方新粒子接上。
+
+## 2. 发射器 Emitter
+
+粒子从哪里生出来？**发射器**定义生成规则：
+
+- **位置分布**：点、线段、圆盘、球面、box、任意 mesh 表面
+- **初速度分布**：定向锥（速度方向落在锥内随机）、径向、切向
+- **生成速率**：每秒发射 $N$ 个，或一次性 burst
+- **属性范围**：初始大小/颜色/寿命在 $[\min, \max]$ 均匀随机
+
+一个"火焰"发射器可能是：位置在一个小圆盘，速度朝上带 15° 锥角随机，速率 200/s，寿命 0.5-1.2s。参数搭好后一切随机涌现。
+
+发射器可以嵌套。一个"焰火"发射器发射粒子，每个粒子是**子发射器**，飞到最高点后 burst 出一堆彩色粒子。这个层级思路让复杂效果可组合。
+
+## 3. 力场与运动方程
+
+粒子每帧的运动由**力场**（force field）累加：
+
+$$
+\mathbf a_i = \sum_j \mathbf F_j(\mathbf x_i, \mathbf v_i, t) / m_i
+$$
+
+积分方案用[半隐式欧拉或 Verlet](./物理模拟入门.mdx)——粒子多，精度可以低，稳定第一。
+
+常见力场：
+
+| 力场 | 公式 | 用途 |
+|---|---|---|
+| 重力 | $\mathbf F = m\mathbf g$ | 火星、雨、灰尘 |
+| 阻力 | $\mathbf F = -k\mathbf v$ | 空气/水阻，让粒子渐停 |
+| 上升浮力 | $\mathbf F = -\rho V \mathbf g$ | 烟往上飘 |
+| 涡旋 | $\mathbf F = k(\mathbf r \times \mathbf a)/|\mathbf r|^2$ | 龙卷风、旋涡 |
+| 湍流噪声 | $\mathbf F = \nabla\times \text{curl noise}$ | 烟的随机扰动 |
+| 吸引/排斥 | $\mathbf F = k\hat{\mathbf r}/r^2$ | 磁场、黑洞 |
+
+**Curl noise** 特别值得一提。用 Perlin/Simplex 噪声场取 curl（旋度）得到无散度的向量场，粒子跟着这个场走能产生极自然的烟雾流动而不显得规律。Bridson 2007 的论文是奠基之作。
+
+## 4. 生命周期动画
+
+粒子诞生到消亡的过程中，视觉属性按曲线变化。典型的"火焰粒子"：
+
+```
+age →  0.0    0.2    0.5    0.8    1.0
+size:  small→ mid→   large→ large→ small
+color: yellow→orange→red→   dark→  black
+alpha: 0→     1→     1→     0.3→   0
+```
+
+设计工具（Unity Shuriken、Unreal Niagara、Houdini POP）给这些通道每个都提供一条曲线编辑器。工程上就是 age 归一化到 $[0, 1]$ 后查一次曲线（或 texture LUT）。
+
+**Alpha 淡入淡出**尤其关键——粒子突然出现或消失非常刺眼。开头几帧 alpha 从 0 起、结尾 alpha 落到 0，是所有粒子效果的基础。
+
+## 5. Billboard：三维空间里的二维贴片
+
+粒子渲染最普遍的做法是**billboard**（广告牌）——每个粒子是一个正对相机的四边形（quad），贴一张 alpha 半透明纹理（一小团烟、一朵火苗）。
+
+生成 billboard 顶点的三种朝向策略：
+
+- **View-aligned**（视图对齐）：quad 的法线始终等于相机 forward，quad 平面平行于近平面。所有粒子朝向一致，最经济。
+- **World-aligned**（世界对齐）：quad 在世界空间里固定朝向（比如始终朝上），适合尘埃、地上污渍。
+- **Velocity-aligned**（速度对齐）：quad 长轴沿粒子速度方向，另一轴指向相机。适合火花、导弹尾迹这些有明确运动方向的。
+
+Billboard 的顶点在 vertex shader 里生成：给一个中心点 + 大小，展开成 4 个顶点。GPU 端做完全在 vertex shader，CPU 只提供粒子中心数组。
+
+**Soft particles** 处理粒子与几何相交时的硬边问题——粒子插入固体时会有一条尖锐的切割线。做法是在 fragment shader 里读深度缓冲，若粒子片元的深度和场景深度接近，就降低 alpha 淡出。视觉上粒子"融进"几何。
+
+## 6. 渲染排序与 blending
+
+半透明粒子的老大难问题：**从后向前排序**才能得到正确 alpha 混合。几万粒子每帧排序开销可观。工程妥协：
+
+- **加法混合**（additive）：`dst = src + dst`。不需要排序，多层叠加自然发光。适合火、闪光、能量效果。
+- **预乘 alpha**（premultiplied）：`dst = src + (1-src.a) * dst`。也不需要严格排序（近似正确），适合烟雾。
+- **软排序**：CPU 端每帧只做粗略排序（比如按 emitter 分层），单个发射器内部不排。多数玩家看不出问题。
+
+DirectX/OpenGL/Vulkan 的**顺序无关透明**（Order Independent Transparency, OIT）也能解决排序，但工业上除了少数高端项目还是排序 + 加法混合的天下。
+
+## 7. GPU 粒子：把整个模拟搬到显存
+
+CPU 粒子系统每帧循环几万粒子，一旦到十万数量级就要占满一个核心。**GPU 粒子**把状态存在 GPU buffer 里、更新用 compute shader、渲染直接从同一 buffer 读——CPU 完全不 touch 粒子数据。
+
+一个 compute shader 更新的伪代码（HLSL 风）：
+
+```hlsl
+RWStructuredBuffer<Particle> particles;
+[numthreads(64, 1, 1)]
+void UpdateCS(uint3 id : SV_DispatchThreadID) {
+    Particle p = particles[id.x];
+    if (p.age >= p.lifetime) {
+        // 死亡: 从 free list 或 append buffer 回收
+        return;
+    }
+    // 力场累加
+    float3 a = float3(0, -9.8, 0);           // 重力
+    a += SampleCurlNoise(p.position) * 3.0;   // 湍流
+    // 半隐式欧拉
+    p.velocity += a * dt;
+    p.position += p.velocity * dt;
+    p.age += dt;
+    particles[id.x] = p;
+}
+```
+
+发射与死亡用 **AppendStructuredBuffer / ConsumeStructuredBuffer**（DX11）或原子计数器（Vulkan/OpenGL）管理"活着的粒子索引池"。渲染用 **DrawIndirect**——GPU 自己决定要画多少粒子而 CPU 无需知道。
+
+GPU 粒子的能力：单个 GPU（RTX 4090 级别）能实时更新几百万粒子。Unity VFX Graph、Unreal Niagara、Houdini 的 GPU POP 都基于这套架构。
+
+代价：CPU 端无法轻易查询粒子状态（比如"粒子和主角碰撞了吗"）——想查需要 GPU→CPU 回读，延迟一帧以上。所以 GPU 粒子适合纯视觉效果，游戏逻辑相关（如敌人被粒子攻击）通常还是 CPU 粒子。
+
+## 8. 粒子池与回收
+
+粒子频繁生成销毁，若每次都 `malloc/free` 会碎片化+慢。**粒子池**（object pool）预分配一个固定大小的数组，用一个"活跃索引集"表示哪些位置有效。
+
+```
+particles[MAX_PARTICLES]   // 预分配
+active_indices  ← 队列或 bitset
+free_indices    ← 剩下的槽位
+```
+
+发射时从 free_indices 取一个，死亡时归还。全流程零动态分配。工业实现有两种：
+
+- **SoA + swap-remove**：死亡时把最后一个活粒子搬到死粒子槽位，活粒子数 -1。缓存友好但打乱顺序。
+- **松散数组 + free list**：死粒子位置留白，用链表串起空位。顺序不变但访问不连续。
+
+GPU 版本用 AppendBuffer/ConsumeBuffer 或 compute shader 里的 atomic counter 实现。
+
+## 9. 几个经典配方
+
+### 9.1 烟雾
+
+- 发射器：地面圆盘、锥形速度、慢速率 30/s
+- 力：小重力反向（浮力）+ curl noise + 阻力
+- 生命：3-5 秒，尺寸从小变大 2-3 倍
+- 颜色：深灰渐变透明
+- 渲染：alpha 混合 + soft particles，纹理是半透明的烟团
+
+烟的关键是**尺寸增长**（模拟扩散）+ **alpha 淡出**（避免硬边）+ **湍流**（不规则形状）。
+
+### 9.2 火焰
+
+- 发射器：小圆盘，向上锥速度
+- 力：轻微上浮 + 小湍流
+- 生命：短，0.4-0.8 秒
+- 颜色：黄→橙→红→暗红→黑（+alpha 淡出）
+- 渲染：加法混合（发光感）+ animated texture atlas（每个粒子随机切几帧 UV 让形状变化）
+
+火焰要用**加法混合**因为它是光源发光而不是遮蔽——多个粒子叠加应该更亮而不是更透。
+
+### 9.3 流水
+
+- 发射器：水管口，速度带初速度
+- 力：重力 + 空气阻力
+- 生命：碰到地面时销毁（或反弹）
+- 渲染：velocity-aligned billboard，蓝白色贴图带高光
+
+真正的水面（湖、河、海）用不着粒子系统，用位移+法线贴图+反射就行。粒子系统更适合水花、瀑布、喷泉这类**破碎流**。
+
+真正的高保真水做的话，要用 SPH 流体（参见 [流体与布料模拟](./流体与布料模拟.mdx)）——那已经不算传统粒子系统，虽然计算单元也是粒子。
+
+## 10. 粒子系统的边界
+
+粒子系统能做什么、不能做什么：
+
+**能**：模糊、稀疏、光学不重要的现象——烟、火、灰尘、火花、雨雪、魔法、爆炸残骸
+
+**不能**：
+- **强关联现象**：布料（粒子之间有距离约束）→ 用 [布料模拟](./流体与布料模拟.mdx)
+- **不可压缩流体**：真实水池、湖面 → 用 SPH/FLIP/欧拉网格
+- **精确碰撞响应**：碎石落地弹跳 → 用[刚体动力学](./物理模拟入门.mdx)
+- **稠密光照**：厚烟的自阴影、体积散射 → 用 volumetric rendering 或 ray marching
+
+工程上常见的组合：粒子系统做主视觉，其他技术补精细部分。一场爆炸可能是：几十个刚体碎片 + 几百个火粒子 + 几百个烟粒子 + 一个 volumetric 光晕 + 一次冲击波屏幕效果。每种技术各司其职。
+
+粒子系统作为一门技术在 1983 年 Reeves 论文里就基本成型了。40 年过去，架构没变，变的是数量级——从几百个到几百万个，从 CPU 到 GPU 到光线追踪。理解基本的"位置+速度+生命+力场"循环，就理解了所有粒子系统的骨架。
+
+</WordCount>

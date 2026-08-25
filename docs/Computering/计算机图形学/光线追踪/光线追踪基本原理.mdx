@@ -1,0 +1,169 @@
+import WordCount from '../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+# 光线追踪基本原理：从眼睛反向找光
+
+光栅化用的是"图元 → 像素"的正向流水线，问"这个三角形覆盖了哪些像素"；光线追踪是反过来的——问"这个像素后面的场景里第一次撞到什么"。方向不同，逻辑不同，能干的事也不同。反射、折射、软阴影、间接光照这些在光栅化里要拼各种 trick 的效果，在光线追踪里都是自然产物。
+
+## 1. 从相机出发的射线
+
+一条光线是参数方程 $\mathbf{r}(t)=\mathbf{o}+t\mathbf{d}$，$\mathbf{o}$ 是起点，$\mathbf{d}$ 是单位方向向量，$t\geq 0$ 表示沿着方向走多远。看似平凡，但整个光线追踪算法都是围绕它转的。
+
+给定像素中心 $(i,j)$、相机位置 $\mathbf{e}$、视图矩阵和投影参数，射线的生成如下：
+
+$$
+\mathbf{d}_{ij} = \text{normalize}\left(\mathbf{p}_{ij}-\mathbf{e}\right)
+$$
+
+其中 $\mathbf{p}_{ij}$ 是像素中心在世界空间里的位置。屏幕像素在近平面上的坐标可以从 NDC 反推——这一步和光栅化里的[视口变换](../图形渲染管线/渲染管线概览：从顶点到像素的旅程.mdx)是同一个数学，只不过反着来。
+
+一条"眼睛射线"（primary ray）代表一个像素样本。要抗锯齿就在像素里多采几个位置；要景深就在光圈内多采几个 $\mathbf{e}$；要运动模糊就在时间上多采几帧。**采样维度扩了几维，效果就多了几维**，这是光线追踪最迷人的一点。
+
+## 2. 光线-三角形求交：Möller-Trumbore
+
+三维场景通常被表达为三角网格，所以最基础的一步是判断射线与三角形是否相交、在哪相交。
+
+一个三角形由顶点 $\mathbf{v}_0,\mathbf{v}_1,\mathbf{v}_2$ 定义。任意点可以用重心坐标表示：
+
+$$
+\mathbf{P}(u,v)=(1-u-v)\mathbf{v}_0+u\mathbf{v}_1+v\mathbf{v}_2
+$$
+
+代入射线方程 $\mathbf{o}+t\mathbf{d}=\mathbf{P}(u,v)$，整理得：
+
+$$
+\begin{bmatrix}-\mathbf{d} & \mathbf{e}_1 & \mathbf{e}_2\end{bmatrix}\begin{bmatrix}t\\u\\v\end{bmatrix}=\mathbf{o}-\mathbf{v}_0
+$$
+
+其中 $\mathbf{e}_1=\mathbf{v}_1-\mathbf{v}_0$，$\mathbf{e}_2=\mathbf{v}_2-\mathbf{v}_0$。用 Cramer 法则解这个 $3\times 3$ 线性系统就得到 Möller-Trumbore 算法（1997）：
+
+$$
+\begin{aligned}
+\mathbf{p}&=\mathbf{d}\times\mathbf{e}_2,\quad a=\mathbf{e}_1\cdot\mathbf{p}\\
+u&=\frac{(\mathbf{o}-\mathbf{v}_0)\cdot\mathbf{p}}{a}\\
+\mathbf{q}&=(\mathbf{o}-\mathbf{v}_0)\times\mathbf{e}_1\\
+v&=\frac{\mathbf{d}\cdot\mathbf{q}}{a},\quad t=\frac{\mathbf{e}_2\cdot\mathbf{q}}{a}
+\end{aligned}
+$$
+
+有效解需要 $u\geq 0$、$v\geq 0$、$u+v\leq 1$、$t>\epsilon$。这个算法不存储三角形的法线或平面方程，只用顶点——**内存友好**，这在几十亿三角形的场景里很关键。
+
+历史脉络：早期算法先算射线与三角形所在平面的交点再判断是否在三角形内，需要 24 次乘法。Möller-Trumbore 通过重心坐标把它压到 19 次左右，同时天然给出 $u,v$ 用于纹理插值和法线插值。几何基础可以参考[点、线、面与隐式曲面](../图形学数学基础/几何基础：点、线、面与隐式曲面.mdx)。
+
+## 3. Whitted 光线追踪
+
+1980 年 Turner Whitted 发表 *An Improved Illumination Model for Shaded Display*，把光线追踪从"眼睛射线找可见面"扩展为**递归**结构。核心思路：每次射线撞到表面后，根据材质属性生成新的射线。
+
+```
+        eye
+         │
+         ▼ primary ray
+       ┌─┴─┐  (hit)
+       │   │─────► shadow ray → 光源
+       │   │─────► reflection ray ──► 递归
+       │   │─────► refraction ray ──► 递归
+       └───┘
+```
+
+对每个交点 $\mathbf{x}$，最终颜色为：
+
+$$
+L(\mathbf{x},\omega_o)=L_e+k_a I_a+\sum_{l}\text{visible}(\mathbf{x},l)\,(k_d(\mathbf{n}\cdot\mathbf{l})+k_s(\mathbf{r}\cdot\mathbf{v})^n)+k_r L_r+k_t L_t
+$$
+
+其中 $L_r$ 是反射方向递归得到的颜色，$L_t$ 是折射方向递归得到的颜色。折射方向由 Snell 定律 $n_1\sin\theta_1=n_2\sin\theta_2$ 决定。
+
+递归的终止靠**最大深度**（比如 5 层）和**能量阈值**（贡献低于 $10^{-3}$ 就停）。Whitted 的模型只处理**纯镜面反射/折射**——每次只往一个确定方向发射子射线，所以场景里的玻璃和镜子表现极好，磨砂表面和柔和光照根本无法处理。这个坑要等到 Kajiya 的[渲染方程](./材质与间接光照.mdx)才被填上。
+
+## 4. 阴影射线与自相交
+
+从交点 $\mathbf{x}$ 向光源发一条射线 $\mathbf{r}(t)=\mathbf{x}+t(\mathbf{l}-\mathbf{x})$，如果 $t\in(0,1)$ 内命中任何几何体，说明 $\mathbf{x}$ 被遮挡。
+
+一个坑：起点 $\mathbf{x}$ 就在几何体表面上，浮点误差会让射线立刻"命中"自己。修复方法有两种：
+
+- **偏移起点**：$\mathbf{x}'=\mathbf{x}+\epsilon\mathbf{n}$，通用但 $\epsilon$ 难调
+- **忽略源三角形**：记录当前三角形 ID 排除，几何精确但对多面体的凹角不完美
+
+工业界（如 PBRT-v4、Embree）用的是更精细的自适应偏移，误差随交点距原点的距离缩放。
+
+## 5. 与光栅化的正面对比
+
+| 维度 | 光栅化 | 光线追踪 |
+|---|---|---|
+| 算法方向 | 图元 → 像素 | 像素 → 场景 |
+| 复杂度 | $O(n\cdot p)$ | $O(p\log n)$（有加速结构）|
+| 反射/折射 | 环境贴图、平面反射等 hack | 天然支持 |
+| 软阴影 | Shadow Map + PCF | 面光源采样 |
+| 间接光照 | 需要预计算（Lightmap/GI）| 天然支持 |
+| 硬件成熟度 | 40 年 GPU 流水线 | RTX 后才有专用单元 |
+| 内存访问 | 相干，缓存友好 | 发散，缓存不友好 |
+| 并行性 | 顶点/像素高度并行 | 每条射线独立，但发散大 |
+
+早期光线追踪的最大痛点是**每条射线要测试 $O(n)$ 个三角形**，一亿三角形场景根本没法实时。这个问题的答案是[加速结构：BVH 与 k-d 树](./加速结构：BVH与k-d树.mdx)，把复杂度压到对数级别。
+
+## 6. 反射与折射方向的推导
+
+**反射方向**（Snell 反射定律）：
+
+$$
+\mathbf{r}=\mathbf{d}-2(\mathbf{d}\cdot\mathbf{n})\mathbf{n}
+$$
+
+几何直观：把入射方向 $\mathbf{d}$ 在法线方向上取负、在切平面上不变。
+
+**折射方向**推导稍复杂。设入射角 $\theta_i$，折射角 $\theta_t$，折射率比 $\eta=n_1/n_2$，则：
+
+$$
+\mathbf{t}=\eta\mathbf{d}+(\eta\cos\theta_i-\cos\theta_t)\mathbf{n}
+$$
+
+其中 $\cos\theta_i=-\mathbf{d}\cdot\mathbf{n}$，$\cos\theta_t=\sqrt{1-\eta^2(1-\cos^2\theta_i)}$。如果根号内为负说明发生**全反射**（total internal reflection），$\mathbf{t}$ 不存在，光完全按反射方向返回。这是水下看天花板边缘发亮、光纤能导光的原理。
+
+**菲涅尔项**决定反射和折射的能量分配：
+
+$$
+F=\frac{1}{2}\left(\left|\frac{n_1\cos\theta_i-n_2\cos\theta_t}{n_1\cos\theta_i+n_2\cos\theta_t}\right|^2+\left|\frac{n_1\cos\theta_t-n_2\cos\theta_i}{n_1\cos\theta_t+n_2\cos\theta_i}\right|^2\right)
+$$
+
+工程上常用 Schlick 近似 $F\approx F_0+(1-F_0)(1-\cos\theta_i)^5$，误差很小但避免了开方。更多细节见 [BRDF 与材质系统](../着色器/BRDF与材质系统.mdx)。
+
+## 7. 一个最小实现的伪代码
+
+```cpp
+Color trace(Ray r, int depth) {
+    if (depth > MAX_DEPTH) return black;
+    Hit h = scene.intersect(r);
+    if (!h) return background(r.d);
+
+    Color local = shade_direct(h);        // Phong + shadow rays
+    Color reflected = black, refracted = black;
+
+    if (h.mat.reflective) {
+        Ray rr = { h.p + eps*h.n, reflect(r.d, h.n) };
+        reflected = trace(rr, depth + 1);
+    }
+    if (h.mat.transparent) {
+        Ray tr = { h.p - eps*h.n, refract(r.d, h.n, h.mat.ior) };
+        refracted = trace(tr, depth + 1);
+    }
+
+    float F = fresnel_schlick(h, r.d);
+    return local + F*reflected + (1-F)*refracted;
+}
+```
+
+关键点：递归结构直白，`scene.intersect` 的效率决定一切，`eps` 决定自相交是否出错。80 行 C++ 就能写出经典的三球一平面 raytracer 效果，这也是为什么每个图形学新手的第一个 side project 都是它。
+
+## 8. Whitted 之后：向真实感的两条分叉
+
+Whitted 只处理"点光源+光滑面"的世界，对磨砂金属、次表面散射、面积光源无能为力。1980-1990 年代出现两条路线：
+
+- **分布式光线追踪**（Cook, 1984）：把镜面反射方向抖动成一束射线做锥形反射，把点光源变成面光源采样，得到软阴影、光泽反射、景深。计算量线性增加，效果与真实感一起提升。
+- **路径追踪**（Kajiya, 1986）：把光传输写成积分方程，用蒙特卡洛方法求解。理论完备，但收敛慢。
+
+现代离线渲染器（Arnold、RenderMan、Cycles）走的是路径追踪；游戏引擎的实时光追（RTX、Lumen）走的是**混合方案**——光栅化管线 + 光线追踪做反射/阴影/GI。参考 [实时光线追踪与 RTX](./实时光线追踪与RTX.mdx)。
+
+Whitted 光线追踪今天更多作为**教学起点**存在，工业界很少直接使用。但它奠定了两件事：一是"从眼睛反追"的思维范式，二是"射线-场景求交"这个基础操作可复用到今天所有的光追算法里。
+
+</WordCount>

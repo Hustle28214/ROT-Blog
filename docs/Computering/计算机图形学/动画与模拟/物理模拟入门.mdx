@@ -1,0 +1,229 @@
+import WordCount from '../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+# 物理模拟入门：把牛顿第二定律塞进 for 循环
+
+关键帧动画告诉你"下一帧物体在哪"，物理模拟告诉你"下一帧物体应该在哪"。前者靠人指定，后者靠力学定律推导。二者不是对立的——大部分游戏里，人物用关键帧+骨骼，道具、布娃娃、爆炸碎片用物理，视觉一致性靠美术和参数调优。
+
+物理模拟本质是**求解常微分方程**（ODE）：给初始状态和作用力，推出未来状态。这个数学问题几百年前就有了，图形学的贡献主要是：如何**足够快**（每帧毫秒级）、**足够稳**（不爆炸不穿透）、**足够可信**（不要求物理正确，只要视觉正确）。
+
+## 1. 牛顿运动方程
+
+一个粒子的状态是位置 $\mathbf x$ 和速度 $\mathbf v$。作用力 $\mathbf F$ 通常依赖状态和时间：
+
+$$
+\mathbf F = m\ddot{\mathbf x} = m\dot{\mathbf v}
+$$
+
+拆成一阶方程组：
+
+$$
+\dot{\mathbf x} = \mathbf v, \quad \dot{\mathbf v} = \mathbf F(\mathbf x, \mathbf v, t) / m
+$$
+
+给定 $\mathbf x(0), \mathbf v(0)$，怎么推 $\mathbf x(\Delta t), \mathbf v(\Delta t)$？这就是数值积分（time integration）。图形学里 $\Delta t$ 通常等于一帧时间（1/60s）或子步（1/240s）。
+
+## 2. 显式欧拉：能用但很差
+
+最朴素的方法：
+
+$$
+\begin{aligned}
+\mathbf v(t+\Delta t) &= \mathbf v(t) + \Delta t \cdot \mathbf a(t) \\
+\mathbf x(t+\Delta t) &= \mathbf x(t) + \Delta t \cdot \mathbf v(t)
+\end{aligned}
+$$
+
+$\mathbf a(t) = \mathbf F(t) / m$。写成代码 3 行，但物理不对——**能量会随时间增加**。考虑一个弹簧振子，正确解是能量守恒的正弦波，显式欧拉每步都往外扩，几十步后振幅无限大。
+
+```
+      正确解          显式欧拉
+   ╱‾╲╱‾╲╱‾╲       ╱‾╲╱‾╲╱‾‾╲___
+                          ↑ 越来越大
+```
+
+数学上，显式欧拉的局部截断误差是 $O(\Delta t^2)$，全局 $O(\Delta t)$，一阶精度。稳定性差得可怕——弹簧刚度大时 $\Delta t$ 必须极小才不炸。
+
+## 3. 半隐式欧拉（symplectic Euler）
+
+游戏物理引擎最常用的积分器，一个小小的改动：**用更新后的速度算位置**。
+
+$$
+\begin{aligned}
+\mathbf v(t+\Delta t) &= \mathbf v(t) + \Delta t \cdot \mathbf a(t) \\
+\mathbf x(t+\Delta t) &= \mathbf x(t) + \Delta t \cdot \mathbf v(t+\Delta t)
+\end{aligned}
+$$
+
+只调换了顺序，但性质完全不同——半隐式欧拉是**辛积分子**（symplectic integrator），对哈密顿系统能量近似守恒（在一个椭圆里振荡而不发散）。同样是一阶精度但稳定性好得多。
+
+Box2D、Bullet、PhysX 早期版本、大部分教科书代码，用的都是半隐式欧拉。它简单、稳定、够用。
+
+## 4. Verlet 积分：位置就够了
+
+Verlet 积分**不显式存速度**，只存当前位置和上一帧位置：
+
+$$
+\mathbf x(t+\Delta t) = 2\mathbf x(t) - \mathbf x(t-\Delta t) + \Delta t^2 \cdot \mathbf a(t)
+$$
+
+速度是隐式的：$\mathbf v \approx (\mathbf x(t) - \mathbf x(t-\Delta t))/\Delta t$。
+
+Verlet 有一堆好处：
+
+- **二阶精度**：局部误差 $O(\Delta t^4)$
+- **能量近似守恒**：也是辛的
+- **时间反演对称**：正推倒推等价
+- **约束好加**：想强制两点距离恒定？直接把两点位置往正确距离拽，速度自动更新
+- **数值稳**：$1000$ 步之后仍不飘
+
+这最后一条让 Verlet 成了**粒子系统、布料、软体、Position-Based Dynamics** 的默认选择。Jakobsen 在 GDC 2001 的 "Advanced Character Physics" 演讲用 Verlet 做出了当时惊艳的布料效果。
+
+## 5. RK4：精度党的选择
+
+**四阶 Runge-Kutta**（RK4）：
+
+$$
+\begin{aligned}
+k_1 &= f(t, y) \\
+k_2 &= f(t+\Delta t/2, y+\Delta t k_1/2) \\
+k_3 &= f(t+\Delta t/2, y+\Delta t k_2/2) \\
+k_4 &= f(t+\Delta t, y+\Delta t k_3) \\
+y(t+\Delta t) &= y + \Delta t (k_1 + 2k_2 + 2k_3 + k_4)/6
+\end{aligned}
+$$
+
+一步要算 4 次导数，但精度是 $O(\Delta t^5)$——同样精度下可以用大得多的 $\Delta t$。适合天体、化学反应、CFD 这类求高保真度的场合。
+
+游戏里 RK4 反而不常用，因为：
+
+1. 4 次导数评估翻倍甚至更多耗时
+2. RK4 不是辛的，能量在长时间里仍会漂
+3. 游戏物理追求视觉稳定而非精确，半隐式欧拉够了
+
+科学计算里 RK4 是默认，图形学里是稀客。这个反差很能说明"够用即最好"的工程哲学。
+
+## 6. 刚体动力学
+
+粒子是零维的，刚体（rigid body）是三维的——它有质心位置和朝向。刚体状态：
+
+- 位置 $\mathbf x$、线速度 $\mathbf v$
+- 朝向（四元数 $q$ 或矩阵 $R$）、角速度 $\boldsymbol\omega$
+- 质量 $m$、惯性张量 $\mathbf I$（在局部坐标系里）
+
+牛顿-欧拉方程：
+
+$$
+\mathbf F = m\dot{\mathbf v}, \quad \boldsymbol\tau = \mathbf I \dot{\boldsymbol\omega} + \boldsymbol\omega \times (\mathbf I \boldsymbol\omega)
+$$
+
+$\boldsymbol\tau$ 是力矩。第二个式子（欧拉方程）里那个 $\omega \times I\omega$ 项让绕主轴旋转的物体展现出**Dzhanibekov effect**——中间轴旋转不稳定，会周期翻转。太空里的扳手实验拍到过这个现象。
+
+四元数的导数更新：
+
+$$
+\dot q = \frac{1}{2}\begin{bmatrix}0 \\ \boldsymbol\omega\end{bmatrix} \otimes q
+$$
+
+$\otimes$ 是四元数乘。数值积分完后要重新归一化 $q$ 防止漂到非单位。四元数的详细数学参见 [向量与矩阵：图形学的数学基石](../图形学数学基础/向量与矩阵：图形学的数学基石.mdx)。
+
+## 7. 碰撞检测
+
+物体不能穿透彼此——这个约束不是直接来自牛顿方程，而是几何+算法层面的补丁。碰撞检测分两阶段：
+
+**Broad phase**（粗筛）：快速排除不可能碰撞的对。常用空间划分——BVH（层级包围盒）、Sweep and Prune、空间哈希、Grid。目标是把 $O(n^2)$ 的对数降到 $O(n\log n)$ 或 $O(n)$。
+
+**Narrow phase**（精算）：确认两个物体是否真的相交，若相交求接触点、法线、穿透深度。凸多面体之间用 **GJK**，非凸的先做凸分解。
+
+### 7.1 GJK 算法
+
+Gilbert-Johnson-Keerthi 算法基于**Minkowski 差**：两个凸体 $A, B$ 的 Minkowski 差 $A - B = \{a - b : a \in A, b \in B\}$。$A$ 和 $B$ 相交 $\iff$ $A - B$ 包含原点。
+
+GJK 不显式构造 $A - B$，而是迭代地在其中寻找一个包含原点的单纯形（三角形或四面体）。每一步：
+
+1. 选一个方向 $\mathbf d$，找 $A - B$ 里沿这个方向最远的点（**support point**）
+2. 加入当前单纯形
+3. 检查单纯形是否包含原点：包含则相交；否则算离原点最近的子面，用它的外法线作为新 $\mathbf d$
+4. 迭代
+
+GJK 通常 5-10 次迭代收敛，非常快。缺点是原生只判"是否相交"，不给穿透深度。
+
+### 7.2 EPA：补上穿透深度
+
+**Expanding Polytope Algorithm** 从 GJK 结束时的单纯形出发，往外扩展凸包，直到包围整个 $A - B$。最靠近原点的面就给出穿透法线和深度。
+
+GJK+EPA 是 Bullet、PhysX、Box2D 3D 版本的标准组合。工程实现有一堆细节（数值稳健性、退化情形处理），做好了是艺术活。
+
+## 8. 约束求解
+
+碰撞检测检测到穿透后要"推开"。物理引擎不是每帧显式加"推开力"，而是用**约束**（constraint）框架：$\phi(\mathbf x) = 0$ 或 $\phi(\mathbf x) \geq 0$（不等式约束）。碰撞约束的形式：
+
+$$
+\phi = \mathbf n \cdot (\mathbf x_A - \mathbf x_B) - d_{\text{contact}} \geq 0
+$$
+
+$\mathbf n$ 是接触法线，$d_{\text{contact}}$ 是允许的最小距离。铰链、滑块、齿轮都是不同形式的 $\phi$。
+
+### 8.1 Baumgarte 稳定化
+
+约束若只在速度层保持（$\dot\phi = 0$），位置误差会随数值积分累积漂移。Baumgarte 的方法是在 $\dot\phi$ 里加一个**误差反馈项**：
+
+$$
+\dot\phi + \beta \phi/\Delta t = 0
+$$
+
+$\beta \in [0, 1]$。相当于把当前的位置误差按比例 $\beta$ 拉回来。$\beta=0$ 无稳定化，$\beta=1$ 一步全拉回（容易震荡），实际取 $\beta \approx 0.2$。
+
+### 8.2 Sequential Impulses（SI）
+
+Erin Catto 在 2005 GDC 讲的这个方法是 Box2D 的核心，现在被 PhysX、Chaos、多数商业引擎采用。基本思想：不解全局线性方程，而是**逐约束依次施加冲量**、迭代直到收敛。
+
+伪代码：
+
+```
+每帧:
+  外力积分 → 得预测速度
+  for iteration in 1..N:
+    for each constraint:
+      算 违反量 (velocity 层)
+      算 需要的 冲量 J
+      clamp 冲量 (比如接触力只能推不能拉)
+      施加 J 到两个物体的速度
+  用最终速度更新位置
+```
+
+这是 **Projected Gauss-Seidel**（PGS）——把大矩阵解耦成一堆小的 1D 问题。收敛速度不如直接解，但每步便宜，能处理不等式约束（clamp 那步），能中途退出（预算不够停在半收敛状态也不会崩）。
+
+现代变种有 XPBD（eXtended Position-Based Dynamics，Nvidia FleX/Blast 用）、TGS（Temporal Gauss-Seidel，PhysX 5）。核心思路一致——**迭代式约束投影**。
+
+## 9. 一个真实物理引擎的每帧循环
+
+```
+1. 外力施加 (重力、风力、用户输入)
+2. 速度积分 (半隐式欧拉)
+3. Broad phase 碰撞检测 (BVH 更新)
+4. Narrow phase (GJK/EPA)
+5. 约束准备 (碰撞点转成约束)
+6. 速度约束求解 (SI, 4-8 迭代)
+7. 位置积分
+8. 位置约束修正 (Baumgarte 或 PBD split impulse)
+9. 触发回调 (OnCollide 事件)
+10. 睡眠检测 (静止的物体不再模拟)
+```
+
+每一环都能单独写一本书。工程实现的关键是**可预算**——想 60 帧一秒，物理占 5ms，就得在这 5ms 里做完所有事，做不完就砍精度（减迭代次数、放大 sleep 阈值）而不是漏帧。
+
+## 10. 什么时候不用物理
+
+物理模拟的两大对立面：
+
+**关键帧接管**：主要角色的动作、剧情演出都是关键帧+骨骼（参见 [关键帧动画与插值](./关键帧动画与插值.mdx) 和 [骨骼动画与蒙皮](./骨骼动画与蒙皮.mdx)），不用物理是因为要精确控制观感——物理会让角色摔倒的方向不可预期，导演不接受。
+
+**程序化替代**：粒子系统（下一篇的 [粒子系统基础](./粒子系统基础.mdx)）通常不用刚体物理，因为几万个粒子的碰撞求解太贵，改用简化的重力+空气阻力+可选场碰撞。
+
+**规则代替物理**：飞行/驾驶游戏很多用简化的空气动力学而非真物理——GTA 车不用完整的悬挂动力学，Ace Combat 战机也不满足真实 6DoF 飞行方程。规则化的操控好调、好平衡、玩家易预测。
+
+物理引擎的目标从来不是精确模拟宇宙，而是**在给定预算内产生玩家/观众相信的行为**。物理不对但看着对，永远比物理对但看着假优先。
+
+</WordCount>

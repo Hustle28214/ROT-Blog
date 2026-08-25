@@ -1,0 +1,253 @@
+import WordCount from '../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+# 隐式建模与体素：不用三角形表达几何
+
+三角形网格、[参数曲面](./参数曲线与曲面.mdx)、[细分曲面](./曲面细分与几何细分.mdx)都是**显式**几何——直接给出边界的位置。还有一大类完全不同的表达：**隐式几何**，用一个标量场 $f(\mathbf x)$ 表达形状，形状是 $f=0$ 的等值面（isosurface）。这种表达在建模融合、布尔运算、[光线追踪](../光线追踪/光线追踪基本原理.mdx)、体积效果里有独到优势。这篇讲隐式表达的三种主要变体——解析 SDF、体素、Marching Cubes 转换——以及它们各自的适用领域。
+
+## 1. 隐式函数与等值面
+
+一个隐式几何由标量函数定义：
+
+$$
+S = \{\mathbf x \in \mathbb R^3 \mid f(\mathbf x) = 0\}
+$$
+
+规定 $f<0$ 表内、$f>0$ 表外（也可反过来，一致就行）。经典例子：
+
+- **球** $f(\mathbf x) = \|\mathbf x - \mathbf c\| - r$
+- **无限平面** $f(\mathbf x) = \mathbf n\cdot\mathbf x - d$
+- **圆柱**（沿 $z$ 轴） $f(x,y,z) = \sqrt{x^2+y^2} - r$
+- **甜甜圈**（torus） $f(x,y,z) = (\sqrt{x^2+y^2}-R)^2 + z^2 - r^2$
+
+几何基本形式的隐式表达详见 [几何基础](../图形学数学基础/几何基础：点、线、面与隐式曲面.mdx)。这里我们关心怎么用它做建模和渲染。
+
+## 2. SDF：有符号距离场
+
+隐式函数里最特殊的一类是**有符号距离场**（Signed Distance Field/Function, SDF）：
+
+$$
+\mathrm{SDF}(\mathbf x) = \begin{cases} +d(\mathbf x, \partial S) & \mathbf x \notin S \\ -d(\mathbf x, \partial S) & \mathbf x \in S \end{cases}
+$$
+
+绝对值等于到最近边界的距离，符号标示内外。SDF 是隐式函数的一个子集，多了一个关键性质：**梯度处处为单位向量**（几乎处处，除掉一个测度为零的中轴集合）：
+
+$$
+\|\nabla \mathrm{SDF}(\mathbf x)\| = 1
+$$
+
+这个性质让 SDF 极其有用：
+
+- **光线步进**能一步走"当前点到最近表面"的距离，不会穿过边界（下节详述）
+- **法线** = 归一化梯度，直接数值差分：$\mathbf n \approx \nabla f / \|\nabla f\|$
+- **膨胀/收缩** = 加常数：$f(\mathbf x) - c$ 是原形状向外膨胀 $c$ 距离
+- **边界厚度** = 简单的 `abs(f) < ε` 判断，做壳、剪影、外描线（outline）都方便
+
+Inigo Quilez 在 shadertoy 上推广的 SDF 建模 一整套原语和组合器都是解析 SDF——手写数十行 GLSL 生成整个复杂场景，只用几十字节的代码替代兆级三角网。
+
+## 3. CSG：布尔运算
+
+**Constructive Solid Geometry**（构造实体几何）是把复杂形状表达为简单形状的布尔组合。在网格上做布尔运算是个噩梦（要处理面片切割、拓扑修复），在 SDF 上却是三行代数：
+
+$$
+\begin{aligned}
+\text{Union: } & f_{A\cup B}(\mathbf x) = \min(f_A(\mathbf x), f_B(\mathbf x)) \\
+\text{Intersection: } & f_{A\cap B}(\mathbf x) = \max(f_A(\mathbf x), f_B(\mathbf x)) \\
+\text{Difference: } & f_{A\setminus B}(\mathbf x) = \max(f_A(\mathbf x), -f_B(\mathbf x))
+\end{aligned}
+$$
+
+严格说 $\min/\max$ 的结果**不是精确 SDF**——距离字段在两个形状之间会出现"折角"，梯度不再单位。但对大多数应用够用了。想要精确 SDF 需要更复杂的算法。
+
+**平滑并**（smooth union）是 CSG 的一个魔法拓展。用 log-sum-exp 或 soft-min 替代 min：
+
+$$
+\text{smin}(a, b, k) = -\frac{1}{k}\log(e^{-ka} + e^{-kb})
+$$
+
+$k$ 控制融合尖锐度。两个球做 smooth union 会自然长出光滑连接的水滴形状——像水银、粘土、恐龙蛋。传统网格建模里做这种"融合"要么手动加拓扑要么用 metaball，SDF 里一行代码。
+
+## 4. 光线步进：不用求交也能渲染 SDF
+
+传统[光线追踪](../光线追踪/光线追踪基本原理.mdx)对每个物体做 ray-surface intersection，解析方程。SDF 场景没有解析方程可解，但可以用**Sphere Tracing**（球体步进/光线步进）：
+
+```
+struct RayMarchResult { hit: bool, t: float, p: vec3 };
+RayMarchResult marchRay(vec3 ro, vec3 rd, float maxDist) {
+    float t = 0;
+    for (int i = 0; i < MAX_STEPS; i++) {
+        vec3 p = ro + t * rd;
+        float d = sdfScene(p);           // 到最近表面的距离
+        if (d < EPSILON) return {true, t, p};
+        if (t > maxDist)  return {false, 0, vec3(0)};
+        t += d;                          // 一步走 d 那么远，保证不穿透
+    }
+    return {false, 0, vec3(0)};
+}
+```
+
+核心思想：**当前点到表面距离是 $d$，光线沿任意方向前进 $d$ 距离都不会穿透表面**（因为 $d$ 是最近距离）。所以可以放心大跳一步。等表面靠近时步长变小，自然收敛。
+
+Sphere Tracing 是 John Hart 1996 年提出的，简洁到令人惊讶。它有几个特点：
+
+- 不需要空间加速结构（不用 BVH），SDF 自身就是加速信息
+- 支持解析和过程化几何（分形、噪声）
+- 步数与场景复杂度关系弱，几百个物体的 SDF 场景可能和一个物体差不多
+- 极端狭长的擦身而过（grazing）会消耗很多步，需要设 MAX_STEPS 上限
+
+代价是每步都要评估整个场景的 SDF——如果场景是 GPU 上 200 个物体的 min 组合，一次评估调用 200 次函数。这就是为什么 shadertoy 上 SDF 场景都比较简单——不是不能复杂，是复杂了就慢。
+
+**软阴影**是 Sphere Tracing 的免费副产品：光线朝光源走的过程中记录最小距离，越小说明越接近某个遮挡物：
+
+```
+float softShadow(vec3 ro, vec3 rd, float k) {
+    float res = 1.0, t = 0.01;
+    for (int i = 0; i < 32; i++) {
+        float d = sdfScene(ro + rd*t);
+        if (d < 0.001) return 0;
+        res = min(res, k * d / t);
+        t += d;
+    }
+    return res;
+}
+```
+
+$k$ 越大阴影越硬。这是 [阴影与遮挡](../阴影与遮挡/阴影映射原理与实现.mdx) 之外一条完全不同的路子。
+
+## 5. 体素网格：离散化的隐式几何
+
+解析 SDF 表达能力有限（想搞人脸？公式怎么写？）。工程上更常用**体素网格**——把 SDF 采样到一个 3D 数组里：
+
+```
+float sdfGrid[N][N][N];   // N^3 个采样值
+float sdf(vec3 p) {
+    // 归一化到 [0, N-1]
+    vec3 q = (p - gridMin) / cellSize;
+    // 三线性插值
+    return trilerp(sdfGrid, q);
+}
+```
+
+存 SDF 采样值 + 三线性插值 = 一个可微、可评估的 SDF。分辨率是空间-精度权衡：$256^3$ 大约 64 MB（float32），能表达中等大小物体的粗略形状；$1024^3$ 是 4 GB，接近极限。
+
+体素表达的痛点是**内存立方增长**。$O(N^3)$ 存储对于稀疏几何（大部分空间是空的）浪费惊人。解决方案有两大类：
+
+**层次化稀疏结构**：OpenVDB（DreamWorks 开源，几乎是电影工业烟火/液体模拟的标准）用了一个类 B+ 树的结构，只在有内容的地方存数据。**NanoVDB** 是 GPU 友好的紧凑版本，只读但极快。
+
+**神经隐式表达**：把 SDF 用一个小 MLP 拟合，$\mathrm{SDF}(\mathbf x) \approx \mathrm{MLP}_\theta(\mathbf x)$。NeRF、DeepSDF、Instant-NGP、SDF Studio 等一大批 2020 后的工作走这条路。参数量小（几 MB）就能表达高精度几何，但评估慢（每个点一次前向传播）。
+
+## 6. Marching Cubes：从体素到三角形
+
+体素 SDF 建好了怎么渲染？两条路：
+
+1. 直接光线步进（前面讲的）
+2. **转成三角网格**再走传统光栅化管线
+
+Marching Cubes（William Lorensen 和 Harvey Cline 1987 年论文，医学 CT 数据成像出身）是标准转换算法。核心思想：**逐 voxel 处理，根据 8 角上的符号查表决定局部三角形**。
+
+一个立方体 8 个角，每个角有 SDF 值（正或负），共 $2^8 = 256$ 种符号组合。利用对称性（旋转、反射、正负互换）可以归纳为 15 种基本情形：
+
+```
+    Case 0: 全外部          Case 1: 一角在内       Case 2: 邻边两角在内
+    (无三角形)              (1 个三角形)          (2 个三角形组成四边形)
+        ●───●                  ●───●                  ●───●
+       ╱   ╱│                 ╱  ▽╱│                 ╱  ▽╱▽
+      ●───● │                ●─△─● │                ●─△─● │
+      │   │ ●                │   │ ●                │   │ ●
+      │   │╱                 │   │╱                 │   │╱
+      ●───●                  ●───●                  ●───●
+```
+
+对每个 case 预先手工列出应生成的三角形（顶点位于哪些边上）。运行时：
+
+```
+for each voxel cube:
+    idx = 0
+    for i in 0..7:
+        if corner[i].sdf < 0: idx |= (1 << i)
+    triangles = TRI_TABLE[idx]        // 查表得三角形列表
+    for each edge (e_a, e_b) in triangles:
+        // 顶点位置线性插值到 SDF=0 的位置
+        t = corner[e_a].sdf / (corner[e_a].sdf - corner[e_b].sdf)
+        v = lerp(corner[e_a].pos, corner[e_b].pos, t)
+        emit v
+```
+
+产出一个近似 SDF 等值面的三角网。$256$ 项查表 + 每 voxel 常数时间处理，速度很快。
+
+**原始 Marching Cubes 有个坑**：某些 ambiguous case 里，同一符号模式可以对应两种不同拓扑，选错了会出现小洞或穿孔。Nielson 和 Hamann 1991 年、Chernyaev 1995 年分别给出了修正版。工业代码（VTK、OpenVDB）用的都是修正版本。
+
+替代方案：**Dual Contouring**（Ju 等 2002）走"顶点在 voxel 内、边穿过 voxel 面时算交点"的思路，能保留尖锐特征（Marching Cubes 天然把所有边角磨圆）。**Marching Tetrahedra** 用四面体单元避免歧义。
+
+## 7. 体素在游戏和引擎里
+
+除了作为 SDF 的容器，voxel 本身也是一种游戏几何表达。《我的世界》就是最出名的例子——每个 voxel 是一个明确的方块，直接光栅化。这类"离散 voxel"没有等值面提取，也不搞光线步进，就是把 voxel 当积木。
+
+现代大型场景里 voxel 还有一个身份是**全局光照的中间表示**：
+
+- **Voxel Cone Tracing**（Cyril Crassin 2011）：把场景光照烘到稀疏 voxel 八叉树里，运行时锥体采样近似漫反射间接光
+- **DDGI / 探针方法**：voxel 网格上放光照探针，SH 系数存漫反射辐照度
+- **SDF for GI**：UE5 的 Lumen 有一部分基于场景的低精度 SDF 表达做光线求交（避开三角形 BVH 的成本）
+
+## 8. 体积渲染：不只有边界
+
+上面所有讨论都在处理"边界表面"（$f=0$ 的等值面）。**体积渲染**（volume rendering）把整个空间看作有密度的介质：烟、雾、云、火焰、玻璃内部、CT 数据。
+
+体积渲染方程（省略散射项的简化版）：
+
+$$
+C(\mathbf o, \mathbf d) = \int_{t_n}^{t_f} T(t)\, \sigma(\mathbf r(t))\, c(\mathbf r(t))\, dt
+$$
+
+$T(t) = \exp\!\left(-\int_{t_n}^{t}\sigma(\mathbf r(s))\,ds\right)$ 是从入口到 $t$ 的透射率，$\sigma$ 是密度（吸收+散射系数），$c$ 是自发光/散射辐亮度。
+
+数值求解就是**光线沿路径分段采样累积**：
+
+```
+vec4 volumeRender(ro, rd) {
+    vec4 acc = vec4(0);
+    float t = tNear;
+    while (t < tFar && acc.a < 0.99) {
+        vec3 p = ro + t*rd;
+        vec4 sample = sampleVolume(p);   // 采样密度、颜色
+        acc.rgb += (1 - acc.a) * sample.a * sample.rgb;
+        acc.a   += (1 - acc.a) * sample.a;
+        t += stepSize;
+    }
+    return acc;
+}
+```
+
+数据源可以是：3D 纹理（云、烟）、程序噪声（大气雾）、医学 CT/MRI 切片、Houdini 模拟出的 VDB 场。
+
+NeRF 及其变种正是把这个方程反过来学：给一堆图像和相机姿态，学一个神经场 $\sigma(\mathbf x), c(\mathbf x, \mathbf d)$，然后就能从任意视角合成新图像。本质是**神经网络参数化的体积几何**，跟 SDF 神经隐式表达是姐妹。
+
+## 9. 隐式 vs 显式：一个总结表
+
+| 维度 | 显式（网格） | 隐式（SDF/体素） |
+|---|---|---|
+| 存储 | 顶点 + 面表 | 函数或采样网格 |
+| 内部/外部判断 | 复杂（射线穿越计数） | 一次求值 $f(\mathbf x)$ |
+| 布尔运算 | 网格切割极难 | min/max 三行 |
+| 光滑融合 | 需重建拓扑 | smooth-min |
+| 精确表面查询 | 直接 | 需要迭代（求根/等值面提取） |
+| GPU 光栅化 | 天然支持 | 不直接支持 |
+| 光线求交 | BVH + 三角求交 | Sphere Tracing |
+| 内存 vs 精度 | 与三角数线性 | 与体素分辨率立方 |
+| 尖锐特征 | 天然保留 | 需要 Dual Contouring 或高分辨率 |
+
+选择法则：**做加/删/融合选隐式，做布线/UV/骨骼绑定选显式**。工业管线里两者常常互转：ZBrush 里雕刻用 SDF-like 的"DynaMesh"，最终导出成清理过拓扑的三角网。Houdini 里烟、水做完模拟是 VDB，渲染前 Marching Cubes 转网格。
+
+## 10. 与其他表示的边界
+
+回顾整个几何处理的谱系：
+
+- [多边形网格](./多边形网格表示与数据结构.mdx)：离散、显式、GPU 友好
+- [参数曲面](./参数曲线与曲面.mdx)：连续、显式、光滑、需拓扑规则
+- [细分曲面](./曲面细分与几何细分.mdx)：连续、显式、任意拓扑
+- 隐式几何（本篇）：连续、隐式、任意拓扑 + 自然布尔
+
+四种表达各解决了几何的一部分难题，工业管线里往往并存。选择不是二元的，而是"这个操作用哪种最方便"。SDF 光线步进对实时场景是精妙工具，但要绑骨骼做角色动画，没人愿意用它。反过来做布尔运算或者程序化融合，网格系统的痛苦谁做谁知道。
+
+</WordCount>

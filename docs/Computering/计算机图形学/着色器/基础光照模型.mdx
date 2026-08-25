@@ -1,0 +1,265 @@
+import WordCount from '../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+# 基础光照模型：从余弦定律到 Blinn-Phong
+
+图形学里"光照模型"这个词的含义已经漂移了两次。1970 年代 Bui Tuong Phong 提出的模型是**经验模型**——不追求物理正确,只追求视觉可信。2010 年之后 PBR 兴起,大家又回到辐射度量学、能量守恒、微表面理论。中间四十年整个实时图形工业都是踩着 Phong/Blinn-Phong 走过来的,直到今天绝大多数手机游戏、Web3D、老版本 Unity 材质仍然是它。理解这套经验模型不是为了怀旧,而是为了理解 PBR **为什么长成那样**。
+
+## 1. 一切从 Lambert 开始
+
+一块理想的漫反射表面(纸、粉笔、未上釉的陶),从任何角度看都一样亮。这个"任何角度都一样亮"的性质叫 **Lambertian**,它的物理机制是入射光在表面下发生多次散射,再各向同性地射出。
+
+亮度不随观察方向变的表面,反射辐射亮度(radiance)只依赖入射方向。设法线为 $\mathbf n$、光源方向为 $\mathbf l$(都是单位向量,指向外),则:
+
+$$
+L_o = \frac{\rho}{\pi} L_i \max(\mathbf n\cdot\mathbf l,\, 0)
+$$
+
+$\rho$ 是反照率(albedo),$\rho/\pi$ 是漫反射 BRDF 值,$L_i$ 是入射辐射亮度。核心是那个 $\mathbf n\cdot\mathbf l$——**余弦定律**,几何上表示单位面积接收到的通量随入射角变化。太阳直射赤道最亮、斜射两极最暗,是同一件事。
+
+实时管线里通常把 $\rho/\pi$ 和 $L_i$ 合并成"漫反射颜色 $k_d$"和"光源强度 $I$",简化为:
+
+$$
+I_{\text{diffuse}} = k_d\, I\, \max(\mathbf n\cdot\mathbf l,\, 0)
+$$
+
+那个 $\max$ 不能省。背面的余弦是负的,直接乘会得到"负光",物理上不合理,渲染上会出现莫名的黑色噪点。GLSL 里的 `max(dot(N,L), 0.0)` 是所有光照 shader 的起手式。
+
+```glsl
+// 最小 Lambert 片段着色器
+vec3 N = normalize(vNormal);
+vec3 L = normalize(lightPos - vWorldPos);
+float NdotL = max(dot(N, L), 0.0);
+vec3 diffuse = albedo * lightColor * NdotL;
+```
+
+### 1.1 余弦定律的几何直觉
+
+想象一束平行光,截面积 $A$,垂直照到表面时铺在面积 $A$ 上;倾斜 $\theta$ 角时铺在面积 $A/\cos\theta$ 上。单位面积获得的光减少到 $\cos\theta$ 倍。
+
+```
+   光束                     光束
+    ↓↓↓↓                    ↘↘↘↘
+   ────                     ─────────
+   面积 A                   面积 A/cosθ
+   垂直:每单位面积 1 份光    斜射:每单位面积 cosθ 份光
+```
+
+这个"投影"是纯几何事实,与材质无关。所有光照模型的漫反射项都逃不掉 $\cos\theta$。
+
+## 2. 镜面反射:Phong 的经验高光
+
+Lambert 只能画出粉笔、纸这种完全漫反射的东西。塑料、金属、湿地面上的高光,Lambert 完全没有。1975 年 Phong 加了一个经验项:
+
+$$
+I_{\text{specular}} = k_s\, I\, \max(\mathbf r\cdot\mathbf v,\, 0)^{n}
+$$
+
+$\mathbf r$ 是入射光的反射向量,$\mathbf v$ 是视线方向,$n$ 是光泽度指数(shininess)。$\mathbf r\cdot\mathbf v$ 描述"视线偏离完美反射方向多远",$n$ 次幂让偏离一点点就迅速衰减——这就是高光的"点"。$n$ 大高光小而集中(光滑塑料),$n$ 小高光大而弥散(粗糙塑料)。
+
+反射向量的计算:
+
+$$
+\mathbf r = 2(\mathbf n\cdot\mathbf l)\mathbf n - \mathbf l
+$$
+
+GLSL 里 `reflect(-L, N)`——注意 GLSL 的 `reflect` 用的是**入射**方向(指向表面内),所以传 `-L`。
+
+Phong 模型的完整形式是三项叠加:
+
+$$
+I = k_a I_a + k_d I \max(\mathbf n\cdot\mathbf l,0) + k_s I \max(\mathbf r\cdot\mathbf v,0)^n
+$$
+
+$k_a I_a$ 是**环境光**——一个粗暴的常数项,补偿"没被光源直射的地方也不该全黑"这个事实。物理上不合理(真实的间接光取决于场景),但作为占位符能让画面不至于阴影处漆黑一片。间接光的正经处理见[材质与间接光照](../光线追踪/材质与间接光照.mdx)。
+
+### 2.1 Phong 的问题:反射向量的成本
+
+$\mathbf r$ 要在每个像素上算一次,涉及一次点积、一次乘法、一次减法。60 年代末 70 年代初的硬件这算得心疼。Blinn 在 1977 年提出用**半角向量**代替反射向量。
+
+## 3. Blinn-Phong:一个更聪明的近似
+
+半角向量 $\mathbf h = (\mathbf l + \mathbf v)/\|\mathbf l+\mathbf v\|$。观察 $\mathbf n\cdot\mathbf h$:当视线和光源方向的角平分线正好对齐法线时,这就是完美镜面反射的方向。用它替换 $\mathbf r\cdot\mathbf v$:
+
+$$
+I_{\text{specular}} = k_s\, I\, \max(\mathbf n\cdot\mathbf h,\, 0)^{n'}
+$$
+
+好处是显著的:
+
+- $\mathbf h$ 只需要一次归一化,比 $\mathbf r$ 便宜
+- 光源方向不变时 $\mathbf h$ 不随位置变太多(远光源下几乎不变),可以做**每顶点**计算然后插值(Gouraud + Blinn-Phong)
+- **形状略有不同**:Blinn-Phong 的高光偏椭圆,和真实测量的粗糙表面高光更接近
+
+$n'$ 和 Phong 的 $n$ 不是同一个东西,经验上 $n' \approx 4n$ 才产生相似大小的高光。
+
+到 1988 年 James Blinn 的这个改动进了硬件——OpenGL 固定管线的 "specular" 就是 Blinn-Phong。整个 90 年代到 2005 年前后的实时渲染基本上都是它。
+
+Phong vs Blinn-Phong 的高光形状对比:
+
+```
+观察掠射角(视线接近平行于表面)时:
+  Phong:      Blinn-Phong:
+    ·             ▬▬▬
+  高光变小        高光被拉长
+
+正视时几乎一样。测量数据表明真实粗糙表面在掠射角会
+出现"反射拉长"现象,Blinn-Phong 的行为反而更真实。
+```
+
+## 4. 半兰伯特:卡通渲染的秘密武器
+
+Valve 在 Half-Life 2 里用了一个改动:
+
+$$
+I_{\text{diffuse}} = k_d I \left(\frac{\mathbf n\cdot\mathbf l + 1}{2}\right)^2
+$$
+
+$(\mathbf n\cdot\mathbf l + 1)/2$ 把余弦从 $[-1,1]$ 映射到 $[0,1]$,再平方一次拉低背光面。这叫 **Half-Lambert**,它**非物理**——背面也有光,能量根本不守恒——但效果好。
+
+用途:低多边形角色、卡通渲染、老引擎里"没有全局光照怎么让背光面别死黑"的补丁。物理上正确的做法是加环境光或 IBL,Half-Lambert 是穷人版。
+
+```glsl
+float HalfLambert(vec3 N, vec3 L) {
+    float nl = dot(N, L) * 0.5 + 0.5;
+    return nl * nl;
+}
+```
+
+## 5. 环境光:一个占位符的演化
+
+原始 Phong 里 $k_a I_a$ 是**全场景常数**。这个假设在洞穴里不成立(阴影处应该更暗)、在户外不成立(天空是蓝的、地面是棕的)。改进历程:
+
+| 时期 | 做法 | 复杂度 |
+|---|---|---|
+| 1975 | 全局常数 $I_a$ | $O(1)$ |
+| 1990s | 半球光照(天空色/地面色,按法线插值) | $O(1)$ |
+| 2000s | 立方体贴图环境光 | 一次贴图采样 |
+| 2010s+ | IBL 预积分(见[高级纹理技术](./高级纹理技术.mdx)) | 一次贴图采样,物理正确 |
+
+半球光照公式(便宜、够用):
+
+$$
+I_{\text{ambient}} = \text{lerp}(C_{\text{ground}}, C_{\text{sky}}, \tfrac{\mathbf n\cdot\mathbf u + 1}{2})
+$$
+
+$\mathbf u$ 是世界向上向量。做出室外场景的第一印象已经够了。
+
+## 6. 光源类型和衰减
+
+上面公式里的 $\mathbf l$ 和 $I$ 依赖光源类型:
+
+**平行光(方向光)**:模拟太阳。$\mathbf l$ 全场景常数,$I$ 不衰减。
+
+**点光源**:$\mathbf l = \text{normalize}(P_{\text{light}} - P)$,强度按距离衰减。物理正确是**平方反比**:
+
+$$
+I(d) = \frac{I_0}{d^2}
+$$
+
+实时渲染里常加常数项和线性项防止 $d\to 0$ 时数值炸掉:
+
+$$
+I(d) = \frac{I_0}{k_c + k_l d + k_q d^2}
+$$
+
+OpenGL 固定管线默认公式。$k_c=1, k_l=0, k_q=1$ 时退化为纯平方反比。
+
+**聚光灯**:点光源基础上加锥形衰减,通常用 $\cos$ 和一个 falloff 指数:
+
+$$
+I_{\text{spot}} = I(d) \cdot \max(\mathbf l\cdot\mathbf d_{\text{spot}},\cos\theta_{\text{outer}})^{n_s}
+$$
+
+## 7. 逐顶点 vs 逐片段(Gouraud vs Phong Shading)
+
+注意区分两组名词:
+
+- **Phong Reflection Model**:上面的光照公式,数学模型
+- **Phong Shading**:在**每个片段**上执行光照计算的着色策略
+- **Gouraud Shading**:在**每个顶点**执行光照计算,然后在片段间**线性插值颜色**
+
+Gouraud 便宜(顶点数远小于片段数),但对高光是灾难——高光尺寸接近或小于三角形时,插值会把它抹掉或错位。1970 年代硬件跑 Gouraud,当代硬件绝大多数场景跑 Phong Shading。
+
+```
+Gouraud (三角形顶点计算,颜色插值):
+  V1━━━━━━━V2         高光落在三角形内部时消失,
+    ╲     ╱           或呈现为奇怪的三角形色块
+      ╲ ╱             (Mach 带效应也明显)
+       V3
+
+Phong Shading (法线插值,像素级计算):
+  法线在三角形内插值,每个像素独立求 n·l 和 n·h
+  高光形状正确,代价是片段着色器工作量按像素规模增长
+```
+
+Phong Shading 和 Phong Reflection Model 都由同一个 Phong 提出,但是两回事,不要混。
+
+## 8. 能量守恒:经验模型的破绽
+
+Phong 模型的一个尴尬事实是它**不守恒能量**——理论上表面反射的能量不该超过入射能量,即漫反射项加上镜面反射项对所有出射方向积分应 $\leq 1$。
+
+Phong 的 $k_d + k_s$ 可以随便设,你可以让一个塑料球又漫反射满亮又镜面反射满亮,像发光体一样。艺术家能调出好看的画面,但换个光照就崩。真实材质里粗糙(漫反射强)和光滑(镜面强)是此消彼长的关系——粗糙的塑料没有强高光,镜子没有漫反射。
+
+粗暴修补:让 $k_s + k_d \leq 1$,并且 $k_s$ 越大时 $k_d$ 越小。真正的做法要走 BRDF 路线,归一化 Blinn-Phong 是过渡:
+
+$$
+f_r = \frac{k_d}{\pi} + k_s \frac{n+8}{8\pi}(\mathbf n\cdot\mathbf h)^n
+$$
+
+那个 $(n+8)/(8\pi)$ 是归一化因子,保证镜面项对半球积分小于 1。这已经很接近 [BRDF 与材质系统](./BRDF与材质系统.mdx)里 Cook-Torrance 的形式了。
+
+## 9. 完整的 Blinn-Phong 片段着色器
+
+把上面所有讨论落地:
+
+```glsl
+uniform vec3 uLightPos;
+uniform vec3 uLightColor;
+uniform vec3 uViewPos;
+uniform vec3 uAlbedo;
+uniform float uShininess;   // ≈ 32-256
+uniform vec3 uAmbient;
+
+in vec3 vWorldPos;
+in vec3 vNormal;
+
+out vec4 fragColor;
+
+void main() {
+    vec3 N = normalize(vNormal);
+    vec3 L = normalize(uLightPos - vWorldPos);
+    vec3 V = normalize(uViewPos  - vWorldPos);
+    vec3 H = normalize(L + V);
+
+    float NdotL = max(dot(N, L), 0.0);
+    float NdotH = max(dot(N, H), 0.0);
+
+    vec3 diffuse  = uAlbedo * NdotL;
+    vec3 specular = vec3(pow(NdotH, uShininess));
+
+    // 简单点光源平方反比衰减
+    float d = length(uLightPos - vWorldPos);
+    float atten = 1.0 / (1.0 + 0.09 * d + 0.032 * d * d);
+
+    vec3 color = uAmbient * uAlbedo
+               + (diffuse + specular) * uLightColor * atten;
+
+    fragColor = vec4(color, 1.0);
+}
+```
+
+这段代码在 2010 年是移动图形的旗舰效果,今天是 shader 入门第一课。它做对的事:余弦定律、法线归一化、片段级光照、距离衰减。它做错或过简的事:$k_s$ 是常数、菲涅尔缺失、能量不守恒、环境光是死值。
+
+## 10. 从这里去哪儿
+
+顺着这条线往下走有两个方向:
+
+**加数据**——引入[纹理映射](./纹理映射基础.mdx)让 $k_d$ 随位置变化(diffuse map)、让法线随位置扰动([高级纹理技术](./高级纹理技术.mdx)里的法线贴图),这是 2000-2010 年主要的战场。
+
+**修模型**——把 Phong 换成物理正确的[BRDF](./BRDF与材质系统.mdx),引入菲涅尔、微表面、多次散射,这是 2012 之后所有 3A 游戏和电影 CG 走的路。
+
+Phong 不会消失。手机低端 GPU、Web 端 Three.js 默认材质、许多 UI 3D 元素仍然是它。理解一个便宜、简单、够用的模型,永远比追新更重要。
+
+</WordCount>

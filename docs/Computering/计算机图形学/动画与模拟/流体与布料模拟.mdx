@@ -1,0 +1,232 @@
+import WordCount from '../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+# 流体与布料模拟：连续介质的离散化艺术
+
+刚体假设物体不变形，粒子假设个体独立无关联。真实世界里最有趣的东西恰恰在这两个假设之外——**布料**、**橡胶**、**水**、**烟**、**沙**——这些都是**连续介质**，内部各处相互耦合、宏观呈现无穷多的自由度。
+
+模拟连续介质的通用套路是**离散化**：把连续的物质切成有限个采样点，用采样点之间的差分近似连续偏微分。切法有两大流派：**Lagrangian**（跟着物质走的采样点，比如粒子/质点）和 **Eulerian**（固定在空间格子上的采样点，物质在格子里流动）。这两条路径几乎覆盖所有软体和流体算法。
+
+## 1. 布料的质点-弹簧模型
+
+最直观的布料模型：把布看成一张 $M \times N$ 的顶点网格，每个顶点是一个粒子，粒子间用弹簧连接。1987 年 Terzopoulos 就用这套做出了可用的布料模拟。
+
+三种弹簧对应三种约束：
+
+```
+structural (结构):     shear (剪切):        bend (弯曲):
+                                         
+  ○──○──○             ○  ○  ○            ○  ○  ○  ○
+  │  │  │             │╲╱│╲╱│              ╲     ╱
+  ○──○──○             │╱╲│╱╲│               ╲___╱
+  │  │  │             ○  ○  ○
+  ○──○──○
+```
+
+- **structural**：水平和垂直邻居——控制拉伸
+- **shear**：对角邻居——防止布料被剪切成平行四边形
+- **bend**：跨一个的邻居（或者角度约束）——控制折叠僵硬度
+
+每根弹簧遵守胡克定律：$\mathbf F = -k(l - l_0)\hat{\mathbf r}$，$l_0$ 是原长，$k$ 是刚度系数。加上阻尼项 $-c\mathbf v_{\text{rel}}$ 让振动能耗散。
+
+时间积分用 [半隐式欧拉或 Verlet](./物理模拟入门.mdx)。质点-弹簧简单、直观、易并行、易并入现有物理引擎。
+
+**主要缺点是超弹性**（super-elasticity）——为了防止穿透和过度拉伸，$k$ 得很大；但 $k$ 大了显式积分不稳，$\Delta t$ 又得极小。60Hz 一帧要拆成几十上百子步。这个矛盾在 1990-2000 年是布料模拟的核心难题。
+
+## 2. PBD：位置基动力学
+
+Müller 等人 2007 年提出的 **Position-Based Dynamics** 从根上换了思路：**不算力、不积分速度，直接操作位置**。
+
+一步循环：
+
+```
+1. 外力施加     v ← v + Δt · F/m
+2. 预测位置     p ← x + Δt · v
+3. 约束投影     for each constraint C:
+                  修改 p 使 C(p) = 0
+                (迭代若干次收敛)
+4. 更新速度     v ← (p - x) / Δt
+5. 提交位置     x ← p
+```
+
+关键在第 3 步：把每个约束（比如"两点距离 = $l_0$"）看成一个几何投影——**把当前位置直接推到满足约束的位置**。距离约束的投影：
+
+$$
+\Delta \mathbf p_1 = -\frac{w_1}{w_1+w_2}(|\mathbf p_1-\mathbf p_2| - l_0)\hat{\mathbf n}
+$$
+
+$w_i = 1/m_i$ 是逆质量，$\hat{\mathbf n}$ 是两点连线单位向量。这本质是 Gauss-Seidel 迭代——一次投影一个约束，遍历所有约束，重复几次。
+
+PBD 的好处：
+
+- **绝对稳定**：不解方程，位置投影不会发散
+- **约束刚度直接**：一次投影几乎完全满足约束，不像弹簧那样残留形变
+- **易并行**：约束之间独立处理（有依赖时用图着色分组）
+- **代码简单**：每种约束就是一小段几何数学
+
+PBD 的问题：刚度和迭代次数耦合（迭代越多越硬）、和 $\Delta t$ 耦合（时间步变了整体硬度变了）。**XPBD**（eXtended PBD, 2016）加了一个补偿项让刚度与 $\Delta t$、迭代次数解耦。现在 XPBD 是 Nvidia FleX、Bullet 软体、Unity Cloth（部分模式）的默认。
+
+## 3. 布料的自碰撞
+
+布料折叠时会自己撞到自己。自碰撞（self-collision）比外部碰撞难得多，因为：
+
+- 检测量是 $O(n^2)$（$n$ 个三角形两两检测），必须空间加速
+- 已经穿透的部分要找出正确的"应该在哪一侧"，有时候没有唯一解
+- 摩擦让邻近层的布料黏在一起
+
+工业做法：
+
+1. **三角形-点/三角形-边**广义检测：不只是顶点碰面，还要检测边和边穿透
+2. **连续碰撞检测**（Continuous Collision Detection, CCD）：不检测"这帧末是否相交"，而是检测"从上帧末到这帧末的运动过程中是否相交"，避免快速运动的粒子跳过障碍物
+3. **响应用 PBD 投影**：找到穿透对，把两个点沿法线方向推开半个穿透距离
+
+Marvelous Designer、Houdini Vellum、Style3D 这些专业布料软件的自碰撞都非常鲁棒，代价是每帧几秒钟级别的计算，做不了实时。
+
+## 4. Navier-Stokes 方程
+
+流体的支配方程是 **Navier-Stokes**（1822 年 Navier，1845 年 Stokes）。不可压缩牛顿流体的形式：
+
+$$
+\rho\left(\frac{\partial \mathbf u}{\partial t} + \mathbf u \cdot \nabla \mathbf u\right) = -\nabla p + \mu \nabla^2 \mathbf u + \mathbf f
+$$
+
+$$
+\nabla \cdot \mathbf u = 0
+$$
+
+各项含义：
+
+| 项 | 名字 | 含义 |
+|---|---|---|
+| $\partial \mathbf u/\partial t$ | 加速度 | 时间变化 |
+| $\mathbf u \cdot \nabla \mathbf u$ | 对流 | 流体自己带自己走 |
+| $\nabla p$ | 压强梯度 | 高压推向低压 |
+| $\mu\nabla^2 \mathbf u$ | 粘性 | 内摩擦扩散动量 |
+| $\mathbf f$ | 外力 | 重力等 |
+| $\nabla\cdot\mathbf u=0$ | 不可压缩 | 体积守恒 |
+
+第二个方程（散度为零）是"不可压缩"的数学表达——流入流出体积相等。这个约束让流体模拟难：它是**全局约束**，一处压缩会瞬间影响整个流体。
+
+图形学求解 NS 有三大路径：**SPH**（Lagrangian）、**Eulerian grid**（欧拉网格）、**FLIP**（混合）。
+
+## 5. SPH：光滑粒子流体
+
+**Smoothed Particle Hydrodynamics**（SPH）1977 年为天体物理发明的，2003 年 Müller 等人引入图形学。核心思想：**用粒子表示流体，物理量在粒子附近用一个光滑核函数插值**。
+
+任意物理量 $A$ 在位置 $\mathbf r$ 的插值：
+
+$$
+A(\mathbf r) = \sum_j \frac{m_j}{\rho_j} A_j W(\mathbf r - \mathbf r_j, h)
+$$
+
+$W$ 是光滑核，通常用 Poly6 或 Cubic Spline，$h$ 是核半径。密度直接算：
+
+$$
+\rho_i = \sum_j m_j W(\mathbf r_i - \mathbf r_j, h)
+$$
+
+压强用状态方程（比如 Tait 方程）$p = k(\rho/\rho_0 - 1)$。压强梯度力：
+
+$$
+\mathbf F_i^{\text{pressure}} = -\sum_j m_j \frac{p_i + p_j}{2\rho_j} \nabla W(\mathbf r_i - \mathbf r_j, h)
+$$
+
+粘性力和外力类似。然后就是普通[数值积分](./物理模拟入门.mdx)推粒子。
+
+SPH 的优势：
+
+- **完全 Lagrangian**：粒子跟着流体走，不需要网格，天然处理自由表面
+- **易加边界**：粒子和几何体碰撞就是[粒子系统](./粒子系统基础.mdx)那套
+- **并行度高**：GPU 上跑得飞快
+
+问题：
+
+- **不可压缩性差**：Tait 方程只是近似不可压，压力波传播慢
+- **表面张力和低速流不真实**：小水滴容易散
+- **邻居查询开销大**：每帧要重建空间哈希
+
+改进有 **PCISPH**（Predictive-Corrective 迭代压强）、**IISPH**（Implicit Incompressible）、**DFSPH**（Divergence-Free）。渲染流体表面用 Marching Cubes 抽取等密度面，或屏幕空间流体渲染（screen space fluids）。
+
+## 6. 欧拉网格法
+
+**欧拉法**在固定的规则网格上采样速度、压强、密度。Stam 1999 年的 "Stable Fluids" 论文是里程碑——第一个实时的、无条件稳定的流体求解器。
+
+Stam 的算法把一步 NS 拆成 4 个子步：
+
+1. **对流**（advection）：物质沿速度场走。用**半 Lagrangian**——从当前网格点反向追踪速度，采样上一步的场。天然稳定。
+2. **扩散**（diffusion）：粘性项 $\mu \nabla^2 \mathbf u$，用隐式 Laplace 求解（共轭梯度）。
+3. **外力**：$\mathbf u \leftarrow \mathbf u + \Delta t \mathbf f/\rho$。
+4. **投影**（projection）：把速度场投影到无散度子空间。解 Poisson 方程 $\nabla^2 p = \nabla\cdot \mathbf u^*$，然后 $\mathbf u = \mathbf u^* - \nabla p$。
+
+第 4 步是最贵的——每帧要解一个大型稀疏线性方程组。共轭梯度（CG）+ 预处理器（如 MIC(0)、MG）是标配。
+
+**MAC grid**（Marker-and-Cell）是欧拉法的标准存储：压强存在格心，速度分量存在格面（$u$ 存左右面，$v$ 存上下面，$w$ 存前后面）。这个交错网格让离散散度和梯度算子性质好。
+
+欧拉法的问题：**数值耗散**——每次半 Lagrangian 采样都有插值损失，尖锐的烟卷会越来越糊。高阶方法（BFECC、MacCormack、CIP）能缓解。
+
+## 7. FLIP：两个世界的混合
+
+**FLIP**（FLuid Implicit Particle，1980 年代 Brackbill 提出，Zhu & Bridson 2005 引入图形学）：粒子存储速度和位置，网格只做压强投影。
+
+一帧：
+
+1. **粒子→网格**：把粒子速度用核函数插值到网格上
+2. **在网格上做压强投影**（欧拉法那套）——得到无散度速度场 $\mathbf u^{n+1}$
+3. **网格→粒子**：把速度变化（$\mathbf u^{n+1} - \mathbf u^n$）插值回粒子，加到粒子速度上
+4. **粒子对流**：$\mathbf x_p \leftarrow \mathbf x_p + \Delta t \mathbf u_p$
+
+FLIP 把欧拉法的"不可压缩投影"和 Lagrangian 的"无耗散对流"结合了。**PIC**（Particle-In-Cell）是把速度直接从网格拿而不是速度变化——耗散大但稳定。**FLIP/PIC 混合**（$\alpha \cdot \text{FLIP} + (1-\alpha)\cdot \text{PIC}$）取两者优点。
+
+FLIP 是**行业标准**：Houdini 的 FLIP Solver、迪士尼 Frozen 的雪、绝大多数好莱坞水/沙效果都是它。**APIC**（Affine PIC, 2015）、**MPM**（Material Point Method，能同时模拟流体、雪、沙、软体，被冰雪奇缘用来做雪）是进一步演化。
+
+## 8. 三大流体方法对比
+
+| 特性 | SPH | Euler grid | FLIP |
+|---|---|---|---|
+| 存储 | 粒子 | 网格 | 粒子 + 网格 |
+| 表面追踪 | 天然 | 需要 level set | 粒子直接给 |
+| 不可压缩 | 弱 | 强（Poisson） | 强 |
+| 数值耗散 | 低 | 高 | 中低 |
+| 并行 | 极好 | 好（Poisson 除外） | 好 |
+| 适合 | 游戏水花、天体 | 烟、火 | 好莱坞水、影视 |
+| 典型使用者 | 游戏引擎 | 早期烟火 | Houdini、Weta |
+
+## 9. 流体渲染
+
+模拟出来的流体密度/速度/温度场怎么渲染？
+
+**表面流体**（水、酒）：抽取等密度面。Marching Cubes 生成三角网格（参见 [多边形网格表示与数据结构](../几何处理/多边形网格表示与数据结构.mdx)），或者屏幕空间流体渲染（在深度图上直接光照）。
+
+**体积介质**（烟、火、云）：光线步进（ray marching）穿过体积，累加发射与吸收。可以用体积路径追踪采样多次散射。真实的烟需要 volumetric light（体积光）——太阳光穿过烟时有明显的丁达尔效应，工业渲染这是标配。
+
+**火焰额外要 blackbody radiation**：黑体辐射公式给温度到颜色的映射（温度低 → 红，高 → 白），配合密度做发光。
+
+## 10. 工程现实
+
+一段电影级流体效果的完整流水线：
+
+1. **模拟**：Houdini FLIP，模拟一次要几小时到几天
+2. **缓存**：把每帧粒子/网格数据写到磁盘（.bgeo, .vdb），几十 GB 到几 TB
+3. **网格化**：粒子→表面网格（VDB Mesh 或 OpenVDB To Polygons）
+4. **合成飞溅**：额外发射的白沫、水花粒子（whitewater、bubbles、spray）
+5. **渲染**：Karma/Arnold/RenderMan，每帧几十分钟到几小时
+6. **合成**：Nuke 里叠加多层——主水体、白沫、光晕、景深
+
+游戏里没有这些奢侈——所有流体都是**假**的：法线贴图动画的水面、精灵图轮播的火焰、粒子系统近似的溅水。真正的 Navier-Stokes 求解偶尔出现在极高端项目（Uncharted 4 的水、Alan Wake 2 的烟），跑在预计算的**烘焙**格式里，或者受限的实时 FLIP。
+
+对比一下这几种模拟技术在整个体系中的位置：
+
+| 现象 | 用什么 |
+|---|---|
+| 硬物体交互 | [刚体动力学](./物理模拟入门.mdx) |
+| 稀疏视效 | [粒子系统](./粒子系统基础.mdx) |
+| 布、旗、头发 | PBD 距离约束 |
+| 橡胶软体 | PBD 体积约束 + FEM |
+| 水、油、蜂蜜 | FLIP 或 SPH |
+| 烟、云 | Eulerian grid |
+| 沙、雪、泥 | MPM |
+
+理解了 Lagrangian 和 Eulerian 这两个基本思路，其他都是变奏。图形学四十年来在软体/流体这一块的核心工作，就是围绕**如何离散化连续介质**做工程平衡——精度、速度、稳定性、艺术可控性——四选二或者三选一。
+
+</WordCount>

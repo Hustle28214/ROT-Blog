@@ -1,0 +1,266 @@
+import WordCount from '../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+# 片段处理与输出合并
+
+光栅化把三角形吐成了一大堆片段（fragment），带插值好的属性和深度。真正把这些片段变成屏幕上一个像素还差最后一段路：**片段着色器**决定这个片段长什么样，**输出合并**决定它能不能、以什么方式写进帧缓冲。这一段路虽然逻辑不复杂，但性能上是整条管线里最容易撞墙的地方——所有的带宽、所有的 overdraw 代价都在这里买单。
+
+## 1. 片段和像素不是一回事
+
+术语先分清楚：
+
+| 概念 | 含义 |
+|---|---|
+| 像素 pixel | 屏幕/帧缓冲里的一个格子，位置固定 |
+| 片段 fragment | 一次光栅化生成的候选，可能被丢弃 |
+| 样本 sample | MSAA 下的亚像素采样点 |
+
+一个像素能对应零到 N 个片段：被 overdraw 覆盖 3 次就 3 个片段依次进 OM，被 Early-Z 全踢掉就 0 个。MSAA 4x 下一个片段可能同时代表 1–4 个样本（覆盖了几个亚像素点）。这层区分不清楚，接下来的深度测试、混合都会理解错。
+
+## 2. 片段着色器 FS
+
+FS 是可编程管线里代码量最大、最耗性能的阶段。GLSL 版一个典型的漫反射 FS：
+
+```glsl
+in vec3 vWorldPos;
+in vec3 vNormal;
+in vec2 vUV;
+uniform sampler2D uAlbedo;
+uniform vec3 uLightDir;
+uniform vec3 uLightColor;
+
+out vec4 fragColor;
+
+void main() {
+    vec3 N = normalize(vNormal);
+    vec3 L = normalize(-uLightDir);
+    float NdotL = max(dot(N, L), 0.0);
+    vec3 albedo = texture(uAlbedo, vUV).rgb;
+    vec3 color = albedo * uLightColor * NdotL;
+    fragColor = vec4(color, 1.0);
+}
+```
+
+FS 的输入：插值属性（varying）+ uniform（贴图、常量缓冲）+ 内置量（`gl_FragCoord`、`gl_FrontFacing`）。
+输出：一个或多个颜色（MRT 时多个），可能改深度（`gl_FragDepth`）。
+
+FS 里能做的事千变万化——见 [基础光照模型](../着色器/基础光照模型.mdx)、[纹理映射基础](../着色器/纹理映射基础.mdx)、[BRDF与材质系统](../着色器/BRDF与材质系统.mdx)。这里只讨论 FS 与管线其他部分的接口。
+
+### 2.1 discard 与提前退出
+
+FS 里 `discard`（HLSL: `clip`）声明"这个片段不该写"：
+
+```glsl
+if (texture(uMask, vUV).a < 0.5) discard;
+```
+
+用途：alpha 测试（草、树叶）、程序生成的镂空。但 discard 会破坏 **Early-Z**——不算 FS 就不知道要不要 discard，所以硬件通常只能开 Late-Z，管线里所有优化被抹平。
+
+现代 API 提供了**early fragment tests** 修饰符（`layout(early_fragment_tests) in;`）：程序员承诺 FS 不改深度、不 discard 之前的 Z 决定，让硬件强制 Early-Z。这是 alpha test 之外一切追求性能的 FS 的标配。
+
+### 2.2 gl_FragDepth
+
+FS 里写 `gl_FragDepth = ...` 能覆盖插值出来的深度。真实用途少但存在——软粒子的深度渐变、伪造凹凸表面的深度（POM）。代价：Early-Z 直接关闭。所以除非必要，别碰这个。
+
+## 3. 输出合并 OM
+
+FS 之后所有的"能不能写入"的判断都在 OM 里做。逻辑顺序：
+
+```
+FS 输出 (color, depth, coverage)
+        │
+        ▼
+   ┌─────────────┐
+   │ Scissor 测试 │  在指定矩形外的丢弃
+   └─────┬───────┘
+         ▼
+   ┌─────────────┐
+   │ 模板测试     │  与 stencil buffer 比较
+   └─────┬───────┘
+         ▼
+   ┌─────────────┐
+   │ 深度测试     │  与 depth buffer 比较
+   └─────┬───────┘
+         ▼
+   ┌─────────────┐
+   │ Alpha 覆盖   │  MSAA 下 alpha → coverage
+   └─────┬───────┘
+         ▼
+   ┌─────────────┐
+   │ 混合         │  与 framebuffer 已有值加权
+   └─────┬───────┘
+         ▼
+   ┌─────────────┐
+   │ 写掩码       │  按 channel/bit 屏蔽写入
+   └─────┬───────┘
+         ▼
+     帧缓冲
+```
+
+## 4. 深度测试
+
+深度测试的核心是一个比较：`z_new [op] z_buffer`，op 常见的 `LESS`、`LEQUAL`、`GREATER`、`EQUAL`。默认 `LESS`（近处遮远处）。通过就写深度，不通过就丢弃片段。
+
+### 4.1 深度缓冲的精度
+
+深度缓冲存的是 $z_{\text{NDC}}$（或 D3D 的 $[0,1]$ 深度）。因为投影矩阵是$1/w$型双曲映射，深度精度**近处极高、远处极低**：
+
+$$
+z_{\text{NDC}} = \frac{f}{f-n} - \frac{fn}{(f-n)z_{\text{view}}}
+$$
+
+$n, f$ 是近远平面距离。远处一个深度单位可能对应几十米实际空间——两个物体贴太近就 **Z-fighting**（闪烁）：
+
+$$
+\Delta z_{\text{view}} \approx \frac{z^2}{fn} \cdot \Delta z_{\text{NDC}}
+$$
+
+解决办法：拉近远平面（$f$ 别太大）、用 32 位深度、用**反向深度**（Reverse Z：把 $n$ 和 $f$ 交换，配合 $z$-clear 用 0 和 GREATER 比较，用 $1/z$ 分布的优势填补远处精度）。反向深度是 3A 引擎的标配。
+
+### 4.2 Depth Pre-pass
+
+先跑一趟只写深度不算颜色的渲染（简化 FS），把 Z-buffer 填满，然后第二趟正式渲染时开 `Equal` 深度测试——所有被遮挡的片段直接被 Early-Z 剔掉。用 FS 极重的场景（复杂光照）这套非常划算，代价是几何被跑两次。
+
+## 5. 模板测试
+
+模板缓冲（stencil buffer）通常 8 位整数，跟深度合打包在一个 texture（D24S8 或 D32S8）。模板测试比一个复杂的规则：
+
+```
+if ((ref & mask) op (stencil & mask)):  通过
+```
+
+`op` 是比较运算符（`NEVER`, `LESS`, `EQUAL`, `GREATER`, `ALWAYS`, ...），`ref` 是程序员设的参考值，`mask` 是位掩码。同时可以配置"通过时如何更新 stencil"——`KEEP`、`REPLACE`、`INCR`、`DECR`、`INVERT`。
+
+### 5.1 模板测试的经典应用
+
+- **屏幕空间遮罩**：先画一次镜子/传送门的形状，模板置 1；正式画场景时开模板测 `EQUAL 1`，只有落在遮罩里的片段能通过
+- **平面反射**：模板 = 反射平面的区域，反射场景只画在模板内
+- **阴影体**（Stencil Shadow）：Carmack 的 Doom 3 阴影方案，用模板计数光影相交次数
+- **Portal / Screen Door**：任何需要"仅在某形状内绘制"的效果
+- **UI 层裁剪**：矩形裁剪之外的复杂形状裁剪
+
+模板的核心用法是**多趟渲染中传递可见性信息**——把第一趟的几何决定用模板保存下来，供后续趟使用。
+
+## 6. Alpha 混合
+
+不透明物体一次覆盖一个像素就够了。透明物体（玻璃、烟雾、粒子）需要跟已有内容混合。混合方程：
+
+$$
+C_{\text{out}} = C_{\text{src}} \cdot F_{\text{src}} \;\text{op}\; C_{\text{dst}} \cdot F_{\text{dst}}
+$$
+
+$C_{\text{src}}$ 是 FS 输出的颜色（含 alpha），$C_{\text{dst}}$ 是 framebuffer 里已有的颜色。$F_{\text{src}}, F_{\text{dst}}$ 是混合因子，`op` 通常是 `+`。常见组合：
+
+| 名称 | $F_{\text{src}}$ | $F_{\text{dst}}$ | 效果 |
+|---|---|---|---|
+| 传统 alpha | $\alpha_{\text{src}}$ | $1-\alpha_{\text{src}}$ | 半透明 |
+| 预乘 alpha | $1$ | $1-\alpha_{\text{src}}$ | src 已经乘过 alpha |
+| 加法混合 | $1$ | $1$ | 火焰、发光 |
+| 乘法混合 | $C_{\text{dst}}$ | $0$ | 阴影贴、变暗 |
+| Screen | $1$ | $1-C_{\text{src}}$ | 屏幕叠加 |
+
+### 6.1 预乘 Alpha
+
+如果颜色在 shader 里已经乘过 alpha，$C_{\text{src}} = \alpha \cdot C_{\text{rgb}}$，混合公式就是 $C_{\text{out}} = C_{\text{src}} + (1-\alpha) C_{\text{dst}}$。为什么好？
+
+- **数值稳定**：alpha 很小时 $\alpha \cdot C_{\text{rgb}}$ 精度可控，传统 alpha 会在贴图缩放（mipmap 生成）时把黑色边缘漏出来
+- **多次混合可交换**：预乘下的混合运算满足结合律，off-screen 中间合成不出错
+
+工业界（Pixar、皮克斯、几乎所有电影合成）都用预乘 alpha。实时图形也在往这边靠。
+
+### 6.2 排序问题
+
+Alpha 混合结果依赖绘制顺序：先画玻璃再画背景 vs 先画背景再画玻璃，结果不同。**传统解法**：不透明物体从前到后（吃 Hi-Z），透明物体从后到前（保证混合正确）。
+
+但排透明物体是 CPU 大负担，还只能按物体级排——同一网格内自相交的透明面片仍然错。**OIT**（Order-Independent Transparency）家族的方案能免排序：
+
+- Depth Peeling：多趟"扒皮"，每趟取最近未处理透明层
+- Weighted Blended OIT：McGuire 2013，用加权和近似正确顺序，一趟搞定，视觉上够用
+- 线性化列表（Per-Pixel Linked List）：DX11 起 UAV 支持，一个像素记录多个片段，最后按深度排序合成
+
+## 7. Alpha to Coverage
+
+MSAA 下有个便宜的近似透明方案：**alpha to coverage**。不真做混合，而是把 alpha 值转成"覆盖多少个亚像素样本"。alpha=0.5 就随机覆盖一半样本。多个树叶重叠时，各自独立地"覆盖不同的样本子集"，MSAA 分辨率解析（resolve）时天然平均，看起来像半透明。
+
+优点：不需要排序、不需要混合。缺点：MSAA 8x 只有 8 级 alpha 分度，边缘会有噪点。植被渲染的经典技巧。
+
+## 8. MRT：多渲染目标
+
+FS 可以同时输出多个颜色：
+
+```glsl
+layout(location = 0) out vec4 gAlbedo;
+layout(location = 1) out vec4 gNormal;
+layout(location = 2) out vec4 gPosition;
+
+void main() {
+    gAlbedo   = vec4(texture(uAlbedo, vUV).rgb, 1.0);
+    gNormal   = vec4(normalize(vNormal) * 0.5 + 0.5, 1.0);
+    gPosition = vec4(vWorldPos, 1.0);
+}
+```
+
+这就是**延迟渲染 G-Buffer** 的基础——一趟几何 pass 就把颜色、法线、位置、材质参数全写出去，光照 pass 再从这些纹理里读。
+
+MRT 的限制：所有目标必须同分辨率、同 MSAA 采样数；每个目标可以不同格式（HDR 用 R16G16B16A16F，法线用 R8G8_SNORM 压缩……）。硬件支持一般 4–8 个目标。
+
+MRT 的代价：**带宽**。每个片段要写 N 个像素的数据，$N$ 张 32bpp 目标就是 $4N$ 字节/片段的写带宽。1080p 全屏 4 MRT 一帧 32 MB，60 fps 就是 2 GB/s——不算多，但加上读回来就翻倍。移动 GPU 上是主要瓶颈之一，所以移动端的 tile-based 架构（PowerVR、Adreno、Mali）会把 G-Buffer 保存在片上 tile 内存里、不落回显存，就是要吃这块带宽。
+
+## 9. 帧缓冲
+
+一个**帧缓冲对象**（Framebuffer Object, FBO / D3D 里叫 RenderTarget View）是若干附件的集合：
+
+- 颜色附件 0..N（对应 MRT 的每个 output）
+- 深度附件（可选）
+- 模板附件（可选，通常与深度合打包）
+
+附件底下是**纹理**或**渲染缓冲**（Renderbuffer，纯写不读）。写好的颜色附件可以后续当纹理采样——这就是所有屏幕后期效果的基石：先渲染到 FBO，再把它作为纹理采样着色到屏幕四边形上做 Bloom / Tone Mapping / FXAA 等。
+
+一个典型 3A 引擎的一帧涉及几十个 FBO：Shadow Map、G-Buffer、SSAO Buffer、多个 Bloom Mip、Motion Vector Buffer、Depth Pyramid…… 每个都是一次 pass，一堆纹理切换。渲染图（Render Graph）就是管理这些依赖的调度器。
+
+## 10. Blend State 与 Pipeline State Object
+
+现代 API（Vulkan、DX12、Metal）把 OM 的所有配置——深度写、深度测试函数、模板 op、混合因子、写掩码——打包成一个**渲染状态对象**（PSO），跟 shader 一起在初始化时创建、绘制时切换。这让驱动能预编译所有可能的固定功能组合，避免运行时状态切换开销。
+
+OpenGL/DX11 是"设置一个状态就生效"的即时模式，看起来友好但每次 draw call 前都可能要驱动重新配置一堆硬件寄存器，管线卡顿。Vulkan 强制预打包让 CPU 端 draw call 开销降一个数量级。
+
+## 11. FS + OM 的性能法则
+
+按经验优先级：
+
+1. **减 overdraw**：不透明物体前到后画，让 Early-Z 剔背后。alpha test 少用（关掉 Early-Z）
+2. **压 FS**：贴图采样比算术贵、条件分支比直算贵、避免 varying 数量爆炸
+3. **管带宽**：多 MRT 和大分辨率要谨慎，用压缩格式（BC/ETC/ASTC）
+4. **别乱开混合**：一个混合是 read-modify-write，比不透明写贵 2–3 倍
+5. **模板配 Early-Z**：模板测试也能提前，帮助早剔除
+
+工业界见过的最典型性能坑：一个 shader 里读了 12 张纹理还开着 MSAA 4x 和 4 个 MRT，一帧 4K 分辨率，带宽直接爆掉——GPU profiler 里 ROP unit 100% 忙。解法通常是**分离 pass**——不用 alpha 的物体不走同一个 shader、不用 MRT 的物体不写空 attach。
+
+## 12. 与其他阶段的接口
+
+- 上游：[光栅化：三角形如何变成像素](./光栅化：三角形如何变成像素.mdx) 输出的片段流
+- 全局管线视图：[渲染管线概览：从顶点到像素的旅程](./渲染管线概览：从顶点到像素的旅程.mdx)
+- 光照计算：[基础光照模型](../着色器/基础光照模型.mdx) 和 [BRDF与材质系统](../着色器/BRDF与材质系统.mdx)
+- 阴影相关 pass：[阴影映射原理与实现](../阴影与遮挡/阴影映射原理与实现.mdx)、[阴影体及其他阴影技术](../阴影与遮挡/阴影体及其他阴影技术.mdx)
+- 后续屏幕后处理：[抗锯齿技术](../后期处理与视觉特效/抗锯齿技术.mdx)、[高动态范围与色调映射](../后期处理与视觉特效/高动态范围与色调映射.mdx)
+
+## 13. 一个片段的一生
+
+从光栅器出来的一个片段，最终到进入帧缓冲的完整过程：
+
+1. 从光栅器收到位置、深度、插值属性
+2. Scissor 测试：不在裁剪矩形里就丢
+3. Early Stencil / Early Z（若允许）：不通过就丢
+4. 送入 FS：几十到几百条指令
+5. FS 输出颜色（可能是多个 target 的颜色）
+6. Late Stencil / Late Z（若 Early 版被禁用）
+7. Alpha to Coverage 处理
+8. 对每个 target 做混合运算：$C = C_{\text{src}} F_{\text{src}} + C_{\text{dst}} F_{\text{dst}}$
+9. 按写掩码写入帧缓冲
+
+FS 和 OM 是管线的终点。这里做完了，一帧图像的一个像素就定型了。等所有像素都被处理完，framebuffer swap 上屏，一帧渲染完成——下一帧从 CPU 提交新的 draw call 开始，整条流水线又转起来。
+
+理解这一段最重要的是意识到：**成本在这里**。CPU 端 draw call 优化、几何 LOD、剔除，全都是为了让最后进入 FS+OM 的片段数尽量少。因为每一个多余的片段，代价可能是 100 条 shader 指令、5 次纹理采样、$N$ 次帧缓冲读写——乘以每秒上亿个片段，是 GPU 每一度电真正被烧掉的地方。
+
+</WordCount>

@@ -1,0 +1,209 @@
+import WordCount from '../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+# 材质与间接光照：渲染方程与蒙特卡洛
+
+[Whitted 光追](./光线追踪基本原理.mdx)只处理点光源和纯镜面材质，磨砂金属、面光源、次表面散射一概拒绝。真正的物理光传输需要一个统一的数学框架——1986 年 Jim Kajiya 提出**渲染方程**（The Rendering Equation），从此计算机图形学有了自己的 Maxwell 方程。
+
+## 1. 渲染方程
+
+场景中某点 $\mathbf{x}$ 沿方向 $\omega_o$ 射出的辐射（radiance）为：
+
+$$
+L_o(\mathbf{x},\omega_o)=L_e(\mathbf{x},\omega_o)+\int_{\Omega^+} f_r(\mathbf{x},\omega_i,\omega_o)\,L_i(\mathbf{x},\omega_i)\,(\mathbf{n}\cdot\omega_i)\,d\omega_i
+$$
+
+- $L_e$：自发光项（光源本身）
+- $f_r$：双向反射分布函数（BRDF），描述表面材质
+- $L_i(\mathbf{x},\omega_i)$：从方向 $\omega_i$ 入射到 $\mathbf{x}$ 的辐射
+- $\mathbf{n}\cdot\omega_i$：Lambert 余弦项，表面法线与入射方向的夹角
+- $\Omega^+$：法线所在半球
+
+$L_i$ 又依赖于场景里其他点的 $L_o$——这是一个**递归积分方程**。展开后可以写成 Neumann 级数：
+
+$$
+L=L_e+TL_e+T^2L_e+T^3L_e+\dots
+$$
+
+其中 $T$ 是光传输算子。物理直观：$L_e$ 是直接光，$TL_e$ 是一次弹射的间接光，$T^2L_e$ 是两次弹射后的间接光……
+
+这个方程无法解析求解。有限元方法（Radiosity, 1984）只适用于漫反射；[光栅化管线](../图形渲染管线/渲染管线概览：从顶点到像素的旅程.mdx)只能算 $L_e+$ 局部直接光。要算完整的 $L$，工业界的共识答案是**蒙特卡洛积分**。
+
+## 2. 蒙特卡洛路径追踪
+
+蒙特卡洛的核心是用随机采样估计积分：
+
+$$
+\int f(x)dx\approx\frac{1}{N}\sum_{i=1}^N\frac{f(X_i)}{p(X_i)},\quad X_i\sim p
+$$
+
+$p(x)$ 是采样分布，$N$ 是样本数。估计的方差正比于 $1/N$，标准差正比于 $1/\sqrt N$——**样本数翻 4 倍才能把噪声减半**。这是路径追踪慢的根本原因。
+
+**路径追踪**（Kajiya, 1986）把渲染方程的递归展开成一条从相机出发的随机路径：
+
+```
+    eye ──primary──► P0
+                     │ (采样一个反射方向)
+                     ▼
+                     P1
+                     │
+                     ▼
+                     P2 ──► light
+```
+
+每个交点做两件事：
+
+1. **直接光估计**：向光源采样，判可见性，加上 $L_e\cdot f_r\cdot\cos\theta / p_{\text{light}}$
+2. **间接光估计**：按 BRDF 采样一个方向，递归
+
+伪代码：
+
+```cpp
+Color trace(Ray r, int depth) {
+    Hit h = scene.intersect(r);
+    if (!h) return env(r.d);
+    Color Le = h.mat.emission;
+    if (depth > MAX) return Le;
+
+    // 直接光
+    auto [wl, Ll, pl] = sample_light(h.p);
+    Color direct = (visible(h.p, wl))
+                 ? Ll * h.mat.brdf(r.d, wl) * dot(h.n, wl) / pl
+                 : black;
+
+    // 间接光
+    auto [wi, pi] = h.mat.sample_brdf(r.d, h.n);
+    Ray next = { h.p, wi };
+    Color indirect = trace(next, depth+1) * h.mat.brdf(r.d, wi) * dot(h.n, wi) / pi;
+
+    return Le + direct + indirect;
+}
+```
+
+## 3. 重要性采样
+
+盲目均匀采样半球是灾难。假设一个高光很强的塑料表面，BRDF 集中在反射瓣附近 5° 内，均匀采样 1000 个方向里只有几个落进有效区域，其他贡献几乎为零——大部分算力浪费。
+
+**重要性采样**：让采样分布 $p(x)$ 尽可能贴合被积函数 $f(x)$，最理想 $p\propto f$ 时方差为 0。
+
+常见采样策略：
+
+- **BRDF 采样**：对镜面材质按镜面瓣，对漫反射按 $\cos\theta$ 分布，对 GGX 微表面按可见法线分布。见 [BRDF 与材质系统](../着色器/BRDF与材质系统.mdx)
+- **光源采样**：直接在光源表面均匀采点，$p=1/A_{\text{light}}$
+- **环境贴图采样**：把 HDR 环境贴图按亮度构建 CDF，往亮的方向多采
+
+**余弦加权半球采样**（Lambert 表面的标配）：
+
+$$
+\theta=\arccos(\sqrt{\xi_1}),\quad \phi=2\pi\xi_2
+$$
+
+其中 $\xi_1,\xi_2\in[0,1)$ 是均匀随机数。这个变换正好让 $p(\omega)=\cos\theta/\pi$，与 Lambert BRDF 的 $\cos$ 项抵消。
+
+## 4. 俄罗斯轮盘赌
+
+路径不能无限递归。硬截断（比如 depth > 8 就停）会引入**偏差**（bias）——高阶弹射的能量被完全丢弃，场景整体偏暗。
+
+**俄罗斯轮盘赌**（Russian Roulette, Arvo & Kirk, 1990）用概率性终止保持无偏：
+
+```
+每次弹射结束：
+    以概率 q 终止，返回 0
+    以概率 1-q 继续，把当前 throughput 乘以 1/(1-q)
+```
+
+数学：期望值不变。设 $L$ 是继续路径的期望，则
+
+$$
+E[\text{result}]=q\cdot 0+(1-q)\cdot\frac{L}{1-q}=L
+$$
+
+$q$ 一般取 $1-\max(\text{throughput})$——路径越暗越早终止。这是**自适应**的样本预算分配：给高贡献路径更多计算。
+
+## 5. 多重重要性采样（MIS）
+
+单一策略采样常有盲区。BRDF 采样对小光源很差（光源方向几乎不采到），光源采样对镜面材质很差（BRDF 值几乎全在光源方向外）。
+
+**MIS**（Veach & Guibas, 1995）把多种策略结合起来。用 $n$ 种采样分布 $p_1,\dots,p_n$，取样后按加权和估计：
+
+$$
+\hat F=\sum_{i=1}^n\frac{1}{n_i}\sum_{j=1}^{n_i}\frac{w_i(X_{i,j})f(X_{i,j})}{p_i(X_{i,j})}
+$$
+
+**平衡启发式**（balance heuristic）给出方差近乎最优的权重：
+
+$$
+w_i(x)=\frac{n_i p_i(x)}{\sum_k n_k p_k(x)}
+$$
+
+**幂启发式**（power heuristic）$w_i\propto (n_i p_i)^\beta$（$\beta=2$ 常用）在实际中噪声更低。
+
+一个直观例子：拿 BRDF 采样和光源采样各来一次，MIS 保证在两种极端场景（大光源、小光源）下都不崩。Cycles、Arnold、PBRT 的核心就是 direct lighting 用 MIS。
+
+## 6. 双向路径追踪与光子映射简介
+
+有些场景路径追踪很痛苦：
+
+- **焦散**（caustics）：光透过玻璃球在地面聚成亮斑。从眼睛出发几乎采不到玻璃球正好折射到那一点的路径
+- **小孔从暗室看外界**：光路极稀疏
+
+这两类问题的答案是**双向策略**。
+
+### 6.1 双向路径追踪（BDPT）
+
+Lafortune & Willems (1993), Veach & Guibas (1994)。从眼睛发一条子路径 $\mathbf{x}_0,\mathbf{x}_1,\dots,\mathbf{x}_s$，从光源发一条 $\mathbf{y}_0,\mathbf{y}_1,\dots,\mathbf{y}_t$，然后**尝试连接**每对端点。
+
+```
+    eye ── x0 ── x1 ── x2
+                        ╲
+                         ╲ 连接
+                        ╱
+    light ── y0 ── y1 ─╯
+```
+
+每种 $(s,t)$ 组合是一种采样策略，用 MIS 结合。BDPT 对焦散和困难光路显著改善路径追踪的收敛。代价是内存和实现复杂度飙升。
+
+### 6.2 光子映射
+
+Jensen (1996)。分两阶段：
+
+1. **光子发射阶段**：从光源发大量光子，反射折射后落到表面存下来，形成一个**光子图**（用 k-d 树索引）
+2. **渲染阶段**：从眼睛发射线，在交点处查询附近 $k$ 个光子密度作为间接光估计
+
+光子映射在焦散上无敌——直接跟着光走。缺点是**有偏**（bias）——光子密度估计依赖搜索半径。Progressive Photon Mapping (Hachisuka, 2008) 用渐进方式让偏差随样本数趋 0，成为兼具无偏和高效的方案。
+
+### 6.3 Metropolis Light Transport
+
+Veach & Guibas (1997)。用马尔可夫链 Monte Carlo，在"路径空间"里随机游走，接受/拒绝新路径。特长是**局部探索**——找到一条重要路径后可以在它附近变异出许多类似路径。极难场景的救星，但收敛与场景高度耦合，工业界用得少。
+
+## 7. 收敛与噪声的经验数据
+
+在一个中等场景（Cornell Box + 玻璃球 + 面光源）里估计像素颜色：
+
+| 方法 | 达到"视觉可接受"所需样本 |
+|---|---|
+| 均匀采样 | > 10,000 spp |
+| BRDF 重要性采样 | 500 spp |
+| MIS（BRDF + light）| 100 spp |
+| BDPT | 50 spp（对焦散） |
+| 光子映射 | 20 spp + 100 万光子 |
+
+spp = samples per pixel。1080p 图像 100 spp 意味着约 2 亿条路径，每条 3-5 次弹射，10 亿次射线-场景求交。这就是为什么离线渲染需要几分钟到几小时一帧，也是为什么实时光追必须**大幅降低 spp** 然后靠[降噪算法](./实时光线追踪与RTX.mdx)补救。
+
+## 8. 与光栅化间接光照方案的对比
+
+| 方案 | 类型 | 精度 | 实时 |
+|---|---|---|---|
+| 路径追踪 | 每帧完整解 | 高（无偏）| 否（离线）|
+| Lightmap 烘焙 | 预计算漫反射 | 中，仅静态 | 是 |
+| Voxel Cone Tracing | 体素近似 | 低，仅漫反射 | 是 |
+| SDF/SSGI | 屏幕空间 | 低，有漏光 | 是 |
+| Lumen（UE5）| 混合，硬件加速 | 中高 | 是（RTX GPU）|
+| RTXGI/DDGI | Probe + 光追 | 中，delayed | 是 |
+
+游戏引擎的路径是**混合**：直接光和高频反射用光追精确算，低频间接光用 Probe/Voxel 缓存。这些工程妥协的动机就是"我们付不起 100 spp/帧"。
+
+渲染方程仍是那个渲染方程，只不过每个人都在用不同的方式作弊——**任何看起来对的近似都是好近似**。理论完整了 40 年，工程博弈才刚开始。
+
+</WordCount>

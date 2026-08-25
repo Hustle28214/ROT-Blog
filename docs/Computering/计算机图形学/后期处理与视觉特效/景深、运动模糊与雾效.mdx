@@ -1,0 +1,199 @@
+import WordCount from '../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+# 景深、运动模糊与雾效：模拟真实世界的"不清晰"
+
+理想的针孔相机会给出一切都清晰的图像，但真实世界的图像永远是模糊的——镜头有孔径、快门有时长、大气有粒子。人眼把这些"不清晰"当成距离、速度、体量的线索。计算机图形学里，这类"故意加的模糊"统称**镜头/大气效果**，是后处理阶段最有辨识度的一部分。
+
+## 1. 景深：孔径不为零带来的圈
+
+针孔相机（pinhole）里的光线路径唯一，所有物体不管远近都对应像面上一点。真实镜头有孔径 $A$，物体不在焦平面时会成一个圆——**弥散圆**（Circle of Confusion, CoC）。
+
+### 1.1 薄透镜模型与 CoC 半径
+
+薄透镜方程：
+
+$$
+\frac{1}{s_o}+\frac{1}{s_i}=\frac{1}{f}
+$$
+
+$s_o$ 是物距，$s_i$ 是像距，$f$ 是焦距。设焦平面对应物距 $s_o=S$，另一深度 $z$ 处的物体像面直径推导后得到弥散圆直径：
+
+$$
+c(z)=\frac{|z-S|}{z}\cdot\frac{f^2}{N(S-f)}
+$$
+
+$N=f/A$ 是光圈值 f-number。三个直观结论：
+
+- **CoC 与深度差符号无关**——前景失焦和后景失焦都会模糊
+- **越大光圈（$N$ 越小）CoC 越大**——所以人像镜头用 f/1.4 拍虚化背景
+- **越长焦距 CoC 越大**——85mm 比 35mm 更容易糊背景
+
+工程上把 CoC 换算到屏幕像素：$r_{\text{pixel}}=c(z)\cdot\text{sensor\_to\_pixel}$。
+
+### 1.2 散景（Bokeh）——CoC 的形状
+
+CoC 不是几何点而是**光圈的成像**。圆形光圈得圆形散景，六边形光圈得六角形散景。远处的高光被扩散成"光斑"，是散景最显眼的表现。
+
+想在游戏里做真实的六边形/心形散景，通常用**分散写入**（scatter）：每个高亮像素往目标半径内的多个像素叠加带形状 mask 的能量。GPU 上更常见的是反过来做**聚集**（gather）：目标像素采样一圈周围像素并按 CoC 加权。
+
+### 1.3 实时景深的两大流派
+
+**Gather-based DoF**（大多数游戏）：
+1. 一个 pass 计算每像素 CoC，存到 alpha 通道
+2. 分辨率减半，做前景 / 后景分离（否则清晰前景会把后景颜色"漏"进来）
+3. 用径向 sample pattern（Poisson disc / 环形 disc）在半分辨率图上做 gather 模糊，权重按 CoC 决定
+4. upsample、合成
+
+**Scatter-as-Gather + Tile 优化**：把屏幕分块，先算每个 tile 的最大 CoC，模糊时只对 tile 范围内的像素做合并。UE、Frostbite 都是这一套。
+
+**难点**：焦平面附近的"清晰/模糊边界"（bleeding）、半透明物体（几何 order-independent）、[TAA](./抗锯齿技术.mdx)的历史帧被 DoF 糊化后再累积会永久模糊。所以 DoF 一般放在 TAA resolve 之后。
+
+### 1.4 光线追踪的 DoF
+
+在 [光线追踪](../光线追踪/材质与间接光照.mdx) 里 DoF 是**免费**的——从像素射线不再从针孔出发，而是从光圈内随机采样一点，指向"焦平面上应该被采到的点"。多条采样光线自然产生 CoC。这也是为什么离线渲染的散景永远比后处理更真实——它是几何正确的。
+
+## 2. 运动模糊：曝光时间不为零的痕迹
+
+真实相机快门开合有时长 $\Delta t$，物体在这段时间内相对相机运动，就会在像面留下条纹。人眼看运动模糊会自动理解为"高速"。缺失运动模糊的画面（早期赛车游戏、24fps 电影没启用 shutter）会显得抽帧、卡顿。
+
+### 2.1 几何法：多次渲染取平均
+
+概念上最简单：曝光时间内均匀采样 $N$ 个时刻，各渲染一次，取平均。$N$ 足够大就是 ground truth。
+
+代价是渲染成本乘以 $N$。离线渲染（V-Ray、Arnold）就是这么做的，实时几乎不用。
+
+### 2.2 后处理法：velocity buffer + 定向模糊
+
+主流实时方案：
+1. 几何 pass 输出 motion vector $\vec v(p)$，公式和 [TAA](./抗锯齿技术.mdx) 里的一样
+2. 后处理 pass 沿 $\vec v(p)$ 方向做**线性模糊**——从像素中心向 $\vec v/2$ 方向和 $-\vec v/2$ 方向各采样 $N$ 步
+
+$$
+C_{\text{out}}(p)=\frac{1}{N}\sum_{i=0}^{N-1} C\left(p+\left(\frac{i}{N-1}-\frac{1}{2}\right)\vec v(p)\right)
+$$
+
+优点：一个 pass，成本可控。缺点：
+- **前景后景 bleed**——快速移动的角色会把背景颜色拉进来。工程 fix 是深度感知加权：拒绝远于自己 depth 的样本。
+- **背景遮挡**：McGuire 等人 2012 年 "A Reconstruction Filter for Plausible Motion Blur" 提出分块最大速度、随机采样、深度加权、层次遮挡的一整套 filter，成为现代实时运动模糊的事实标准。
+
+### 2.3 快门角度与感官尺度
+
+摄影术语里 shutter angle 是快门开启角度占单帧时长的比例，180° 意味着曝光时长 = 1/(2·fps)。游戏里的模糊强度参数其实等价于这个。太大（>270°）画面像流糖水，太小（<90°）动作显得卡。24fps 电影传统 180°；60fps 游戏一般 90°–120° 更舒适。
+
+### 2.4 相机模糊 vs 物体模糊
+
+- **物体模糊**：物体动，相机静。地上的车飞驰而过，需要 per-object motion vector。
+- **相机模糊**：整帧全糊。只需要用相机自身矩阵变化生成 motion vector。
+- **旋转模糊**：车轮辐条、旋转叶片。屏幕空间 motion vector 无法处理（辐条上采样点是"直线运动"，但整体是圆周）。需要几何法或专门 shader。
+
+## 3. 雾效：把大气介质当成积分
+
+雾、霾、水下光衰减，本质都是**光线穿过参与介质**时被吸收/散射的过程。经典的比尔-朗伯定律：
+
+$$
+L_{\text{eye}}=L_{\text{scene}}\cdot T(d) + L_{\text{fog}}\cdot(1-T(d))
+$$
+
+$T(d)$ 是从物体到眼睛距离 $d$ 上的透过率（transmittance），$L_{\text{fog}}$ 是雾自身贡献的光。核心问题就是求 $T(d)$。
+
+### 3.1 线性雾、指数雾、指数平方雾
+
+最原始的固定管线年代（OpenGL fixed pipeline）三种参数化：
+
+**线性雾**：
+
+$$
+T(d)=\frac{d_{\text{end}}-d}{d_{\text{end}}-d_{\text{start}}}
+$$
+
+超出 $d_{\text{end}}$ 完全雾化。物理上不成立但便宜。
+
+**指数雾**：
+
+$$
+T(d)=e^{-\sigma d}
+$$
+
+$\sigma$ 是消光系数。这一条来自参与介质常数密度的比尔定律，物理正确。
+
+**指数平方雾**：
+
+$$
+T(d)=e^{-(\sigma d)^2}
+$$
+
+近处不糊、远处快速糊。没有物理来源，纯粹是艺术调节——想让"远处一堵墙"效果更明显。
+
+### 3.2 高度雾（Height Fog）
+
+真实大气密度随高度指数衰减。让 $\sigma$ 依赖于 $y$ 坐标：
+
+$$
+\sigma(y)=\sigma_0 e^{-y/H}
+$$
+
+沿视线积分：
+
+$$
+\tau=\int_0^d \sigma(y(s))\,\mathrm{d}s
+$$
+
+对于直线视线 $y(s)=y_0+s\sin\theta$，积分可以解析出：
+
+$$
+\tau=\frac{\sigma_0}{\sin\theta}e^{-y_0/H}(1-e^{-d\sin\theta/H})\cdot H
+$$
+
+$\theta$ 是视线俯仰角。$\sin\theta\to 0$（水平视线）时用泰勒展开避免除零。UE 的 Exponential Height Fog 就是这套公式，加上双层（不同 $\sigma_0, H$）叠加得到更丰富的分层雾。
+
+### 3.3 体积雾：ray marching + 光照
+
+前面所有的雾都不考虑光源在雾里的散射（in-scattering）。想让阳光穿过树林出现"上帝光柱"（god rays）、想让一个火把在雾里出现光晕，需要**体积雾**。
+
+体渲染方程简化形式：
+
+$$
+L(d)=\int_0^d T(s)\,\sigma_s(s)\,L_{\text{in}}(s)\,\mathrm{d}s + T(d)L_{\text{scene}}
+$$
+
+$\sigma_s$ 是散射系数，$L_{\text{in}}$ 是该点从各光源到达的入射光（要做阴影测试）。
+
+实时体积雾（Frostbite 的 Volumetric Fog、UE 的 Volumetric Fog）通用做法：
+1. 沿视锥切一系列 slab（frustum-aligned 3D texture，一般 160×90×64）
+2. Voxel 里存密度 $\sigma$ 和 in-scattering 值（对所有光源做阴影采样）
+3. 从近到远在 3D texture 上做**前缀积分**（scattering integration pass），得到每个 voxel 的累计透过率和累积 in-scattering
+4. 屏幕像素采样 3D texture，用 depth 索引对应 slab
+
+```
+     eye ─→  slab0 slab1 slab2 ... slabN-1
+                │      │              │
+     每帧一次 compute： in-scatter + shadow query
+                            │
+     一次前缀 pass： T累乘、L累加
+                            │
+     采样：屏幕像素 (uv, linearZ) → 3D tex
+```
+
+64 层是精度和带宽的折衷。近处 slab 密、远处 slab 稀（exponential slice），因为近处一点密度变化就影响很大。
+
+### 3.4 大气散射
+
+体积雾的极端形式是**大气散射**（Rayleigh + Mie），用来渲染天空。Rayleigh 解释蓝天/红霞（$\sim 1/\lambda^4$，波长依赖），Mie 解释朝阳晕光/云雾白色。Nishita 1993 的模型是经典基础，后来 Bruneton、Hillaire 各自做了预计算 LUT 版本。Frostbite/UE5 天空系统就是 Hillaire 的 "A Scalable and Production Ready Sky and Atmosphere Rendering Technique"。跟屏幕空间雾同源，只不过尺度到了行星级别。
+
+## 4. 三者的共通哲学：真实世界都是积分
+
+针孔相机是 delta 函数，快门瞬时是 delta 函数，空气无参与介质是 delta 函数。任何**不理想**都表现为在时间、空间、光路上的积分：
+
+| 效果 | 积分变量 | 现实原因 | 视觉线索 |
+|---|---|---|---|
+| 景深 | 光圈上的空间点 | 镜头孔径 | 距离感 |
+| 运动模糊 | 曝光时间 | 快门开合 | 速度感 |
+| 雾/大气 | 视线路径 | 空气散射吸收 | 空间深度、体量 |
+
+**离线渲染**把这些积分交给 Monte Carlo，一并解决。**实时渲染**只能把每种积分拆开、各自用最省的 approx——分辨率降一半、gather 半径预算 K 次、体素 3D texture 64 层。表面上完全不同的技术，底层都在回答一个问题：**如何用有限采样近似连续世界？**
+
+后处理链里这三个效果一般按 [片段处理与输出合并](../图形渲染管线/片段处理与输出合并.mdx) 之后、[色调映射](./高动态范围与色调映射.mdx) 之前的顺序执行——因为它们都要在**线性 HDR** 空间做，映射到 LDR 后再做散景/条纹会得到错误的能量守恒。
+
+</WordCount>

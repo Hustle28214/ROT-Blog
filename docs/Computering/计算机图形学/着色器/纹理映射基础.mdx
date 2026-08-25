@@ -1,0 +1,245 @@
+import WordCount from '../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+# 纹理映射基础:让像素长在几何体上
+
+纹理映射是 Ed Catmull 1974 年博士论文里的东西——把一张 2D 图像贴到 3D 表面上,让每个片段除了几何信息(位置、法线)之外还带一张"图"的信息。这个想法看起来平平无奇,但它是整个实时渲染工业得以运转的关键:硬件擅长贴图采样(内存访问 + 双线性插值),不擅长复杂 shader 计算,所以把材质的复杂性尽可能烘焙到纹理里,是几十年不变的策略。
+
+本文只讲最基本的:UV 坐标怎么来、采样时如何处理边界和过滤、mipmap 为什么必要。更花哨的[法线贴图、视差、IBL 见下一篇](./高级纹理技术.mdx)。
+
+## 1. UV 坐标:从 3D 表面到 2D 纹理平面
+
+一张纹理是 2D 网格 $[0,1]\times[0,1]$(约定,不是绝对——OpenGL 里原点在左下,DirectX 里在左上,是十几年来无数 bug 的源头)。3D 模型的每个顶点带一对纹理坐标 $(u,v)$,把顶点映射到纹理平面上的一个点。三角形内部的 UV 由三个顶点的 UV **重心坐标插值**得到。
+
+问题的本质是:如何为 3D 曲面找出一套"展开图"。这个问题一般无解——地球仪展成平面必然扭曲,数学定理(Gauss 的绝妙定理)保证了非零高斯曲率的表面无法保长度地展开。所以 UV 展开有多种策略:
+
+| 表面 | 常用参数化 |
+|---|---|
+| 平面 | 直接 $(x,y)$ |
+| 圆柱 | $u=\theta/2\pi,\ v=z$ |
+| 球面 | $u=\phi/2\pi,\ v=\theta/\pi$(极点处扭曲) |
+| 立方体 | 六个面各自 UV(cube map 就用这个) |
+| 任意网格 | LSCM、ABF、[几何处理](../几何处理/参数化.mdx)里的展开算法 |
+
+3D 建模软件(Blender/Maya)里"UV 展开"就是这一步。艺术家常常手动切缝(seam),控制哪些边可以被"剪开"贴到平面上。
+
+### 1.1 三角形内部的 UV 插值
+
+给定三角形三个顶点的属性 $(u_1,v_1), (u_2,v_2), (u_3,v_3)$,三角形内点 $P$ 的重心坐标为 $(\lambda_1,\lambda_2,\lambda_3)$,直接插值:
+
+$$
+u = \lambda_1 u_1 + \lambda_2 u_2 + \lambda_3 u_3
+$$
+
+**注意透视校正**。屏幕空间的线性插值在透视投影下**不对应**世界空间的线性插值——远处的三角形被压缩,直接按屏幕像素插 UV 会导致贴图"游动"。硬件解决方案是插值 $u/w$ 和 $1/w$,最后除回来:
+
+$$
+u_{\text{correct}} = \frac{(u/w)_{\text{interpolated}}}{(1/w)_{\text{interpolated}}}
+$$
+
+这个细节见[光栅化](../图形渲染管线/光栅化：三角形如何变成像素.mdx)。今天的 GPU 硬件默认做透视校正,shader 里带 `noperspective` 修饰符才关。
+
+## 2. 采样:从 UV 到颜色
+
+给定连续的 UV 坐标,纹理是离散的像素网格。取色的过程叫**采样**(sampling)。GLSL 里 `texture(sampler2D, uv)` 一句话背后隐藏着一大堆参数决策。
+
+### 2.1 包裹模式(Wrap Mode)
+
+UV 超出 $[0,1]$ 时怎么办?四种主流策略:
+
+```
+u=1.3 时的行为:
+
+REPEAT      : u 变成 0.3     (瓷砖平铺)
+MIRRORED    : u 变成 0.7     (镜像平铺,消除接缝)
+CLAMP       : u 变成 1.0     (边缘颜色延伸)
+BORDER      : 使用指定的边缘色
+```
+
+**REPEAT** 是最常用的——一张地砖、一片草地,拉一张 256×256 的 tile 反复贴。**CLAMP** 用在 UI 贴图、天空盒面之间的接缝(防止渗色)。**MIRRORED** 用在需要 seamless 但没有真正 seamless 纹理时,靠镜像掩盖接缝。**BORDER** 少见,阴影贴图外的透明边界会用。
+
+### 2.2 边界的坑
+
+REPEAT 模式配上双线性过滤,在 $u=1.0$ 附近会采样到 $u=0.99$ 的像素和 $u=0.00$ 的像素混合。如果纹理左右边缘颜色差异大(比如一张不 seamless 的纹理),接缝处会出现一条彩色线。这是"平铺纹理设计要 seamless"的技术原因之一。
+
+CLAMP 模式如果延伸出去的像素颜色和内部差异大,边缘会出现光晕("bleeding"),特别是 mipmap 采样时——低层级 mip 的边缘像素混合了远处颜色。解决方法是使用 `GL_CLAMP_TO_EDGE`(用边缘像素填充)而不是 `GL_CLAMP`(用固定颜色填充)。
+
+## 3. 过滤:从连续到离散的抗混叠
+
+一个像素落在纹理上,严格说是覆盖一小片区域(footprint)。这片区域里可能覆盖 0.7 个纹素、也可能覆盖 100 个纹素。取颜色的方式就是过滤策略。
+
+### 3.1 最近邻(Nearest)
+
+$$
+c = T(\lfloor u\cdot W + 0.5\rfloor, \lfloor v\cdot H + 0.5\rfloor)
+$$
+
+选择离 UV 中心最近的一个纹素。**用途**:像素艺术、需要看清像素边界的调试贴图、色板 LUT 查表(SDF 贴图除外)。**问题**:放大时马赛克明显、缩小时严重混叠(闪烁)。
+
+### 3.2 双线性(Bilinear)
+
+取 UV 周围最近的 4 个纹素,先在 $u$ 方向做两次线性插值得到两个中间值,再在 $v$ 方向做一次线性插值:
+
+$$
+c(u,v) = (1-a)(1-b)\,c_{00} + a(1-b)\,c_{10} + (1-a)b\,c_{01} + ab\,c_{11}
+$$
+
+$a,b$ 是 UV 在纹素单元格内的小数部分。硬件专门有电路做这个,4 次纹理读取 + 少量算术,可以视为免费。
+
+```
+        c01 ────── c11
+         │  ╲(a,b)  │
+         │   ╲      │
+         │    ╲     │
+        c00 ────── c10
+
+结果 = c00·(1-a)(1-b) + c10·a(1-b) + c01·(1-a)b + c11·ab
+```
+
+**用途**:99% 的场景都够用。**问题**:放大到极致时会看到"每 4 个像素一个梯度矩形"的伪影,是双线性的模糊本性(C0 连续,一阶导不连续)。想更平滑用 bicubic,但硬件不直接支持,shader 里手动实现要 16 次采样。
+
+### 3.3 缩小时的混叠灾难
+
+真正的问题不在放大,而在缩小。想象一张 4096×4096 的纹理贴到屏幕上占 16×16 像素——每个屏幕像素覆盖 $\approx 256\times 256$ 个纹素,而双线性只读 4 个。这**远远不够**,采样定理告诉我们高频信号被欠采样会产生混叠(aliasing)——远处的地砖会闪烁、条纹图案会呈现出莫名的摩尔纹。
+
+治本的做法是**预先在多个尺度上平均**——mipmap。
+
+## 4. Mipmap:预积分的层级金字塔
+
+Lance Williams 1983 年提出 mipmap ("mip" 来自拉丁语 *multum in parvo*——"多在少中")。为一张 $2^n\times 2^n$ 的纹理生成 $n+1$ 层的图像金字塔:第 0 层是原图,第 $k$ 层是 $2^k$ 缩小版,每个像素等于原图对应 $2^k\times 2^k$ 区域的平均。
+
+```
+Level 0: 1024×1024  (原图)
+Level 1:  512×512
+Level 2:  256×256
+Level 3:  128×128
+...
+Level 10:   1×1     (整张图的平均色)
+
+存储代价:1 + 1/4 + 1/16 + ... = 4/3 倍原图大小
+```
+
+用法:根据这个像素在纹理上覆盖的 footprint 大小选择合适层级 $\lambda$:
+
+$$
+\lambda = \log_2\!\left(\max\!\left(\left\|\frac{\partial (u,v)}{\partial x}\right\|,\left\|\frac{\partial (u,v)}{\partial y}\right\|\right)\cdot T_{\text{size}}\right)
+$$
+
+$\partial u/\partial x$ 是屏幕空间 x 方向移动 1 像素时 UV 变化多少,GPU 用**quad 差分**(相邻 2×2 片段的差)硬件计算。$\lambda$ 越大选越小(越模糊)的层。
+
+### 4.1 三线性过滤(Trilinear)
+
+$\lambda$ 一般不是整数。选相邻两层 $\lfloor\lambda\rfloor$ 和 $\lceil\lambda\rceil$ 各做一次双线性,再在两个结果之间线性插值:8 次纹素读取。这就是 **trilinear filtering**。用途:防止 mip level 切换时出现可见的**分界线**(mip banding)。
+
+以前的低端硬件为了省带宽会用 bilinear + point mip(不做层间插值),现在几乎所有设备都直接上 trilinear。
+
+### 4.2 各向异性过滤(Anisotropic)
+
+mipmap 有一个根本缺陷:它假设 footprint 是**方形**的。但当你以掠射角看地面时,一个屏幕像素在纹理上的 footprint 是极端拉长的椭圆——沿视线方向覆盖 100 个纹素、垂直方向只覆盖 2 个纹素。
+
+用各向同性 mipmap 会选择过高的 $\lambda$(为了覆盖长轴),导致短轴方向过度模糊——远处的路面看起来一塌糊涂。
+
+**各向异性过滤**(anisotropic filtering, AF)在长轴方向采样多次:2x AF 采样 2 次,4x AF 采样 4 次,...,16x AF 采样 16 次。硬件专门支持,是"设置里那个 AF 16x"选项。
+
+```
+掠射角下的 footprint:
+
+       屏幕像素 →  拉长的椭圆 footprint
+
+正视地面:                 掠射地面:
+  ┌──┐                     ─────────────
+  │▓▓│  近似圆形             ▓▓▓▓▓▓▓▓▓▓
+  └──┘                     ─────────────
+  bilinear + mip           需要 AF 采样长轴上多个点
+  就够                    (否则要么锯齿要么糊)
+```
+
+AF 是免费午餐里最接近真的:视觉提升明显,性能开销可控(采样次数正比于 AF 级别),现代 GPU 从来不关。
+
+## 5. 采样质量与性能的权衡
+
+四种主要策略在放大/缩小场景下的表现:
+
+| 策略 | 放大表现 | 缩小表现 | 每片段采样次数 |
+|---|---|---|---|
+| Nearest | 硬边马赛克 | 严重闪烁 | 1 |
+| Bilinear | 平滑但模糊 | 严重闪烁 | 4 |
+| Bilinear + Mipmap | 同上 | 无混叠但有 mip banding | 4 |
+| Trilinear | 同上 | 平滑无 banding | 8 |
+| Trilinear + AF 16x | 同上 | 掠射角清晰 | 最多 128 |
+
+现代工业默认几乎是**trilinear + 各向异性 8x/16x**,是"最能看"和"能跑"的平衡点。
+
+## 6. 特殊的纹理与它们的采样注意事项
+
+### 6.1 法线贴图不能线性插值到零
+
+法线贴图的每个像素编码了一个单位向量。双线性插值 4 个单位向量得到的**不是单位向量**,而是一个模长小于 1 的向量。shader 里必须重新 `normalize`。此外 mipmap 生成时的简单平均会让高频法线细节被抹平,导致粗糙感消失。工业界做法是用 Toksvig 因子或 LEAN mapping 保存"粗糙度"到 mip,让远处的粗糙细节以粗糙度的形式保留。见[高级纹理技术](./高级纹理技术.mdx)。
+
+### 6.2 sRGB 纹理的解码
+
+摄影/艺术纹理绝大多数存储在 sRGB 空间(接近 gamma 2.2)。着色器计算应该在**线性空间**做,所以采样时必须先做 $s^{2.2}$ 转换。GPU 硬件支持 `GL_SRGB8` 格式自动解码,或 shader 里手动 `pow(color, 2.2)`。搞错这一步会让所有光照结果"看起来对但不太对"——阴影过暗、颜色偏白。见[色彩空间与人眼感知](../图形学数学基础/颜色与视觉：色彩空间与人眼感知.mdx)。
+
+### 6.3 深度纹理和整数纹理
+
+深度贴图应当**不做过滤**(过滤两个不相关深度会得到无意义的中间值,阴影边缘出错)。整数属性贴图(材质 ID)同理——nearest 模式,mipmap 禁用。
+
+## 7. GLSL 中的完整采样调用
+
+```glsl
+uniform sampler2D uAlbedo;   // sRGB 存储,GPU 自动线性化
+in vec2 vUV;
+out vec4 fragColor;
+
+void main() {
+    // 最基本的采样:mip level 由 GPU 自动计算
+    vec4 c = texture(uAlbedo, vUV);
+
+    // 显式 LOD (通常不用,除非特殊需求)
+    // vec4 c2 = textureLod(uAlbedo, vUV, 2.0);
+
+    // 显式偏导 (光线追踪或 compute shader 里必需)
+    // vec2 dpdx = dFdx(vUV);
+    // vec2 dpdy = dFdy(vUV);
+    // vec4 c3 = textureGrad(uAlbedo, vUV, dpdx, dpdy);
+
+    fragColor = c;
+}
+```
+
+绝大多数情况下 `texture()` 就够——GPU 从 quad 差分推断 LOD、应用采样器状态里的过滤模式和 wrap 模式。需要显式控制的场合:光线追踪(quad 差分不存在)、SDF 字体(要偏导判断像素大小)、程序化 mip 选择(某些美术效果)。
+
+## 8. 从贴图到 shader 的完整流程
+
+一个基本的带纹理的 Blinn-Phong 材质,把上一篇[基础光照](./基础光照模型.mdx)里的常数 $k_d$ 换成采样结果:
+
+```glsl
+uniform sampler2D uAlbedoMap;
+uniform vec3 uLightPos, uLightColor, uViewPos;
+
+in vec3 vWorldPos;
+in vec3 vNormal;
+in vec2 vUV;
+
+out vec4 fragColor;
+
+void main() {
+    vec3 albedo = texture(uAlbedoMap, vUV).rgb;
+    vec3 N = normalize(vNormal);
+    vec3 L = normalize(uLightPos - vWorldPos);
+    vec3 V = normalize(uViewPos  - vWorldPos);
+    vec3 H = normalize(L + V);
+
+    vec3 diffuse  = albedo * max(dot(N, L), 0.0);
+    vec3 specular = vec3(0.04) * pow(max(dot(N, H), 0.0), 64.0);
+
+    fragColor = vec4((diffuse + specular) * uLightColor, 1.0);
+}
+```
+
+一张 `uAlbedoMap` 就能让全场景的塑料球变成木箱、石头、皮革,而 shader 一个字符不用改。这就是纹理映射的核心价值——**把材质的空间变化外包给数据**。
+
+真正的物理材质当然不止一张 albedo。金属度、粗糙度、法线、AO、发射、参数化到 UV 上的每一项,都需要下一篇讨论的[高级纹理技术](./高级纹理技术.mdx)。
+
+</WordCount>

@@ -1,0 +1,312 @@
+import WordCount from '../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+# BRDF 与材质系统:物理正确的反射
+
+[基础光照模型](./基础光照模型.mdx)是经验的——参数好调、效果凑合、但物理上说不通。真正描述"表面如何反射光"的语言是**BRDF**(双向反射分布函数),它从辐射度量学出发,把反射约束在能量守恒和光路可逆的框架里。2012 年迪士尼、Epic、皮克斯几乎同时收敛到同一套 GGX + Cook-Torrance + Schlick 的组合,从此**PBR**(Physically Based Rendering)成为工业标准。
+
+这不是数学炫技。PBR 的真正价值是**材质参数可复用**——一个"生锈金属"贴图,搬到任何光照下都合理;一个艺术家的手作,能在电影和实时中一致呈现。
+
+## 1. 从辐射度量学开始
+
+要谈"光的反射"必须先定义"光是什么"。**辐射度量学**(radiometry)是这套语言。
+
+### 1.1 四个基本量
+
+**辐射通量**(Radiant Flux) $\Phi$:单位时间穿过某面/进入某空间的**能量**,单位瓦特 (W)。
+
+**辐射照度**(Irradiance) $E = d\Phi/dA$:单位面积接收的通量,单位 $W/m^2$。太阳直射地面约 $1000\ W/m^2$。
+
+**辐射强度**(Radiant Intensity) $I = d\Phi/d\omega$:点光源沿某方向单位立体角发射的通量,单位 $W/sr$。
+
+**辐射亮度**(Radiance) $L = d^2\Phi / (dA_\perp\, d\omega)$:单位面积、单位立体角穿过的通量,单位 $W/(m^2\cdot sr)$。**这是渲染方程里的主角**——图像的每一像素本质上都是接收到的 radiance。
+
+之所以 radiance 特殊,是因为它沿光线**恒定**(真空、无吸收介质中),意味着"从相机沿光线追出去,一直追到光源"这套 ray tracing 逻辑成立。
+
+### 1.2 立体角与投影
+
+立体角 $d\omega = \sin\theta\, d\theta\, d\phi$,半球积分:
+
+$$
+\int_\Omega d\omega = \int_0^{2\pi}\int_0^{\pi/2}\sin\theta\, d\theta\, d\phi = 2\pi
+$$
+
+漫反射的余弦加权半球积分是 $\pi$——正是为什么 Lambertian BRDF 里出现 $\rho/\pi$:让积分回到 $\rho$ (反照率)。
+
+## 2. BRDF 的定义
+
+Fred Nicodemus 1965 年定义**双向反射分布函数**:
+
+$$
+f_r(\omega_i, \omega_o) = \frac{dL_o(\omega_o)}{dE_i(\omega_i)} = \frac{dL_o(\omega_o)}{L_i(\omega_i)\cos\theta_i\, d\omega_i}
+$$
+
+$\omega_i$ 是入射方向,$\omega_o$ 是出射方向。$f_r$ 描述从 $\omega_i$ 方向来的单位入射照度中,有多少变成 $\omega_o$ 方向的出射亮度。单位是 $1/sr$。
+
+### 2.1 三条铁律
+
+任何合法 BRDF 必须满足:
+
+1. **非负**:$f_r \geq 0$
+2. **光路可逆(Helmholtz reciprocity)**:$f_r(\omega_i, \omega_o) = f_r(\omega_o, \omega_i)$
+3. **能量守恒**:对所有入射方向 $\omega_i$,$\displaystyle\int_\Omega f_r(\omega_i, \omega_o)\cos\theta_o\, d\omega_o \leq 1$
+
+第 2 条是路径追踪的物理基础——从相机出发和从光源出发算出的图像必须一致。Phong 违反第 2 条(反射向量对称性只对 $\omega_i \leftrightarrow \omega_o$ 部分成立)。Cook-Torrance 满足全部三条。
+
+### 2.2 渲染方程
+
+Kajiya 1986 年提出的渲染方程:
+
+$$
+L_o(\mathbf p, \omega_o) = L_e(\mathbf p, \omega_o) + \int_\Omega f_r(\omega_i, \omega_o)\, L_i(\mathbf p, \omega_i)\, \cos\theta_i\, d\omega_i
+$$
+
+$L_e$ 是自发光,积分项是所有入射方向乘以 BRDF 再乘以余弦项。**这就是图形学要解的方程**。有 BRDF 且已知入射亮度,原则上就能算出出射亮度。实时渲染的所有工程都在做**这个积分怎么便宜地近似**。见[光线追踪基本原理](../光线追踪/光线追踪基本原理.mdx)。
+
+## 3. Lambertian BRDF
+
+理想漫反射的 BRDF 是常数:
+
+$$
+f_r^{\text{diffuse}} = \frac{\rho}{\pi}
+$$
+
+验证能量守恒:$\displaystyle\int_\Omega \frac{\rho}{\pi} \cos\theta_o\, d\omega_o = \frac{\rho}{\pi}\cdot\pi = \rho$。当 $\rho \leq 1$ 时守恒。
+
+$\pi$ 从哪儿来?就是把常数分布归一化到单位半球积分。经验模型 $k_d I \cos\theta$ 里通常吞掉了这个 $\pi$——所以 Phong 的 $k_d$ 和 PBR 的 $\rho$ 差一个 $\pi$。
+
+## 4. 微表面理论:粗糙表面的正确描述
+
+金属、塑料、大理石都不是理想镜面,也不是理想漫反射。它们的高光有一定"宽度",随粗糙度变化。1967 年 Torrance 和 Sparrow 提出**微表面理论**:把宏观上一块的表面建模为无数微小、完美镜面的小面(microfacet),它们的法线服从某种统计分布。
+
+宏观反射 = 所有恰好把入射光反射到观察方向的微表面贡献之和。这就是 Cook-Torrance BRDF:
+
+$$
+f_r^{\text{specular}} = \frac{D(\mathbf h)\, F(\mathbf v, \mathbf h)\, G(\mathbf l, \mathbf v, \mathbf h)}{4(\mathbf n\cdot\mathbf l)(\mathbf n\cdot\mathbf v)}
+$$
+
+三个因子各司其职:
+
+- **$D$**(法线分布函数, NDF):微表面法线朝哪个方向的概率密度
+- **$F$**(菲涅尔项):微表面反射入射光的比例
+- **$G$**(几何项/遮蔽项):微表面之间的自遮挡、自阴影
+
+分母 $4(\mathbf n\cdot\mathbf l)(\mathbf n\cdot\mathbf v)$ 是雅可比,从"微表面朝向 $\mathbf h$"变换到"反射方向 $\omega_o$"必需。
+
+## 5. NDF:GGX 及其祖先
+
+### 5.1 Beckmann 分布
+
+1963 年 Beckmann 的分布:
+
+$$
+D_{\text{Beckmann}}(\mathbf h) = \frac{1}{\pi \alpha^2 (\mathbf n\cdot\mathbf h)^4} \exp\left(\frac{(\mathbf n\cdot\mathbf h)^2 - 1}{\alpha^2 (\mathbf n\cdot\mathbf h)^2}\right)
+$$
+
+$\alpha$ 是均方根斜率(近似 = 粗糙度)。物理上"合理",但**尾巴太短**——真实材质的高光有很宽的低强度"halo",Beckmann 无法产生。
+
+### 5.2 GGX / Trowbridge-Reitz
+
+Trowbridge 和 Reitz 1975 年、Walter 等人 2007 年在图形学社区重新发现:
+
+$$
+D_{\text{GGX}}(\mathbf h) = \frac{\alpha^2}{\pi \left[(\mathbf n\cdot\mathbf h)^2 (\alpha^2 - 1) + 1\right]^2}
+$$
+
+GGX 的关键性质是**长尾**——远离完美镜面方向时衰减慢,产生真实的高光光晕。2010 年前后所有 AAA 引擎(UE4、Frostbite、CryEngine)在自研 PBR 时都选了 GGX。今天 GGX 是事实标准。
+
+$\alpha$ 是**粗糙度平方**是工业约定——迪士尼 2012 年论文观察到 $\alpha = \text{roughness}^2$ 让艺术家的调节更线性。所以现代 shader 里几乎总是:
+
+```glsl
+float a = roughness * roughness;
+float a2 = a * a;
+float NdotH2 = NdotH * NdotH;
+float denom = NdotH2 * (a2 - 1.0) + 1.0;
+float D = a2 / (PI * denom * denom);
+```
+
+## 6. 菲涅尔项:光进入表面的比例
+
+菲涅尔方程描述电磁波在两种介质界面的反射比。真实公式极复杂(S 极化 + P 极化,还要区分吸收介质和电介质),图形学用 **Schlick 1994 年近似**:
+
+$$
+F_{\text{Schlick}}(\mathbf v, \mathbf h) = F_0 + (1 - F_0)(1 - \mathbf v\cdot\mathbf h)^5
+$$
+
+$F_0$ 是正入射反射率,$(1 - \mathbf v\cdot\mathbf h)^5$ 描述斜射角反射率增加(掠射角所有材质都变镜子——想想湿地面在远处的样子)。
+
+$F_0$ 是材质关键属性:
+
+| 材质 | $F_0$ (RGB) |
+|---|---|
+| 水 | 0.02 |
+| 皮肤 | 0.028 |
+| 塑料 | 0.04 |
+| 玻璃 | 0.04 |
+| 铝 | (0.91, 0.92, 0.92) |
+| 铜 | (0.95, 0.64, 0.54) |
+| 金 | (1.00, 0.71, 0.29) |
+
+**电介质**(dielectrics):非金属,$F_0$ 是灰度、近似 0.04。差异非常小,以至于 UE4 的默认 shader 直接假定"非金属就是 0.04",省一张贴图。
+
+**金属**(conductors):$F_0$ 是彩色(黄金 = 金色、铜 = 橙红)——**金属的镜面反射本身就带颜色**,这是金属和塑料最直观的区别。金属没有漫反射(自由电子几乎完全吸收/反射,不进入表面深处)。
+
+### 6.1 金属工作流
+
+把"电介质 vs 金属"的选择编码成一个 metallic 参数 $m \in [0,1]$:
+
+$$
+F_0 = \text{lerp}(0.04, \text{albedo}, m)
+$$
+
+$$
+k_d = (1 - m) \cdot (1 - F)
+$$
+
+$m=0$: 电介质,$F_0=0.04$、有漫反射;$m=1$: 金属,$F_0$ = albedo、没漫反射。这就是[高级纹理技术](./高级纹理技术.mdx)里 metallic 贴图的作用。
+
+## 7. 几何项:自遮挡与自阴影
+
+微表面之间会互相遮挡:入射光被别的微表面挡住(shadow)、反射光被别的微表面挡住(masking)。**Smith 遮蔽函数**是理论上正确的公式:
+
+$$
+G(\mathbf l, \mathbf v, \mathbf h) = G_1(\mathbf l)\, G_1(\mathbf v)
+$$
+
+其中 $G_1$ 是**Schlick-GGX 近似**(UE4 用):
+
+$$
+G_1(\mathbf v) = \frac{\mathbf n\cdot\mathbf v}{(\mathbf n\cdot\mathbf v)(1 - k) + k},\quad k = \frac{(\alpha + 1)^2}{8}\ \text{(直接光)}\quad \text{or}\quad k = \frac{\alpha^2}{2}\ \text{(IBL)}
+$$
+
+两种 $k$ 因为直接光和 IBL 的积分性质不同,Heitz 2014 年的推导。UE4 就是这么写的:
+
+```glsl
+float G_SchlickGGX(float NdotV, float k) {
+    return NdotV / (NdotV * (1.0 - k) + k);
+}
+float G_Smith(float NdotV, float NdotL, float k) {
+    return G_SchlickGGX(NdotV, k) * G_SchlickGGX(NdotL, k);
+}
+```
+
+粗糙度大时 G 显著小于 1——粗糙表面的能量被自遮挡吃掉一部分,这也是"哑光"表面的物理原因。
+
+## 8. 完整的 Cook-Torrance PBR 直接光计算
+
+综合前面的东西:
+
+```glsl
+vec3 CookTorranceBRDF(vec3 N, vec3 V, vec3 L, vec3 albedo,
+                     float roughness, float metallic) {
+    vec3 H = normalize(V + L);
+    float NdotL = max(dot(N, L), 0.0);
+    float NdotV = max(dot(N, V), 0.0);
+    float NdotH = max(dot(N, H), 0.0);
+    float VdotH = max(dot(V, H), 0.0);
+
+    // F0: 电介质用 0.04, 金属用 albedo
+    vec3 F0 = mix(vec3(0.04), albedo, metallic);
+
+    // D 项 (GGX)
+    float a  = roughness * roughness;
+    float a2 = a * a;
+    float d  = NdotH * NdotH * (a2 - 1.0) + 1.0;
+    float D  = a2 / (PI * d * d);
+
+    // F 项 (Schlick)
+    vec3 F = F0 + (1.0 - F0) * pow(1.0 - VdotH, 5.0);
+
+    // G 项 (Smith + Schlick-GGX)
+    float k = (roughness + 1.0);
+    k = k * k / 8.0;
+    float G1L = NdotL / (NdotL * (1.0 - k) + k);
+    float G1V = NdotV / (NdotV * (1.0 - k) + k);
+    float G  = G1L * G1V;
+
+    vec3 specular = (D * F * G) / max(4.0 * NdotL * NdotV, 0.001);
+
+    // 漫反射: Lambert, 但用菲涅尔项和金属度扣除能量
+    vec3 kd = (vec3(1.0) - F) * (1.0 - metallic);
+    vec3 diffuse = kd * albedo / PI;
+
+    return (diffuse + specular) * NdotL;
+}
+```
+
+对每个光源调一次这个函数,乘以光强,累加即可。这段 30 行代码涵盖了 UE4/Unity URP/glTF 材质的核心。
+
+## 9. 能量守恒的检查
+
+来验证一下这套 BRDF 真的守恒能量。取粗糙度 $\alpha=1$ 的"最漫反射的 GGX",在正入射下积分整个半球:
+
+$$
+\int_\Omega \frac{D\,F\,G}{4(\mathbf n\cdot\mathbf l)(\mathbf n\cdot\mathbf v)}\cos\theta_o\, d\omega_o
+$$
+
+数值积分结果 $\approx 0.5$ 左右——没超过 1。加上漫反射项 $(1-F_{\text{avg}})(1-m)\rho$,总能量在 $\rho$ 附近,不超过 1。**守恒**。
+
+但一个隐藏问题:**多次散射**。真实微表面会互相反射多次,GGX 的 $G$ 项只考虑了单次散射,粗糙度高时能量丢失显著(可以到 20-30%)。业界解决方案是**Kulla-Conty 补偿项**或**多重散射 GGX**——一个额外的能量补偿贴图,把丢掉的能量补回漫反射。Filament 和 UE5 都有实现。
+
+## 10. 材质参数的物理边界
+
+PBR 的好处是"给合理参数出合理结果",但艺术家很容易越界:
+
+| 参数 | 合理范围 | 越界后果 |
+|---|---|---|
+| Albedo (电介质) | RGB 各 $[0.02, 0.9]$ | 太亮 = 违反能量守恒 |
+| Albedo (金属) | 参考真实测量 | 编造的金属看起来假 |
+| Roughness | $[0.04, 1.0]$ | 0 会产生数值不稳定 |
+| Metallic | 0 或 1 | 中间值物理上无意义(灰尘/氧化物除外) |
+
+**"metallic 是 0 或 1"** 是最重要的原则。现实中不存在 metallic=0.5 的材质——除非是**局部混合**(比如生锈的铁,一部分铁一部分锈),而空间上的混合可以通过纹理达到,不必参数化。
+
+## 11. 各向异性 BRDF
+
+上面的 GGX 是**各向同性**——沿法线绕一圈,反射行为不变。但拉丝金属、头发、CD 表面有**各向异性**——沿一个方向粗糙度大、垂直方向粗糙度小。做法是引入切线方向 $\mathbf t$ 和两个粗糙度 $\alpha_t, \alpha_b$:
+
+$$
+D_{\text{aniso}}(\mathbf h) = \frac{1}{\pi \alpha_t \alpha_b} \frac{1}{\left((h_t/\alpha_t)^2 + (h_b/\alpha_b)^2 + h_n^2\right)^2}
+$$
+
+$h_t, h_b, h_n$ 是 $\mathbf h$ 在切线基下的三个分量。UE4 里"Anisotropy"参数就是这个,需要艺术家提供切线方向贴图。
+
+## 12. 分层材质与生产管线
+
+真实世界的东西是**分层**的——汽车漆:金属基底 + 透明清漆;人皮:表皮 + 真皮 + 血液;树叶:蜡质表面 + 内部次表面散射。工业解法是把多个 BRDF 叠加,每层有自己的参数和菲涅尔权重。
+
+**BSDF**(Bidirectional Scattering Distribution Function) = BRDF + BTDF(透射) + BSSRDF(次表面散射),完整描述任意介质。Disney Principled BSDF 是最流行的实用参数化,一套参数 (base color, metallic, roughness, subsurface, sheen, clearcoat, ...) 涵盖 90% 材质,是 Blender、Cycles、UE 的默认。
+
+## 13. PBR 的边界
+
+PBR 不是万金油:
+
+- **Hair/Fur**:圆柱体几何,Marschner 模型专门处理
+- **Cloth**:织物的反射不是 GGX,专用 Charlie/Ashikhmin 分布
+- **Skin**:需要次表面散射(subsurface scattering),BSSRDF 或屏幕空间 SSS 近似
+- **Glass/Water**:BTDF、色散、焦散(caustics),路径追踪路线更容易
+- **Emissive**:自发光是 $L_e$,和 BRDF 无关
+
+BRDF 只是渲染方程里 $f_r$ 那一项。间接光的完整解决还需要[光线追踪](../光线追踪/材质与间接光照.mdx)或实时全局光照方案。
+
+## 14. 从 Phong 到 PBR:一次范式转变
+
+回顾整条脉络:
+
+```
+1975  Phong        经验高光, 参数无物理含义
+1977  Blinn-Phong  半角向量替换反射向量, 硬件友好
+1982  Cook-Torrance 首次微表面 + 菲涅尔, 电影 CG
+2001  Ward         各向异性经验模型
+2007  Walter GGX   长尾 NDF, 但离线渲染专用
+2012  Disney/Epic  实时 PBR 统一, GGX + Schlick + Smith
+2016  多重散射     Kulla-Conty 能量补偿
+2020+ 神经 BRDF    NeRF 及分层材质学习
+```
+
+范式转变的意义不在"效果更好"——2005 年也有令人信服的画面。**转变在于工作流**:艺术家不再调"具体某个光照下好看的参数",而是描述**材质本身**;光照怎么变,材质总是自洽。这让制作管线从"每个镜头调 shader"变成"一次做完到处用",这是产业级效率革命。
+
+关于 PBR 参数如何组织成一个完整可以放进项目里用的材质系统、贴图打包如何做、如何和光线追踪结合——见[高级纹理技术](./高级纹理技术.mdx)和[材质与间接光照](../光线追踪/材质与间接光照.mdx)。
+
+</WordCount>

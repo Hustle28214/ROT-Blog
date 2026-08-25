@@ -1,0 +1,169 @@
+import WordCount from '../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+# 抗锯齿技术：把采样定理的债还上
+
+光栅化本质上是采样——把连续的几何函数在像素中心离散地问一次"这里被三角形覆盖了吗"。凡是采样就绕不开 Nyquist：信号频率高于采样率一半时，能量会折叠回低频，表现为**走样**（aliasing）。屏幕上表现为阶梯状的边缘、爬行的电线、闪烁的高光。抗锯齿的整个历史，就是一部"如何在有限带宽下逼近连续像素积分"的工程史。
+
+## 1. 采样理论的两个视角
+
+一个像素理论上应该等于像素方格内**信号的加权积分**（box filter 是最粗的近似，Gaussian、Mitchell-Netravali 更贴近人眼）：
+
+$$
+I_{\text{pixel}}(x_0,y_0)=\iint f(x,y)\,w(x-x_0,y-y_0)\,\mathrm{d}x\,\mathrm{d}y
+$$
+
+但 GPU 只在像素中心执行一次 `discard/keep` + 一次片元着色。这一次采样对应频谱上无限展开的梳状复制。三角形的边缘是**阶跃函数**，其 Fourier 谱衰减很慢（$1/\omega$），必然含超过 Nyquist 的分量——这是几何走样的根源。着色器里 `sin(1000·uv)`、法线贴图高频、镜面高光则是**着色走样**的根源，二者需要不同的手段。
+
+```
+       连续边缘       单点采样        走样输出
+        /             ·              ██
+       /              ·  ·          ████
+      /               ·  ·           ██
+     /                ·  ·          ██
+    /                 ·             ██
+```
+
+## 2. SSAA：暴力超采样，正确性的上界
+
+Super-Sample Anti-Aliasing 直接把整个渲染分辨率放大 $k\times k$ 倍，最后 downsample 回来。$4\times$ SSAA 就是把 1920×1080 渲成 3840×2160，每个像素积分 16 个采样点。
+
+**优点**：几何走样、着色走样、纹理走样、着色器高频统统解决——因为整个管线（光栅化、片元着色、深度测试）都在高分辨率跑。
+
+**代价**：填充率、带宽、着色成本**同时**乘以 $k^2$。$2\times$ SSAA 就要 4 倍算力。对现代 PBR + 复杂后处理管线，这是灾难。
+
+SSAA 在实时管线里几乎绝迹，只留在离线渲染（[光线追踪](../光线追踪/材质与间接光照.mdx)天然是分层随机 SSAA）和"截图党"手动开 DSR/VSR 的场景。
+
+## 3. MSAA：只对几何边缘超采样
+
+Multi-Sample AA 是 SSAA 的工程妥协。硬件在光栅化阶段生成 $N$ 个**覆盖率采样点**（coverage samples），每个采样点独立做深度/模板测试；但片元着色器**每像素只跑一次**，颜色写入所有通过测试的样本。
+
+$4\times$ MSAA 的采样模式一般是 Rotated Grid：
+
+```
+    ·  ×               × 代表 4 个采样点
+    ×  ·               像素中心不一定被采样
+    ·  ×
+    ×  ·
+```
+
+resolve 时把 4 个样本平均得到最终像素。
+
+**为什么比 SSAA 快很多**：着色仍然按像素做，只有覆盖率、深度是超采样的。所以片元着色器复杂度基本不变。
+
+**它救不了什么**：
+- Alpha test（草地、树叶、铁丝网）——片元着色器输出的 alpha 只写入被覆盖的那些样本，边缘依然锯齿。解决方式是 **Alpha to Coverage**：把 alpha 值转换为覆盖掩码。
+- Shader aliasing——高光、法线贴图的高频跟采样点数无关。
+- 延迟渲染——G-Buffer 每像素只能存一份材质属性，MSAA 要在几何 pass 存 $N$ 份 G-Buffer，显存爆炸。这是 MSAA 在 2010 年后淡出主流引擎的根本原因。
+
+## 4. FXAA/SMAA：后处理形态学
+
+延迟渲染兴起后，业界开始寻找"只吃最终帧，不改渲染管线"的方案。
+
+**FXAA**（Fast Approximate AA，Timothy Lottes, NVIDIA 2009）：
+1. 用亮度算局部对比度，检测边缘
+2. 判断边缘是水平还是垂直
+3. 沿边缘方向搜索端点
+4. 根据像素在边缘的相对位置做一次方向性混合
+
+一趟全屏 pass，几乎零显存开销，成本 0.5–2 ms。缺点是所有细节都会被稍微糊掉——文本、UI、细线尤其明显。
+
+**SMAA**（Enhanced Subpixel Morphological AA）：FXAA 的进化版，边缘检测更精细（用色度而非仅亮度），使用**预计算查找表**匹配 L/T/Z 型转角模式，能重建 $2\times$ 甚至 $4\times$ 的形态学 AA 效果。SMAA 1x 单帧 pass，SMAA T2x 引入时序，SMAA S2x 结合 MSAA。
+
+形态学 AA 的本质是**在图像空间猜几何**——从像素亮度差异逆推边缘位置。这个"猜"必然有失败案例：subpixel 细节（远处的电线）依然会闪烁，因为它们在单帧图像里根本没有连续边缘可供推理。
+
+## 5. TAA：把时间维度也纳入采样
+
+Temporal Anti-Aliasing 是现代 3A 引擎的标准配置。核心思路：**如果单帧算不动 SSAA，就把 SSAA 分摊到多帧**。
+
+### 5.1 Jitter + History Buffer
+
+每一帧把投影矩阵的 $x,y$ 平移一个亚像素抖动量（常用 Halton(2,3) 低差异序列），前 8 帧的 jitter 加起来就是一个 $8\times$ SSAA 的采样图案。当前帧渲染完后，与上一帧的 history buffer 混合：
+
+$$
+C_t = \alpha\, C_{\text{current}} + (1-\alpha)\, C_{\text{history}}(\text{reproject}(p))
+$$
+
+$\alpha\approx 0.05\sim 0.1$，等价于指数移动平均，有效样本数 $\sim 1/\alpha$。
+
+### 5.2 Motion Vector 与 Reprojection
+
+物体在动，摄像机在动，直接用上一帧同位置像素会拖影。所以要在几何 pass 里额外输出 **motion vector**——每个像素在屏幕空间从上一帧移到当前帧的位移：
+
+$$
+\vec v(p) = p - \text{proj}(M_{t-1} M_t^{-1}\text{unproj}(p, z_t))
+$$
+
+采样 history 时用 `history_sample = HistoryTex.Sample(p - v(p))`。
+
+### 5.3 Ghosting、闪烁与 Neighborhood Clamping
+
+Reprojection 会失败：
+- 遮挡关系变化（disocclusion）——上一帧被前景挡住的地方现在露出来了，history 里根本没有这块信息
+- 光照变化（灯突然亮）——history 是错的
+- 半透明、粒子——motion vector 不好定义
+
+工程 fix 是 **neighborhood clamping**：把 history 采样值 clamp 到当前帧 $3\times 3$ 邻域颜色的 AABB（YCoCg 空间的效果最好）内。这样即使 reproject 找错了像素，也会被拉回合理范围。副作用是过度 clamp 会退化为无 TAA 的锯齿。
+
+TAA 的调参永远是**清晰度**（低 $\alpha$、松 clamp、多帧累积）和**响应性**（高 $\alpha$、紧 clamp、少残影）的对抗。UE4/UE5 的 TAA/TSR、Frostbite、Decima 各自做了大量工程 patch。
+
+### 5.4 TAA Upsampling
+
+既然 TAA 已经在做时序累积，何不同时做超分？把渲染分辨率降到 1440p，jitter 到 4K 像素中心之间，累积后重建 4K 图像——这是 **TAAU / TSR / DLSS 前身**的思路。UE5 的 TSR 就是深度魔改的 TAAU，跟 DLSS 竞争。
+
+## 6. DLAA/DLSS/FSR：机器学习入场
+
+**DLSS**（NVIDIA）1.0 在 2019 年是"每个游戏训练一个网络"，效果参差。2.0 之后固定网络架构，输入是**低分辨率 jittered 帧 + motion vector + 深度 + 抖动偏移**，输出是**高分辨率抗锯齿帧**。本质是一个学会做 TAA + upsampling 的 CNN，跑在 Tensor Core 上，2–3 ms 出结果。
+
+**DLAA** 是 DLSS 去掉 upsampling 部分——原生分辨率进、原生分辨率出，纯粹用网络做 TAA。适合算力够但对画质敏感的用户。
+
+**FSR 2.x**（AMD）是无 ML 的手写 TAAU，用启发式做 disocclusion 检测和 history clamping，硬件不挑，效果略逊于 DLSS 2 但相差不大。
+
+**FSR 3 / DLSS 3** 加上了 **frame generation**——用光流+运动矢量在两帧之间插一帧，把 60fps 秀成 120fps。这不再是抗锯齿了，属于时域插值，本质上跟视频编解码里的 motion compensation 同源。
+
+## 7. 各方案的对比
+
+| 方案 | 几何锯齿 | 着色走样 | 亚像素细节 | GPU 成本 | 主要问题 |
+|---|---|---|---|---|---|
+| No AA | 差 | 差 | 差 | 0 | 阶梯、闪烁 |
+| $4\times$ SSAA | 好 | 好 | 好 | $4\times$ | 太贵 |
+| $4\times$ MSAA | 好 | 差 | 中 | $\sim 1.3\times$ | 延迟渲染难做 |
+| FXAA | 中 | 中 | 差 | 极小 | 糊 |
+| SMAA 1x | 中好 | 中 | 差 | 小 | subpixel 闪烁 |
+| TAA | 好 | 中好 | 好 | 中 | ghosting、糊 |
+| DLAA | 极好 | 好 | 好 | 中（需 Tensor） | 硬件门槛 |
+| DLSS/FSR | 好 | 好 | 好 | 负（省算力） | disocclusion artifact |
+
+## 8. 特殊场景
+
+**Alpha test 边缘**：MSAA 下用 Alpha to Coverage；TAA 下需要在 shader 里做 dithered alpha（例如 Hashed Alpha Testing, Wyman 2017）配合时序累积。
+
+**Specular aliasing**：高光的高频完全跟几何无关。经典解法是 **pre-filtered normal**（把法线贴图的方差编码到粗糙度里，LEAN mapping、Toksvig、Frostbite 的 Specular AA）——[片段处理](../图形渲染管线/片段处理与输出合并.mdx)里着色前先把 normal 分布做卷积。这是从"事后抗锯齿"转向"事前预滤波"，跟纹理的 mipmap 一个思路。
+
+**线状物体**：远处电线、栏杆宽度小于 1 像素时，无论 MSAA 还是 TAA 都难保。UE5 的 Nanite 用连续 LOD 让远处几何自然折叠到 subpixel 大小以下，避免二值覆盖率突变。
+
+## 9. 抗锯齿其实是"预滤波 + 重建"的整门学问
+
+回到第 1 节的积分公式，所有方案本质都在做两件事：
+
+1. **预滤波**——保证输入信号带宽不超过 Nyquist（mipmap、Specular AA、几何 LOD）
+2. **多样本重建**——在采样层面尽量逼近真实积分（MSAA、SSAA、TAA、DLSS）
+
+哪一步都不能省。只堆采样点不做预滤波，[纹理](../图形渲染管线/光栅化：三角形如何变成像素.mdx)的高频永远抓不干净；只做预滤波不管几何边缘，直线仍然是阶梯。工程上，现代管线大致是：
+
+```
+几何 LOD  +  mipmap  +  Specular AA        ← 预滤波
+       ↓
+TAA jitter 光栅化                          ← 采样
+       ↓
+motion vector reprojection + neighborhood clamp  ← 时序重建
+       ↓
+DLSS/FSR/TSR (可选) upsample               ← 空间重建
+       ↓
+后处理链（[色调映射](./高动态范围与色调映射.mdx)、[景深](./景深、运动模糊与雾效.mdx)等）
+```
+
+理解抗锯齿的最好方式，不是记住 FXAA 里那 200 行 shader 代码，而是把每个方案都放回"采样定理欠了什么债、这里用什么办法还"的框架里。
+
+</WordCount>

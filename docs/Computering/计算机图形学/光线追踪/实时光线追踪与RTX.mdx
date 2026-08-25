@@ -1,0 +1,174 @@
+import WordCount from '../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+# 实时光线追踪与 RTX：硬件、API 与降噪
+
+光线追踪从 1980 年 Whitted 提出到 2018 年 NVIDIA Turing 架构发布 RTX，走了近 40 年才勉强"实时"。这背后不是一个算法突破，而是**硬件专用单元 + 混合渲染架构 + AI 降噪**三管齐下的合力。
+
+## 1. 为什么实时光追这么晚
+
+一个 1080p @ 60fps 的画面每秒需要生成约 1.24 亿像素样本。按 [路径追踪](./材质与间接光照.mdx) 的经验数据，视觉可接受要 100+ spp，每 spp 4-8 次弹射——每秒 500 亿到 1 万亿条射线。2010 年前的 GPU 每秒撑死几亿条射线，差三个数量级。
+
+破局要素：
+
+- **硬件 BVH 遍历**：RT Core 把射线-AABB 测试和三角形求交做到寄存器级别
+- **降噪**：不再追求 100 spp，而是 1 spp + 神经网络/滤波补偿
+- **混合管线**：光栅化算直接光和 G-Buffer，光追只算难做的部分（反射、阴影、GI）
+
+三者缺一不可。硬件让每条射线便宜，降噪让 1 spp 可用，混合让工作量可控。
+
+## 2. NVIDIA RTX 硬件架构
+
+Turing (2018)、Ampere (2020)、Ada Lovelace (2022) 三代 RT Core 各有升级。核心组件：
+
+- **BVH Traversal Unit**：硬件遍历 BVH，指令上层看不到，只有 `TraceRay` 一个入口
+- **Ray-Box Intersection**：AABB 测试的专用 ALU，一个周期出结果
+- **Ray-Triangle Intersection**：Möller-Trumbore 硬编码到晶体管
+- **Tensor Core**：Ampere 起把张量单元也纳入光追流水，用于 [DLSS](https://developer.nvidia.com/rtx/dlss) 和 OptiX AI 降噪
+
+Ada 的 RT Core 引入 **Opacity Micromap** 和 **Displaced Micro-Mesh** 硬件加速。前者让透贴（树叶、栅栏）的 alpha 测试提前剔除，减少 shader 调用；后者压缩位移贴图后的百万三角形网格，直接放进 BVH。
+
+AMD RDNA2 (2020)、Intel Arc (2022)、Apple M3 (2023) 陆续跟进，光追专用单元现在是高端 GPU 的标配。
+
+## 3. DXR 与 Vulkan RT
+
+微软 2018 年发布 **DirectX Raytracing (DXR)** 作为 D3D12 的扩展，Khronos 2020 年发布 **VK_KHR_ray_tracing_pipeline**。两者概念对齐，API 形态几乎一致。
+
+核心抽象：
+
+- **加速结构**：TLAS/BLAS 两层，参考 [BVH 章节](./加速结构：BVH与k-d树.mdx)
+- **着色器绑定表**（SBT）：把射线类型映射到具体的着色器代码
+- **五种着色器阶段**：Ray Generation、Intersection、Any-Hit、Closest-Hit、Miss
+
+一个最简单的 DXR 派发：
+
+```hlsl
+[shader("raygeneration")]
+void RayGen() {
+    RayDesc ray;
+    ray.Origin = camera.pos;
+    ray.Direction = normalize(pixel_ws - camera.pos);
+    ray.TMin = 0.001;
+    ray.TMax = 10000.0;
+
+    PayloadType payload = { 0, 0, 0 };
+    TraceRay(scene, RAY_FLAG_NONE, 0xFF, 0, 1, 0, ray, payload);
+
+    output[DispatchRaysIndex().xy] = payload.color;
+}
+
+[shader("closesthit")]
+void ClosestHit(inout PayloadType p, in BuiltInTriangleIntersectionAttributes attr) {
+    // 计算命中着色
+}
+
+[shader("miss")]
+void Miss(inout PayloadType p) {
+    p.color = sample_env(WorldRayDirection());
+}
+```
+
+`TraceRay` 是唯一暴露给用户的追踪入口，其他所有 BVH 遍历、AABB 测试都是硬件黑盒。这个 API 设计非常保守——不允许用户实现自己的遍历算法，因为硬件加速的前提是接口固定。
+
+## 4. TLAS / BLAS 两层加速结构
+
+DXR 的一大关键设计。**BLAS**（Bottom-Level）存储几何本身的 BVH，**TLAS**（Top-Level）存储场景里的物体实例。
+
+```
+        TLAS
+      /  |  \
+    Inst Inst Inst
+     ↓    ↓    ↓
+   BLAS  BLAS BLAS
+   (Cube)(Tree)(Cube)  ← 两个 Cube 复用同一个 BLAS
+```
+
+每个实例存一个 4×3 变换矩阵、一个 BLAS 引用、一个 24-bit InstanceID、一个 8-bit mask。射线遍历时先走 TLAS 找命中的实例，把射线变换到 BLAS 空间再遍历 BLAS。
+
+这个设计解决了几个大问题：
+
+- **实例化**：森林里 10000 棵树共享一个 BLAS，只在 TLAS 里存 10000 个 instance
+- **动态场景**：物体移动只需重建 TLAS（$O(n_{\text{inst}})$），BLAS 不动
+- **蒙皮/形变**：BLAS 用 refit 更新 AABB 保持拓扑不变，比重建快 10 倍
+
+工程惯例：静态 BLAS 用 `PREFER_FAST_TRACE` 花时间构一次质量最优；动态 BLAS 用 `PREFER_FAST_BUILD + ALLOW_UPDATE` 便于每帧 refit。
+
+## 5. 着色器绑定表（SBT）
+
+一条射线击中某个几何体后要调用哪个 Closest-Hit 着色器？答案不能硬编码——同一场景有木头、金属、玻璃等成百上千种材质。SBT 是一个跳转表：
+
+$$
+\text{index}=\text{InstanceContributionToHitGroup}+\text{GeometryContribution}\cdot\text{RayContributionToHitGroup}+\text{MissShaderIndex}
+$$
+
+计算细节繁琐，但直观思路是：每个 (实例, 几何, 射线类型) 组合决定一个着色器。这套机制让**一次 TraceRay 派发覆盖所有材质**，避免 CPU 端按材质分批的开销。
+
+代价是 SBT 的构建复杂度和 GPU 缓存不友好性。着色器发散是实时光追的第一杀手——两个相邻像素命中不同材质，它们的执行路径完全不同，SIMD 效率归零。这就是所谓的**shader divergence**。
+
+## 6. 每像素 1 spp 与降噪的合力
+
+一个 4K@60fps 的 RTX 3090 大约能跑 1-4 spp。这在 [路径追踪](./材质与间接光照.mdx) 的收敛曲线上属于"完全无法接受的原始噪点"级别。所有实时光追效果的关键是**降噪**。
+
+### 6.1 时空累积
+
+**Temporal**：把上一帧的结果 reproject 到当前帧，用 exponential moving average $C_t=\alpha C_{\text{new}}+(1-\alpha)C_{t-1}$ 融合。$\alpha=0.1$ 意味着有效样本数是 10 spp 而实际只算了 1 spp。代价：**鬼影**（disocclusion 时用了错误的历史）、**滞后**（快速移动的高光反应不过来）。
+
+**Spatial**：在当前帧内做保边空间滤波，把邻域相似的像素平均。类似[双边滤波](../../数字图像处理/02-灰度变换与空间滤波.mdx)但用 G-Buffer 的法线/深度/材质做引导。
+
+### 6.2 SVGF 与其后继
+
+**SVGF**（Spatiotemporal Variance-Guided Filter, Schied et al. 2017）是实时光追降噪的奠基工作：
+
+1. 计算每像素的时空累积方差
+2. 用 A-trous wavelet 空间滤波，滤波强度随方差自适应
+3. 时间反馈到下一帧
+
+**A-SVGF**（Adaptive SVGF）、**RELAX**（NVIDIA NRD）、**ReSTIR**（重要性重采样，NVIDIA 2020）继承并改进 SVGF。ReSTIR 让实时光追第一次能处理**多光源直接光**——传统一光源采样在 1000 个光源的场景里几乎失效，ReSTIR 用重采样+空间复用把有效样本数放大到 100+，2022 年 Cyberpunk 2077 Overdrive 模式的关键技术。
+
+### 6.3 OptiX AI Denoiser 与 DLSS Ray Reconstruction
+
+**OptiX Denoiser**：NVIDIA 训练的卷积自编码器，输入 1-4 spp 的光追输出 + G-Buffer 辅助（法线、albedo），输出去噪结果。离线渲染器（Blender Cycles、Arnold）都集成了它。
+
+**DLSS 3.5 Ray Reconstruction** (2023)：把光追降噪从"传统滤波 + 上采样"合并成一个 Transformer 网络端到端。相当于同时做降噪和超分。
+
+## 7. DLSS/FSR/XeSS 与光追的关系
+
+DLSS (NVIDIA)、FSR (AMD)、XeSS (Intel) 都是**时间超分辨率**——在低分辨率渲染，然后用历史帧和运动矢量重建高分辨率图像。
+
+DLSS 和光追不是同一件事，但**天生互补**：
+
+- 光追是性能大户，每减一半像素性能翻倍
+- 1080p 光追 + DLSS 到 4K 的开销 ≈ 1080p 光追原生
+- 高分辨率反过来降低了每像素样本数需求（同样噪声在小像素上更不明显）
+
+所以 RTX 游戏的默认套餐是：光栅化 G-Buffer + 光追反射/阴影/GI + AI 降噪 + DLSS 上采。每一步都在偷工减料，合起来能跑。
+
+## 8. 实时光追的典型效果集
+
+工业界把光追效果拆成菜单，按性能预算逐项打开：
+
+| 效果 | 每像素射线数 | 降噪难度 | 视觉收益 |
+|---|---|---|---|
+| 硬阴影 | 1 | 低 | 中 |
+| 软阴影 | 1-4 | 中 | 高 |
+| 反射（粗糙）| 1 | 高 | 高 |
+| 反射（镜面）| 1 | 低 | 中 |
+| 环境光遮蔽 (RTAO) | 4-8 | 低 | 中 |
+| 全局光照 (RTGI) | 1-2/probe | 极高 | 极高 |
+| 焦散 | 高 | 极难 | 局部很高 |
+| 路径追踪 (Overdrive) | 2-4 | 极高 | 极高 |
+
+Cyberpunk Overdrive、Portal RTX、Alan Wake 2 已经在做**完整路径追踪**——不再有光栅化管线的直接光/间接光划分，一切都是路径追踪 + ReSTIR + Ray Reconstruction。这在 2018 年是无法想象的。
+
+## 9. 三次范式转换
+
+回顾 40 年，光线追踪三次跳跃：
+
+1. **1980 Whitted**：算法从光栅化的正向图元变成反向射线，[基本原理](./光线追踪基本原理.mdx)成型
+2. **1986 Kajiya**：渲染方程 + 蒙特卡洛，从"确定性追反射"到"随机性积分光传输"
+3. **2018 RTX**：硬件专用单元 + 神经网络降噪，把 40 年只能离线的东西塞进 16.6 毫秒一帧
+
+第四次会是什么？神经辐射场（NeRF、3D Gaussian Splatting）已经在挑战"必须先建模再渲染"的整个前提。未来五年，光线追踪、神经渲染、体渲染的边界可能会彻底模糊。
+
+</WordCount>

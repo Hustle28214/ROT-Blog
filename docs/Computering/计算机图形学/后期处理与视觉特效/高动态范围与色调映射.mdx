@@ -1,0 +1,219 @@
+import WordCount from '../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+# 高动态范围与色调映射：把太阳塞进 8-bit 屏幕
+
+物理世界的亮度跨度极大——月光下 $10^{-3}\,\text{cd/m}^2$，室内 $10^2$，天空 $10^4$，直视太阳 $10^9$。人眼靠虹膜和视锥/视杆细胞适应几乎全部范围。而普通显示器只能输出 100–400 尼特，8-bit sRGB 只有 256 个离散强度值。**要在这块小板子上让画面显得"真实"，必须先在内部保留完整能量，再压缩到显示器动态范围**。这就是 HDR 渲染 + 色调映射的整条链。
+
+## 1. 为什么必须用浮点缓冲区
+
+在 8-bit 的 R8G8B8 里做光照，所有超过 1.0 的亮度会 clip 成 255。一盏聚光灯照到白墙，理论亮度可能是 30，clip 到 1.0 意味着**中间计算全部丢失**。你后面再做 bloom、色调映射、曝光调整都无法恢复。
+
+浮点缓冲区（FP16 / R11G11B10F）让每个通道能存 $\sim 10^{-5}$ 到 $10^{5}$ 的值。虽然精度不均匀（浮点数在大值处间隔大），但对光照能量已经够。
+
+| 格式 | 位宽 | 通道 | 用途 |
+|---|---|---|---|
+| R8G8B8A8_SRGB | 32 | 8/8/8/8 + gamma | 最终输出 / 反射率贴图 |
+| R11G11B10F | 32 | 无 alpha, 无符号浮点 | 主流 HDR framebuffer |
+| R16G16B16A16F | 64 | FP16 | 高精度 HDR，含 alpha |
+| R32G32B32A32F | 128 | FP32 | 累积、去噪、离线 |
+
+R11G11B10F 是"最贱格式"——32 位，无 alpha，红绿 11 位（5-bit 指数 + 6-bit 尾数），蓝 10 位。因为人眼对蓝色不敏感所以给蓝少一位。带宽跟 R8G8B8A8 一样但能存 HDR，一度是主流引擎的 scene color 首选。缺点是**没有符号位**，负数或减法运算要小心。
+
+## 2. 线性空间：光的算数只在线性域正确
+
+sRGB 屏幕的 gamma 大约是 2.2，意思是"给 shader 一个 0.5 的值，屏幕实际亮度是 $0.5^{2.2}\approx 0.22$"。这是 CRT 时代物理特性的遗留，也恰好接近人眼对暗部更敏感的感知曲线。
+
+**问题**：如果不显式解 gamma，光照会算错。两个 0.5 的光叠加：
+- 线性域：$0.5+0.5=1.0$（亮起来）
+- sRGB 域直接相加再显示：屏幕看到 $1.0^{2.2}$，但如果 clip 到 1.0 就"没什么变化"
+- 更糟的：把 sRGB texture 直接采样进 shader 做混合，得到的是伽马编码值的混合，永远偏暗
+
+标准做法：
+1. Texture 采样时硬件自动解 sRGB（`GL_SRGB` / DXGI `_SRGB` 格式），得到线性值
+2. 所有光照、混合、乘法、加法全部在**线性 HDR 空间**做
+3. 帧缓冲用浮点线性
+4. 输出到 backbuffer 时做 tone mapping + gamma 编码
+
+这就是 [颜色与视觉](../图形学数学基础/颜色与视觉：色彩空间与人眼感知.mdx) 里说的"线性工作流"。90 年代的游戏几乎都错，2005 年后 UE3/CryEngine 才把这事讲清楚。
+
+## 3. 曝光：把场景亮度拉到显示范围附近
+
+线性 HDR 场景值可能在 $[0, 100]$，色调映射函数一般假设输入在 $[0, \sim 10]$ 附近才好看。中间要有一个**曝光**步骤：
+
+$$
+L_{\text{exposed}}=L_{\text{scene}}\cdot 2^{EV}
+$$
+
+$EV$（exposure value）像相机曝光补偿。
+
+### 3.1 自动曝光（Auto Exposure）
+
+游戏里想模拟"从暗屋走到阳光下人眼慢慢适应"，需要自动调 $EV$。做法：
+
+1. 下采样 HDR 帧到很小（比如 $256\times 256$）
+2. 计算平均亮度（几何平均 = 对 log(L) 求算术平均后 exp，避免高光离群点主导）
+3. 目标平均亮度定为 0.18（sensor 灰卡的经典中灰值），$EV=\log_2(0.18/L_{\text{avg}})$
+4. 时间平滑：$EV_t=\text{lerp}(EV_{t-1}, EV_{\text{target}}, \Delta t/\tau)$，$\tau$ 视杆细胞适应约 1–3 秒
+
+工程上更精细的做法是用 **histogram-based exposure**：GPU compute shader 算出 64/128 bin 的亮度直方图，忽略最暗的 X% 和最亮的 Y%（避开天空和阴影主导），中间部分求中位数。UE4/UE5 就是这个方案。
+
+## 4. 色调映射：把 $[0, \infty)$ 压到 $[0, 1]$
+
+一个色调映射算子（TMO）就是函数 $f: \mathbb{R}_+ \to [0,1]$。设计目标：亮部平滑过渡、暗部保留细节、颜色不失真。
+
+### 4.1 Reinhard
+
+Reinhard 2002 年的形式最简单：
+
+$$
+L_{\text{out}}=\frac{L}{1+L}
+$$
+
+或加入白点 $L_{\text{white}}$（超过此值 clip 到 1）：
+
+$$
+L_{\text{out}}=\frac{L(1+L/L_{\text{white}}^2)}{1+L}
+$$
+
+优点：单调、渐近到 1、数学简洁。缺点：整体感觉"灰蒙蒙"、对比度不足、亮部过渡显得平坦。早期 HDR paper 的默认选择，现代游戏已经不用。
+
+### 4.2 Uncharted 2 / Hable Filmic
+
+John Hable 在 2010 的 GDC 上公开了《神秘海域 2》的 filmic TMO，一个 6 参数曲线：
+
+$$
+f(x)=\frac{x(Ax+CB)+DE}{x(Ax+B)+DF}-\frac{E}{F}
+$$
+
+具体是 shoulder + linear + toe 三段拼接的曲线，来自胶片响应曲线的经验拟合。特点：暗部 toe 段有柔和的压缩（不像 Reinhard 那样在 0 附近线性），亮部 shoulder 段拉出漂亮的高光过渡。审美上"胶片感"强。
+
+作为参数曲线它调节余地大，但也难调——很多引擎默认参数就直接抄 Hable 的。
+
+### 4.3 ACES
+
+**ACES**（Academy Color Encoding System）是电影工业为解决"不同设备色调不一致"提出的完整流水线。核心是 RRT（Reference Rendering Transform）+ ODT（Output Device Transform），前者把 scene-referred HDR 压到 display-referred，后者做设备特定映射。
+
+图形界常用的是 Krzysztof Narkowicz 2016 提出的 ACES 简化拟合：
+
+$$
+f(x)=\frac{x(2.51x+0.03)}{x(2.43x+0.59)+0.14}
+$$
+
+一个 Padé 有理函数。跑起来只需要一次乘加除。它逼近 ACES 曲线到肉眼分辨不出，是现在几乎所有引擎的默认（UE、Unity URP/HDRP、Frostbite）。
+
+ACES 还有一个隐藏优点：**它自然处理色相偏移**。饱和度极高的橙色在其他 TMO 下会变成纯白（因为红通道先饱和），ACES 曲线会让红色在饱和前"弯"向黄再向白，符合胶片过曝时的表现。
+
+### 4.4 AgX / GT ToneMap
+
+近年新算子：
+- **AgX**（Troy Sobotka）：设计目标是解决 ACES 在高饱和度光源下"变粉紫"的老问题
+- **GT ToneMap**（Gran Turismo 7 Uchimura 2017）：参数化黑点、白点、中灰、shoulder 强度、toe 强度，更适合游戏美术调
+- **Neutral Tonemap**（Khronos）：glTF/PBR 参考实现的中性选择
+
+比较不同 TMO 的做法：先渲同一张 HDR 场景，把 R11G11B10F 数据存下来，然后离线跑各种映射。不能在两个不同游戏截图之间对比——曝光和白平衡都不同。
+
+## 5. Bloom：把过亮的能量"漏"出来
+
+真实相机镜头玻璃有散射、传感器有 blooming（电荷溢出）、人眼有 Airy disc。这些都让极亮点在图像上产生**光晕**。渲染里模拟这个效果就叫 **bloom**（旧名 "glow"）。
+
+### 5.1 阈值 vs 能量守恒
+
+老式 bloom：
+1. 用亮度阈值 $L_t$（比如 1.0）分离出高亮部分：$L_{\text{bright}}=\max(0, L-L_t)$
+2. 对高亮部分做多次高斯模糊
+3. 加回原图
+
+问题：阈值是**硬 clip**——1.0 以下完全不发光，1.01 立刻发光，画面里出现"闪一下"的边界不自然。
+
+现代做法（UE4 之后）是**无阈值 bloom**：
+
+1. 不做阈值，直接对整个 HDR 场景做**金字塔式下采样 + 上采样**（Call of Duty: Advanced Warfare 2014 SIGGRAPH 讲过的 Next Generation Post Processing）
+2. Downsample chain：每层 $1/2$ 分辨率，做 $13$-tap tent 滤波
+3. Upsample chain：每层 $\times 2$ 分辨率，做 tent 上采样，与同分辨率的 downsample 层相加
+4. 最终 bloom = 各层加权和，混回原图
+
+金字塔的作用是同时得到不同尺度的模糊——小 kernel 只糊几像素，大 kernel 糊到几百像素。物理上模拟"lens flare 大小的能量分布"。
+
+```
+    原图 HDR
+      ↓ /2
+     L1   ────┐  加回
+      ↓ /2   │
+     L2   ──┐│
+      ↓     ││
+     ...    ││
+      ↓     ↓↓
+     L6 ─→ up ─→ up ─→ ... ─→ bloom result
+                                  ↓
+                            与原图混合
+```
+
+因为在**线性 HDR** 空间做，能量守恒——很亮的高光扩散得远、很暗的部分几乎不影响。这才是 bloom 该有的物理感觉。
+
+### 5.2 顺序
+
+bloom 在色调映射之**前**。因为 bloom 模拟的是镜头前的物理散射，属于场景能量的一部分，不是显示端的操作。如果先 tonemap 再 bloom，超亮值已经被压缩，扩散半径就不再体现真实亮度差异。
+
+## 6. 色彩分级：调色是最后一步
+
+Tonemap 完成后图像已经在 $[0, 1]$，但美术可能还想让整个画面偏冷、加青调、压绿色等。这一步叫 **color grading**，工具是 3D LUT（look-up table）。
+
+一个 $32^3$ 的 3D LUT 存 32K 个 RGB → RGB 映射，运行时 shader 用 `texture(LUT, rgb)` 三线性插值。美术在 Photoshop / DaVinci 里调好一个参考帧，导出 LUT，游戏加载。
+
+现代引擎把整条 tonemap + grading pipeline 合并成一个 3D LUT——一次纹理采样解决全部颜色变换，性能极佳。
+
+## 7. HDR 显示器：不用再压缩到 SDR 了
+
+HDR10 / Dolby Vision 显示器能到 1000–4000 尼特，10-bit / 12-bit 深度，色域 Rec.2020。**输出到 HDR 显示器时，色调映射目标不再是 $[0,1]$**，而是显示器能表现的实际亮度范围。
+
+管线变化：
+- Scene HDR → tone map 到 **PQ**（Perceptual Quantizer，SMPTE ST.2084）编码空间
+- 输出格式 R10G10B10A2 或 R16G16B16A16F
+- 白点、峰值亮度、色域都在 metadata 里告诉显示器
+
+游戏引擎为 SDR 和 HDR 输出维护两条 tonemap 曲线。ACES 官方 ODT 已经覆盖了 SDR 100 nit、HDR 1000 nit、HDR 4000 nit 等目标。
+
+## 8. 完整后处理链
+
+把本目录三篇文章的内容串起来：
+
+```
+Scene rendered in linear HDR (FP16 / R11G11B10F)
+        │
+        ├── [运动模糊](./景深、运动模糊与雾效.mdx)（用 velocity buffer）
+        ├── [景深](./景深、运动模糊与雾效.mdx)（用 CoC）
+        ├── 体积雾/大气散射
+        │
+        ↓
+   Bloom（金字塔下采样上采样）
+        │
+        ↓
+   Exposure（自动/手动 EV）
+        │
+        ↓
+   Tone Mapping（ACES/Hable/AgX/…）
+        │
+        ↓
+   Color Grading（3D LUT）
+        │
+        ↓
+   Gamma 编码 / PQ 编码
+        │
+        ↓
+   [抗锯齿](./抗锯齿技术.mdx) FXAA/SMAA（若在 LDR 做）
+        │
+        ↓
+   Backbuffer → 屏幕
+```
+
+TAA 一般在 tone map **之前**（在 HDR 空间做时序累积更稳，避免 clamp 的错误能量），FXAA/SMAA 常放在 LDR 空间末尾。UE4 有个专门的 "Tonemapped After TAA" 顺序辩论——两种做法各有妥协。
+
+## 9. 一个反直觉的事实
+
+早期 HDR 引擎让高光"亮瞎眼"，是因为**过度炫技**——什么都要 bloom、什么都要 lens flare。真实世界里眼睛的适应和视觉神经的响应是极其非线性的，一堵白墙、一个太阳、一个显示器在你眼里都可以"够亮"。
+
+好的 HDR + tonemap 追求的不是"更亮的画面"，而是**让画面在任何亮度条件下都有可读性**：暗部有细节、亮部不 clip、颜色不偏移、时序稳定。搞清楚每一步的输入输出空间、能量守恒、非线性顺序，比记住 ACES 那六个系数重要得多。
+
+</WordCount>

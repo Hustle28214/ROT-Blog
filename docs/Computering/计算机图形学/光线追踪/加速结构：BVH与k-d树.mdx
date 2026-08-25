@@ -1,0 +1,182 @@
+import WordCount from '../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+# 加速结构：BVH 与 k-d 树
+
+朴素光线追踪对每条射线要测试场景里所有三角形，一亿面片场景一帧几分钟是常态。想要实时——甚至只是想让离线渲染在几分钟内跑完——就必须把**射线-场景求交**从 $O(n)$ 压到 $O(\log n)$。方法是空间索引结构：预处理时把三角形组织进树，运行时用树做剪枝。
+
+## 1. 均匀网格：最朴素的空间划分
+
+把场景包围盒切成 $N\times N\times N$ 的立方体格子，每个格子记录自己内部的三角形列表。射线遍历时用 3D-DDA（Amanatides & Woo, 1987）逐格前进，只测试格子里的三角形。
+
+```
+     ┌─┬─┬─┬─┬─┐
+     ├─┼─┼─┼─┼─┤
+   ──┼─┼─┼─X─┼─┤  X 处三角形只在这个格子里测
+     ├─┼─┼─┼─┼─┤
+     └─┴─┴─┴─┴─┘
+```
+
+优点：构造简单，遍历常数极小。缺点：**几何分布不均**时崩溃——一个村庄场景，90% 三角形聚在城堡里，格子要么全空要么爆炸。医学上叫"茶壶在体育场"（teapot in a stadium）问题。
+
+均匀网格的**理论最优**只在均匀分布下成立。真实场景几乎永远不均匀，所以工业级渲染器普遍用自适应结构：BVH 和 k-d 树。
+
+## 2. BVH：包围盒层次
+
+Bounding Volume Hierarchy 是**基于物体划分**的二叉树。每个节点存一个 AABB（轴对齐包围盒），根节点框住整个场景，内部节点框住其子节点的所有几何体，叶节点存三角形。
+
+```
+              [Root AABB]
+             /           \
+        [AABB L]        [AABB R]
+        /     \          /     \
+     leaf   leaf      leaf     leaf
+     (△△△)  (△△)     (△△△△)   (△)
+```
+
+遍历时先测试根盒——如果射线不与根盒相交就直接返回；否则递归测试左右子节点。用一个 $t_{\text{best}}$ 记录目前最近命中距离，任何 $t_{\min}>t_{\text{best}}$ 的节点可以直接剪枝。
+
+**关键性质**：几何体只出现在一个叶节点里。这意味着 BVH 里三角形不重复存储，内存高效，而且构造是稳定的（不需要处理跨节点几何体）。
+
+### 2.1 射线-AABB 相交测试（Slab method）
+
+AABB 是三对平行平面的交集。射线与每对平面求交得区间 $[t_{\min,i},t_{\max,i}]$，三个区间取交集若非空则相交：
+
+$$
+t_{\text{enter}}=\max_i t_{\min,i},\quad t_{\text{exit}}=\min_i t_{\max,i}
+$$
+
+命中条件是 $t_{\text{enter}}\leq t_{\text{exit}}$ 且 $t_{\text{exit}}\geq 0$。这个算法能被 SIMD 优雅并行——一条射线同时对 4 个（AVX 是 8 个）AABB 做测试，就是 Embree 高性能的秘密之一。
+
+## 3. SAH：表面积启发式
+
+BVH 构造的核心问题是**怎么划分**。均匀二分？按几何中心排序？都会得到糟糕的树。工业标准是 **Surface Area Heuristic**（Goldsmith & Salmon, 1987；MacDonald & Booth, 1990）。
+
+直觉：一条射线击中包围盒 $A$ 的概率正比于 $A$ 的表面积（在射线方向均匀分布假设下，这是**几何概率**的经典结论）。
+
+一次遍历某节点的代价：
+
+$$
+C(\text{node})=C_{\text{trav}}+p_L\,C(L)+p_R\,C(R)
+$$
+
+其中 $p_L=S(A_L)/S(A)$、$p_R=S(A_R)/S(A)$ 是子节点表面积比。叶节点的代价是 $C_{\text{leaf}}=N\cdot C_{\text{isect}}$。SAH 目标是**递归最小化总代价**：
+
+$$
+\arg\min_{\text{split}}\ C_{\text{trav}}+\frac{S(A_L)}{S(A)}N_L C_{\text{isect}}+\frac{S(A_R)}{S(A)}N_R C_{\text{isect}}
+$$
+
+工程实现两种做法：
+
+- **完全枚举**：沿每个轴对三角形排序，扫过所有可能划分位置。质量最高，构造 $O(n\log^2 n)$
+- **Binned SAH**（Wald, 2007）：把轴分成 $k$ 个桶（比如 16 个），只在桶边界取候选划分。构造 $O(n\log n)$，质量损失 <5%，是 PBRT 和 Embree 的默认
+
+伪代码：
+
+```cpp
+Node* build(vector<Primitive>& prims) {
+    AABB bounds = compute_bounds(prims);
+    if (prims.size() <= LEAF_THRESHOLD) return leaf(prims);
+
+    float best_cost = INF; int best_axis = -1; float best_pos;
+    for (int axis = 0; axis < 3; axis++) {
+        for (int bin = 1; bin < NUM_BINS; bin++) {
+            auto [L, R] = split(prims, axis, bin);
+            float cost = Ct + (SA(L)*L.size() + SA(R)*R.size()) * Ci / SA(bounds);
+            if (cost < best_cost) { best_cost = cost; best_axis = axis; best_pos = bin; }
+        }
+    }
+    if (best_cost >= LEAF_THRESHOLD * Ci) return leaf(prims);
+    return internal(build(L), build(R));
+}
+```
+
+$C_{\text{trav}}/C_{\text{isect}}$ 的比值通常取 $0.125\sim 1$，取决于硬件。RTX 硬件里 AABB 测试用专用单元，比值更小。
+
+## 4. k-d 树：基于空间划分
+
+k-d 树用**轴对齐平面**切空间，每个内部节点存一个划分轴 $\{x,y,z\}$ 和位置 $p$，把当前区域一分为二。
+
+```
+        x=5
+       /   \
+     y=3    y=7
+    / \    / \
+   ...
+```
+
+与 BVH 的关键区别：**一个三角形可能横跨划分平面**，所以要么放两边（引用重复），要么保留在父节点。经典做法是**允许重复**——一个三角形被 3~5 个叶节点引用不罕见。
+
+### 4.1 k-d 树的构造与 SAH
+
+同样用 SAH，但候选划分位置只能是**三角形 AABB 的面**——因为在其他位置切没有拓扑上的意义。这产生了几个刁钻但重要的技巧：
+
+- **完美划分候选**：三角形的 $x_{\min}, x_{\max}$ 都是候选，$O(n\log n)$ 排序后扫描
+- **空空间切割**：如果左边全空、右边全非空，即使 SAH 代价不低也值得切，因为射线过空区加速极大
+- **早停条件**：$C_{\text{split}}>C_{\text{no-split}}$ 时停
+
+Wald & Havran 在 2006 年证明 k-d 树的最优构造是 $O(n\log n)$，是当时 CPU 上追求极致质量的首选。
+
+### 4.2 k-d 树遍历
+
+用递归栈遍历。到内部节点时按射线方向决定先近后远：
+
+```
+       │←── 射线
+   ────┼────── split
+    近 │  远
+```
+
+先递归"近侧"子树，若命中且 $t<$ 划分平面距离则可提前返回；否则再进"远侧"。这个"stackless with ropes"变种把每个叶节点的邻居指针存好，可以不用栈——早期 GPU 上很重要。
+
+## 5. BVH vs k-d 树
+
+| 维度 | BVH | k-d 树 |
+|---|---|---|
+| 划分依据 | 物体 | 空间 |
+| 几何存储 | 无重复 | 有重复（1.5-3x）|
+| 构造复杂度 | $O(n\log n)$ Binned SAH | $O(n\log n)$ 精确 |
+| 构造速度 | 更快，可并行 | 稍慢 |
+| 遍历速度 | 稍慢（AABB 测试贵）| 更快（平面测试廉价）|
+| 增量更新 | 易（refit 包围盒）| 难（结构随几何变）|
+| 动态场景 | 好 | 差 |
+| 内存 | 紧凑 | 膨胀 |
+| GPU 友好 | 极好 | 一般 |
+
+**趋势**：2010 年前 k-d 树在离线渲染领先，2010 年后 BVH 全面胜出，原因有三：
+
+1. **动态几何**：游戏、动画每帧变形，BVH 的 refit（只更新 AABB 不改拓扑）$O(n)$ 就能搞定；k-d 树几乎必须重建
+2. **SIMD 友好**：多分支 BVH（BVH4、BVH8）一次并行测 4/8 个盒子；k-d 树的二分本质上串行
+3. **GPU 硬件**：NVIDIA RTX、AMD RDNA2 的光追单元直接是 BVH 遍历器，不是 k-d 遍历器
+
+Embree（CPU）、OptiX（GPU）、DXR、Vulkan RT 全部以 BVH 为标准。k-d 树今天基本退到"点云查询、KNN 搜索"这类静态场景应用。
+
+## 6. 高级 BVH 技巧
+
+- **BVH4/8**：内部节点存 4 或 8 个子节点而非 2 个，配合 SIMD 一条 AVX-256 指令做 8 个 AABB 测试
+- **SBVH**（Stich et al., 2009）：允许划分平面切割三角形，兼具 BVH 的紧凑性和 k-d 树的空间划分优势。质量提升 10-30%
+- **LBVH**（Karras, 2012）：用 Morton 码线性构造，GPU 上并行毫秒级重建整个 BVH，动态场景利器
+- **TLAS/BLAS 两层结构**：Top-Level 装物体的变换（instance），Bottom-Level 装几何。同一个模型出现 1000 次只需一份 BLAS。DXR 的核心设计，见[实时光线追踪与 RTX](./实时光线追踪与RTX.mdx)
+- **压缩节点**：把 AABB 用 8 bit/维量化存储，节点从 64 字节缩到 32 甚至 16 字节。带宽敏感的 GPU 大爱
+
+## 7. 遍历时的优化细节
+
+**射线相干性**：眼睛射线彼此接近，走的路径也接近，缓存命中率高；反射/折射后的次级射线变得发散（一个凸面镜把附近像素的反射打得四面八方），缓存崩坏。解决方案：**射线排序**（把方向相近的射线打包一起遍历）、**Wavefront 架构**（把发散的射线按目标节点重新分组）。
+
+**Any-hit vs Closest-hit**：阴影射线只想知道"有没有挡"，遇到第一个命中就可以返回；主射线要找**最近**命中。DXR 提供 `RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH` 让阴影射线走快速路径。
+
+**Watertight intersection**：BVH 遍历过程中相邻三角形共享边，浮点误差可能让射线"从缝里漏过去"产生黑洞像素。Woop 等人（2013）提出的水密（watertight）三角形求交算法保证共享边上不漏光，PBRT-v4 和现代硬件都采用。
+
+## 8. 一些经验数据
+
+在 20 万三角形的 Sponza 场景（离线渲染基准）里：
+
+- 朴素测试：每条射线 20 万次三角形测试
+- 均匀网格（$100^3$ 格）：约 1000 次
+- BVH（Binned SAH）：约 30 次三角形测试 + 60 次 AABB 测试
+- 精确 SAH k-d 树：约 22 次三角形测试 + 55 次平面测试
+
+从 20 万降到几十次，这就是加速结构的价值。有了它，[Whitted 光追](./光线追踪基本原理.mdx)才能从"1970 年代离线奇观"变成"1990 年代离线主力"再变成"2018 年后实时可用"。
+
+</WordCount>

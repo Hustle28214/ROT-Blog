@@ -1,0 +1,249 @@
+import WordCount from '../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+# 高级纹理技术:让表面撒谎
+
+[基础纹理映射](./纹理映射基础.mdx)让 albedo 随位置变化。这远远不够——真实材质的**几何微结构**(凹凸、缝隙、划痕)在网格几何里表达代价太大,而人眼对光照的敏感度让我们无法直接忽略这些细节。本文讨论的都是"用便宜的贴图欺骗眼睛,让平面看起来有几何细节"的技术:从法线贴图到 IBL。
+
+一个反复出现的原则:**越贵的效果,越应该预计算烘焙成纹理**。这是过去二十年实时图形的核心策略。
+
+## 1. 法线贴图(Normal Mapping)
+
+James Blinn 1978 年提出"bump mapping"——用一张灰度高度图 $h(u,v)$ 扰动法线,让平面产生凹凸感。原理是:表面变形后的新法线正比于 $-\nabla h$。这个想法后来被工程化成**法线贴图**——直接把扰动后的单位法线打包到一张 RGB 纹理里,采样即可用。
+
+### 1.1 切线空间(Tangent Space)
+
+法线不能存在世界坐标——那样每个顶点都要独立法线贴图。存在**切线空间**里:每个片段有本地基 $(\mathbf T, \mathbf B, \mathbf N)$,分别是切线、副切线、法线,构成正交基。法线贴图的 RGB 编码这个空间里的法线:
+
+$$
+\mathbf n_{\text{tangent}} = \left(\text{tex.rgb}\cdot 2 - 1\right)
+$$
+
+$\times 2 - 1$ 是把 $[0,1]$ 存储范围映射到 $[-1,1]$ 向量分量。渲染时用切线矩阵变换到世界空间:
+
+$$
+\mathbf n_{\text{world}} = [\mathbf T\ \mathbf B\ \mathbf N] \cdot \mathbf n_{\text{tangent}}
+$$
+
+法线贴图看起来那么蓝(RGB $\approx (128,128,255)$),因为大多数像素的法线接近 $(0,0,1)$——切线空间里正对表面外,只有小的 X/Y 扰动。
+
+```glsl
+in vec3 vNormal, vTangent;
+in vec2 vUV;
+uniform sampler2D uNormalMap;
+
+vec3 getWorldNormal() {
+    vec3 T = normalize(vTangent);
+    vec3 N = normalize(vNormal);
+    vec3 B = cross(N, T);
+    mat3 TBN = mat3(T, B, N);
+
+    vec3 nTangent = texture(uNormalMap, vUV).xyz * 2.0 - 1.0;
+    return normalize(TBN * nTangent);
+}
+```
+
+### 1.2 法线贴图的局限
+
+法线贴图**扰动光照方向,不扰动几何**。掠射角看会露馅——凹凸的"影子"应该遮挡后面的凹凸,但法线贴图里的凸起是**平的**,不会互相遮挡也不会有视差。所以石墙贴图从正面看很立体,视线放平就变回一张纸。
+
+解决方案:视差映射(下一节)。
+
+## 2. 视差映射(Parallax Mapping)
+
+思路:用一张高度图 $h(u,v)$,根据视线方向偏移 UV,模拟"看凸起时其顶部相对底部有位移"。最简单的 Parallax Mapping:
+
+$$
+u' = u + \frac{V_x}{V_z}\cdot h(u,v)\cdot s
+$$
+
+$V$ 是切线空间视线方向,$s$ 是缩放系数。这是**近似**,只在 $h$ 变化平缓时对——陡峭区域会漂。
+
+### 2.1 Steep Parallax 和 Parallax Occlusion Mapping
+
+粗暴改进:沿视线光线做 raymarch,一步一步在高度图上前进,找出光线与"高度场表面"的第一个交点。这叫 **Steep Parallax Mapping**,几十次纹理采样,画面质量接近真实置换。
+
+**Parallax Occlusion Mapping**(POM):Steep Parallax 找到 hit 之后,在最后两步之间做二分或线性插值细化,消除阶梯感。是 2005-2015 年 3A 游戏地面/砖墙的标准配置。
+
+```
+视线 ─→
+       ┌───┐   ┌─┐   ← 高度场剖面
+    ───┘   └───┘ └───
+    ↓
+    在每一步测试:光线高度 vs 高度场高度
+    第一次"光线低于表面"就是 hit
+```
+
+代价:每片段十几到几十次纹理采样,GPU 带宽消耗大。今天的替代方案是直接上 [DirectX Tessellation](../图形渲染管线/渲染管线概览：从顶点到像素的旅程.mdx) 做真实几何位移。
+
+### 2.2 边界的坑
+
+视差映射的偏移 UV 可能超出三角形范围——你在看这个三角形,但采样的却是隔壁三角形的贴图。工业做法是 clamp 或 discard 超界像素,或干脆让边缘出现平缓的过渡。
+
+## 3. 置换映射(Displacement Mapping)
+
+视差是**假的**——只改变了看到的颜色,几何本身没变。要真的改变几何,只能在管线里加**曲面细分**(tessellation)或**几何着色器**,把网格细分再按高度图偏移顶点位置。
+
+优势:轮廓真的凸起,阴影正确,不同视线方向表现一致。
+代价:三角形数量指数级增长,曲面细分固定管线成本(GPU 里 tessellation shader 单元并不如片段着色器强)。
+
+一般规则:**近处用置换,远处用法线**,靠 LOD 平滑切换。这是《使命召唤》和《战地》系列的地形做法。
+
+## 4. PBR 材质纹理套装
+
+物理材质需要多个参数——粗糙度、金属度、AO、法线——都随位置变化。工业界把它们打包成一套贴图,一个模型一套。典型的 **glTF/UE/Unity 标配纹理**:
+
+| 通道 | 内容 | 编码 |
+|---|---|---|
+| Albedo (Base Color) | 漫反射基色/金属反射基色 | sRGB |
+| Normal | 切线空间法线 | Linear, [-1,1] $\to$ [0,1] |
+| Metallic | 金属度 0/1 | Linear |
+| Roughness | 粗糙度 [0,1] | Linear (常和 Metallic 打包在同一张 RG) |
+| AO | 环境光遮蔽 [0,1] | Linear |
+| Emissive | 自发光 | HDR / sRGB |
+| Height | 位移/视差用 | Linear |
+
+**通道打包**:金属度和粗糙度都是灰度,常打包成一张 R+G 双通道,再加 AO 就是 RGB。glTF 标准就是这么定的(MetallicRoughnessTexture: G=roughness, B=metallic)。省一次采样、省一次显存,足以让艺术家喜欢。
+
+### 4.1 albedo 的定义漂移
+
+在旧的经验模型里 albedo = 漫反射颜色。PBR 里 albedo(或 base color) 的意义分裂:
+
+- **非金属(电介质)**: albedo 是漫反射颜色,镜面反射用一个几乎恒定的 $F_0\approx 0.04$
+- **金属**: albedo 是**镜面反射颜色**——金属没有漫反射!$F_0$ = albedo
+
+这就是"金属工作流"(metallic workflow)的核心:一张 albedo + 一个 metallic 遮罩,告诉着色器"这块像素应该按金属还是电介质处理"。详见[BRDF 与材质系统](./BRDF与材质系统.mdx)。
+
+### 4.2 粗糙度不是模糊度
+
+粗糙度控制 BRDF 里微表面法线分布的宽度,不是简单"把结果模糊"。$\text{roughness}=0.5$ 不是"高光模糊 50%",是 GGX 分布参数。这个非线性性使得艺术家的直觉("我把粗糙度设 0.5")和实际渲染结果之间有一层非平凡的映射,是新手 PBR 试错的常见坑。
+
+## 5. 立方体贴图(Cube Map)
+
+一张纹理是 2D,如果我们要**基于方向**采样(比如查询"沿这个方向的天空是什么颜色"),需要 3D 输入 $\to$ 颜色的映射。立方体贴图是最直接的做法:围绕原点的立方体六个面各存一张 2D 纹理,采样时从原点沿方向 $\mathbf d$ 射线找到与立方体交点,查对应面的对应像素。
+
+```
+             ┌───┐
+             │ +Y│              六面按方向分配:
+         ┌───┼───┼───┬───┐      +X/-X 左右
+         │-X │ +Z│ +X│ -Z│      +Y/-Y 上下
+         └───┼───┼───┴───┘      +Z/-Z 前后
+             │ -Y│
+             └───┘
+```
+
+GLSL 里是 `samplerCube` 和 `texture(sampler, dir)`,方向不需要归一化(硬件会归)。
+
+**用途**:天空盒(采样视线方向)、环境反射(采样反射向量)、点光源的阴影贴图(6 面记录 6 方向深度)、IBL 各种预积分产物。
+
+### 5.1 天空盒 vs 环境反射
+
+天空盒:采样**视线**方向 $\mathbf v$,画到远平面,让整个场景外围看起来是天空。
+
+环境反射:采样**视线反射后的方向** $\mathbf r = \text{reflect}(-\mathbf v, \mathbf n)$,把当前片段染上环境的颜色,产生反光效果。金属球、湿地面靠这个。
+
+同一张 cube map 通常两用。艺术家把 HDR 全景图(equirectangular projection)一次性烘焙成 cube map,渲染时只查表。
+
+## 6. IBL:基于图像的照明
+
+**IBL** (Image-Based Lighting) 是 Paul Debevec 1998 年的工作。核心思想:环境本身就是光源。一张 HDR 全景图记录了各个方向的入射辐射亮度,渲染时对每个方向积分——这就是最完整的间接光。
+
+问题是:**对着色器每片段做半球积分**是不可能的,一次积分需要几千次采样。IBL 的智慧在于**把积分预计算好**,渲染时只查表。
+
+### 6.1 漫反射辐照度贴图(Irradiance Map)
+
+漫反射项对入射方向的积分:
+
+$$
+E(\mathbf n) = \int_\Omega L_i(\omega)\, \max(\mathbf n\cdot\omega,0)\, d\omega
+$$
+
+只依赖法线 $\mathbf n$,不依赖视角。对每个法线方向做一次积分,结果打包成一张 cube map:辐照度贴图。渲染时按片段法线采样即可,一次读取拿到完整半球积分。
+
+分辨率可以很低——积分本身把高频光照压平了,32×32×6 就够。
+
+### 6.2 镜面预过滤(Prefiltered Environment Map)
+
+镜面反射依赖视角,分布还依赖粗糙度。完整积分是四维输入 $(\mathbf v, \mathbf n, \text{roughness})$,存不下。Unreal 4 的**分裂积分近似**(split-sum approximation)是工业标配:
+
+$$
+\int L_i(\omega) f_r(\omega, \mathbf v)(\mathbf n\cdot\omega) d\omega \approx \underbrace{\int L_i(\omega) D(\omega)d\omega}_{\text{预过滤环境}} \cdot \underbrace{\int f_r(\mathbf n\cdot\omega)d\omega}_{\text{BRDF LUT}}
+$$
+
+前一项用**多层 mip 的 cube map**表达:每一 mip 对应一个粗糙度值,粗糙度越大用越糊的 mip。后一项只依赖 $\mathbf n\cdot\mathbf v$ 和粗糙度,是一张 2D LUT。
+
+渲染时:
+
+```glsl
+vec3 R = reflect(-V, N);
+float mipLevel = roughness * MAX_MIP;
+vec3 prefiltered = textureLod(uPrefilterMap, R, mipLevel).rgb;
+
+vec2 brdfLUT = texture(uBrdfLUT, vec2(max(dot(N,V),0.0), roughness)).rg;
+vec3 F = F0 * brdfLUT.x + brdfLUT.y;
+
+vec3 specularIBL = prefiltered * F;
+```
+
+三次纹理采样,得到近似正确的镜面 IBL。这是 UE4/UE5、Unity HDRP、Filament、glTF viewer 全都在用的方案。
+
+### 6.3 IBL 的能量正确性
+
+IBL 的漫反射和镜面反射要用**互补的能量分配**,不能两者都是满能量——否则一个金属球会又漫反射又反射,发出比入射光更多的能量。分配规则和菲涅尔项耦合:
+
+$$
+k_d = (1 - F)\cdot (1 - \text{metallic})
+$$
+
+金属完全没有漫反射;电介质在掠射角(F 大)漫反射也变少。见[BRDF 与材质系统](./BRDF与材质系统.mdx)里的推导。
+
+## 7. 特殊纹理:细节图和贴花
+
+**Detail Map**:近距离看时叠加一层高频细节。比如一堵墙的 albedo 是 1024×1024,近看还是糊,再叠一张 tile 100 次的高频噪声图,视觉分辨率就提上去了:
+
+$$
+\text{final} = \text{albedo} \cdot \text{detail} \cdot 2
+$$
+
+代价是所有距离都在采样,细节图分辨率一定要小。
+
+**Decal**:局部贴花——把弹孔、涂鸦、血迹贴到已有几何上,不改动网格。做法:延迟渲染阶段用一个盒子体积重投影 UV 到目标表面,采样贴花贴图 blend 到 G-buffer。是现代游戏"随手做出破坏效果"的技术核心。
+
+**Detail Normal Map**:法线贴图也可以两层——base normal 定义大结构,detail normal 加高频微凹凸。合成两张法线不是简单相加,推荐 Reoriented Normal Mapping(RNM):
+
+$$
+\mathbf n_{\text{result}} = \text{normalize}(\mathbf n_1(z_1 + 1) - \mathbf n_2(-1))
+$$
+
+细节数学见 Colin Barré-Brisebois 2012 年 GDC 演讲,几乎所有 3A 引擎都在用这个式子。
+
+## 8. 纹理压缩
+
+一张 4K RGBA8 是 64 MB,一个场景几十套材质就是几个 GB——显存不允许。压缩格式是必需的:
+
+| 格式 | 压缩率 | 用途 |
+|---|---|---|
+| DXT1/BC1 | 6:1 | 无 alpha 通道贴图 |
+| DXT5/BC3 | 4:1 | 带 alpha 或法线 |
+| BC4/BC5 | 8:1 / 4:1 | 单/双通道(高度、粗糙度、法线) |
+| BC6H | 6:1 | HDR |
+| BC7 | 4:1 | 高质量 RGBA |
+| ASTC | 可变 | 移动端 |
+| ETC2 | 4:1 | OpenGL ES |
+
+压缩是**有损**的,法线贴图和 sRGB 贴图对压缩误差的敏感度不同——法线的三通道被压缩会导致法线偏移,产生 mach 带。工业做法是把法线的 X/Y 存到 BC5 的 RG,shader 里 $z = \sqrt{1-x^2-y^2}$ 恢复,只压两个通道保留精度。
+
+## 9. 虚拟纹理和流式加载
+
+面对 8K 甚至 16K 纹理的大世界,一次全部装载显存不现实。**虚拟纹理**(Virtual Texturing, VT)把纹理切成 128×128 或 256×256 的 tile,只把当前视野需要的 tile 加载到"物理纹理缓存"。id Software 的 Rage 引擎、Unreal 5 的 Nanite 都基于这类思想。
+
+VT 的技术挑战:tile 边界的过滤(相邻 tile 可能不在同一物理位置)、mip level 的流式决策、feedback pass(GPU 报告"我需要哪个 tile")。是当代大世界渲染的深水区。
+
+## 10. 从纹理到渲染方程
+
+所有这些贴图技术,归根到底是在**为渲染方程供数据**。表面的 BRDF 参数从贴图查,入射光照从 IBL 查,几何法线从法线贴图查。核心算法(渲染方程)不变,变的只是每一项的数据源。
+
+理解了纹理如何供数据,下一步就是理解[BRDF](./BRDF与材质系统.mdx)如何用这些数据——把 albedo, roughness, metallic 变成物理上守恒的反射行为。
+
+</WordCount>

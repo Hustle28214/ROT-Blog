@@ -9,7 +9,7 @@ import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 
 
-//const announcementBarContent = `2025新年快乐🎉`
+const announcementBarContent = `本博客文字数突破一百万，文章总数突破一千+，什么时候吃顿好的庆祝一下！`
 
 
 /** @type {import('@docusaurus/types').Config} */
@@ -188,11 +188,13 @@ const config = {
         disableSwitch: false,
         respectPrefersColorScheme: true,
       },
-      // announcementBar: {
-      //   id: 'announcementBar-1',
-      //   backgroundColor: '#B3E5FC',
-      //   content: announcementBarContent,
-      // },
+      announcementBar: {
+        id: 'announcementBar-1',
+        backgroundColor: '#B3E5FC',
+        textColor: '#091E42',
+        isCloseable: true,
+        content: announcementBarContent,
+      },
       // Replace with your project's social card
       image: 'img/docusaurus-social-card.jpg',
       navbar: {

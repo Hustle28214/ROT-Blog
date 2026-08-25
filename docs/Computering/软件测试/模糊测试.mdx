@@ -1,0 +1,161 @@
+import WordCount from '../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+# 模糊测试：给程序喂垃圾直到它崩溃
+
+模糊测试（Fuzzing）的思路简单得离谱：随机生成一堆奇怪的输入喂给程序，看它有没有崩溃、有没有触发内存错误、有没有假死。不需要写测试用例，不需要理解程序逻辑，就靠算力和运气找漏洞。它由威斯康辛大学的 Barton Miller 在 1988 年的一堂课上无意间发明——一场雷暴让他远程登录的 UNIX 终端不停接收乱码字符，命令行程序纷纷崩溃。他让学生把这件事系统化，写了个叫 `fuzz` 的工具往 UNIX utilities 里灌随机字节，结果 25–33% 的程序被弄挂。
+
+从那以后，Fuzzing 从一个"没人会当真"的野路子，一路演化成 Google、Microsoft、Apple 每天烧掉几万核 CPU 的安全基础设施。Heartbleed、Shellshock、libpng 里的一堆漏洞、Chrome 每个月披露的 CVE，很大一部分是 fuzzer 跑出来的。跟传统 [黑盒测试](./动态测试：黑盒测试.mdx) 里手工设计等价类的做法比，fuzzing 用蛮力算力换测试设计人力——机器一晚上尝试的输入比一个人一辈子写的用例还多。
+
+## 1. Fuzzer 的三种颜色
+
+按对被测程序内部信息的了解程度分成三类：
+
+| 类型 | 别名 | 对程序的了解 | 生成输入的策略 | 代表 |
+|---|---|---|---|---|
+| 黑盒 | dumb fuzzer | 只知道 I/O 接口 | 纯随机 / 简单变异 | Radamsa、zzuf |
+| 灰盒 | coverage-guided | 运行时收集覆盖率反馈 | 变异 + 反馈引导 | AFL、libFuzzer、Honggfuzz |
+| 白盒 | symbolic / concolic | 分析代码结构 | 符号执行求解路径约束 | KLEE、SAGE |
+
+**黑盒**最省事，但效率低——比如程序开头就检查 `input[0] == 'P' && input[1] == 'K'`（ZIP magic number），随机字节 1/65536 才有一次通过，绝大多数时间在测第一个 `if` 分支。它的价值在于**零门槛**：不需要重新编译目标，不需要理解代码，甚至可以测闭源程序。
+
+**灰盒**是当前主流。它给被测程序打桩，跑的时候实时收集覆盖率信息，如果某个变异输入触发了新的代码路径，就把它加进语料库当种子继续变异。这样 fuzzer 会自己"学会" ZIP 文件的 magic number——发现某个字节改动开辟了新分支，就保留下来继续演化。这是 AFL 那一波革命的核心思想。灰盒的最大代价是**需要能重新编译目标或至少能插桩**——所以主要用在开源项目和自己的代码上，闭源二进制上有 QEMU 模式或 Intel PT 硬件追踪的变体。
+
+**白盒**用符号执行分析程序，把每个分支的路径条件写成约束方程组，用 SMT solver 求解出能触达任意一个 `if` 分支的输入。理论上最强——每条可达路径都能生成对应输入——实际有 **path explosion** 问题：一个 `for` 循环 100 次会展开出 $2^{100}$ 条路径。KLEE 在小型 UNIX utilities 上很成功，在大型软件上难以规模化。Microsoft 的 SAGE 用 concolic execution（同时具体和符号运行）折中，找出过 Windows 里一大堆 file format parser 漏洞。
+
+## 2. AFL 的工程细节值得单独讲
+
+American Fuzzy Lop（AFL）由 Michał Zalewski 在 2013 年发布，是灰盒 fuzzing 事实标准。虽然 AFL 本体 2020 年后停更（继任者是 AFL++），但它的几个工程决策决定了整个领域的形状。
+
+**Fork-server 模式**：普通 fuzzer 是每次 `fork+exec` 一个新进程跑输入。AFL 发现 `exec` 里 dynamic linker 加载 libc 的耗时占大头，而这部分对每次运行是一样的。它让被测程序停在 `main` 之前，等 fuzzer 通过管道发信号后再 `fork` 出一个副本跑输入。每秒执行数从 100 提到 10000+，是数量级的提升。这也是为什么 fuzzing 领域一提到"exec/s"就是硬指标——同样一小时，10 exec/s 找不出 bug，10000 exec/s 能找一堆。
+
+**Bitmap coverage**：不用完整的覆盖率追踪，而是一个 64KB 的 bitmap，每条 edge（分支跳转对）哈希到 bitmap 的一个字节，命中就加 1。碰撞率 3% 左右，但空间从 MB 级压到 KB 级，共享内存也快。判断"新覆盖"就是看 bitmap 有没有出现新的桶被点亮。这个 tradeoff 就是灰盒 fuzzing 能在单机 24 小时跑几亿次的关键。AFL++ 后来引入了 context-sensitive coverage（同一 edge 从不同调用路径来算两次覆盖）进一步降低碰撞。
+
+**变异策略是分层的**：
+
+```
+1. bitflip:     翻转 1/2/4/8/16/32 位
+2. arith:       ±1..35 加减小整数
+3. interest:    换成"有趣的"值（0、INT_MAX、-1、0xFF...）
+4. dictionary:  从字典表插入 magic bytes（PDF、ELF header）
+5. havoc:       堆叠随机变异（切片、插入、复制、截断）
+6. splice:      两个种子拼接
+```
+
+前面几步是**确定性变异**，穷举完再进 havoc 的**随机阶段**。这个顺序不是随便定的——确定性阶段能保证种子每一位都被测到，havoc 才是发现意外的深度阶段。
+
+**Corpus minimization**：跑几个小时后语料库里会积累几万个"有意思"的种子，其中很多是冗余的（触发同一组 edge）。`afl-cmin` 用贪心算法挑一个最小子集覆盖同样的 edge 集合，让下一轮跑得更快。
+
+## 3. libFuzzer 和 in-process fuzzing
+
+libFuzzer 是 LLVM 项目里的 fuzzer，跟 AFL 思路一致但走了另一条工程路。它是 **in-process** 的——不 fork 子进程，直接在同一个进程里循环调用被测函数。写法是暴露一个 `LLVMFuzzerTestOneInput`：
+
+```cpp
+extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    my_json_parser(data, size);  // 被测函数
+    return 0;
+}
+```
+
+编译时链接 libFuzzer，运行时它就在内部循环喂输入。速度比 AFL 快一个数量级（省了 fork 开销），但代价是**状态污染**——被测函数如果有全局状态、内存泄漏、fd 泄漏，跑几万次会崩掉 fuzzer 本身。所以 libFuzzer 特别适合小、无状态、纯计算的目标：解码器、hash 函数、parser 内层。AFL 那种 fork 出子进程的模式更适合有状态、复杂启动的目标。
+
+Chrome、Firefox、Kubernetes 大量用 libFuzzer 写 fuzz targets，因为它们的 codec、parser、序列化模块本身就是 stateless 的，天然合适。
+
+## 4. Sanitizers：让 crash 变得看得见
+
+Fuzzing 只有配合 sanitizer 才真正有威力。sanitizer 是编译期插桩，在运行时检测各种内存错误：
+
+| Sanitizer | 检测什么 | 开销 |
+|---|---|---|
+| AddressSanitizer (ASan) | 缓冲区溢出、use-after-free、double-free | ~2x 慢 |
+| UndefinedBehaviorSanitizer (UBSan) | 有符号溢出、null deref、除零 | ~1.2x 慢 |
+| MemorySanitizer (MSan) | 使用未初始化内存 | ~3x 慢 |
+| ThreadSanitizer (TSan) | 数据竞争 | ~5x 慢 |
+| LeakSanitizer (LSan) | 内存泄漏 | ~1.1x 慢 |
+
+不用 sanitizer 的 fuzzing 只能捕捉"程序 crash 了"这种粗粒度信号——很多严重漏洞（如堆越界读 4 字节但没 crash）会被漏过。上了 ASan 后 fuzzer 的 bug 检测率提升几倍。工业标准配置是 **ASan + UBSan**，MSan 只在关键项目开（噪音大、假阳性多）。
+
+Google 甚至有个专门为 fuzz 优化的 libc 变体，把 heap 里所有 free 的地方都毒化——让 use-after-free 立即崩，而不是等下次访问才 crash。类似的工具还有 Chrome 的 PartitionAlloc，把不同类型对象隔离在不同堆，防止 type confusion 攻击的同时也让 fuzzer 更容易发现类型错误。
+
+## 5. 语料库、种子和 crash triage
+
+Fuzzing 的效率高度依赖初始语料。给 PDF parser 喂随机字节和喂几百个真实 PDF 文件当种子，效果天差地远——真实 PDF 已经过了 magic number 检查、xref 表初始化等一大堆屏障，fuzzer 从这里开始变异就是从"接近 bug"的位置起跑。
+
+好种子的特征：**小、多样、覆盖不同代码路径**。1KB 的 PDF 比 10MB 的 PDF 好——fuzzer 变异小文件更快，每秒能跑更多输入。OSS-Fuzz 项目在这方面积累了大量公共 corpus，很多开源项目直接复用。
+
+跑出来的 crash 需要 **triage**（分诊）。一个 fuzzer 一晚上找出 10000 个 crash，很多是同一个 bug 被反复触发。分诊的三步：
+
+1. **去重**：按 stack trace hash 分组，同一处栈都是同一个 bug
+2. **最小化**（`afl-tmin`）：把导致 crash 的输入砍到最短仍能触发的形式，几 MB 变几十字节
+3. **可利用性评估**：区分单纯 crash 和可能的安全漏洞——写 0 的地方能不能被控制？stack overflow 能不能覆盖返回地址？工具：Microsoft 的 `!exploitable` 或 AFL 自带的 `crash-explorable`
+
+工业界的经验数据：真实 crash 里能升级成可利用漏洞的大约 5–15%，剩下的多数是 null pointer、除零、断言失败——是 bug 但不是安全洞。
+
+## 6. Fuzzing 的战功
+
+几个著名成果说明 fuzzing 的现实价值：
+
+**Heartbleed（CVE-2014-0160）**：OpenSSL 心跳扩展没检查长度字段，导致内存越界读。Codenomicon 的商业 fuzzer 和 Google 内部审计几乎同时独立发现。这不是巧合——TLS 协议里的 length-value 结构是 fuzzer 最擅长打的靶子。事后 OpenSSL 项目全面接入 fuzz 基础设施，一年内又挖出几十个类似漏洞。
+
+**libpng 系列 CVE**：libpng 的 chunk parser 在过去十年被 fuzzer 找出几十个越界读写。PNG 格式复杂、C 语言实现、部署广泛，是 fuzz 界的经典靶场。
+
+**Google OSS-Fuzz**：2016 年上线，为开源项目提供免费的持续 fuzzing 基础设施。到 2024 年已在 1000+ 项目里找出 40000+ bug（其中 8000+ 是安全漏洞），Chrome、libxml、SQLite、OpenSSL、Kubernetes 全都接入。OSS-Fuzz 的存在证明了 fuzzing 已经从"技巧"变成"基础设施"。它内部的 ClusterFuzz 是核心调度器，可以并行管理几万个 fuzz job、自动化 corpus 同步、bug 报告到 issue tracker。
+
+**syzkaller**：Google 开发的内核 fuzzer，针对 Linux/Windows/BSD 内核 syscall 接口。截至 2024 年在 Linux 内核里找出 5000+ bug。它的特别之处是不仅生成 syscall 参数，还生成 syscall 序列——因为很多内核 bug 是 syscall 之间的状态交互引发的。syzkaller 用一个叫 syzlang 的 DSL 描述 syscall 语义，本质上是 [基于模型的测试](./基于模型的测试.mdx) 和 fuzzing 的杂交。
+
+**Cloudflare 用 AFL 找 nginx bug**：内部 fuzz 发现 nginx 处理特定 HTTP/2 帧时的 crash，上报后修复。这是"业务方主动上 fuzz 保护线上组件"的典型案例。
+
+## 7. Differential fuzzing 和其他变种
+
+主流 fuzzing 找的是 crash，但很多 bug 不 crash。有几个变种针对不同 bug 类型：
+
+**Differential fuzzing**：同时跑两个语义应该等价的实现（比如两个 JPEG 解码器、两个 SSL 库、两个 SQL 引擎），同一个输入结果不一致就是 bug。CryptoFuzz 用这个方式在 OpenSSL、mbedTLS、BoringSSL 之间对比找出了几十个密码学 bug。SQL 领域的 SQLancer 让 SQLite、MySQL、PostgreSQL 跑同一个查询对比结果，找出上百个数据库 bug。这类 fuzzing 特别有效于验证**语义正确性**而不只是**内存安全**。
+
+**Property-based fuzzing**：结合 property-based testing 的思想，写属性（例如"排序后长度不变"、"encode 后 decode 恢复原样"），fuzzer 生成输入尝试反证。Hypothesis 库在 Python 里做这个做得很成熟。
+
+**Structure-aware fuzzing**：libFuzzer 支持 protobuf-mutator——给一个 protobuf 定义，fuzzer 按结构变异合法的 proto message，绕过词法/语法层直接测语义层。这是 grammar-based fuzzing 的现代实现。
+
+## 8. 结构化输入是硬骨头
+
+朴素 fuzzing 对二进制格式（图像、压缩包、可执行文件）效果好，对**结构化文本输入**（JSON、SQL、编程语言源码）效果差。原因：JSON parser 前面加了个词法分析器，随机变异一个合法 JSON 十有八九产生词法错误，早早 return，根本进不到 semantic 层的代码。
+
+解决方案是 **grammar-based fuzzing**：给 fuzzer 一份 BNF 或类似语法，让它按语法生成合法输入。代表工具：
+
+- **Peach Fuzzer**：用 XML 定义 data model，商业老牌
+- **Domato**（Google）：DOM/JS fuzzer，专门找浏览器 bug
+- **Nautilus**：把语法和 coverage feedback 结合，语法内变异
+- **Grammarinator**：Python 里从 ANTLR 语法自动派生 fuzzer
+- **jsfunfuzz**：Mozilla 早期 JS 引擎 fuzzer，靠人工规则生成合法 JS
+
+再深一层的挑战是**有状态协议**。fuzz 一个 HTTP server 不是发一个包就完事——需要先握手、认证、进入某个 session 才能触达深层代码。这类目标要写 stateful fuzzer，或者用 [基于模型的测试](./基于模型的测试.mdx) 里的状态机建模，把 fuzzer 的搜索空间限制在合法状态转换上。
+
+## 9. 局限
+
+**深状态不可达**：fuzzer 是随机搜索器，需要几十步精确操作才能触发的 bug 它够不到。任何需要复杂前置条件的逻辑漏洞（业务流程漏洞、并发时序）都超出它的能力。
+
+**语义 bug 抓不到**：fuzzer 靠 crash 和 sanitizer 报警识别 bug，但很多严重问题不 crash——比如权限校验错误、金额计算错 1 分钱、SSL 校验被跳过。这类要靠 [黑盒测试](./动态测试：黑盒测试.mdx) 或人工审计。differential fuzzing 能部分解决——只要有两个"应该等价"的实现对照。
+
+**吞噬算力**：Google 花在 fuzzing 上的年 CPU 时数是天文数字。单个项目单人跑 AFL 一晚上是最低配置，认真做要几十台机器持续跑。经济学上只有大厂或高风险项目（金融、内核、加密）划算。
+
+**假阳性**：sanitizer 有时会误报（AddressSanitizer 在某些 SIMD 优化的代码上会误认为越界）。crash triage 里最难的是判断"这是被测代码的 bug 还是 fuzzer 环境的 bug"。
+
+**闭环外的行为**：需要网络、GPU、硬件外设的程序难 fuzz——每次运行的成本太高、环境难重置。这也是为什么 fuzzer 主要在 parser、codec、协议栈这类纯计算模块里最成功。近年有 hypervisor-based fuzzer（Nyx、kAFL）尝试 fuzz 整个操作系统或虚拟机，但工程复杂度高。
+
+**Harness 写不好等于白搭**：fuzz target 的入口函数（harness）质量决定 fuzz 效果。一个把输入直接 pass 给 `strcpy` 的 harness 会一直找到 strcpy 的问题；一个精心设计触及多个 API 的 harness 才能覆盖真实使用路径。Harness 写作是有门槛的手艺活。
+
+## 10. Fuzzing 在测试家谱里的位置
+
+Fuzzing 是**输入侧多样性的极端形式**。它和相邻方法的关系：
+
+- [基于模型的测试](./基于模型的测试.mdx)：也从"生成器"角度自动造用例，但用状态机保证合法性，牺牲随机性换有效性
+- [变异测试](./变异测试.mdx)：反过来，输入侧不动而修改代码，测试测试套件
+- [白盒测试](./动态测试：白盒测试.mdx)：符号执行本质是一种白盒 fuzzing
+- [黑盒测试](./动态测试：黑盒测试.mdx)：等价类划分和 fuzzing 的目标一致——探索输入空间——但一个手工一个自动
+- Property-based testing（Hypothesis、QuickCheck）：结构化随机输入 + 显式属性断言，是 fuzzing 和单元测试的中间地带
+- [混沌工程](./混沌工程与弹性测试.mdx)：可以理解为"系统层 fuzzing"——不改代码不改输入，改运行时环境（延迟、丢包、节点崩溃）观察反应
+- [精准测试](./精准测试.mdx) 与 fuzzing 结合：只对本次改动的模块跑 fuzz，把 24 小时 fuzz 收窄到 2 小时
+
+现代软件安全的三支柱是 fuzzing、静态分析（[静态测试](./静态测试技术.mdx)）和 [混沌工程](./混沌工程与弹性测试.mdx)。三者互补：fuzzer 挖代码层漏洞，静态分析扫已知模式，混沌工程暴露系统层脆弱性。Fuzzing 是这三者里成本最低、投入产出比最高的——写个 harness 挂上 OSS-Fuzz，剩下的交给 Google 的服务器。展望未来，AI-guided fuzzing 是活跃研究方向，用 LLM 生成种子、猜测复杂输入结构、辅助 crash 分析——2023 年 Google 发表的实验用 LLM 生成 fuzz target 已经能在几十个项目上跑通。等这条线成熟，写 harness 的门槛会大幅降低，fuzzing 会进入更多普通团队。
+
+</WordCount>

@@ -1,0 +1,287 @@
+import WordCount from '../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+# 测试工具简介：一张全景图与一份选型经验
+
+测试工具的世界很拥挤。单元测试有一打框架、UI 自动化四五种、性能测试也有五六个，再加上 API、Mock、BDD、覆盖率、CI、缺陷管理、混沌工程——一个团队工具链上写着二十个名字并不夸张。这篇文章想做两件事：**先把类目铺开，再讲怎么挑**。挑的原则贯穿全文，一句话总结在最后：贴合语言栈、看社区活跃度、看 CI 集成度，其他都是次要的。
+
+## 1. 单元测试框架
+
+单元测试是自动化金字塔的底座（详见 [按粒度：测试层次](./按粒度：测试层次.mdx)），每种语言几乎都有事实标准。
+
+| 语言 | 主流框架 | 特点 |
+|---|---|---|
+| Java | JUnit 5、TestNG | JUnit 5 模块化、TestNG 有数据驱动/并发注解 |
+| Python | pytest、unittest | pytest 语法极简、fixture 强、插件生态爆炸 |
+| Go | testing（标准库） | 标准库自带，`t.Run` 支持子测试和表驱动 |
+| JavaScript | Jest、Mocha、Vitest | Jest 一体化、Mocha 灵活、Vitest 快（Vite 生态） |
+| .NET | xUnit、NUnit、MSTest | xUnit 是社区首选，NUnit 老牌 |
+| Ruby | RSpec、Minitest | RSpec 描述性 DSL、Minitest 更 Ruby 味 |
+| Rust | 标准 `#[test]` + cargo test | 内置得非常好用 |
+| C/C++ | Google Test、Catch2 | GTest 工业标配、Catch2 header-only |
+| Swift | XCTest、Swift Testing | Swift Testing 是 2024 之后的新宠 |
+| Kotlin | Kotest、JUnit 5 | Kotest 提供 BDD 风格 |
+
+选型经验：
+
+- **同一栈内的默认选择基本没错**。Java 项目直接上 JUnit 5，Python 上 pytest，JS 上 Jest 或 Vitest。别为了"更新更快"跳去小众框架，招人和查文档都会痛
+- **pytest 是 Python 的杀手锏**。fixture、参数化、marker、插件（`pytest-xdist` 并行、`pytest-cov` 覆盖、`pytest-mock` mock）合起来是当前最好的单元测试体验之一
+- **Vitest 正在取代 Jest** 的一部分份额，特别是 Vite 项目。API 兼容 Jest 但快得多
+- **TestNG 在 Java 端已经被 JUnit 5 追上**，除非你重度依赖它的数据驱动
+
+单元测试还常搭配 property-based testing（Hypothesis、QuickCheck、jqwik、fast-check）——用生成式测试补充边界，跟 [模糊测试](./模糊测试.mdx) 是近亲。
+
+## 2. UI 自动化
+
+UI 自动化的详细对比见 [自动化测试](./自动化测试.mdx) 第 4 节。这里只列全景：
+
+| 工具 | 定位 | 适用 |
+|---|---|---|
+| Selenium 4 | WebDriver 老牌 | 多语言、多浏览器、老项目 |
+| Playwright | 现代 E2E 事实标准 | 新项目、跨 WebKit、要 trace 视频 |
+| Cypress | 前端团队友好 | 单浏览器、Time-travel debug 需求 |
+| Puppeteer | Chrome 自动化底层 | 爬虫、PDF 生成、简单 E2E |
+| Appium | 移动端 | iOS/Android 原生和 Hybrid |
+| Espresso / XCUITest | 原生移动端框架 | 单平台深度、性能好 |
+| Detox | RN 端到端 | React Native 项目 |
+| WebdriverIO | Node 生态的 WebDriver 封装 | JS 栈需要多浏览器 |
+
+一个反常识观点：**移动 App 的 UI 自动化整体比 Web 难维护**——分辨率、机型、系统版本组合爆炸，稳定性远不如 Web。如果不是核心产品，尽量把测试压到 API 层。
+
+## 3. API 测试
+
+API 测试是 ROI 最高的自动化层——比 UI 稳定、比单元测试贴近业务。
+
+| 工具 | 类型 | 场景 |
+|---|---|---|
+| Postman | GUI + 脚本 | 手工探索、协作、简单自动化 |
+| Insomnia | 类似 Postman | 更轻量、GraphQL 友好 |
+| Bruno | 开源、Git 友好 | Postman 不想付费的替代 |
+| REST Assured | Java DSL | Java 项目集成测试 |
+| Karate | DSL + Gherkin | 非程序员也能写、跨语言 |
+| SuperTest | Node 库 | Express/Koa 项目自集成 |
+| requests + pytest | Python 组合 | 灵活、和单元测试同栈 |
+| httpyac / hurl | 纯文本 HTTP | 命令行 & Git 友好 |
+| Pact / Spring Cloud Contract | 契约测试 | 微服务 provider/consumer |
+
+选型经验：
+
+- **API 测试要写成代码而不是保存在工具里**。Postman collection 可以起步用，但长期一定要放进代码库，跟 CI 一起版本化。Bruno、httpyac、hurl 就是为解决这个问题
+- **契约测试和 API 测试不是一回事**。API 测试验证接口行为，契约测试验证接口双方对 schema 的共识——微服务架构里两者都要
+- **性能测试工具也能做功能 API 测试**（比如 k6），但反过来 API 测试工具做不了压测
+
+## 4. 性能测试
+
+性能测试要区分**基准（benchmark）、负载（load）、压力（stress）、浸泡（soak）** 四种，工具选型看你要哪种。
+
+| 工具 | 特点 | 适用 |
+|---|---|---|
+| JMeter | GUI 老牌、生态大 | 传统企业、非程序员协作 |
+| Gatling | Scala DSL、报告漂亮 | 代码化压测、JVM 栈 |
+| k6 | JS 脚本、云原生、CI 友好 | 现代团队、DevOps |
+| Locust | Python 脚本、分布式 | Python 栈、要自定义逻辑 |
+| wrk / wrk2 | 命令行、极简、极快 | 快速验证 QPS 上限 |
+| Vegeta | Go 编写、命令行 | 简单 rate-based 压测 |
+| Artillery | Node 脚本 | JS 栈 |
+| Tsung | Erlang | 巨量并发、协议层压测 |
+| Locust vs k6 | 后者更工业化 | 新项目优先 k6 |
+
+三条经验：
+
+1. **JMeter 的 GUI 只用来编辑脚本，别在 GUI 里跑压测**——性能开销比脚本本身还大，官方文档专门警告过
+2. **k6 是这两年的默认选择**——脚本是 JS、结果能推 Prometheus/Grafana、CI 一行命令跑、Grafana 官方维护，几乎没有短板
+3. **wrk 适合"验一下"**，正式压测的报告和门槛检查还是要 k6/Gatling/JMeter
+
+再补一句：**压测环境和生产环境永远不是一回事**。压测数据要经过校准（生产采样回放、影子流量），才谈得上"能反映真实容量"。
+
+## 5. 安全测试
+
+安全测试的工具分静态（SAST）、动态（DAST）、依赖（SCA）三大类。
+
+| 工具 | 类型 | 说明 |
+|---|---|---|
+| SonarQube | SAST + 质量 | 综合平台，规则丰富 |
+| Semgrep | SAST | 规则可读性极高、开源 |
+| CodeQL | SAST | GitHub 出品、查询语言强 |
+| Checkmarx / Fortify | SAST 商业 | 大企业合规常见 |
+| OWASP ZAP | DAST 开源 | Web 应用扫描、Burp 的免费替代 |
+| Burp Suite | DAST 商业 | 渗透测试事实标准 |
+| Nuclei | 模板扫描 | CVE 快速扫、社区模板多 |
+| Snyk | SCA + SAST | 依赖漏洞 + IaC + 容器 |
+| Dependabot | SCA | GitHub 原生依赖更新 |
+| Trivy | 容器/IaC | 镜像扫描广泛使用 |
+| Gitleaks / TruffleHog | 密钥扫描 | 防止密钥泄漏到 Git |
+
+选型经验：
+
+- **SAST 一定要接 CI，不要指望人工跑**。Semgrep 或 SonarQube 在 PR 时给出结果，是最低成本的安全基线
+- **Snyk 是中小团队的一站式选择**——依赖、IaC、容器都能扫，接入简单
+- **Burp 是渗透工程师的手工工具**，不是团队自动化工具。团队自动化用 ZAP
+- 别忘了 **secret scanning**（Gitleaks、GitHub 内置），一次提交泄漏 AWS key 的教训比任何工具费都贵
+
+安全测试和 [模糊测试](./模糊测试.mdx) 有很多交叉——协议 fuzz、API fuzz 是安全团队的日常。
+
+## 6. Mock 工具
+
+Mock 让被测组件脱离外部依赖，是单元测试和集成测试的关键基础设施。
+
+| 工具 | 语言/场景 | 类型 |
+|---|---|---|
+| Mockito | Java | 对象级 mock |
+| unittest.mock | Python 内置 | patch 装饰器好用 |
+| Jest mock / Vitest mock | JS | 内置在框架里 |
+| Sinon | JS | 老牌独立库 |
+| MSW（Mock Service Worker） | 前端 | 拦截浏览器 fetch/XHR |
+| WireMock | 语言无关 HTTP | 独立服务，HTTP mock 事实标准 |
+| Mountebank | 多协议 | HTTP/TCP/SMTP mock |
+| Nock | Node HTTP | 拦截 Node 层 |
+| Testcontainers | 集成测试 | 用真实容器替代 mock（更真实） |
+| LocalStack | AWS 服务 mock | 本地跑一套 AWS |
+
+一个观点：**能不 mock 就不 mock**。用 Testcontainers 起一个真实 Postgres，比 mock 一堆 SQL 查询更能发现 bug。Mock 越多，测试越像验证"你的假设和你的代码一致"，而不是"你的代码和真实世界一致"。
+
+MSW 是前端近几年的爆款：**同一套 mock 定义前后端都能用、开发和测试环境都能用**，这个跨环境复用是它的核心价值。
+
+## 7. BDD 工具
+
+BDD（行为驱动开发）想让业务人员能读懂测试，方式是用 Gherkin 语法写"Given/When/Then"。
+
+| 工具 | 语言 |
+|---|---|
+| Cucumber | Java/JS/Ruby/多语言 |
+| SpecFlow | .NET |
+| Behave | Python |
+| pytest-bdd | Python + pytest |
+| Godog | Go |
+| Karate | 自带 Gherkin 做 API 测试 |
+
+BDD 是个有争议的东西。理论上很美好——PM 写用例，QA 写 step 定义，开发实现功能。实践中大部分团队的 feature 文件最后都是 QA 一个人写、一个人维护，业务方从来不看。**如果没有真正的业务参与，BDD 只是给你的用例套了个 Gherkin 外壳，还多了一层抽象成本。**
+
+真正适合 BDD 的场景：**规则密集的业务**（金融、保险、税务）——用例本身就是业务规则的表达，PM 会认真读。其他场景直接用 pytest/JUnit 更省事。
+
+## 8. 覆盖率工具
+
+覆盖率是测试充分性的一个下限指标（详见 [动态测试：白盒测试](./动态测试：白盒测试.mdx)）。
+
+| 工具 | 语言 |
+|---|---|
+| JaCoCo | Java 事实标准 |
+| Cobertura | Java 老牌，被 JaCoCo 取代 |
+| Coverage.py | Python |
+| Istanbul / nyc / c8 | JavaScript |
+| gcov + lcov | C/C++ |
+| Go 内置 `go test -cover` | Go |
+| SimpleCov | Ruby |
+| dotCover / Coverlet | .NET |
+| Codecov / Coveralls | 云端聚合与可视化 |
+
+选型基本没得选——每个语言就一个主流。要说的是**覆盖率不是目标，是诊断工具**：
+
+- 90% 覆盖率也可能全是无意义断言
+- 60% 覆盖率如果覆盖的是核心分支，比 90% 覆盖 getter/setter 有价值
+- 分支覆盖比行覆盖更能说明问题
+- 想真正验证覆盖有效性，看 [变异测试](./变异测试.mdx)——mutation score 是覆盖率的"照妖镜"
+
+Codecov / Coveralls 提供的 PR 增量覆盖率报告很有用：**每个 PR 只要求新代码覆盖率达标**，比要求全库达标现实得多。
+
+## 9. CI/CD 平台
+
+CI 平台承载所有自动化的执行。
+
+| 平台 | 特点 |
+|---|---|
+| Jenkins | 老牌、插件多、自己维护 |
+| GitHub Actions | 和 GitHub 深度集成、YAML 简单 |
+| GitLab CI | GitLab 一体化、Runner 灵活 |
+| CircleCI | SaaS 好用、并发计费清晰 |
+| Buildkite | 混合模式（云控制平面 + 自建 runner） |
+| TeamCity | JetBrains、企业环境常见 |
+| Bamboo | Atlassian、正在被淘汰 |
+| Drone | 轻量、容器原生 |
+| Argo Workflows | K8s 原生 |
+| Tekton | K8s 原生、CNCF |
+
+选型经验：
+
+- **代码在哪，CI 就在哪**——GitHub 项目用 Actions，GitLab 用 GitLab CI。跨系统的胶水成本极高
+- **Jenkins 只有一个理由继续用**：你已经积累了几百个 Job、迁移代价太大。新项目基本没理由再选 Jenkins
+- **Buildkite** 是有意思的中间形态——自己控制 runner（安全、性能）但控制面 SaaS（免维护）
+- **runner 的算力要匹配测试规模**——UI 测试跑 4C8G 会挂，别为省钱把 runner 压到发苦
+
+CI 的实践细节见 [自动化测试](./自动化测试.mdx) 第 8 节。
+
+## 10. 缺陷与用例管理
+
+工程之外，管理侧也是一整套工具。
+
+| 工具 | 类型 | 场景 |
+|---|---|---|
+| Jira | 项目/缺陷 | 事实标准，可搭配 Xray/Zephyr |
+| Xray | Jira 插件 | 用例管理、执行报告 |
+| Zephyr | Jira 插件 | 类似 Xray |
+| TestRail | 独立平台 | 用例库、执行、报告 |
+| Qase | 独立平台 | 类 TestRail、SaaS 友好 |
+| PractiTest | 综合 | 中大型团队 |
+| Testomat.io | 现代 | 和自动化脚本双向同步 |
+| Linear | 项目管理 | 新兴、更快、缺陷跟踪够用 |
+| Redmine | 开源 | 自托管、老牌 |
+
+详细的用例/缺陷生命周期管理见 [测试管理](./测试管理.mdx) 和 [测试过程与生命周期](./测试过程与生命周期.mdx)。
+
+一个反常识：**工具越复杂，管理越形式化**。小团队用 Notion + GitHub Issues 就够，别一上来就上 Jira + Xray + Confluence 全家桶——填字段的时间比测试本身还多。
+
+## 11. 混沌工程
+
+把系统主动搞坏，看看能不能撑住——详细见 [混沌工程与弹性测试](./混沌工程与弹性测试.mdx)。
+
+| 工具 | 特点 |
+|---|---|
+| Chaos Monkey | Netflix 出品、始祖、随机杀实例 |
+| Chaos Mesh | K8s 原生、CNCF、类型丰富 |
+| Litmus | K8s 原生、实验目录多 |
+| Gremlin | 商业 SaaS、UI 友好 |
+| Pumba | Docker 层混沌 |
+| Toxiproxy | 网络层故障注入 |
+| PowerfulSeal | K8s + 云资源混沌 |
+
+选型经验：
+
+- **K8s 环境上 Chaos Mesh 或 Litmus**，二选一都行
+- **只在生产做混沌之前先在 staging 做**，否则你就是在生产事故里学习
+- Toxiproxy 是**开发环境模拟网络问题的神器**——延迟、丢包、慢速一行命令
+
+## 12. 工具太多不如工具少而深
+
+回到全景之外的元问题：**该配多少工具？**
+
+一个常见反模式：团队每种类型都装一个工具、每个工具都用得半吊子。三年下来工具链有 25 个但没有一个是团队公认可靠的。选型有几条硬经验：
+
+1. **贴合语言栈**：Python 栈就走 pytest + Locust + Coverage.py + requests + Semgrep 一条链。硬塞一个 Java 系工具，维护成本会翻倍
+2. **社区活跃度**：看 GitHub star 增长曲线、最近半年的 commit 频率、Stack Overflow 问题量。**活跃度是长期维护成本的最好预测**
+3. **CI 集成度**：能不能一行命令跑、能不能输出 JUnit XML、能不能出机器可读的报告。**CI 不友好的工具最后一定会被绕过**
+4. **文档质量**：官方 quickstart 十分钟能不能跑起来。跑不起来的工具，团队再牛也会放弃
+5. **迁移成本**：换工具的代价（脚本重写、CI 改造、团队培训）通常被低估 3–5 倍。**没有明显痛点别换**
+
+再补两条软经验：
+
+- **同一类别只留一个主选**——单元测试就一个框架，UI 自动化就一个工具，性能测试就一个。多头维护会耗尽预算
+- **工具能不能被非专家用**：即使团队里的 QA 走了，剩下的人能不能接着跑 CI、看报告、加用例。选型时问自己："三年后离职这个工具的人是谁？"
+
+## 13. 工具在测试家谱里的位置
+
+工具不是测试的核心，只是执行方式。真正决定质量的是**测什么、怎么测、什么时候测**——这些问题分散在这个目录的其他文章里：
+
+- 分层策略在 [按粒度：测试层次](./按粒度：测试层次.mdx)
+- 自动化的执行原则在 [自动化测试](./自动化测试.mdx)
+- 需要测的专项（性能、安全、可用性、兼容性）在 [按目标：专项测试](./按目标：专项测试.mdx)
+- 测试设计方法在 [动态测试：白盒测试](./动态测试：白盒测试.mdx) 和 [动态测试：黑盒测试](./动态测试：黑盒测试.mdx)
+- 高级方法：[模糊测试](./模糊测试.mdx)、[变异测试](./变异测试.mdx)、[基于模型的测试](./基于模型的测试.mdx)、[精准测试](./精准测试.mdx)
+- 生产阶段的验证：[混沌工程与弹性测试](./混沌工程与弹性测试.mdx)
+- 探索性、无脚本的部分：[探索性测试](./探索性测试.mdx)
+- 流程侧：[敏捷测试](./敏捷测试.mdx)、[测试管理](./测试管理.mdx)、[测试过程与生命周期](./测试过程与生命周期.mdx)
+- 编码前的第一道防线：[静态测试技术](./静态测试技术.mdx)
+
+工具是配角。**先想清楚要解决什么问题、要在哪一层解决，工具的名字自然就浮出来**。反过来，先选工具再找问题，最后一定是工具链复杂、测试价值稀薄。
+
+</WordCount>

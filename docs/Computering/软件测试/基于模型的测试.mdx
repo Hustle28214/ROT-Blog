@@ -1,0 +1,211 @@
+import WordCount from '../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+# 基于模型的测试：先画状态机再让它自己造用例
+
+基于模型的测试（Model-Based Testing，MBT）的核心动作只有一个：先给被测系统（SUT，System Under Test）画一个数学模型描述它应该怎么行为，然后让工具从模型里自动生成一堆测试用例去打真实系统。人不再一条条写用例，而是维护一份规格——用例是规格的副产品。
+
+它不是新东西。1990 年代欧洲电信业为了测程控交换机就在用 SDL 和 UML 状态图做 MBT，AT&T 有过用有限状态机自动生成协议 conformance 测试的实践。MBT 一直没在通用软件里火起来，是因为建模成本高——但在协议栈、嵌入式、支付系统这类"错一次损失惨重"的领域里，它一直是标准做法。近几年 TLA+ 因为 Amazon 的实践（DynamoDB、S3）重新受到关注，让 MBT 的思想再次进入主流工程师视野。
+
+## 1. 为什么要建模
+
+想象你在测一个 ATM 取款流程。手写测试用例的话大概会写：
+
+```
+测试1: 插卡 → 输密码 → 输金额 → 出钞
+测试2: 插卡 → 输错密码 → 提示重输
+测试3: 插卡 → 输错密码三次 → 吞卡
+测试4: 插卡 → 余额不足 → 提示
+测试5: 插卡 → 网络异常 → 退卡
+...
+```
+
+写了 20 条你会觉得差不多了。但状态机分析告诉你可能的路径远不止 20 条：状态数 × 事件数是指数级组合。手工写永远会漏掉一些角落——比如"输错密码两次 → 余额不足 → 网络异常"这种组合场景。
+
+MBT 的价值不是"写得快"（建模其实更慢），而是**"覆盖得系统"**。它把测试空间的完整度从人工判断变成图算法：只要模型正确，工具能保证覆盖所有 transition、所有状态对、所有长度为 k 的路径。这是手工方式无论多认真都做不到的。
+
+另一个隐藏的收益是**规格本身的价值**。建模过程逼迫团队严格定义系统的状态和转移，很多"我以为大家理解一致"的模糊点会在这时暴露。业界的一个说法："MBT 项目里 60% 的 bug 是在建模阶段发现的——测试还没跑，模型的存在已经问出了以前没人问过的问题"。
+
+## 2. 用什么模型
+
+不同层次的建模语言适合不同场景：
+
+| 建模形式 | 表达力 | 适合场景 | 代表 |
+|---|---|---|---|
+| 有限状态机 FSM | 状态 + 转移 | UI 流程、协议握手 | GraphWalker |
+| 扩展状态机 EFSM | FSM + 变量、卫式条件 | 带条件的业务流程 | Spec Explorer |
+| UML 状态图 | 层级、正交、历史 | 复杂嵌入式系统 | MaTeLo、Conformiq |
+| Petri 网 | 并发 + 资源 | 制造、工作流 | CPN Tools |
+| Alloy | 关系逻辑 | 数据结构不变量 | Alloy Analyzer |
+| TLA+ | 时序逻辑 | 分布式系统正确性 | TLC model checker |
+| Event-B | 精化步骤 | 高可靠软件 | Rodin |
+| B method | 精化 + 证明 | 铁路、航空 | Atelier B |
+| Markov chain | 状态转移概率 | 性能、可靠性 | MaTeLo |
+| CSP / π-calculus | 并发通信 | 协议、并发系统 | FDR4 |
+
+日常项目里 90% 用 FSM 或 EFSM 就够。UML 状态图适合已经在用 UML 建模的团队。Alloy 和 TLA+ 严格说是 model checking 工具而不是 MBT 工具——它们直接证明性质，不生成测试——但两者思路同源，边界很模糊。
+
+Amazon 用 TLA+ 建模 DynamoDB 的一致性协议、S3 的强一致性升级、EBS 的复制协议，找到了很多深藏的分布式 bug。他们的经验总结是："TLA+ 让工程师被迫想清楚 corner case"——这个价值本身就够 justify 建模成本。Microsoft 的 Azure Cosmos DB、Amazon 的 Route 53 也都用过 TLA+。这些是 MBT 家族里"上限最高"的分支。
+
+有一类特殊的 MBT 叫**基于规格的测试**（specification-based testing）：规格用 formal notation（Z、B、VDM）写，工具从规格生成用例。这在航空航天（DO-178C 要求）、地铁信号（IEC 61508 SIL 4）里是硬性合规要求。巴黎地铁 14 号线的自动驾驶系统用 B method 全程规格化，出厂就是"数学证明过"的软件。
+
+## 3. 从模型到测试用例的三个步骤
+
+不管什么模型，MBT 工具做的事总归三步：
+
+**第一步：形式化模型**。用工具的建模语言把 SUT 期望行为写下来。这一步 90% 的心血花在这里。
+
+**第二步：选覆盖准则**。告诉工具"生成多少用例算够"，常见准则：
+
+- **状态覆盖**：每个状态至少访问一次
+- **转移覆盖（transition coverage）**：每条 edge 至少走一次
+- **转移对覆盖（switch coverage）**：所有相邻 transition 对（A→B→C）都走过
+- **N-switch 覆盖**：所有长度 N 的路径
+- **全路径覆盖**：所有可能路径（有环状态机会无限，需要 bound）
+- **数据流覆盖**：变量的 def-use 对
+- **不变量违反覆盖**：故意构造违反 invariant 的路径
+
+覆盖率越高用例越多。转移覆盖是常用起点，一个 20 状态 40 转移的图大概生成 40–80 条用例。转移对覆盖能捕捉更多顺序性 bug，用例数翻几倍。全路径覆盖在有环图上不可行，实际用 bounded model checking 加深度限制。
+
+**第三步：生成用例并绑定到 SUT**。工具输出的是抽象路径（`s0 → e1 → s2 → e3 → s4`），需要一层适配代码把抽象事件（`inputPin(1234)`）翻译成对真实 SUT 的调用（HTTP 请求、UI 点击、函数调用）。这层叫 **test adapter** 或 **glue code**，MBT 项目的活代码量主要在这里。
+
+Adapter 层的设计模式一般是：
+
+```
+抽象事件层  →  Page Object / API Client 层  →  SUT
+     |                    |                     |
+  from 模型            测试友好 API           真实系统
+```
+
+三层结构让模型独立于 SUT 的技术栈——今天用 REST 明天用 gRPC，只改中间层。
+
+## 4. ATM 例子完整走一遍
+
+用 GraphWalker 的语法建模一个简化 ATM：
+
+```
+状态：
+  Idle, CardIn, PinPrompt, AmountPrompt,
+  Dispensing, Ejecting, CardEaten, Error
+
+事件：
+  insertCard, inputPin(ok/wrong), inputAmount(ok/tooMuch),
+  dispense, eject, threeFails, networkFail
+
+转移：
+  Idle          --insertCard--> CardIn
+  CardIn        --inputPin(ok)--> AmountPrompt
+  CardIn        --inputPin(wrong)--> PinPrompt
+  PinPrompt     --inputPin(ok)--> AmountPrompt
+  PinPrompt     --threeFails--> CardEaten
+  AmountPrompt  --inputAmount(ok)--> Dispensing
+  AmountPrompt  --inputAmount(tooMuch)--> Error
+  Dispensing    --dispense--> Ejecting
+  Ejecting      --eject--> Idle
+  Error         --eject--> Idle
+```
+
+用 GraphWalker 跑 `random(edge_coverage(100))` 策略，输出可能是：
+
+```
+Path 1: Idle → insertCard → CardIn → inputPin(ok) → AmountPrompt
+        → inputAmount(ok) → Dispensing → dispense → Ejecting → eject → Idle
+Path 2: Idle → insertCard → CardIn → inputPin(wrong) → PinPrompt
+        → inputPin(wrong) → PinPrompt → threeFails → CardEaten
+Path 3: Idle → insertCard → CardIn → inputPin(ok) → AmountPrompt
+        → inputAmount(tooMuch) → Error → eject → Idle
+...
+```
+
+每条路径就是一条测试用例。适配层把它们翻译成对 ATM 系统的实际调用：
+
+```python
+def on_insertCard(): atm.insert("1234-5678")
+def on_inputPin_ok(): atm.pin("1234")
+def on_inputPin_wrong(): atm.pin("0000")
+def on_dispense(): assert atm.state == "dispensing"
+...
+```
+
+跑完发现某条路径 SUT 状态和模型不一致 → bug。MBT 一次会跑几十上百条这种路径，覆盖手工用例设计里容易漏掉的顺序组合。
+
+一个真实的 bug 例子：某次跑生成的 Path 27 是 `Idle → insertCard → CardIn → inputPin(wrong) → PinPrompt → inputPin(wrong) → PinPrompt → inputPin(ok) → AmountPrompt`。ATM 实现漏掉了"两次错密码后成功输入应该重置错误计数"这个语义——它把 PinPrompt 当成了 dead-end 状态。手工用例设计者很少会写"错两次然后成功"这种奇怪组合，MBT 生成器毫不犹豫地铺出所有可能。
+
+## 5. Model learning：反向工程模型
+
+有时候你有系统但没有规格——遗留代码、第三方 API。这时可以让工具**从系统 trace 里学出一个模型**，这个过程叫 model learning 或 automata learning。
+
+代表算法是 **L\***（Angluin，1987）：learner 主动向系统提问（"如果输入序列是 abc 输出什么"）+ 猜测（"这是我的模型对吗"），系统充当 teacher。收敛后得到一个和系统行为等价的最小 DFA。
+
+工业工具 **LearnLib** 用 L\* 及其变体，成功从 SSH、TLS、Bluetooth 实现里逆向出状态机，然后对比不同厂商实现——发现好几个实现和 RFC 规范偏离的地方。这条路对**协议 conformance 测试**特别有用。
+
+被动 learning 是另一种：只看 log 不主动交互，用 PSL、EDSM 之类算法从 trace 里推断状态机。精度差些但零侵入。
+
+Model learning 是 MBT 和逆向工程的交叉，让"没有规格也能做 MBT"成为可能，代价是学到的模型不一定和"应该的规格"一致——你可能学到的是"当前实现的行为"，包括其中的 bug。
+
+## 6. 主流工具
+
+MBT 工具比想象中多，但都比较小众：
+
+| 工具 | 语言/生态 | 模型 | 特点 |
+|---|---|---|---|
+| GraphWalker | Java/JS | FSM/EFSM | 开源、轻量、语法友好 |
+| ModelJUnit | Java | EFSM | JUnit 集成，教学用得多 |
+| Spec Explorer | C#/.NET | AsmL | Microsoft 出品，已停更 |
+| Conformiq Creator | 商业 | UML | 电信业标准 |
+| MaTeLo | 商业 | Markov chain | 用概率分布模拟真实用户 |
+| Tcases | Java | 组合模型 | 组合测试，非纯 MBT |
+| fMBT | Python | AAL | 支持 Android UI |
+| LearnLib | Java | 自动机学习 | 从 trace 反推模型 |
+| Modbat | Scala | 扩展 FSM | 好写、Scala 内嵌 DSL |
+| NModel | .NET | 探索式 | 微软研究院遗产 |
+
+Markov chain 一路是被低估的分支：给每条 transition 加权重，工具按权重采样路径，模拟真实用户行为分布。它测出来的问题更接近生产事故，比均匀覆盖更"有用"，代价是需要用户行为数据。MaTeLo 在航天、汽车业里做认证测试用得多，因为标准里要求"按操作剖面（operational profile）测试可靠性"，Markov chain 正好对应。
+
+## 7. MBT 和邻居们的关系
+
+MBT 经常被和几个相近方法混。厘清一下：
+
+**MBT vs Property-Based Testing（Hypothesis、QuickCheck）**：两者都自动生成测试，但重点不同。Property-based testing 生成的是输入值（随机数、字符串、列表），验证一个数学性质（`reverse(reverse(x)) == x`）。MBT 生成的是操作序列，验证系统状态转移。粗略比喻：property-based 是横向（值的空间），MBT 是纵向（时间/顺序）。QuickCheck 有个扩展叫 `Quickcheck.StateM`，专门做 stateful testing，本质就是 MBT 的属性化版本。Erlang 世界的 PropEr、Java 的 jqwik 都有 stateful 扩展。
+
+**MBT vs [模糊测试](./模糊测试.mdx)**：模糊测试也自动生成输入，但完全靠随机+反馈。MBT 是"规约驱动的 fuzzing"——把搜索限制在合法状态转换里，不会浪费在无效输入上。代价是搜索空间小、发现意外少。有 stateful fuzzer 试图结合两者，比如 syzkaller 的 syscall 描述——它其实就是内核 syscall 的部分 MBT 模型。
+
+**MBT vs [白盒测试](./动态测试：白盒测试.mdx)**：白盒是从代码结构生成用例，MBT 是从规格生成。前者依赖实现，后者独立于实现。MBT 能发现"代码符合覆盖率但不符合规格"的 bug，白盒能发现"符合规格但代码里加了个后门"的 bug。
+
+**MBT vs [探索性测试](./探索性测试.mdx)**：完全相反的哲学。MBT 严格、可重复、需要建模；探索测试灵活、依赖人的直觉。互补关系——MBT 保底，探索测试补 MBT 漏掉的边缘案例。
+
+**MBT vs 组合测试**（Combinatorial / Pairwise Testing）：组合测试关注"参数组合空间"（10 个参数每个 3 取值 = 3^10 组合，用 pairwise 减到 100 条），MBT 关注"时序空间"。两者可以正交组合：状态机的每个 transition 里的参数用 pairwise 覆盖。
+
+## 8. 局限
+
+MBT 从来没成为主流有它的道理：
+
+**建模成本高**。给一个复杂业务系统写状态机可能要 2–3 人月，比写手工用例慢得多。ROI 只在长期维护、迭代频繁的场景才回本。
+
+**Model drift（模型漂移）**是最致命的问题。SUT 演进了，模型没跟着更新——测试全通过，但测的是过时的规格，等于没测。工业界的经验：模型 6 个月不 review 一次就基本失效。有些团队会反过来做——从系统 trace 里学习模型（model inference），但准确度不稳定。抵抗漂移的实践：把模型跟需求文档绑在同一次评审、每次发布强制回归模型、用 CI 检测模型和代码 diff 的相关性。
+
+**层级和并发难建模**。经典 FSM 是扁平的，UML 状态图支持嵌套和正交但工具支持有限。真实系统里 UI 层 + 业务逻辑 + 数据库事务同时演化，画一张图无法完整表达。多个并发状态机的组合状态爆炸，让模型 checker 爆内存。
+
+**Oracle problem**：MBT 生成路径容易，但"到达这个状态后期望的输出是什么"仍需人写。工具能生成 100 条路径的输入，但每条路径的断言还是要人写或从模型里推。断言不写全 MBT 就退化成"只测不 crash"。这个问题不比手写用例的断言问题少多少——MBT 省的是设计输入的时间，省不掉断言的时间。
+
+**工具生态小**。相比 pytest、JUnit 那些拥有百万用户的框架，GraphWalker 的 GitHub star 是四位数。冷门意味着遇到问题没答案、集成有摩擦、招不到会用的人。招聘"熟悉 GraphWalker"的人比招"熟悉 JUnit"的人难 10 倍。
+
+**规格的准确性**：MBT 只对"规格正确"的假设有意义。如果规格本身就错（把 `> 100` 写成 `> 1000`），MBT 会精确地按错的规格测系统，还告诉你"全过了"。规格审查是硬工作，没法交给工具。
+
+## 9. MBT 在测试家谱里的位置
+
+MBT 是**规约驱动测试**的当代代表，在测试家谱里的位置：
+
+- 往前追溯到 1970 年代的**形式化方法**（Hoare logic、VDM、Z）——MBT 是形式化方法向工业界妥协的产物，牺牲严谨换取工程可行
+- 平行的是**契约式设计**（Design by Contract，Eiffel）——契约是嵌在代码里的规约，MBT 是外化的规约
+- 现代继承者是 **TLA+**（Amazon 用它验证 DynamoDB、S3）和 [混沌工程](./混沌工程与弹性测试.mdx) 里的行为规约
+- 相邻工具：property-based testing 库如 Hypothesis、fast-check、jqwik
+- [自动化测试](./自动化测试.mdx) 是执行层，MBT 是生成层，两者互补
+- [模糊测试](./模糊测试.mdx) 是无模型的输入生成，MBT 是有模型的
+- [基于粒度：测试层次](./按粒度：测试层次.mdx) 里 MBT 更多用在 integration 和 system 层，很少下到单元
+- [变异测试](./变异测试.mdx) 是测测试套件质量的元测试，MBT 是让测试套件更完备的生成器——两者串起来是"用 MBT 生成 + 用变异测试评估"的完整闭环
+
+一个务实的建议：不要一上来就全项目 MBT。挑一个关键有状态模块（支付流程、审批工作流、协议握手），先建 20 状态左右的小模型跑起来，看能不能挖到手工用例漏掉的 bug。挖到就继续，挖不到说明这块用手工用例更划算。MBT 是好工具，但不是所有钉子都需要锤子。往后看，随着 LLM 能"读文档生成状态机"的能力提升，MBT 建模的门槛会显著降低——现在有几个原型项目让 LLM 从用户手册直接产出 UML 状态图给 MBT 工具用。这条路走通，MBT 有可能从小众变成通用工具。
+
+</WordCount>

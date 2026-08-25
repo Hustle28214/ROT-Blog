@@ -1,0 +1,190 @@
+import WordCount from '../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+# 精准测试：只跑本次改动碰到的用例
+
+精准测试（Precise Testing / Test Impact Analysis，TIA）解决一个非常朴素的痛点：你改了一行代码，为什么要跑全部 20 万条测试？一次 CI 三小时的问题不能靠"多买机器"解决——工程师提 PR 后要等三小时才能合，反馈太慢工作流就崩了。精准测试的想法是把测试集缩小到"本次改动可能影响的那些"，通常能把 CI 时间压到十分之一以下。
+
+它在小项目里没啥必要——一共 500 条测试全跑一遍只要 3 分钟，任何"聪明选择"的收益都会被工程复杂度吃掉。它是**大型 monorepo 的救命工具**。Google 的 monorepo 有几十亿行代码百万级测试，Facebook 每天几万次提交，微软的 Windows 仓库同样量级——这些团队如果不做精准测试，CI 就直接死了。国内的字节、腾讯、阿里近几年也都在建自己的 TIA 系统，方案各有侧重，但核心思想一致。
+
+## 1. 三种"少跑测试"的策略
+
+精准测试是个笼统名字，实际上覆盖了三种不同但相关的策略。搞混了会问错问题：
+
+| 策略 | 干什么 | 目标 | 风险 |
+|---|---|---|---|
+| Test Selection | 选择性运行 | 跳过与本次改动无关的测试 | 漏跑真正相关的 |
+| Test Prioritization | 排序 | 让容易失败的先跑，早出错早停止 | 无风险，只是省时间 |
+| Test Minimization | 语料库瘦身 | 从冗余的用例集合里挑最小子集 | 长期维护性下降 |
+
+三者可以叠加。经典配方是：先做 minimization 一年一次砍掉历史包袱，日常 CI 用 selection + prioritization 组合——先跳过 90% 的无关用例，剩下 10% 里高失败率的先跑。**Selection 是最激进也是最能省时间的**，是精准测试的核心。
+
+学术界里 selection 又叫 **regression test selection (RTS)**，分 safe RTS（保证不漏跑任何本该跑的用例）和 unsafe RTS（用启发式，可能漏但更快）。工业界普遍用 unsafe——因为 safe 需要精确追踪每一个可能的依赖（配置、反射、动态加载），代价太大。unsafe RTS 配合"每日跑一次全量作为兜底"，是工程上的正解。
+
+## 2. 代码-用例映射：selection 的地基
+
+Test selection 的核心问题：怎么知道一条测试"覆盖"了哪些代码？这需要一份代码到测试的反向映射。有三种做法：
+
+**方法 1：覆盖率反查**
+
+跑一遍完整测试套件，用覆盖率工具记录每条测试跑过哪些行，反转索引：
+
+```
+file: src/payment/discount.py
+  line 42 --> [test_discount_basic, test_discount_edge, test_e2e_checkout]
+  line 43 --> [test_discount_edge, test_e2e_checkout]
+  line 44 --> [test_discount_basic]
+```
+
+改代码时，把 diff 涉及的行查表得到相关测试。优点：精度高、跨语言通用。缺点：需要定期重新采集（代码演化后映射失效）、覆盖率插桩本身很慢。
+
+覆盖率粒度选择很关键：**行级**最精细但索引大、**方法级**是好平衡、**文件级**最粗但索引小。工业系统一般选方法级。Ekstazi（Java 学术工具）选类级，索引更小但选出的测试集更保守（多选）。
+
+**方法 2：静态调用图（call graph）**
+
+从代码依赖关系推导映射。测试 A 调用了函数 f，f 调用了 g，那么改 g 影响测试 A。构建方式：编译期从 AST 或字节码提取调用边。
+
+```
+test_discount_basic --> apply_discount --> calc_percentage --> round_money
+```
+
+改 `round_money` 定位到 `test_discount_basic`。优点：不用跑测试就能构建。缺点：动态调用（反射、多态、eval、依赖注入）静态看不到，精度低于覆盖率反查。
+
+静态方法在**强静态类型语言**（Rust、Go、Haskell、Kotlin）里可靠，在动态语言（Python、Ruby、JavaScript）里坑多。Java 是折中——大部分调用能静态分析，但 Spring 依赖注入之类的框架会绕过静态图。
+
+**方法 3：混合**
+
+工业界几乎都用混合。静态调用图起底粗筛，覆盖率精修细节，两者互补。Google 的 TAP 系统内部大量用静态图 + 定期覆盖率校准。有些系统再加一层**运行时插桩**——每次跑测试实时记录访问过的类/方法，把当次数据合并进映射表。这条路能自动追随代码演化，代价是每次都有一点开销。
+
+## 3. 从"改了什么"到"该跑什么"
+
+有了映射还需要精确识别"这次 PR 改了什么"。看起来是 `git diff`，其实没那么简单：
+
+**代码层面**：diff 到函数粒度还是行粒度？行粒度精，但整个文件重排（格式化、rename）会产生大量假 diff。工业系统一般 diff 到 method/function 粒度。有个更聪明的做法叫 **AST diff**：解析两个版本的 AST 找出真实的语义变更（新增函数、修改函数体、删除类），忽略纯格式化。工具：GumTree、diff-ast。
+
+**依赖层面**：改了 `pom.xml` / `package.json` / `Cargo.toml` 里的一个版本号，间接影响的代码可能上万行。这类 diff 要触发**保守回退**——跑全量测试或至少跑所有 integration 层。有些团队会更精细：改的是 patch 版本（`1.2.3 → 1.2.4`）不回退，minor/major 才回退。
+
+**配置层面**：改了 YAML、环境变量、feature flag，映射系统看不见。这是精准测试的**盲区之一**，工业实践是给关键配置文件建独立映射表，改了它就跑对应的一组测试。字节内部有个"配置影响域"的元数据机制，让每个 config key 手动标注"影响哪些模块"。
+
+**跨仓库依赖**：monorepo 好办，多仓库难办——上游改了 API，下游仓库的测试选择系统不知道。需要中央化的 dependency graph，Bazel/Buck/Pants 之类的构建系统天生支持。多仓库场景要用 Semver + BOM（Bill of Materials）机制人肉维护。
+
+伪代码大致长这样：
+
+```python
+def select_tests(diff):
+    changed_symbols = extract_symbols(diff)      # 函数、类
+    changed_configs = extract_configs(diff)      # 配置文件
+    affected_tests = set()
+    for sym in changed_symbols:
+        affected_tests |= mapping.lookup(sym)
+    for cfg in changed_configs:
+        affected_tests |= config_mapping.lookup(cfg)
+    if is_dep_change(diff):
+        return ALL_TESTS  # 保守回退
+    return affected_tests
+```
+
+## 4. 智能排序：Prioritization
+
+假设改动关联到 500 条测试，全跑还是要 30 分钟，能不能进一步压？Prioritization 的思路是**让最可能失败的先跑**——如果它挂了立即通知开发者，不用等全跑完。
+
+排序信号常见几个：
+
+- **历史失败率**：过去一个月这条测试挂过 20 次的比挂过 0 次的先跑
+- **和改动的语义距离**：diff 直接改的函数对应的单元测试最先跑，然后 integration 层，最后 e2e
+- **执行时间**：快的先跑（1 秒的和 5 分钟的一起排，先跑 1 秒的能更早得到部分反馈）
+- **测试价值**：过去几个月这条测试实际发现过 bug 的算高价值，从没抓过 bug 的低价值
+- **代码作者**：改动作者过去改这块代码时经常挂哪几条测试，那几条先跑
+- **文件相关度**：diff 中最"热"的文件相关的测试排前
+
+Facebook 的 **Predictable Test Selection** 论文（2020）用机器学习把这些信号 blend 到一个分数里排序。他们报告在 mobile 项目上能提前 95% 的失败在 20% 的时间内出现——大部分挂掉的用例都排在前面。模型输入是几百维稀疏特征：diff 文件路径 embedding、文件历史 flakiness、作者过去挂率、测试执行时间统计、测试自身历史结果。用一个 gradient boosting 模型（XGBoost 变种）打分，每天用最新数据 retrain。
+
+Prioritization 的一个好处是**它没风险**：即便预测错了排序，最坏结果也是"总时间没变短"，不会漏跑测试。所以很多团队把 prioritization 当入门级精准测试先做——不需要重构 CI 架构，只在测试运行层加一层 sorter。
+
+## 5. 三大厂的工业实践
+
+**Google TAP（Test Automation Platform）**：处理谷歌整个 monorepo 的 CI。基于 Bazel 的构建图知道每个测试依赖哪些代码单元，改了什么单元就跑对应测试。TAP 每天跑几亿次测试，超过 90% 通过 selection 跳过。他们还做**test flakiness classification**——挂了自动重跑，反复挂才通知开发者，把 flaky test 的噪音过滤掉。TAP 论文里有个反直觉数据：跳过 90% 测试后漏跑率不到 0.1%——这归功于 Bazel 精确的依赖图。
+
+**Facebook Predictable Test Selection**：机器学习模型输入 diff 特征（改了什么文件、哪些行、作者、历史）预测每个测试挂的概率，只跑概率高的 top-K。他们发表的论文（ICSE 2020）在 Instagram、WhatsApp mobile CI 上把总测试时间降到原来的 30%，同时保留 95% 的失败检测率。他们内部还有一个叫 **Sapienz** 的系统专门做 Android UI 测试自动生成，跟 TIA 数据管道联动。
+
+**Microsoft SmartRunner / Azure Test Impact**：VS 里的一个功能，用 IL 级插桩记录每条测试跑过哪些方法。改一段代码时 IDE 立刻列出受影响测试，本地开发就能只跑相关。这个功能在 .NET 生态里做了十几年。SmartRunner 的一个特色是**开发者本地也能用**——不只是 CI 层的加速，写代码时就享受精准。
+
+**Bazel/Buck/Pants**：构建系统自带的 test impact 分析。以 Bazel 为例，`bazel test //...` 会分析 target 的依赖图，改了什么源码文件只重新跑该文件所在 target 及其反向依赖里包含的测试。这是最"免费"的精准测试——只要你用 Bazel，selection 是自动的。前提是项目要真正采纳 Bazel 的 BUILD 文件粒度，实际迁移成本很高。
+
+**Ekstazi（Java 学术工具）**：细粒度到 class 级依赖记录，第一次跑全量记录依赖，之后每次基于 diff 选测。适合中小 Java 项目。作者 Milos Gligoric 是 UT Austin 教授，Ekstazi 是 TIA 学术界最完整的开源实现。
+
+**Uber Piranha 系列**：Uber 的移动 CI 特别看重代码影响面，Piranha 做 feature flag 清理和 TIA。他们的挑战是 iOS/Android 双端语言不同、模块化程度不同，TIA 要跨语言协调。
+
+**国内实践**：字节跳动的 ByteFuzz + 精准回归、腾讯 WeTest、阿里 EAS 都有自研 TIA，公开资料不多但架构大同小异——基于 diff + 覆盖率映射 + ML 排序，接入到自家 DevOps 平台。
+
+## 6. 什么时候值得上
+
+精准测试是复杂工程，不是所有项目都值得。判断依据：
+
+| 项目规模 | CI 时长 | 建议 |
+|---|---|---|
+| < 1k 测试 | < 5 分钟 | 全跑，别折腾 |
+| 1k–10k 测试 | 5–30 分钟 | Prioritization + 简单 selection |
+| 10k–100k 测试 | 30 分钟–3 小时 | 完整 TIA |
+| > 100k 测试 | > 3 小时 | 必须做，ROI 极高 |
+
+另一个维度是**改动频率**。一天 10 个 PR 和一天 1000 个 PR 的经济学完全不同——后者上 TIA 一年省的机器成本能雇一个专职工程师维护它。
+
+再一个是**测试稳定性**。上 TIA 前必须先把 flaky test 收拾干净——不然预测模型和映射数据会被噪音污染。Google 的经验：TIA 上线前团队应该把 flaky rate 压到 <1%，否则得不偿失。
+
+## 7. Flaky test：TIA 的天敌
+
+Flaky test（不稳定测试）值得单独一节：同一份代码同一份用例，跑一次挂一次通过。原因：时序依赖、随机数种子、外部依赖、并发资源竞争、时区/locale、机器负载。
+
+Flaky test 对 TIA 系统的破坏是双向的：
+
+1. 模型学到"改了 X 会挂 Y"，实际是 Y 自己 flaky，跟 X 无关
+2. Selection 跳过了不 flaky 的相关测试，反倒让 flaky 的高频挂在 CI 里看不到本次改动的真实影响
+
+Google 的做法：flaky 检测自动化 → 挂了自动重跑 → 反复挂标记 quarantine → PR 里不 block → 由专人集中修。Facebook 类似。TIA 系统必须内建 flaky 分类器，否则会像一台读了坏数据的机器学习模型一样越用越糟。
+
+## 8. 局限
+
+**语义变更追不到**：改了配置、依赖版本、环境变量、feature flag，这些不进代码 diff 但会改变行为。TIA 系统要么保守回退跑全量（丢掉大部分速度），要么承受漏跑风险。
+
+**Flaky test 污染信号**：TIA 依赖历史数据判断"哪些测试和这段代码相关"，如果某条测试因为 flaky 挂过 30 次，会被误判为高关联性，永远优先跑，浪费时间。要先解决 flaky test 才能上 TIA。
+
+**映射不完整**：动态语言（Python、JavaScript、Ruby）的反射、装饰器、猴子补丁让静态分析瞎眼。覆盖率反查也可能不覆盖某些死代码分支——真的改到那里就会漏跑。
+
+**追不到 non-code 影响**：数据库 schema 变更、消息队列 topic 变更、外部服务合同变更，全都在代码库之外，TIA 感知不到。这是为什么大厂都同时维护"日常 selection CI + 每天一次全量 CI"两条线。
+
+**建设成本**：搭一套完整 TIA 从 0 到能用大概要 1–2 人年，还要专职团队维护。数据管道、映射更新、监控告警、误跑追责——这套东西本身就是一个大型软件项目。中小团队直接用 Bazel/Nx/Turborepo 的现成 TIA 更实际。
+
+**"这次别信 TIA 了"按钮不能少**：release 前的最后一轮 CI、周五下班前的 PR、动了关键模块的 PR，一定要提供一键跑全量的开关。TIA 是加速器不是安全网，出事的时候你会庆幸自己没删掉那个按钮。
+
+**信任建立慢**：团队第一次听说"CI 只跑了 5% 测试就绿了"会本能不信。要花几个月做双跑（selection 版本 + 全量版本对比），证明没漏跑真实 bug，才能建立信任。这个社会工程学工作往往比技术工作更耗时。
+
+**冷启动没数据**：机器学习方案需要历史 fail 数据训练。新项目、新模块、大重构后，模型没样本可学，退化成纯静态映射，效果打折。
+
+## 9. 精准测试的进阶话题
+
+**Test Suite Reduction (TSR)**：跟 minimization 类似但更学术——从整个测试套件里挑一个"覆盖率不变但用例数最少"的子集。理论优美但工业界很少直接用，因为砍掉的用例即便当前覆盖率不变，未来重构后可能就变关键了。TSR 追求短期最优，牺牲长期健壮。
+
+**Regression Test Prioritization (RTP) with cost model**：不只考虑失败概率，还考虑失败的**代价**——比如生产环境敏感模块的失败比工具函数的失败更严重。给测试打价值分，排序时综合。
+
+**Cross-language TIA**：多语言项目（前端 TS + 后端 Java + 客户端 Kotlin）里如何统一维护映射？目前没有很好的通用方案，主要靠人肉在 build system（Bazel）里维护跨语言 target 依赖。
+
+**Model-based TIA**：把 [基于模型的测试](./基于模型的测试.mdx) 的思想引入 TIA——从系统的行为模型判断"改动影响哪些行为路径"，映射到测试。前提是有可用模型，实践少但方向新颖。
+
+## 10. 精准测试在测试家谱里的位置
+
+精准测试处在**测试执行层**，不涉及用例怎么写，只管怎么高效运行。它和相邻概念的关系：
+
+- [自动化测试](./自动化测试.mdx)：精准测试是自动化测试规模化以后的必然结果——用例多了不选择就跑不动
+- [测试管理](./测试管理.mdx)：TIA 系统本身就是测试管理平台的一部分
+- [测试过程与生命周期](./测试过程与生命周期.mdx)：CI/CD 阶段的效率优化
+- [变异测试](./变异测试.mdx)：可以复用 TIA 的映射基础——只对本次改动的代码做变异
+- [混沌工程](./混沌工程与弹性测试.mdx)：也在追求"用最少的实验发现最多的问题"，思路同源
+- [敏捷测试](./敏捷测试.mdx)：敏捷强调快速反馈，TIA 是让"合并前拿到测试结果"这件事在大项目里仍然可能的关键
+- [基于模型的测试](./基于模型的测试.mdx)：模型能改进 TIA 的映射精度
+- [模糊测试](./模糊测试.mdx) 和 TIA 数据管道结合可以做 targeted fuzzing——只对改动的模块 fuzz
+
+一个有趣的观察：精准测试的价值和"测试太多"成正比。团队规模上千人的项目才真正需要它，小团队投资精准测试是过度工程。它像 Kubernetes——工具本身很牛，但你得先长到需要用它的体量才能享受红利。往下一步，随着 LLM 进入代码分析领域，用 LLM 直接根据 diff 语义判断"该跑哪些测试"是当前研究方向之一——比传统调用图更聪明，但延迟和成本还没跑通。这条路走下去会重塑 TIA 的形态——从"精确追踪代码依赖"变成"语义理解 diff 意图"。等大模型能理解"这次 diff 是修改折扣计算逻辑"而不只是"这次 diff 改了 payment.py 的 42 行"，选测的精度会跳一个数量级。至少这是未来几年 TIA 领域最值得关注的方向。
+
+</WordCount>

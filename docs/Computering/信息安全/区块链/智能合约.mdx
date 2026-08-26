@@ -4,7 +4,192 @@ import WordCount from '../../../../src/components/WordCount/WordCount';
 
 ## 智能合约
 
+我们先从一个日常场景开始。你去买一瓶可乐,把硬币投进自动售货机,机器发出一声响,可乐掉出来。整个过程中你不需要相信售货员是不是诚实,也不需要有一位第三方公证——机器的机械结构本身保证了"付钱就得可乐,不付钱就没有"。密码学家 Nick Szabo 在 1994 年就注意到这件事有一种漂亮的抽象:一段规则,只要预设条件被触发就自动执行,不依赖任何一个可以被贿赂的人。他给这种东西起了个名字,叫智能合约。
 
+真正把这套构想推到实际系统的是 2015 年上线的以太坊。它在比特币的账本之上加了一台图灵完备的虚拟机(EVM),允许开发者把任意逻辑写成代码部署到链上,由全网节点共同执行、共同验证。一份合约一旦部署,代码和它维护的状态就都写在链上,几乎不可能被单方面篡改。
 
+这一节我们讨论智能合约的基本模型、怎么写、怎么跑,以及为什么它比普通程序容易出安全事故。
+
+### 一个最小的合约
+
+我们先看一段最简单的 Solidity 代码,然后逐行解释。
+
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+contract Counter {
+    uint256 public count;
+
+    event Incremented(address indexed by, uint256 newCount);
+
+    function increment() external {
+        count += 1;
+        emit Incremented(msg.sender, count);
+    }
+}
+```
+
+这个合约做的事情非常简单——维护一个整数计数器,谁调用 `increment` 就把它加 1。但麻雀虽小,里面已经出现了几个值得说明的概念。
+
+`pragma solidity ^0.8.20` 是版本锁。0.8 及以后的 Solidity 默认带整数溢出检查,而更早的版本需要显式引入 SafeMath 库来防溢出——这个改动本身就是一次安全教训。
+
+`uint256 public count` 声明了一个 256 位的公开状态变量。Solidity 会为每个 `public` 状态变量自动生成一个同名的 getter 函数,所以外部读它就像调用一个函数。
+
+`event` 声明了一种事件。合约执行过程中,`emit Incremented(...)` 会向交易日志里写一条记录,链下前端或索引器可以订阅这条日志来感知状态变化。事件是"广播",不是"存储",读它比读状态便宜得多——这也是我们在区块链基础那一节强调过的。
+
+`msg.sender` 是当前直接调用者的地址,注意它和 `tx.origin` 有细微差别,后面讨论安全时我们会回到这一点。
+
+短短十几行代码,已经把 Solidity 的基本模型讲清楚了:合约有状态变量,有可调用的函数,函数执行会改状态,顺带广播事件。
+
+### 合约是怎么被执行的
+
+现在我们把镜头拉远一点,看看当有人调用 `increment` 时,底层到底发生了什么。
+
+EVM 是一台基于栈的虚拟机,字长 256 位。它有三种不同的存储层次:栈、内存、存储。栈是每次函数调用的临时空间,几乎免费;内存是每次交易内的临时空间,便宜;存储是永久写在链上的状态,极贵——写一个新槽位要消耗约两万单位的 gas。
+
+这个成本差异不是"性能优化",它是**根本性的**。写一次 storage 的 gas 相当于做几百次算术运算的 gas。所以写合约时我们经常需要主动把状态变量先拷到内存里,算完再一次性写回:
+
+```solidity
+function batchAdd(uint256[] calldata items) external {
+    uint256 s = total;              // 一次读 storage
+    for (uint256 i = 0; i < items.length; i++) {
+        s += items[i];              // 在 memory 里算
+    }
+    total = s;                      // 一次写 storage
+}
+```
+
+如果不这么写,每次循环都直接改 `total`,gas 就会飙升到不可接受。这类"能避开 storage 就避开"的直觉是写好合约的基本功。
+
+至于 EVM 本身,它是一台确定性的机器:同样的输入必须产生同样的输出,不然全网节点算出来的状态就对不上了。所以合约里没有随机数,没有网络 IO,没有系统时间——只有当前区块的时间戳,而且这个时间戳还是矿工可以在一个窄区间里操控的。想要"公平抽奖"?你需要 Chainlink VRF 或者别的可验证随机数方案。
+
+### 合约的生命周期
+
+我们把合约从写好到销毁的完整流程走一遍。
+
+第一步,用 Solidity 写源码;第二步,编译成两样东西:EVM 字节码和 ABI(外部调用接口)。字节码是要上链的;ABI 是给链下调用者(前端、后端、其他合约)看的,它描述了合约有哪些函数、参数类型如何、返回值如何。第三步,通过一笔特殊的部署交易把字节码写到链上;链会返回一个新地址,这个地址就是合约的身份。第四步,任何人(外部账户或其他合约)都可以通过 ABI 编码的 calldata 触发合约函数。
+
+有意思的是,合约地址在部署前就已经可以算出来:它是部署者地址和部署时的 nonce 一起哈希出来的结果。这就是为什么有时候我们能在链上看到"某个地址已经收到了空投,但合约还没部署"——地址是可以预测的。
+
+有一个可选的第五步是销毁。在早期,`selfdestruct` 可以让合约"消失"并把余额转给指定地址。以太坊在 2024 年的 Cancun 升级里已经把这个操作的语义大幅削弱,不再推荐使用。
+
+### 一些经典的安全坑
+
+信息安全视角下,智能合约最有意思的地方就在这里:漏洞和钱绑得非常近,一个 bug 就是几百万美元。历史反复上演,以下几个坑几乎每年都要重新犯一遍。
+
+#### 重入攻击
+
+2016 年的 The DAO 事件就是这个漏洞,以太坊为了挽回损失做了硬分叉,分出了以太经典。看这段有问题的代码:
+
+```solidity
+mapping(address => uint256) public balances;
+
+function withdraw() external {
+    uint256 amount = balances[msg.sender];
+    (bool ok, ) = msg.sender.call{value: amount}("");
+    require(ok);
+    balances[msg.sender] = 0;
+}
+```
+
+问题出在哪儿?`msg.sender.call{value: amount}("")` 是一个外部调用。如果 `msg.sender` 是一个恶意合约,它在收到以太币时会触发自己的 `receive()` 函数,而这个函数可以再次调回 `withdraw()`。此时 `balances[msg.sender]` 还没被清零,于是钱被重复取走。整个过程可以在同一笔交易里递归很多次,直到把合约里的余额榨干。
+
+修复的思路叫 CEI 模式,即先做检查(Checks)、再改状态(Effects)、最后才对外调用(Interactions):
+
+```solidity
+function withdraw() external {
+    uint256 amount = balances[msg.sender];
+    balances[msg.sender] = 0;               // 先清状态
+    (bool ok, ) = msg.sender.call{value: amount}("");
+    require(ok);
+}
+```
+
+或者用 OpenZeppelin 的 `ReentrancyGuard` 加一个 `nonReentrant` 修饰器。CEI 模式是我们写涉及外部调用的函数时应当默认遵守的顺序,不是可选风格。
+
+#### tx.origin 钓鱼
+
+`msg.sender` 是直接调用者,而 `tx.origin` 是最初发起整个交易的外部账户。如果我们不小心用 `tx.origin` 做权限校验:
+
+```solidity
+require(tx.origin == owner);
+```
+
+攻击者只要构造一个合约,并诱骗 `owner` 去调用它的一个看起来正常的方法。这个方法内部再调用你的合约,此时 `msg.sender` 是攻击者的合约,但 `tx.origin` 还是 `owner`——鉴权就穿了。所以做权限校验永远用 `msg.sender`。
+
+#### 整数溢出
+
+Solidity 0.8 之前,`uint8 x = 255; x += 1` 会静默地绕回 0。这个坑年代有点久了,现在的默认行为是溢出直接 revert,只有显式写 `unchecked { }` 才会关掉检查。但如果我们在读老代码或者为了 gas 手动关检查,还是要小心——很多历史漏洞就是这一位偏差引发的。
+
+#### 预言机操纵
+
+DeFi 合约常常需要知道"1 ETH 等于多少 USDC"。如果直接读某个 DEX 池子的即时价格,就是把方向盘交给了任何一个能借得起闪电贷的人:
+
+```solidity
+uint256 price = pool.reserve1 * 1e18 / pool.reserve0;
+```
+
+攻击者可以在同一笔交易里把池子价格拉爆,让你按被操纵的价格进行结算,然后再把价格恢复。因为闪电贷把"借千万美元资金"的成本降到了几十美元手续费,这类攻击从 2020 年 bZx 事件开始几乎年年重演。修复方法是用时间加权平均价(TWAP)或者 Chainlink 之类的去中心化价格源。这一部分我们在 DeFi 安全那一节还会详细展开。
+
+#### delegatecall 和存储布局
+
+`delegatecall` 会在**当前合约的上下文**里执行另一个合约的代码——包括读写当前合约的存储、当前合约的余额,以及当前合约的身份。它是代理合约实现升级的基础,但用错就等于把管理员权限拱手让人。2017 年 Parity 多签钱包冻结 51 万 ETH 的事件,就是一次 `delegatecall` 加上未初始化变量的悲剧。
+
+### 可升级合约
+
+"部署即不可改"听起来很美,但真业务里 bug 总是要修的。业界主流的做法是代理模式:一个 Proxy 合约持有资金和状态,把所有调用通过 `delegatecall` 转发到实现合约(Implementation);想升级时,把 Proxy 指向新的实现合约地址。
+
+具体的模式有透明代理、UUPS、Diamond(EIP-2535)等,OpenZeppelin 的 `@openzeppelin/contracts-upgradeable` 提供了最常用的一套实现。代价是升级权掌握在管理员手里,去中心化程度打折。所以大项目通常还会再套一层多签或时间锁,让社区在升级生效前有时间审查代码。
+
+这里有一个初学者容易踩的坑:代理和实现合约的**存储布局必须严格一致**。如果实现合约的 V2 版本在某个字段前面加了一个新变量,所有存储槽都会错位,导致原本的状态被解读成完全不同的值。OpenZeppelin 的 upgradeable 库为此专门约定了"存储间隙"(`__gap`)的写法,就是为了给未来升级留出空间。
+
+### 从链下调用一个合约
+
+我们再从另一个方向看合约:从前端 dApp 或后端脚本怎么去调用它。以 ethers.js 为例:
+
+```javascript
+import { ethers } from "ethers";
+
+const provider = new ethers.JsonRpcProvider("https://mainnet.infura.io/v3/<KEY>");
+const wallet = new ethers.Wallet("<PRIVATE_KEY>", provider);
+
+const abi = [
+  "function increment() external",
+  "function count() view returns (uint256)",
+];
+const contract = new ethers.Contract("0x...", abi, wallet);
+
+const c = await contract.count();          // view 函数
+const tx = await contract.increment();     // 状态变更
+await tx.wait();
+```
+
+这里最关键的区别是,`count()` 是 `view` 函数——它不改状态,所以调用它走的是 `eth_call`,只在节点本地算一遍,不上链、不花钱,几毫秒返回。而 `increment()` 会改状态,必须走 `eth_sendRawTransaction`:钱包签名、广播、等待被打包、等待确认。这个差别我们在写 dApp 时会反复用到——凡是不改状态的东西都应该用 view 拿,以节省 gas 和延迟。
+
+### 除了以太坊
+
+EVM 生态里,合约几乎可以无缝移植到 BNB Chain、Polygon、Arbitrum、Optimism、Base 等各种链上。非 EVM 生态则自成一派。Solana 用 Rust 写合约,并且把"程序"和"账户"完全分离——代码是只读的,状态放在账户里,这让并发执行成为可能。Move 系(Aptos、Sui)引入了资源模型,天然防重入和双花。Cosmos 生态的 CosmWasm 用 Rust 编译到 WASM。每一种模型都有自己的取舍,但"链上可验证的、确定性执行的代码"这个内核是共通的。
+
+### 小结
+
+智能合约是一段部署在链上的程序,它的状态和代码都在链上可查、可验证,由虚拟机确定性执行。它带来了几个新的编程约束:一切开销都要付费,一切结果都必须确定,一切代码都必须假设"任何人都会调用"。这些约束改变了我们对"错误"的态度——普通程序里的一个 bug 大不了 crash,合约里的一个 bug 就是可被立即利用的漏洞。
+
+学好合约安全,和"避免所有 bug"是两回事。真正有帮助的是建立对底层机制的直觉:哪些操作要花钱、哪些数据可以被谁改、哪些外部调用会不会回头调我。这一节里的每一个坑都不复杂,但它们反复被踩,说明"知道"和"直觉"之间还差很远的距离。剩下的路,靠动手写、动手打 CTF。
+
+### 练习
+
+1. 把这一节里的 Counter 合约在 Remix 上部署一次,自己调用一次 `increment`,再从 Etherscan 上找到对应的交易看它的 log,理解 event 是怎么出现在链上的。
+2. 拿这一节里的重入漏洞 `withdraw` 函数,写一个攻击合约把它掏空。这个练习不难,但它会让你对"外部调用会回头"这件事产生肌肉记忆。
+3. 假设一个合约在初始化函数 `initialize()` 上没有加 `onlyOwner` 保护,而这个合约是通过代理部署的。攻击者可以做什么?想想为什么"部署 + 初始化"必须放在同一笔交易里。
+4. 读 OpenZeppelin 的 `ReentrancyGuard` 源码,理解它是怎么实现的。为什么它需要一个 storage 变量而不能只用 memory?
+
+### 参考
+
+- Wood G. Ethereum Yellow Paper. https://ethereum.github.io/yellowpaper/paper.pdf
+- Solidity 官方文档. https://docs.soliditylang.org/
+- SWC Registry(智能合约弱点分类). https://swcregistry.io/
+- OpenZeppelin Ethernaut(合约漏洞 CTF). https://ethernaut.openzeppelin.com/
+- Rekt News(重大安全事件复盘). https://rekt.news/
 
 </WordCount>

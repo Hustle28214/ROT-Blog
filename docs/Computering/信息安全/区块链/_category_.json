@@ -1,0 +1,8 @@
+{
+  "label": "区块链",
+  "position": 3,
+  "link": {
+    "type": "generated-index",
+    "description": "区块链与智能合约的信息安全视角:基础原理、共识机制、密钥管理、DeFi 与合约漏洞。"
+  }
+}

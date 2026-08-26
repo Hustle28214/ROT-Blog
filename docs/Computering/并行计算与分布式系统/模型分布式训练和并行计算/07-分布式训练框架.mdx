@@ -1,0 +1,164 @@
+import WordCount from '../../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+前面六章我们讲的都是"原理"——各种并行策略是什么、为什么这么设计、通信怎么走。到了实际项目里，你不会从零手写这些东西，而是用现成的框架。**这一章就来盘点一下主流的分布式训练框架**，讲讲它们各自擅长什么、什么时候该选谁。
+
+我把这些框架大致分成三层来看：**底层原语**（PyTorch native）、**大模型训练框架**（DeepSpeed、Megatron、ColossalAI）、**上层封装**（HuggingFace 生态）。选型的核心思路就是"用最上层能满足需求的那一层"——越上层越省心，但灵活度越低。
+
+## 1. PyTorch 原生：一切的地基
+
+PyTorch 自带一套完整的分布式原语。它不是一个"训练框架"，更像"积木"——所有别的框架都建在它之上。
+
+**`torch.distributed`** 是通信原语库：进程组、All-Reduce、All-Gather、Broadcast，配 NCCL / Gloo / MPI 后端。你要写自定义通信，就靠它。
+
+**DDP** (`torch.nn.parallel.DistributedDataParallel`)：数据并行的标准实现。前面第二章讲过。
+
+**FSDP / FSDP2** (`torch.distributed.fsdp`)：等价于 ZeRO-3 的原生实现。FSDP2 在 PyTorch 2.x 引入，用 DTensor 表达分片，语义更清晰，和 `torch.compile`、混合精度的配合也更好。
+
+**DTensor** (`torch.distributed.tensor`)：分片张量的核心抽象。有了它，你可以直接写 "把这个 tensor 按 dim=0 切到 mesh 的第 0 维"，通信由框架处理。是 FSDP2 和 PyTorch native TP 的底座。
+
+**`torch.distributed.pipelining`**：PyTorch 2.x 加入的原生 pipeline 并行。
+
+**`torchrun`**：多进程启动器，支持弹性训练、故障恢复。
+
+什么时候用它？**中小规模模型 + 需要完全控制训练流程的场景**。写研究代码、微调 10B 以内模型、或者想搞懂"分布式到底是怎么跑起来的"，都是很好的选择。缺点是**做超大规模训练时缺少现成方案**，得自己拼。
+
+## 2. DeepSpeed：显存优化大师
+
+DeepSpeed 是微软的框架，最出名的是 **ZeRO 系列**——事实上 ZeRO 这个概念就是他们提出的。
+
+它主打的能力有几块：
+
+**ZeRO-1 / 2 / 3**：切优化器状态、梯度、参数。第二章讲过。
+
+**ZeRO-Offload / ZeRO-Infinity**：把状态卸载到 CPU 甚至 NVMe。这个真的很猛——极端情况下你可以在几张 GPU + 一个大 NVMe 阵列上训超大模型，代价是 PCIe / NVMe 带宽会成为瓶颈。什么时候有用？**卡不多但模型大**的时候。
+
+**DeepSpeed-MoE**：完整的 MoE 训练支持，含 All-to-All 优化和负载均衡策略。
+
+**Pipeline 并行**：1F1B 调度。
+
+**Ulysses**：DeepSpeed 家的序列并行方案。
+
+它和 PyTorch 的集成非常好。你只需要写一个 JSON 配置文件指定"用 ZeRO 几档、要不要 offload、混合精度怎么开"，然后用 `deepspeed.initialize` 包一下已有的模型和 optimizer，就能跑起来。HuggingFace Trainer 也原生支持它。
+
+**它的短板是没有很好的 TP 实现**。所以真的到千亿以上、单层放不下的时候，通常搭配 Megatron 一起用（Megatron-DeepSpeed）。
+
+## 3. Megatron-LM：大模型训练的工业标准
+
+如果说 DeepSpeed 主打显存，那 Megatron 主打**极致的性能**。它是 NVIDIA 官方的库，从 GPT-2 到 GPT-3、Llama、Nemotron，几乎所有公开的大模型训练都用它或它的变种。
+
+主要能力：
+
+**1D 张量并行**：第三章讲的那套 Megatron 切法。
+
+**Sequence Parallelism**：默认伴随 TP 开启。
+
+**Pipeline 并行**：包括原始 1F1B、Interleaved 1F1B、Zero-Bubble。
+
+**Context Parallelism**：Ring Attention 实现。
+
+**MoE**（Megatron-Core 里）。
+
+**TransformerEngine 集成**：FP8 训练、通信 - 计算重叠、算子融合，把 H100 / H200 榨得非常干净。
+
+它有几个特点你要清楚：
+
+**强绑定 Transformer 结构**。Megatron 提供的不是"通用分布式训练"，而是"针对 Transformer 深度优化过的分布式实现"。如果你的模型是 CNN 或图神经网络，Megatron 帮不了你。
+
+**学习曲线陡**。Megatron 的代码库结构复杂、命令行参数多如牛毛。想改点东西得对代码库有一定了解。
+
+**非常快**。为 Transformer 定制到这个程度，性能是别的框架比不了的。同样硬件上 Megatron 的 MFU 比 DeepSpeed 通常高 10-20%。
+
+**什么时候用**：**从头训一个 10B 以上的 dense Transformer**，Megatron 基本没有对手。
+
+## 4. Megatron-DeepSpeed：两全其美
+
+字面意思：**用 Megatron 的 TP/PP + DeepSpeed 的 ZeRO/MoE**。
+
+BLOOM、GLM-130B 等就是用这个组合训出来的。历史意义很大。
+
+不过现在 Megatron-Core 自己也支持了 ZeRO-1，Megatron-DeepSpeed 的组合价值下降了一些。但你如果做 MoE 大模型，还是会考虑它——因为 Megatron 的 MoE 支持不如 DeepSpeed-MoE 完整。
+
+## 5. ColossalAI：更前沿的并行策略
+
+ColossalAI 是国内 HPC-AI Tech 的开源框架，目标是"一站式"支持各种并行技术。
+
+它的特色：
+
+**多维张量并行**：1D、2D、2.5D、3D。是唯一一个把这些前沿 TP 都实现了的框架。
+
+**Gemini**：他们自研的异构内存管理器，可以在训练过程中动态地在 GPU / CPU / NVMe 之间搬数据。
+
+**丰富的 pipeline 调度**：GPipe、1F1B、Chimera 都有。
+
+**接口相对友好**：文档和示例比 Megatron 好读一些。
+
+**适合什么场景**：中等规模训练、想尝试较新的并行策略、团队规模不大的项目。工业界大厂用得不如 Megatron 多，但学术界和小团队接受度不错。
+
+## 6. HuggingFace 生态：微调的默认选择
+
+前面几个都是"底层框架"。到了微调场景，绝大部分人用的是 HuggingFace 的封装。
+
+**Accelerate**：跨 DDP / FSDP / DeepSpeed 的统一接口。几行代码就能切换后端。它的哲学是"你写单卡代码，我帮你跑到多卡"。
+
+**Trainer**：整合了 dataset、optimizer、eval、logging、checkpoint 的高级封装。配置文件驱动，写训练脚本非常简洁。
+
+**PEFT**：LoRA、prefix tuning、adapter 等参数高效微调的标准库。
+
+**TRL**：RLHF / DPO / GRPO 的训练库，是所有对齐工作的标配。
+
+**用它做什么**：微调开源模型（7B 到 70B 都很合适）。90% 的开源模型微调项目都是 Accelerate + FSDP 或 Accelerate + DeepSpeed 的组合。
+
+**不适合什么**：从零开始的大规模预训练。它是上层封装，为易用性放弃了一些性能和灵活度。
+
+## 7. JAX 生态：TPU 的世界
+
+如果你在用 TPU，那基本上就是 JAX 的天下。
+
+**GSPMD** / **jax.pjit**：声明式并行的核心。用 `PartitionSpec` 描述分片，XLA 编译器负责生成通信。前一章讲过。
+
+**Pax / Praxis**：Google 内部大模型训练框架的开源版本。Gemini 训练用的就是它的内部版本。
+
+**MaxText**：面向 TPU + GPU 的高性能 LLM 训练库，代码相对简洁、性能好。
+
+**Flax**：JAX 的神经网络库。
+
+**什么时候用**：**TPU 训练几乎必选**。GPU 上也能跑（JAX 支持 CUDA 后端），但生态没有 PyTorch 系厚。JAX 的声明式并行是自动并行研究最活跃的试验场。
+
+## 8. 国产框架
+
+**MindSpore（华为）**：昇腾 NPU 的原生框架，原生集成 auto-parallel。盘古大模型用的就是它。**在昇腾硬件上是唯一选择**。
+
+**PaddlePaddle（百度）**：飞桨的分布式训练能力。文心一言用它训。生态相对独立。
+
+**OneFlow / veScale**：OneFlow 早期以 SBP 抽象和自动并行著称，后被字节收购，团队并入 veScale 等项目。学术上有影响力。
+
+## 9. 选型建议
+
+| 你的场景 | 推荐框架 |
+|---------|--------|
+| 微调 7B - 70B 开源模型 | HuggingFace Accelerate + FSDP 或 + DeepSpeed |
+| 从零训 10B - 100B 模型 | Megatron-LM 或 Megatron-DeepSpeed |
+| 从零训 100B+ 模型 | Megatron-LM（可能需要定制） |
+| 训 MoE 大模型 | Megatron-Core（内含 MoE）或 Megatron-DeepSpeed |
+| 想探索前沿并行策略 | ColossalAI 或 veScale |
+| TPU 训练 | JAX + Pax / MaxText |
+| 昇腾 NPU | MindSpore |
+| RLHF / DPO 对齐 | HuggingFace TRL + Accelerate |
+
+## 10. 一些趋势
+
+最后简单说一下我看到的几个方向。
+
+**PyTorch 原生化**。DTensor + FSDP2 + `torch.distributed.pipelining` 在快速补齐能力。现在你已经可以不依赖 Megatron / DeepSpeed，用纯 PyTorch API 跑相当大规模的训练了。上层框架越来越薄，未来可能就是"PyTorch + 一层轻封装"。
+
+**编译器化**。`torch.compile`、XLA、TVM 等编译器把并行策略当作一个编译 pass。写代码的人不用手工插通信，编译器根据分片信息自动生成。
+
+**异构训练**。GPU + CPU + NVMe，甚至跨云、跨地域的训练。DeepSpeed-ZeRO-Infinity、Google 的 DiLoCo 等都在这个方向探索。分布式训练的边界会继续向外扩。
+
+**低精度训练**。FP8、MX（micro-scaling）格式带来的显存和带宽节省与并行策略正交，但需要框架配合——TransformerEngine 就是干这个的。硬件（H100 / B200）在推着这件事往前走。
+
+分布式训练框架的世界看起来复杂，但每个框架的定位其实都很清楚。**理解它们各自的强项和弱项，选型问题就变得简单**——一台机 8 卡以内、模型能装下，Accelerate + FSDP；单机 8 卡装不下、需要极致性能，Megatron；显存吃紧需要 offload，DeepSpeed。剩下的是细节。
+
+</WordCount>

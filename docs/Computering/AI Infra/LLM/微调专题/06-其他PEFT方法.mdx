@@ -1,0 +1,255 @@
+import WordCount from '../../../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+LoRA 是当前 PEFT 的主流，但不是唯一的选择。历史上还有几条思路——**Adapter、Prompt Tuning、Prefix Tuning、P-Tuning、IA3**——它们在 LoRA 之前或者同时期出现，各有优劣。这一章过一遍这些方法，让你在做技术选型时能有更全面的判断。
+
+## 1. 一张 PEFT 全景图
+
+**参数高效微调（Parameter-Efficient Fine-Tuning, PEFT）** 的核心思想都是一样的：**冻结大部分参数，只训一小块**。区别在于"这一小块"加在哪、长什么样。
+
+大致分四类：
+
+- **Additive（加法类）**：往模型里塞新的可训练模块（Adapter, LoRA, IA3）；
+- **Selective（选择类）**：只训模型自带的一部分参数（BitFit）；
+- **Reparameterization（重参类）**：把原参数重新表达成一个低维形式（LoRA 类）；
+- **Prompt-based（提示类）**：不动模型，只训"输入端的可学习向量"（Prompt Tuning, Prefix Tuning, P-Tuning）。
+
+LoRA 属于重参类。下面主要讲另外三类。
+
+## 2. Adapter：LoRA 的前身
+
+**Adapter**（Houlsby 2019）是 PEFT 里最早的方法之一，比 LoRA 早两年。
+
+**做法**：在 Transformer 的每层里插入两个小的"瓶颈网络"——一个下投影（d → r），一个上投影（r → d），中间加非线性：
+
+```
+x →  attention  →  Adapter_1  → 残差 → LayerNorm →
+       │                                            │
+       └───────── residual ──────────────────────┘
+       ...
+       →  FFN  →  Adapter_2  → 残差 → LayerNorm →
+```
+
+Adapter 里面的结构：
+
+```
+adapter(x) = x + W_up(σ(W_down(x)))
+```
+
+- W_down：d → r 的投影；
+- σ：非线性（GeLU / ReLU）；
+- W_up：r → d 的投影；
+- 外面套一个残差。
+
+**和 LoRA 对比**：
+
+- Adapter 是**串联**到主流路上的（前向必须经过它），LoRA 是**并联**（旁路加项）；
+- Adapter 有**非线性**，LoRA 是纯线性；
+- Adapter 是**新的独立层**，推理时不能合并回主模型；LoRA 可以合并，推理零开销。
+
+**推理开销**：**这是 Adapter 输给 LoRA 的关键**。Adapter 是串联的新层，推理时每层都要多算一次——**延迟增加 5-15%**。LoRA 能合并回去，零延迟增加。
+
+**结果**：Adapter 在 2019-2021 年很流行，但 LoRA 出来后基本被替代。现在还偶尔用在**多任务共享 base 的场景**——不同 Adapter 挂到同一个 base 上按需切换，做 A/B 测试或多用户 serving。
+
+## 3. Prompt Tuning：不改模型，只调"软提示"
+
+**Prompt Tuning**（Lester 2021）思路非常大胆：**根本不改模型，只在输入前面加一段"可学习的向量"**。
+
+**做法**：
+
+- 完全冻结整个模型；
+- 在每个输入 embedding 前面加 k 个"虚拟 token"，每个虚拟 token 是一个可训练的 d 维向量；
+- 训练时只更新这 k 个向量的值。
+
+一次前向长这样：
+
+```
+[soft_token_1, ..., soft_token_k, x_1, x_2, ..., x_n] → 模型 → 输出
+```
+
+前 k 个位置的 embedding 是可学习参数（不是词表里的任何 token），后面的 x 是普通输入。
+
+**参数量**：`k × d`，几千到几万——**极少**。10B 模型上 Prompt Tuning 可能只有 5000 个可训练参数。
+
+**效果**：
+
+- **模型足够大**（10B+）时，Prompt Tuning 接近全参数微调；
+- **模型小**（< 3B）时，效果显著低于 LoRA。
+
+**问题**：
+
+- **训练不稳定**——只训几千个参数改一个几十亿参数模型的行为，训练动力学很脆；
+- **收敛慢**——需要更多 epoch；
+- **对超参敏感**——k 值、LR、初始化都会显著影响。
+
+**现在的地位**：不算主流。**只在极少参数、模型很大**的场景下值得试。
+
+## 4. Prefix Tuning：更强的软提示
+
+**Prefix Tuning**（Li & Liang, 2021）是 Prompt Tuning 的加强版。
+
+Prompt Tuning 只在**输入层**加软 token。Prefix Tuning 在**每一层的 KV**都加"prefix"：
+
+- 冻结模型；
+- 每层的 attention 里，在 K 和 V 前面拼一段可学习的"prefix key"和"prefix value"；
+- 训练时更新这些 prefix。
+
+**效果**：
+
+- 参数量比 Prompt Tuning 大（每层都要一份），但依然比 LoRA 少；
+- 效果比 Prompt Tuning 好——因为每层都有干预，表达能力强。
+
+**缺点**：
+
+- 每层 KV 都变了——**推理时无法合并**，KV Cache 也要相应处理；
+- **消耗上下文长度**——prefix 占了 K/V 的一部分位置。
+
+Prefix Tuning 一直没有像 LoRA 那样流行。但它的思想启发了后面的一些方案。
+
+## 5. P-Tuning：中间的方案
+
+**P-Tuning v1**（清华，2021）：类似 Prompt Tuning，但**允许 soft token 插在输入的任意位置**，而不只是开头。
+
+**P-Tuning v2**（清华，2022）：类似 Prefix Tuning，加深到每一层。相比 Prefix Tuning 的改进：
+
+- soft prefix 用一个小 MLP 生成，不是直接可训练——训练更稳定；
+- 在 encoder-only 和 encoder-decoder 上效果比较好。
+
+P-Tuning 系列在**中文 NLP 社区**流行过一段（因为清华推动），现在也是逐渐让位于 LoRA。
+
+## 6. IA³：最轻的 PEFT
+
+**IA³（Infused Adapter by Inhibiting and Amplifying Inner Activations）** 2022 提出。参数极少，效果不错。
+
+**做法**：在每层 attention 的 K、V、和 FFN 中间输出上，各乘一个可学习的向量：
+
+```
+K' = K ⊙ l_K
+V' = V ⊙ l_V
+FFN_hidden' = FFN_hidden ⊙ l_ff
+```
+
+- l_K, l_V, l_ff：每层 3 个可学习向量，每个维度 d；
+- ⊙ 是逐元素乘。
+
+**参数量**：每层 3 × d，整个模型 3 × L × d。7B 模型（L=32, d=4096）大概 39 万个参数——**比 LoRA 还少 100 倍**。
+
+**效果**：
+
+- 在很多分类任务上和 LoRA 接近；
+- 在生成任务上略输 LoRA。
+
+**推理开销**：像 Adapter 一样是串联的，推理增加一点点开销。但因为只是逐元素乘，比 Adapter 快。
+
+**推荐使用场景**：**参数量极度敏感**的场景。IA³ 的一个 adapter 可以只有几 MB。
+
+## 7. BitFit：只训 bias
+
+**BitFit**（2021）是"选择类"PEFT 的代表：**只训 bias 项，冻结所有 weight**。
+
+模型里每个 linear 层通常都有一个 bias 参数（很小的向量）。只训它们——参数量约占模型的 0.1%。
+
+**效果**：
+
+- 分类任务上惊人地好，接近全参数微调；
+- 生成任务上效果一般。
+
+**推荐使用场景**：**几乎不需要用了**。参数量少的诉求上 IA³/VeRA 更好，效果诉求上 LoRA 更好。BitFit 是"知识面广度"角度值得知道，但实操上一般不选。
+
+## 8. 各方法对比表
+
+给一个综合对比：
+
+| 方法 | 参数量 | 效果 | 推理开销 | 主流程度 |
+|------|-------|------|---------|---------|
+| LoRA | 0.1-1% | 好 | 可为 0（合并后） | 主流 |
+| DoRA | 0.1-1% | 更好一点 | 可为 0 | 上升中 |
+| Adapter | 0.5-3% | 好 | +5-15% | 已过时 |
+| Prompt Tuning | 极少 | 大模型上够用 | +少许 | 少用 |
+| Prefix Tuning | 少 | 好 | +少许 | 少用 |
+| P-Tuning v2 | 少 | 好 | +少许 | 少用 |
+| IA³ | 极少 | 一般-好 | +少许 | 少用 |
+| BitFit | 极少 | 分类好 | 0 | 已过时 |
+
+**总结**：**LoRA 家族是当前默认选择**。其他方法在特殊场景（Adapter for multi-tenant serving、Prompt Tuning for 极少参数）还有价值，但一般用不到。
+
+## 9. 什么时候不用 LoRA、用别的
+
+即使 LoRA 是主流，一些场景下还是值得考虑其他方法：
+
+**多个客户共享 base，每个客户一个 adapter**：Adapter 或者 LoRA 都行。LoRA 更省内存（只要 LoRA 的量，Adapter 要整层）。
+
+**参数量极度敏感**（比如给几万个用户各存一个 personal adapter）：VeRA、IA³。
+
+**只做非常轻的行为改动**（比如让模型多用某种口头禅）：Prompt Tuning 就够。
+
+**追求最好效果**：**全参数 SFT/DPO**。LoRA 和它总有 1-2 个点的差距。
+
+**极端资源限制**（比如手机端 finetune）：Prompt Tuning + 大模型。参数少到可以在手机上训。
+
+## 10. 一个务实的选择路径
+
+给一个实操建议：
+
+```
+[目标是什么]
+   │
+   ├─ 追极致效果 → 全参数 SFT/DPO
+   ├─ 一般应用（效果好 + 便宜）→ LoRA + LoRA+ + DoRA  ← 90% 的场景
+   ├─ 大规模 multi-tenant → LoRA 或 Adapter，看你的框架支持
+   ├─ 参数量极敏感 → VeRA / IA³
+   ├─ 只想微调"输出风格" → Prompt Tuning 或直接 prompt engineering
+   └─ 学术研究 → 都试试
+```
+
+如果你不知道选什么，**LoRA + LoRA+ + DoRA 是最不会错的默认**。
+
+## 11. PEFT 库和框架支持
+
+**HuggingFace peft** 库支持了几乎所有主流 PEFT 方法。用它的话切换方法非常简单：
+
+```python
+from peft import LoraConfig, PrefixTuningConfig, PromptTuningConfig, IA3Config
+
+# LoRA
+config = LoraConfig(r=16, lora_alpha=32, target_modules=[...])
+
+# Prefix Tuning
+config = PrefixTuningConfig(num_virtual_tokens=30)
+
+# Prompt Tuning
+config = PromptTuningConfig(num_virtual_tokens=20)
+
+# IA3
+config = IA3Config(target_modules=[...], feedforward_modules=[...])
+
+model = get_peft_model(base_model, config)
+```
+
+改一行代码就换一个方法。**这也是"多方法实验"的成本很低**——如果你不确定用哪个，各试一下。
+
+## 12. 一些实践注意
+
+**参数量 ≠ 存储大小**。虽然一些方法（VeRA、IA³）参数量极少，但**你要额外存下"哪些位置被改了"的元信息**。总存储可能没想象的那么小。
+
+**加载速度不同**。LoRA 加载很快（几个 MB），Adapter 因为是新层，可能要重新构建计算图。生产环境用要测一下。
+
+**训练时的显存**。所有 PEFT 方法在训练时的**激活值显存都差不多**——因为激活值大小取决于模型架构，不是取决于可训练参数量。所以 PEFT 主要省的是"梯度 + 优化器状态"，而不是"整个训练显存"。这个直觉很多人搞错。
+
+**不同 PEFT 方法能不能叠加**：技术上能，比如"LoRA + Prompt Tuning"。但**效果通常没有单独用 LoRA 好**——叠加带来的复杂性 > 收益。别叠加。
+
+## 13. 一句话总结
+
+PEFT 是个方法家族，LoRA 只是其中最成功的一支：
+
+- **主流选择**：LoRA 家族——原始 LoRA、LoRA+、DoRA、rsLoRA、PiSSA；
+- **辅助地位**：Adapter（多租户）、IA³/VeRA（极小参数）；
+- **少用**：Prompt/Prefix/P-Tuning（大模型上可以，但 LoRA 更好）；
+- **已过时**：BitFit。
+
+**大部分场景下，你都应该用 LoRA。** 了解其他方法是为了在**特殊场景**下有备选，而不是为了替代 LoRA。
+
+下一章我们看一个特殊的微调场景——**长上下文微调**。当你想把一个 4K 上下文的模型改造成 128K 的时候，会遇到 LoRA 也解决不了的问题。
+
+</WordCount>

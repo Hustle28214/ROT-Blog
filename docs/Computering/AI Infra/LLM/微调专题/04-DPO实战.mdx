@@ -1,0 +1,253 @@
+import WordCount from '../../../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+08 章我们讲了 DPO 的原理——一个用监督学习目标做的偏好对齐。这一章往下钻：**怎么真的把 DPO 跑起来，从数据构造到超参调节到常见踩坑**。DPO 是当前开源社区最主流的对齐方法，值得把细节讲透。
+
+## 1. DPO Loss 再看一遍
+
+先把公式写在这里：
+
+$$
+\mathcal{L}_{\text{DPO}} = -\log \sigma\left(\beta \log \frac{\pi_\theta(y_w | x)}{\pi_{\text{ref}}(y_w | x)} - \beta \log \frac{\pi_\theta(y_l | x)}{\pi_{\text{ref}}(y_l | x)}\right)
+$$
+
+含义：
+
+- $\pi_\theta$：正在训练的模型（policy）；
+- $\pi_{\text{ref}}$：参考模型（一般是 SFT checkpoint，**冻结**）；
+- $y_w$：chosen（人偏好的回答）；
+- $y_l$：rejected（人不偏好的回答）；
+- $\beta$：KL 约束强度。
+
+**直觉解读**：
+
+- 括号里的第一项 `β · log(π_θ(y_w) / π_ref(y_w))`：**训练模型对 chosen 的相对偏好**——训练模型的概率越大于参考模型，值越大；
+- 第二项 `β · log(π_θ(y_l) / π_ref(y_l))`：训练模型对 rejected 的相对偏好；
+- 两者相减：**训练模型偏向 chosen 的强度**。
+
+DPO 让这个差值越大越好。**它拉高 chosen 的概率，压低 rejected 的概率——但都是相对于参考模型的**。
+
+**为什么要"相对"**？因为直接绝对拉高 chosen 会破坏模型分布——所有回答都被拉向 chosen，模型多样性丧失。相对参考模型的话，SFT 已经好的部分不会被过度调整，只调整 chosen 和 rejected 之间的相对关系。
+
+## 2. 偏好数据长什么样
+
+DPO 的每个训练样本是一个三元组：
+
+```json
+{
+  "prompt": "什么是熵？",
+  "chosen": "熵是热力学中衡量系统无序程度的物理量。它最早由克劳修斯在19世纪提出……",
+  "rejected": "就是乱的意思吧。"
+}
+```
+
+一个数据集大概几千到几万条这种三元组。
+
+**数据来源**：
+
+- **人类标注**：给每个 prompt 两个回答（一般来自当前模型的多次采样，或者不同模型），让人选偏好；
+- **AI 打分（RLAIF）**：用 GPT-4 或者 Claude 当 judge，给两个回答打分；
+- **规则生成**：某些任务有客观标准，规则决定 chosen/rejected；
+- **公开数据集**：UltraFeedback、HH-RLHF、Nectar、Skywork-Reward-Preference。
+
+主流开源 DPO 训练几乎都用 UltraFeedback（63k prompt，每个 prompt 4 个回答按质量排序，通常取最高和最低作为 chosen/rejected）。
+
+## 3. 从 SFT 到 DPO：完整流程
+
+一个标准流程：
+
+**Step 0（前提）**：你已经有一个 SFT 好的模型 `M_SFT`。DPO 是在 SFT 之上做的，不能直接对 base model 做 DPO。
+
+**Step 1：准备偏好数据**。找一个偏好数据集（UltraFeedback、你自己收集的、混合的都行）。
+
+**Step 2：设置 reference 模型**。**`M_SFT` 就是 reference**。它冻结，只做前向，不参与梯度更新。
+
+**Step 3：初始化 policy 模型**。**从 `M_SFT` 复制一份**作为 policy 的初始化。这一份要训练。
+
+**Step 4：DPO 训练**。每个 step：
+
+- 一个 batch 的 (prompt, chosen, rejected)；
+- 计算 `log π_θ(y_w | x)`, `log π_θ(y_l | x)`, `log π_ref(y_w | x)`, `log π_ref(y_l | x)`；
+- 组合成 DPO loss；
+- 反向、更新 policy。
+
+**Step 5：得到 `M_DPO`**。这就是最终对齐后的模型。
+
+**显存开销**：policy 全套（参数、梯度、优化器）+ reference（只有参数）。7B 模型 BF16 大概是 40GB + 14GB = 54GB。一张 80GB 卡够，或者 policy 用 LoRA 能再省一半以上。
+
+## 4. β 值：DPO 最关键的超参
+
+β 控制 KL 约束的强度。这个值很敏感，直接决定 DPO 的成败。
+
+- **β 太大**（比如 β=1）：KL 约束太强，模型几乎不动——训了个寂寞；
+- **β 太小**（比如 β=0.01）：KL 约束太弱，模型跑飞——效果甚至比 SFT 差；
+- **β 合适**（一般 0.1-0.5）：模型稳步向偏好数据学习。
+
+**经验值**：
+
+- **UltraFeedback 类通用数据**：β=0.1；
+- **难度高、分歧大的偏好**：β=0.3-0.5（约束更强，防止过激）；
+- **数据高度一致的**：β=0.05-0.1（更激进）。
+
+**看 log 判断 β 对不对**。DPO 训练时会 log 一个 `reward_margin`（chosen 减 rejected 的隐含 reward 差）。健康的训练里这个值会**逐渐上升，从 0 涨到几**。如果几百 step 都是 0 附近——β 太大或 LR 太小。如果一开始就飙到 20+——β 太小或数据太简单，模型在过拟合。
+
+## 5. 学习率、epoch 和 batch
+
+**学习率**：DPO 的 LR 显著低于 SFT。**SFT 用 2e-5，DPO 用 5e-7 到 5e-6**。为什么这么低？因为你已经在很好的 SFT 起点上，只想做很小的偏好调整。LR 高一点点，模型就跑飞。
+
+**Epoch**：**1 个 epoch，最多 2 个**。DPO 极容易过拟合——训 3 个 epoch 后你会看到 reward_margin 涨到几十、chosen 的 log 概率大幅上升，但**实际下游效果反而变差**。这是过度优化的典型表现。
+
+**Batch size**：中等 batch（64-256 个 pair）。太小方差大、训练不稳；太大不必要，DPO 数据本来就少。梯度累积调到 total batch 128 或 256 是常见配置。
+
+**Warmup**：几十到几百 step 即可。
+
+一个参考配置：
+
+```yaml
+learning_rate: 5e-7
+lr_scheduler: cosine
+warmup_ratio: 0.1
+epochs: 1
+per_device_batch_size: 4
+gradient_accumulation_steps: 8
+# 总 effective batch = 32 (单卡) or ×n (多卡)
+
+beta: 0.1
+loss_type: sigmoid  # 标准 DPO
+```
+
+## 6. LoRA + DPO：省钱的方案
+
+DPO 因为要装两个模型（policy + reference），显存开销大。**用 LoRA 训 policy 就能大幅省开销**：
+
+- Reference：冻结的 SFT 模型，14GB（7B）；
+- Policy：base 部分冻结（共享 reference 的参数），只训 LoRA——梯度和优化器状态只算 LoRA 的部分；
+- 结果：显存开销和 LoRA-SFT 差不多，比全参数 DPO 省一半以上。
+
+**多数开源 DPO 都是 LoRA-DPO**。效果和全参数 DPO 差别很小。
+
+TRL 里开启 LoRA-DPO 非常简单：
+
+```python
+from trl import DPOTrainer, DPOConfig
+from peft import LoraConfig
+
+peft_config = LoraConfig(
+    r=16, lora_alpha=32, target_modules=["q_proj", "k_proj", "v_proj", "o_proj"],
+    task_type="CAUSAL_LM",
+)
+
+trainer = DPOTrainer(
+    model=model,
+    ref_model=None,      # None 就自动用 model 的初始 weights 作 reference
+    peft_config=peft_config,
+    args=DPOConfig(beta=0.1, learning_rate=5e-7, ...),
+    train_dataset=dataset,
+    tokenizer=tokenizer,
+)
+```
+
+`ref_model=None` + LoRA 是一个巧妙的组合——**LoRA 部分是新加的**，把它关掉时模型就等价于 reference，不需要单独存一份 reference。
+
+## 7. DPO 常见故障模式
+
+**故障 1：模型输出越来越单调**。
+
+**表现**：DPO 训完后，模型的回答变得公式化，长度趋同、开头/结尾模板化。多样性明显下降。
+
+**原因**：你的偏好数据里 chosen 有明显的风格偏向（比如都是"分点回答的正式风格"），DPO 把模型强推向这个分布。
+
+**解决**：数据里加入风格多样的 chosen 样本、或者降低 β、或者少训几步。
+
+**故障 2：chosen 概率上升但 rejected 概率也上升**。
+
+**表现**：训练 log 里看到 `logps/chosen` 和 `logps/rejected` 都在上升。DPO 的目标应该是拉开两者的差距，两者一起涨——**没起效果**。
+
+**原因**：β 太大 + 数据太容易（chosen 和 rejected 差异不明显）。模型在两个方向上都拉高了整体概率。
+
+**解决**：调小 β，或者换更有区分度的数据（chosen 明显好于 rejected）。
+
+**故障 3：chosen 概率反而下降**。
+
+**表现**：`logps/chosen` 在训练过程中不升反降。
+
+**原因**：这是 DPO 的一个已知副作用——它虽然在优化"chosen 相对 rejected"的偏好，但**没有约束 chosen 的绝对概率**。极端情况下模型可以通过"两个都降低，但 rejected 降得更快"来满足 loss——**这不是我们想要的**。
+
+**解决**：加一个 SFT 项到 loss——变成 "DPO loss + λ · SFT loss on chosen"。这就是 **RPO / TRDPO** 等变种的思路。TRL 里有个 `sft_weight` 参数控制这个。
+
+**故障 4：训完之后下游任务全崩了**。
+
+**表现**：DPO 之前 MMLU 65 分，DPO 之后 55 分。
+
+**原因**：**灾难性遗忘 + 分布漂移**。偏好数据里如果没有多样任务，模型会过拟合到偏好数据的领域上，其他领域退化。
+
+**解决**：偏好数据里保留多样性（各种任务都有）、少 epoch、多任务混合。
+
+## 8. DPO 的一些兄弟：IPO、KTO、SimPO、SLiC-HF
+
+DPO 出来后一堆变种，各自解决 DPO 的某个缺陷。快速过一下：
+
+**IPO（Identity Preference Optimization）**：DPO 在"数据高度可分"时会过拟合——所有偏好对都能完美分开时，loss 可以无限接近 0，模型可以为了追求这个疯狂调整。IPO 换了个非饱和的 loss，避免这个问题。**数据噪声大时值得试**。
+
+**KTO（Kahneman-Tversky Optimization）**：**不需要成对偏好**，只需要"这个回答是好还是坏"的二元标签。数据收集容易得多。适合"我们只有正负例，没法配对"的场景。
+
+**SimPO**：**不需要 reference 模型**。DPO 的一个主要开销就是要装 reference，SimPO 通过重构 loss 拿掉了这个依赖。**便宜、快、效果和 DPO 接近**。
+
+**SLiC-HF**：类似 DPO 但用 hinge loss 而不是 sigmoid loss。更稳定，训练超参不敏感。
+
+**ORPO**：把 SFT 和偏好优化合成一步，不需要单独 SFT。适合从 base 直接冲对齐。
+
+**Choose which**：
+
+- 数据充足、正常偏好对 → DPO；
+- 数据噪声大 → IPO；
+- 只有二元标签 → KTO；
+- 想省显存 → SimPO；
+- 想跳过 SFT → ORPO。
+
+各有场景，DPO 依然是最主流的默认。
+
+## 9. On-policy vs Off-policy 的问题
+
+DPO 有个理论上的软肋：**它是 off-policy 的**——偏好数据里的回答不是当前模型采样出来的，而是别的模型（或人类）的输出。
+
+理论上 PPO 是 on-policy 的——它每步都用当前 policy 采样，直接优化当前模型的分布。这被认为是 PPO 上限比 DPO 高的一个原因。
+
+**Iterative DPO**：一个折中方案。
+
+- 第一轮：用 SFT 采样得到候选，标 chosen/rejected，DPO 训一次；
+- 第二轮：用第一轮 DPO 之后的模型再采样，重新标注，DPO 训第二次；
+- 循环几次。
+
+这样每一轮的偏好数据都来自"最新模型"，接近 on-policy。**Iterative DPO 在很多榜单上超过了标准 DPO**，但工程复杂度显著提高。
+
+Llama-3-Instruct 就用了 iterative DPO。
+
+## 10. 一些实践细节
+
+**Reference 冻结但不能省显存太多**。Reference 只需要前向，不需要梯度，但**权重依然要在显存里**。7B 的 reference 是 14GB。别指望它免费。
+
+**Log-prob 是逐 token 求和的**。`log π(y|x)` 是 y 序列所有 token log-prob 的和。所以**长序列的样本 loss 权重自然更大**。有些实现会做长度归一化（除以序列长度），但**这不是标准 DPO**——加了长度归一化的其实变成了 SimPO 的一部分。
+
+**Chosen 和 rejected 应该配对同一个 prompt**。有些数据集是"chosen 和 rejected 来自不同 prompt"——这不是 DPO 数据，是 KTO 数据。
+
+**数据不平衡的处理**。如果 chosen 平均比 rejected 长 3 倍，会引入长度 bias——模型学会"生成长回答就是好"。这是 RLHF 里的经典 reward hacking，DPO 里同样存在。**做数据时保证 chosen 和 rejected 长度分布接近**。
+
+**评估很难**。跟前面说过的一样——loss 好 ≠ 模型好。要在 MT-Bench、AlpacaEval、Arena Hard 上评。或者做 A/B 测试让人评。别只看 loss。
+
+## 11. 一句话总结
+
+DPO 是当前开源社区最实用的对齐方法：
+
+- **核心**：SFT 之上的偏好微调，用一个监督 loss 替代 PPO；
+- **数据**：几千到几万条 (prompt, chosen, rejected)；
+- **关键超参**：β（KL 强度，一般 0.1）、LR（5e-7 到 5e-6，比 SFT 小 10 倍）、epoch（1）；
+- **故障排查**：看 reward_margin、看 chosen/rejected 各自的 log-prob 变化；
+- **变种**：IPO / KTO / SimPO / ORPO / Iterative DPO，各有取舍。
+
+DPO 训练相对稳，但**对数据质量极其敏感**。你数据造得好，DPO 会让模型明显变强；数据造得糙，DPO 只会让模型变得单调、模板化、甚至变笨。
+
+下一章我们回到参数高效微调的世界，看看 LoRA 之后又冒出来的一堆变种。
+
+</WordCount>

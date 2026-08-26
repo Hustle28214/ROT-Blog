@@ -1,0 +1,335 @@
+import WordCount from '../../../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+前面九章讲的都是"该做什么"。这一章讲的是最直接的问题——**用什么框架**。
+
+开源社区里能做微调的框架有一大堆——**TRL、LLaMA-Factory、Axolotl、Unsloth、DeepSpeed、Megatron-LM、Accelerate**。选起来眼花缭乱。这一章把主流的几个框架特点、适用场景、优缺点讲清楚，让你不用把每个都试一遍。
+
+## 1. 一张地图
+
+先按"抽象层次"给这些框架排个顺序：
+
+**低层次（Kernel / 并行）**：
+
+- **PyTorch**（默认）
+- **DeepSpeed**（分布式训练库，ZeRO 的实现者）
+- **Megatron-LM**（NVIDIA 的巨型模型训练框架）
+- **FSDP**（PyTorch 原生分布式）
+
+**中层次（训练循环）**：
+
+- **HuggingFace Accelerate**（分布式训练的封装）
+- **HuggingFace Trainer**（更高级的 Trainer 抽象）
+
+**高层次（微调专用工具）**：
+
+- **TRL**（HuggingFace 的 RLHF/DPO/SFT 库）
+- **PEFT**（HuggingFace 的 PEFT 库）
+
+**最高层次（YAML / CLI 一键微调）**：
+
+- **LLaMA-Factory**
+- **Axolotl**
+- **Unsloth**
+
+**你越往上走，能改的越少，但用起来越方便**。绝大多数微调任务，你应该从最高层开始。
+
+## 2. LLaMA-Factory：最全能的选择
+
+**LLaMA-Factory** 是最近两年最流行的一体化微调工具。
+
+**特点**：
+
+- 支持几乎所有主流开源模型（LLaMA 系列、Qwen、DeepSeek、Yi、Baichuan、Mistral、Gemma...）；
+- 支持 **CPT、SFT、DPO、PPO、ORPO、SimPO、KTO** 全套；
+- 支持 LoRA、QLoRA、GaLore 等 PEFT 方法；
+- 支持全参数、LoRA、QLoRA 训练；
+- 有 web UI（可以点点点微调）；
+- 中文文档完善；
+- 中文社区活跃。
+
+**上手最快**。一份 YAML 文件就能启动：
+
+```yaml
+model_name_or_path: Qwen/Qwen2.5-7B
+stage: sft
+do_train: true
+dataset: alpaca_zh
+template: qwen
+finetuning_type: lora
+lora_target: all
+output_dir: ./saves/qwen-7b-sft-lora
+per_device_train_batch_size: 2
+gradient_accumulation_steps: 8
+learning_rate: 5e-5
+num_train_epochs: 3.0
+lr_scheduler_type: cosine
+bf16: true
+```
+
+```bash
+llamafactory-cli train config.yaml
+```
+
+**优势**：功能齐全、社区活跃、中文用户友好。
+
+**缺点**：
+
+- 抽象层次很高，深度定制困难；
+- 训练配置多，参数繁杂，学习曲线偏抖；
+- 某些边缘特性可能有 bug（社区在快速迭代）。
+
+**推荐场景**：**大部分开发者的默认选择**。你如果不知道用什么，就用它。
+
+## 3. Axolotl：另一个热门选择
+
+**Axolotl** 是另一个非常流行的一体化微调框架。风格类似 LLaMA-Factory，但更"工程化"一些。
+
+**特点**：
+
+- YAML 配置驱动；
+- 支持 SFT、DPO、KTO、ORPO 等；
+- 支持 LoRA、QLoRA、全参数；
+- 集成 DeepSpeed、FSDP、Multi-node 训练；
+- 英文社区活跃，Discord 有大量用户。
+
+**和 LLaMA-Factory 的区别**：
+
+- Axolotl 更"面向 SRE"——配置更接近底层，适合有工程经验的人；
+- LLaMA-Factory 更"面向研究员"——配置更简洁，改一改就能跑；
+- Axolotl 英文文档更完善，LLaMA-Factory 中文文档更完善。
+
+**推荐场景**：英文社区、需要更多工程灵活性、多机训练。
+
+## 4. Unsloth：追求速度的选择
+
+**Unsloth** 是一个专门做"极速微调"的框架。
+
+**特点**：
+
+- **自研 CUDA kernel**——SFT/DPO 训练速度比标准 HuggingFace 快 2-5 倍；
+- **显存节省 50-80%**（QLoRA 场景）；
+- 支持 LLaMA、Mistral、Gemma 系列；
+- API 简洁，几十行代码微调；
+- 一张 24GB 消费卡能微调更大的模型。
+
+**核心优势**：**速度**。同样的 7B QLoRA 训练，Unsloth 可能 20 分钟跑完，LLaMA-Factory 要 60 分钟。
+
+**代价**：
+
+- **模型支持范围窄**：主要是 LLaMA 家族，对 Qwen、DeepSeek 等的支持可能滞后；
+- **多机训练支持有限**：主要是单机场景；
+- **免费版有些限制**（多机、大规模需要 pro）。
+
+**推荐场景**：
+
+- 单机小规模微调，追求速度；
+- 只微调 LLaMA / Mistral / Gemma；
+- 消费级 GPU（4090、3090）用户。
+
+## 5. TRL：库级的选择
+
+**TRL（Transformer Reinforcement Learning）** 是 HuggingFace 自己的 RLHF 库。它比上面三个抽象层低一些——**你直接用 Python 代码写训练脚本**，而不是配 YAML。
+
+**特点**：
+
+- 提供 `SFTTrainer`、`DPOTrainer`、`PPOTrainer`、`RewardTrainer` 等；
+- 完全基于 HuggingFace 生态（transformers、accelerate、peft）；
+- API 灵活，可以深度定制；
+- 官方维护，更新频率高。
+
+**用法**：
+
+```python
+from trl import SFTTrainer, SFTConfig
+from datasets import load_dataset
+
+trainer = SFTTrainer(
+    model="Qwen/Qwen2.5-7B",
+    args=SFTConfig(output_dir="./output", num_train_epochs=2, ...),
+    train_dataset=load_dataset(...)["train"],
+)
+trainer.train()
+```
+
+**推荐场景**：
+
+- 想深度定制训练循环（比如加自定义 loss、自定义 sampler）；
+- 想集成到自己的项目里（不是独立训练）；
+- 学习 RLHF 的实现细节。
+
+**不推荐场景**：只是想快速训一个模型——用 LLaMA-Factory 更省事。
+
+## 6. DeepSpeed 和 FSDP
+
+这两个是**分布式训练的底层库**——大部分情况下你不会直接用，而是通过上面框架"间接"使用。
+
+**DeepSpeed**：
+
+- Microsoft 出品；
+- 核心是 **ZeRO**（数据并行的显存优化）；
+- 支持 ZeRO-1/2/3 三档；
+- 支持 CPU offload、NVMe offload（把优化器状态放到 CPU 或 SSD）；
+- 有一些不错的推理优化（DeepSpeed-Inference）。
+
+**FSDP（Fully Sharded Data Parallel）**：
+
+- PyTorch 原生实现；
+- 概念上等价于 ZeRO-3；
+- 集成度更好（不需要额外配置文件，就是 PyTorch API）；
+- 现在越来越多被推荐用来替代 DeepSpeed ZeRO-3。
+
+**什么时候直接用**：
+
+- 训练模型很大（30B+ 全参数），需要精细控制并行策略；
+- 特殊的 checkpoint 处理需求；
+- 深度性能调优。
+
+**LLaMA-Factory / Axolotl 都能一键选择用 DeepSpeed 或 FSDP**，不需要你直接调。
+
+## 7. Megatron-LM 和大规模训练框架
+
+**Megatron-LM**（NVIDIA）：为**巨型模型训练**设计的框架。支持 tensor 并行、pipeline 并行、context 并行。真正上千亿模型训练的时候会用到。
+
+**Megatron-DeepSpeed**：Megatron + DeepSpeed 的组合，两者都出现在最新的大规模训练里。
+
+**NeMo**（NVIDIA）：更高层的包装，把 Megatron 变得更容易上手。
+
+**大部分人用不到这些**。它们是训练百亿级以上模型时的选择——需要有 GPU 集群、有工程团队。**中小型微调完全不需要**。
+
+## 8. 大概的选型建议
+
+按场景给个决策：
+
+**小模型 + 消费卡**（7B/13B，1-2 张 4090）：**Unsloth** 或 **LLaMA-Factory**。前者更快，后者更全。
+
+**中模型 + 单机 A100/H100**（7-70B，1-8 张 A100）：**LLaMA-Factory** 或 **Axolotl**。都够用。
+
+**大模型 + 多机**（70B+，多节点）：**LLaMA-Factory / Axolotl + DeepSpeed / FSDP**。上层框架 + 底层并行库配合。
+
+**研究性质、想改训练逻辑**：**TRL + accelerate**。低抽象、高定制。
+
+**巨型模型全参数训练**（100B+）：**Megatron / NeMo**。这个规模已经超出了个人和小团队的范畴。
+
+**RLHF PPO 训练**：**TRL** 或者 **OpenRLHF**。PPO 比 SFT / DPO 复杂得多，通用框架支持有限。
+
+## 9. 效率对比（大概值）
+
+给一个直观感受（不同框架、7B QLoRA、单张 A100）：
+
+| 框架 | 训练速度 | 显存效率 | 上手成本 | 灵活性 |
+|------|--------|--------|--------|-------|
+| Unsloth | ★★★★★ | ★★★★★ | 简单 | 中等 |
+| LLaMA-Factory | ★★★☆ | ★★★★ | 简单 | 中等 |
+| Axolotl | ★★★☆ | ★★★★ | 中等 | 中高 |
+| TRL 手写 | ★★★ | ★★★☆ | 中等 | 高 |
+| Naive HF Trainer | ★★ | ★★★ | 复杂 | 高 |
+
+**不同任务上表现会有出入**。但 Unsloth 在小规模场景下的速度优势基本是碾压性的。
+
+## 10. 各框架的一些"陷阱"
+
+**LLaMA-Factory**：
+
+- `template` 参数一定要选对，不同模型的 template 不同——**选错等于没微调**；
+- 数据集配置在 `dataset_info.json` 里，容易漏配；
+- 多 GPU 训练需要 `--do_train --deepspeed ...` 组合，配置不当会 hang。
+
+**Axolotl**：
+
+- Dataset 配置的 template 匹配容易出错；
+- 需要熟悉 Docker，虽然可以裸装；
+- 版本升级偶尔有 breaking change。
+
+**Unsloth**：
+
+- 部分自定义 kernel 只支持特定 GPU 架构（A10/A100/H100 好，V100/T4 支持有限）；
+- 对新模型的支持有滞后；
+- 免费版对 multi-GPU 有限制。
+
+**TRL**：
+
+- API 在 0.7-0.10 之间有过较大变动，教程可能过时；
+- DPO/PPO 的默认超参不一定合适，需要自己调；
+- 一些 edge case（多轮 DPO、mask 处理）需要小心。
+
+## 11. 一个健康的选型流程
+
+新项目开始时：
+
+1. **原型阶段**：Unsloth（如果 LLaMA 系）或 LLaMA-Factory，快速验证数据和方法是否有效。用 QLoRA、小规模。
+2. **验证阶段**：切到 LLaMA-Factory 或 Axolotl 做正式的一轮训练。中等规模、可能全参数。
+3. **规模化阶段**：如果模型很大或数据很多，可能要用 DeepSpeed 或 Megatron 深度调优。
+4. **生产化阶段**：稳定训练流程后，可能写自己的 wrapper 或者 fork 一个框架做定制。
+
+**不要一上来就选最强大的**——多数团队最后发现 LLaMA-Factory 就够用。
+
+## 12. 一些工具生态的相关组件
+
+除了微调框架本身，一个完整的微调工作流还需要：
+
+**数据处理**：
+
+- `datasets`（HuggingFace）——加载和处理数据集；
+- `deduplicate-text-datasets`——数据去重；
+- `text-dedup`——大规模文本去重。
+
+**Tokenizer**：
+
+- `tokenizers`（HuggingFace）——快速 tokenizer；
+- `tiktoken`（OpenAI）——BPE 计数；
+- `sentencepiece`（Google）——SentencePiece 训练。
+
+**推理**：
+
+- `vLLM`——生产级推理服务；
+- `TGI`（HuggingFace Text Generation Inference）——生产推理；
+- `SGLang`——新一代推理框架；
+- `llama.cpp` / `MLX`——本地/边缘推理。
+
+**评估**：
+
+- `lm-evaluation-harness`——标准 benchmark 运行；
+- `openinstruct evaluator`（Allen AI）——多任务评估；
+- `Chatbot Arena` 相关工具。
+
+**模型合并**：
+
+- `MergeKit`（前面章节讲过）。
+
+**实验管理**：
+
+- `Weights & Biases`——训练指标可视化，实验跟踪；
+- `MLflow`——模型管理；
+- `TensorBoard`——本地训练可视化。
+
+**这一整套生态是"跑通一次微调"必要的组件**。掌握组合而不是单独用某一个。
+
+## 13. 一句话总结
+
+微调框架的选择：
+
+- **想快、单机、LLaMA 系** → Unsloth；
+- **想全能、通用** → LLaMA-Factory；
+- **想工程化、多机** → Axolotl；
+- **想定制、写代码** → TRL；
+- **超大模型** → Megatron / NeMo。
+
+**大部分场景 LLaMA-Factory 就够**——它是当前最平衡的选择。不知道用啥就从它开始。
+
+---
+
+到这里，微调专题的 10 章讲完了。加上前面章节的 SFT、RLHF、LoRA 三篇总览，覆盖了微调从**决策 → 数据 → 训练 → 评估 → 部署**的完整链路：
+
+- **决策**：01 路线全景；
+- **数据**：02 CPT + 03 SFT 数据构造；
+- **训练**：04 DPO 实战 + 05/06 PEFT 方法；
+- **特殊场景**：07 长上下文 + 08 模型合并；
+- **闭环**：09 评估 + 10 框架选择。
+
+微调这件事的复杂性主要不在算法——主流算法就是 SFT、DPO、LoRA 那几个。真正复杂的是**"根据任务选对路径、数据造对、评估做对"**。这个专题里的每一章都在解决这些"选择和判断"问题。
+
+祝你训到自己想要的模型。
+
+</WordCount>

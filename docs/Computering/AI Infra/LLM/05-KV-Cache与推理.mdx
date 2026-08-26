@@ -1,0 +1,209 @@
+import WordCount from '../../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+这一章讲 LLM 推理里最关键的一个优化——**KV Cache**。这个东西说起来极其简单，但整个 LLM 推理系统都是围着它转的。搞明白它，你就能理解为什么"大模型推理是访存瓶颈"、为什么 GPU 显存显得那么不够用、为什么 vLLM 和 PagedAttention 有这么大影响。
+
+## 1. 一个朴素问题：生成一句话要算多少次
+
+先做个思想实验。假设 base model 已经训好了，我们让它生成"今天天气真好"这句话。
+
+按最朴素的做法：
+
+**第 1 步**：输入 `["今天"]`，一次前向，输出下一个 token 分布，采样得到 `"天"`。
+**第 2 步**：输入 `["今天", "天"]`，一次前向，采样得到 `"气"`。
+**第 3 步**：输入 `["今天", "天", "气"]`，一次前向，采样得到 `"真"`。
+**第 4 步**：输入 `["今天", "天", "气", "真"]`，一次前向，采样得到 `"好"`。
+
+每一步都要把**从头到当前**的序列完整过一遍模型。生成 n 个 token 就要跑 n 次前向。
+
+**这里有一个巨大的浪费**。第 2 步在算注意力时，位置 "今天" 那部分的 K、V 向量、第 1 步就已经算过了。第 3 步又要算一遍。第 4 步再算一遍。整个生成过程，早期 token 的 K、V 会被重复计算 O(n) 次。
+
+**能不能把算过的 K、V 存下来重复用？**——可以，这就是 KV Cache。
+
+## 2. 为什么只 cache K 和 V（不 cache Q）
+
+回到注意力公式：
+
+$$
+\text{Attention}(Q, K, V) = \text{softmax}\left(\frac{QK^\top}{\sqrt{d_k}}\right)V
+$$
+
+在自回归生成里，**每一步我们只关心"最新那个 token"的输出**。也就是说，**Q 只需要新 token 那一行**。但 K、V 需要**所有历史 token 的完整列表**——新 token 要和它们全部做注意力。
+
+所以：
+
+- 新 token 的 Q：**每次现算**（只有一行，很便宜）；
+- 所有历史 token 的 K、V：**存下来，每次续写只需要多加新那一行**。
+
+这就是"KV Cache"这个名字的由来——只 cache K 和 V。
+
+## 3. 有了 KV Cache 之后，每一步做什么
+
+回到刚才生成"今天天气真好"的例子，加上 KV Cache 之后：
+
+**第 1 步（Prefill 阶段）**：输入 `["今天"]`——把 prompt 完整过一遍模型，**顺便把每一层的 K、V 都存到 cache 里**。得到下一个 token 分布，采样 `"天"`。
+
+**第 2 步（Decode 阶段）**：输入只有 `"天"` 这一个 token。它经过 embedding → attention。**注意力这里的关键**：只算 `"天"` 的 Q、K、V，然后把它的 K、V **append 到 cache**里，Q 去和 cache 里全部 K、V 做注意力。得到 `"天"` 的输出，投影到词表，采样得到 `"气"`。
+
+**第 3 步、第 4 步…**：同样，每次只处理一个新 token，K、V append 进 cache。
+
+**注意到什么区别了吗？**
+
+- 第 1 步：**输入 n 个 token（prompt 全长），一次算完**——**计算密集**。
+- 第 2、3、4…步：**每次只输入 1 个 token**——**访存密集**（要把整个模型权重和 KV Cache 都从显存搬到 SM）。
+
+这就是 LLM 推理里最本质的一个不对称：**prefill 是 compute-bound，decode 是 memory-bound**。所有推理系统的设计都从这里出发。
+
+## 4. Prefill vs Decode：完全不同的两种负载
+
+再展开一下。假设 batch=1、模型 7B、prompt 长度 512。
+
+**Prefill 一次前向**：
+
+- 前向要过 512 个位置。每个位置都算完整的 attention + FFN。
+- Attention 里 QKV 是 `(512, d)` 矩阵，`QK^T` 是 `(512, 512)`。这是一个正儿八经的矩阵乘，GPU 可以打满。
+- 整个 prefill 阶段约做 `2 × N × 512` 次浮点运算（N 是参数量），大约 **7.2 TFLOPs**。A100 有 312 TFLOPs 的 BF16 峰值算力，理论上 20ms 就够。
+
+**Decode 一次前向**：
+
+- 只处理 1 个新 token。
+- Attention 里 Q 是 `(1, d)`，K、V 是 cache 里的 `(seq_len, d)`。`QK^T` 是 `(1, seq_len)`，只是一个 GEMV，算力用不了多少。
+- 但**要把整个模型权重（14GB）过一遍**。GPU 内存带宽约 2TB/s，把 14GB 搬一遍需要 **7ms**。
+- **计算只需几十微秒，但访存要 7ms**。所以瓶颈是访存。
+
+结论：**decode 的时间 ≈ 权重大小 / 显存带宽**。这个公式非常有用——你能直接估出模型的推理速度上限。
+
+7B 模型 BF16 权重 14GB，A100 带宽 2TB/s，理论 tokens/s ≈ 2000/14 ≈ **143 tokens/s**。实际能到 60-100 tokens/s，因为还有别的开销。
+
+这也解释了**量化为什么这么重要**——INT4 后权重变成 3.5GB，同样带宽下速度直接翻 4 倍。量化不是为了省显存，主要是为了**加速**。
+
+## 5. KV Cache 有多大
+
+KV Cache 的大小是 LLM 推理里"藏着的显存怪兽"。
+
+一层一个 token 一个 head，K 和 V 各占 `d_head` 个数。所以每 token 每层的 KV 大小是 **2 × n_heads × d_head = 2 × d**（因为 `n_heads × d_head = d`）。总大小是：
+
+$$
+\text{KV Cache} = 2 \times L \times d \times \text{seq\_len} \times \text{batch} \times \text{bytes\_per\_element}
+$$
+
+- L：层数
+- d：隐藏维度
+- 2：K 和 V 各一份
+- BF16 每元素 2 字节
+
+**LLaMA-2 7B** 举例，L=32、d=4096、BF16：
+
+- 每 token 每层 KV：`2 × 4096 × 2 = 16 KB`
+- 每 token 整个模型 KV：`16 KB × 32 = 512 KB`
+- **序列 4K token、batch 1** 的总 KV Cache：`512 KB × 4096 = 2 GB`
+- **batch 16 的话**：`2 GB × 16 = 32 GB`
+
+看到了吗？**batch 16、seq 4K，KV Cache 就要 32GB**——比模型本身还大。序列拉到 128K 呢？直接爆。
+
+**KV Cache 是限制批处理和长上下文的头号敌人**。所以有一堆优化专门冲它：
+
+- **MQA / GQA**：让多头共享 K、V，减少 KV Cache（后面讲）；
+- **PagedAttention**：像操作系统的分页管理 KV Cache，减少碎片（vLLM 的核心）；
+- **量化 KV Cache**：把 KV Cache 从 BF16 压到 INT8/INT4；
+- **窗口注意力**：只保留最近 N 个 token 的 KV。
+
+## 6. MQA 和 GQA：从多头 KV 到少头 KV
+
+多头注意力里，8 个头就有 8 份 Q、K、V。**KV Cache 大小和头数成正比**。
+
+**MQA（Multi-Query Attention）**：让所有 Q 头共享同一份 K、V。这样 KV Cache 从 `n_heads × d_head` 降到 `1 × d_head`——**头数是几十的话，KV Cache 直接砍到几十分之一**。
+
+但代价明显：K、V 的表达能力变弱了。原来每个头有专属的"关注视角"，现在都用同一份 K、V，能表达的关系变少。
+
+**GQA（Grouped-Query Attention）**：折中方案。把 h 个头分成 g 组（g 一般是 8），每组共享一份 K、V。所以 K、V 头数从 h 变成 g。
+
+- MHA：h 个 KV，全表达能力，KV Cache 大；
+- MQA：1 个 KV，最省，但效果掉；
+- GQA：g 个 KV，几乎不掉效果，KV Cache 砍到 h/g 分之一。
+
+LLaMA-2 70B、LLaMA-3 8B/70B、Qwen 都用 GQA（g=8）。这已经是主流选择。
+
+## 7. PagedAttention 和 vLLM 的贡献
+
+现在到了 LLM 推理系统里最漂亮的一个工程创新。
+
+**传统 KV Cache 的问题**：
+
+假设 batch 里有 4 个请求，每个的 max_new_tokens 都是 512。传统做法是：**给每个请求预分配一块 `512 × per_token_size` 的连续显存**。
+
+问题在于：
+
+1. **实际生成长度可能远小于 512**——预分配的空间大部分浪费。
+2. **不同请求生成长度不同**——有些 100 token 就结束了，那块 512 的空间大部分空着，直到整个 batch 都结束才能释放。
+3. **动态加入新请求**——如果一个已有请求还没结束，一块显存被占着，新请求进不来。
+
+这种"预分配大块连续空间"的方式，就像 malloc 不带 free——非常浪费。
+
+**PagedAttention 的做法**：向操作系统学习——**把 KV Cache 分成固定大小的"页"（block）**，一页管 16 个 token 的 KV。给一个请求分配 KV 空间时，只按需分配页——需要 100 个 token，就分 7 页；需要 4000 个 token，就分 250 页。**页可以在物理显存里非连续，通过"页表"逻辑上串起来**。
+
+这样：
+
+- **没有内部碎片**：每页 16 个 token 都用满；
+- **动态分配**：请求生成到哪里，分配到哪里；
+- **共享 prompt**：多个请求共用一个 prompt（比如 few-shot 场景），可以让它们的 KV Cache 页共享，**引用计数管理**——就像操作系统的页共享一样。
+
+这个思路是 **vLLM**（2023 UC Berkeley）提出来的。它让 LLM 推理系统的吞吐量提升了 3-5 倍，是当前几乎所有开源推理框架的基础。
+
+## 8. Continuous Batching：不再等最慢的那个
+
+传统 batch 有个特点：**要等整个 batch 里最慢的那个结束**。如果 batch 里有一个请求要生成 512 个 token、另一个只要生成 20 个，那 20 token 那个跑完之后，那块位置就空着，等 512 那个跑完才能开始下一个 batch。
+
+**Continuous Batching**（连续批处理，一些框架叫 in-flight batching）的做法：**每一步 decode 都可以插入/退出请求**。一个请求生成结束了就立刻退出，空出来的位置立刻放入下一个请求。整个系统像流水线一样，"每 step 都是一个动态 batch"。
+
+Continuous batching + PagedAttention 是现代 LLM 推理系统的两大基石。vLLM、TGI、SGLang、TensorRT-LLM 都是这么做的。
+
+## 9. Prefill 和 Decode 要不要分开跑
+
+前面提到 prefill 和 decode 计算特征完全不同——一个 compute-bound，一个 memory-bound。混在一起有个尴尬的问题：
+
+**Prefill 会阻塞 decode**。假设你正在给 8 个用户流式吐字（decode），来了一个新用户，需要 prefill 一段 4K 的 prompt。prefill 要独占 GPU 一小段时间（比如 200ms），这 200ms 里那 8 个用户全都停止吐字，用户体验很差——**明显的卡顿**。
+
+**Chunked Prefill**：把一次长 prefill 切成多个小 chunk（比如每次处理 512 token 的 prefill），穿插在 decode 之间。这样 decode 不会被完全阻塞。
+
+**PD 分离（Prefill-Decode Disaggregation）**：更激进的做法——**把 prefill 和 decode 放到不同的 GPU 上**。prefill GPU 专门跑 prefill、decode GPU 专门跑 decode。prefill 完成后通过 KV Cache 的传输把状态迁移到 decode GPU。这个方案在 DeepSeek 的推理系统、Mooncake 里都有采用。
+
+## 10. 一些实际的数字感
+
+给几个直观数字，方便你判断"某个模型能不能跑起来"：
+
+**7B 模型（BF16 权重 14GB）在 A100 80G 上**：
+
+- 权重占 14GB，剩 66GB 给 KV Cache；
+- 每 token 每层 KV Cache 16KB（GQA 后大概 4KB），一共 32 层；
+- 每 token KV：**128KB**（GQA 后）；
+- 66GB / 128KB ≈ 500K 个 token；
+- 如果单请求上下文 4K：**能同时跑 128 个请求**；
+- 如果 32K 上下文：**只能跑 16 个请求**。
+
+**70B 模型（BF16 140GB）**：单卡塞不下，至少 2 张 A100 80G 或者更多。张量并行切开权重之后，KV Cache 也跟着切。剩余显存能塞多少并发和上下文，是部署时最重要的数字。
+
+**上下文长度决定并发数**。同一台机器，跑 4K 上下文能同时服务几百请求，跑 128K 上下文只能服务十几个。所以当你听说"某模型支持 1M 上下文"时——它支持是一回事，能不能便宜地服务用户是另一回事。
+
+## 11. 一些容易忽视的坑
+
+**KV Cache 的显存分配要在启动时预留**。你启动 vLLM 时看到一个参数 `gpu_memory_utilization=0.9`，就是让它拿 90% 的显存来做 KV Cache 池。这个池是启动时分配的，不是运行时按需 malloc——**运行时按需分配显存 fragment 太多，且慢**。
+
+**长上下文推理时 attention 才是瓶颈**。前面说 decode 是 memory-bound，主要是模型权重的搬运。但**当序列足够长（几万 token），KV Cache 的访存也会变成主要开销**——每 step decode 都要把整个 KV Cache 过一遍算注意力。所以长上下文的推理速度会随 seq_len 线性变慢。
+
+**Flash Attention 主要救的是 prefill**。它把注意力的中间矩阵不落地，直接在 SRAM 里算完，省显存加速 prefill。但对 decode 阶段帮助不大——decode 每步只有一个 query，本来就不用落什么中间矩阵。
+
+**batch 越大不一定越快**。batch 越大，权重的搬运可以摊到更多 token 上，decode 的 tokens/s 变高。但 batch 大了 KV Cache 占用也大，可能挤爆显存或者被换出。找一个"甜蜜点"通常需要实测。
+
+## 12. 一句话总结
+
+KV Cache 是 LLM 推理里最重要的优化，也是所有推理系统设计的起点：
+
+- **不 cache**：生成 n 个 token 要 O(n²) 计算——不可用；
+- **朴素 cache**：静态分配、内部碎片、请求间没法共享——vLLM 之前的做法；
+- **PagedAttention + Continuous Batching**：动态分页、连续批处理、prompt 共享——当前 SOTA。
+
+理解了 KV Cache，你就理解了为什么现代 LLM 推理系统长成 vLLM 的样子。下一章讲**从 logits 到 token 的最后一步**——采样策略。
+
+</WordCount>

@@ -2,7 +2,153 @@ import WordCount from '../../../../src/components/WordCount/WordCount';
 
 <WordCount>
 
-## 
+# Shi-Tomasi 角点检测：为什么"最小特征值"比 Harris 的 $R$ 更好用
 
+1994 年 CVPR 上 Jianbo Shi 和 Carlo Tomasi 发了一篇题目起得极其自信的论文——《Good Features to Track》。这个标题里的每个词都在挑刺：什么叫"好"？什么样的特征叫"good features"？这个"track"是什么意思，为什么和检测挂上钩？
+
+答案藏在 Tomasi 前几年和 Kanade 一起做的**KLT 特征追踪器**里。KLT 每帧要在小窗口里解一个 $2\times 2$ 的线性方程，方程可解性依赖于同一个矩阵 $M$——就是[Harris](./Harris角点检测.mdx) 里的自相关矩阵。所以 Shi 和 Tomasi 提出：**别单独设计一个"角点检测子"，检测的目标就应该是"下游追踪能可靠工作的点"**。这是一个思路上的调转——从"数学上像角的点"到"工程上能追踪的点"。
+
+## 1. KLT 追踪器把角点检测的目标改写了
+
+KLT 的核心是：给两帧图像 $I(x,y,t)$ 和 $I(x,y,t+1)$，在某个特征点 $(x,y)$ 周围小窗口 $W$ 内，寻找位移 $\mathbf{d}=(u,v)$ 使得
+
+$$
+\sum_{W} \bigl[I(x+u,y+v,t+1)-I(x,y,t)\bigr]^2
+$$
+
+最小。对 $I$ 做泰勒展开、令导数为 0，得到线性方程：
+
+$$
+M\,\mathbf{d} = \mathbf{b},\quad M=\sum_W \begin{bmatrix}I_x^2 & I_x I_y \\ I_x I_y & I_y^2\end{bmatrix},\quad \mathbf{b}=-\sum_W (I_t)\begin{bmatrix}I_x \\ I_y\end{bmatrix}
+$$
+
+数值稳定地解出 $\mathbf{d}$，要求 $M$ **可逆且良态**，即两个特征值 $\lambda_1\ge\lambda_2$ 都要大、条件数 $\lambda_1/\lambda_2$ 不要太大。反过来说，KLT 追踪成功的必要条件就是 $\lambda_2$（较小的那个）足够大。
+
+Shi 和 Tomasi 由此得出结论：**要选被追踪能成功的点，就直接检验 $\lambda_2$**。
+
+## 2. Shi-Tomasi 响应函数
+
+替换 Harris 的响应 $R = \det M - k(\text{tr}\,M)^2$，Shi-Tomasi 直接用
+
+$$
+R_\text{ST} = \min(\lambda_1, \lambda_2)
+$$
+
+阈值判断：$R_\text{ST} > \tau$ 则为角点。就这么一行——比 Harris 的公式还简单。
+
+看上去只是把两个特征值的"某个组合"换成了"较小的那个"，为什么这个更好？下面从三个角度说。
+
+### 2.1 响应函数在特征值平面上的等高线
+
+把 $\lambda_1, \lambda_2$ 当做二维坐标，两个响应函数的等高线：
+
+```
+Harris R = λ₁λ₂ − k(λ₁+λ₂)²           Shi-Tomasi R = min(λ₁,λ₂)
+
+λ₂                                       λ₂
+ ↑                                        ↑
+ │      · · · · ·                         │  ┃ ┃ ┃ ┃
+ │  ·············                         │  ┃ ┃ ┃ ┃
+ │  · · · · · · ·                         │  ┃ ┃ ┃ ┃  ← 竖直线
+ │  ·············    ← 双曲线状           │  ┃ ┃ ┃ ┃
+ │  · · · · · · ·                         │  ┃ ┃ ┃ ┃
+ │──────────────→ λ₁                      │──────────→ λ₁
+```
+
+Harris 的等高线是双曲线，允许"一个大一个小"通过很低的 $\lambda_2$——只要 $\lambda_1$ 够大也能让 $R$ 过阈值（虽然 $k$ 项会把边缘拉到负值）。Shi-Tomasi 的等高线是与 $\lambda_1=\lambda_2$ 平行的**竖直线**，卡死了下界。
+
+这在实际图像上意味着什么？**Shi-Tomasi 对"接近边缘"的点更严厉**。同样的场景，Harris 会在长条形结构的端点附近保留一些勉强算角的点，Shi-Tomasi 会直接拒绝——因为它们的 $\lambda_2$ 不够。追踪的角度看，那些点确实不该被追踪，因为 KLT 在它们上会解出病态方程。
+
+### 2.2 没有神秘参数 $k$
+
+Harris 的 $k\in[0.04,0.06]$ 是经验值，不同图像最优 $k$ 不同。Shi-Tomasi 只有一个阈值 $\tau$，且这个阈值有物理意义——它是 $\lambda_2$ 的下限，直接对应 KLT 方程条件数。工程上少一个可调参数就少一处调参痛苦。
+
+### 2.3 数值稳定性
+
+$k(\lambda_1+\lambda_2)^2$ 是两个大数的平方，浮点数下和 $\det$ 相减容易发生**灾难性相消**。当图像有大梯度区域（$\lambda_1,\lambda_2$ 都很大），Harris 的 $R$ 可能在正负之间跳变。$\min(\lambda_1, \lambda_2)$ 没有这个问题。
+
+## 3. 计算 $\min(\lambda_1, \lambda_2)$：还是要开方吗
+
+Harris 当年避免开方是因为 1988 年的硬件贵。到了 1994 年、更到 2020 年之后，一次浮点开方对现代 CPU 已经无关紧要。$2\times 2$ 矩阵特征值的闭式解：
+
+$$
+\lambda_{1,2} = \frac{\mathrm{tr}\,M \pm \sqrt{(\mathrm{tr}\,M)^2 - 4\det M}}{2}
+$$
+
+一个平方根、一个减法，就出 $\lambda_2$。OpenCV 里的 `cv2.cornerMinEigenVal` 就是直接算这个。
+
+## 4. `goodFeaturesToTrack`：Shi-Tomasi 的工程封装
+
+OpenCV 里最常用的角点检测 API 是 `cv2.goodFeaturesToTrack`，直接叫这个名字——Good Features to Track，就是那篇论文的标题。签名：
+
+```python
+corners = cv2.goodFeaturesToTrack(
+    image,
+    maxCorners=100,      # 最多返回多少个
+    qualityLevel=0.01,   # 阈值 = qualityLevel × 最大响应值
+    minDistance=10,      # 角点之间最小距离
+    blockSize=3,         # 计算 M 的邻域尺寸
+    useHarrisDetector=False,  # False 用 Shi-Tomasi，True 用 Harris
+    k=0.04               # 只有 Harris 用
+)
+```
+
+几个参数值得说：
+
+- `qualityLevel`：不是绝对阈值，而是**相对最大响应**的比例。这是聪明的默认——阈值随场景自适应，白天户外和夜晚室内不用重设
+- `minDistance`：NMS 之后再做一次"点之间必须离多远"的稀疏化，保证特征在图像上**均匀分布**。这对 KLT 追踪很重要——一堆挤在一起的角点冗余，均匀分布的角点能覆盖更多几何结构
+- `blockSize`：Harris 里对应高斯窗口。这里是矩形窗（原始 Shi-Tomasi 论文用的就是矩形），实践上 $3\sim 5$ 够用
+
+工程实现的完整流水线：
+
+```
+1. 计算图像梯度 Ix, Iy
+2. 对每个像素计算 M 的三个分量 Ixx, Iyy, Ixy 的窗口和
+3. 计算 min(λ1, λ2) → 响应图
+4. 阈值筛选：R > qualityLevel × max(R)
+5. 3×3 或 5×5 非极大值抑制
+6. 按响应值降序排序
+7. 从最强的开始，每加一个角点，检查它离已有角点的距离 ≥ minDistance
+8. 达到 maxCorners 或候选点用完即停止
+```
+
+第 7 步是 Shi-Tomasi 之外的额外贡献——保证空间均匀性。
+
+## 5. 与 Harris 的对比总结
+
+| 维度 | Harris | Shi-Tomasi |
+|---|---|---|
+| 响应函数 | $\det M - k(\text{tr}M)^2$ | $\min(\lambda_1, \lambda_2)$ |
+| 参数 | $k$ + 阈值 | 只有阈值 |
+| 计算量 | 无开方 | 一次开方（可忽略） |
+| 数值稳定性 | 大梯度时可能相消 | 稳定 |
+| 对边缘的排斥 | 依赖 $k$ | 严格 |
+| 检测数量 | 通常更多 | 通常更少（更保守） |
+| 与 KLT 的关系 | 间接（同样的 $M$） | 直接对应可追踪性 |
+| 旋转不变 | 是 | 是 |
+| 尺度不变 | 否 | 否 |
+| 灰度线性变化 | 响应等比缩放 | 响应等比缩放 |
+
+大多数场景两者输出的角点集合大量重合，Shi-Tomasi 略保守一点。**追踪任务优先选 Shi-Tomasi，纯检测/匹配可以选 Harris**。这是常见的经验建议，但差异其实不大，真正要区分的场景是极端条件——大量长条边缘（Harris 会漏检成"边"），或者极强噪声（Shi-Tomasi 更保守）。
+
+## 6. Shi-Tomasi 后来去哪了
+
+1994 到 2010 年之间，Shi-Tomasi + KLT 是稀疏光流的黄金组合。OpenCV 里的 `calcOpticalFlowPyrLK` 至今仍推荐用 `goodFeaturesToTrack` 选点。
+
+到了 SIFT/SURF/ORB 时代，"检测子 + 描述子"成为主流，光有位置不够，还要能匹配。Shi-Tomasi 只给位置，[特征描述子](../10-表示与描述子.mdx)得另外算——常见做法是 Shi-Tomasi 找位置 + BRIEF/ORB 描述子。
+
+SLAM 里 Shi-Tomasi 至今活跃。ORB-SLAM 系列虽然名字带 ORB，其实早期版本的特征分布均匀化机制就借鉴了 `goodFeaturesToTrack` 的 `minDistance` 思路。VINS-Mono 直接用 Shi-Tomasi + LK，几百 Hz 也能跑。
+
+深度学习时代 SuperPoint、R2D2 这类学到的检测器又回来了，但训练目标本质上仍是"能被稳定检测和描述的点"——和 Shi-Tomasi 的"能被追踪的点"是同一件事，只是用神经网络学到而非用矩阵代数推导。
+
+## 7. 亚像素定位与后续
+
+Shi-Tomasi 输出的仍是像素级坐标。KLT 追踪本身能达到亚像素精度，但如果要用作相机标定、SfM 初始化，需要显式的[亚像素级角点检测](./亚像素级角点检测.mdx)——通常先跑 Shi-Tomasi 定粗略位置，再用 `cornerSubPix` 迭代到亚像素。OpenCV 标定棋盘的完整流水线就是这样：`findChessboardCorners`（粗）→ `cornerSubPix`（细）。
+
+## 8. 一点历史脉络
+
+Shi 和 Tomasi 都是 Kanade 在 CMU 的学生。Kanade 是 1981 年 Lucas-Kanade 光流的作者之一，那篇论文里就已经出现了 $M$ 的雏形。Tomasi 1991 年的博士论文用同样的矩阵做**因子分解法**恢复三维结构——所以他对 $M$ 的每一处细节都门儿清。1994 年这篇"good features"其实是把已有工具（结构张量）用一个新角度解释，说服了社区**检测的目标应该服从下游任务**。这种"以问题为导向"的思路今天在深度学习特征学习里仍然是主流。
+
+对比[Moravec](./Moravec角点检测.mdx) → [Harris](./Harris角点检测.mdx) → Shi-Tomasi 这条线，能看到一个数学工具（局部二阶矩阵 $M$）逐步被理解得更清楚的过程。再往后 [FAST](./FAST角点检测.mdx) 和 [SUSAN](./SUSAN角点检测.mdx) 走了完全不同的路，不再用梯度、不再用矩阵，追求极致速度。这两条路线到 ORB（FAST 检测 + BRIEF 描述）汇合，成为移动端 SLAM 的默认选择。Shi-Tomasi 的历史地位是"从数学定义走到工程可用"的关键一跃。
 
 </WordCount>

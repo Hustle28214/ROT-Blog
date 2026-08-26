@@ -2,4 +2,151 @@ import WordCount from '../../../src/components/WordCount/WordCount';
 
 <WordCount>
 
+## MVC 模式
+
+MVC（Model-View-Controller）是一种把应用程序拆分为**模型（Model）**、**视图（View）**、**控制器（Controller）**三层的软件架构模式。它不是 GoF 意义上的对象级设计模式，而是一种**架构层面的分层思想**。核心目的是：**把数据、显示、交互三件事分开，让每一部分都能独立演化**。
+
+> 通俗理解：就像餐厅——厨房（Model）负责食材加工和数据管理，前厅摆盘（View）负责怎么给客人呈现，服务员（Controller）在客人和厨房之间跑腿传单子。三方各司其职，换菜单不用重装厨房，换服务员不用重开餐厅。
+
+三个角色的分工：
+
+1. **Model（模型）**：应用的数据和业务规则。维护状态、提供数据访问 API、通知感兴趣的观察者。它不知道视图长什么样，也不知道谁在调用它。
+
+2. **View（视图）**：数据的展示层。从 Model 里拿数据渲染出来给用户看，通常也接收用户的原始输入（点击、键盘）后转交给 Controller。View 里不写业务逻辑。
+
+3. **Controller（控制器）**：接收用户的操作、决定该做什么、调用 Model 修改数据，再选择合适的 View 来响应。它是 View 和 Model 之间的协调者。
+
+## 一个直观的例子：用户管理
+
+先看没有分层的写法（伪代码，把数据、显示、交互全塞在一起）：
+
+```java
+// 反例：什么都在一个类里
+class UserPage {
+    Map<String, String> users = new HashMap<>();
+
+    void handleAddUser(String cmdLine) {
+        // 解析输入、修改数据、打印结果全混在一起
+        String[] parts = cmdLine.split(" ");
+        users.put(parts[1], parts[2]);
+        System.out.println("用户 " + parts[1] + " 添加成功");
+        System.out.println("当前用户列表：" + users);
+    }
+}
+```
+
+用 MVC 拆开：
+
+```java
+// Model：用户数据
+class UserModel {
+    private Map<String, String> users = new HashMap<>();
+
+    public void addUser(String name, String email) {
+        users.put(name, email);
+    }
+
+    public Map<String, String> getAllUsers() {
+        return Collections.unmodifiableMap(users);
+    }
+}
+
+// View：视图（这里用控制台，也可以是 Web 页面、GUI 窗口）
+class UserView {
+    public void showAddSuccess(String name) {
+        System.out.println("用户 " + name + " 添加成功");
+    }
+
+    public void showUserList(Map<String, String> users) {
+        System.out.println("当前用户列表：");
+        users.forEach((n, e) -> System.out.println("  " + n + " <" + e + ">"));
+    }
+
+    public void showError(String msg) {
+        System.err.println("错误：" + msg);
+    }
+}
+
+// Controller：控制器
+class UserController {
+    private UserModel model;
+    private UserView view;
+
+    public UserController(UserModel model, UserView view) {
+        this.model = model;
+        this.view = view;
+    }
+
+    public void addUser(String name, String email) {
+        if (name == null || name.isEmpty()) {
+            view.showError("用户名不能为空");
+            return;
+        }
+        model.addUser(name, email);
+        view.showAddSuccess(name);
+        view.showUserList(model.getAllUsers());
+    }
+}
+
+// 客户端
+public class Client {
+    public static void main(String[] args) {
+        UserModel model = new UserModel();
+        UserView view = new UserView();
+        UserController controller = new UserController(model, view);
+
+        controller.addUser("Alice", "alice@example.com");
+        controller.addUser("Bob", "bob@example.com");
+        controller.addUser("", "empty@example.com");
+    }
+}
+```
+
+现在这段代码里：
+
+- 想换成 Web 展示？只改 `UserView`。
+- 想加"添加时同步给邮件系统"？只改 `UserController`。
+- 想把用户存到数据库？只改 `UserModel`。
+
+彼此不再互相牵扯。
+
+## MVC 的变种：MVP、MVVM
+
+MVC 是所有 UI 分层架构的祖师爷，但在实际工程中经常演化成两种变种：
+
+- **MVP（Model-View-Presenter）**：View 不再主动去查 Model，而是把请求丢给 Presenter，Presenter 拿到数据后再回调 View 来更新。View 变得非常"薄"，只关心展示，测试友好。Android 早期的 UI 层常用。
+- **MVVM（Model-View-ViewModel）**：View 和 ViewModel 之间通过**数据绑定**联系起来——ViewModel 暴露可观察的数据，View 声明式地绑定这些数据；用户操作也通过绑定传回 ViewModel。前端框架（Vue、Angular）、桌面框架（WPF、SwiftUI）都是这个套路。
+
+三者的核心分工都一样，区别在于 View 和 Model 之间到底放什么样的"中间层"，以及中间层和 View 之间是主动调用还是双向绑定。
+
+## MVC 里常见的模式组合
+
+MVC 不是孤立的，它把好几个设计模式串在一起：
+
+- **观察者模式**：Model 状态变化时通知 View 刷新，或 ViewModel 通知 View。
+- **策略模式**：Controller 里选择不同的处理策略。
+- **组合模式**：View 通常是嵌套的组件树。
+- **命令模式**：把用户操作封装成命令对象，交给 Controller 分发。
+
+理解这一点后就知道 MVC 为什么能成为架构模式——它是一堆更细粒度模式协作的产物。
+
+## 使用场景
+
+只要涉及"数据 + 显示 + 用户交互"这三件事的系统，就都能套 MVC 或它的变种：
+
+- **传统 Web MVC**：Spring MVC、Ruby on Rails、Django——Controller 是 URL 路由处理器，View 是 HTML 模板，Model 是领域对象。
+- **桌面/移动 UI**：Cocoa、Android、Qt——View 是控件树，Controller 是 Activity/Fragment/ViewController。
+- **前端框架**：React + Redux（Model = Store，View = 组件，Controller ≈ reducer + action），Vue 的 MVVM。
+- **游戏/图形程序**：世界状态 = Model，渲染层 = View，输入处理 = Controller。
+
+## 注意事项
+
+MVC 用不好最常见的两个反模式：
+
+1. **"胖 Controller"**：把业务逻辑全塞进 Controller，Model 变成贫血的数据袋。结果 Controller 变成上帝类，测试困难、无法复用。业务规则应该住在 Model（或 Model 背后的 Domain Service）里，Controller 只做"接收请求 → 委派 → 选择响应"。
+
+2. **View 里写业务**：模板里出现 `if (user.isAdmin) show...`、"如果余额小于 0 就变红"之类的判断本身没问题，但如果条件复杂到需要跨多个字段计算，就该把结果算好后再传给 View，而不是在 View 里堆逻辑。
+
+MVC 是一种**指导思想**而不是必须严格照搬的类结构。不同框架、不同层次（前端 vs 后端 vs 客户端）对三层的边界都有自己的解读，重要的是理解"数据、显示、交互"三种关注点分离的价值，而不是纠结"这个功能该放 Controller 还是 Service"这类细节。
+
 </WordCount>

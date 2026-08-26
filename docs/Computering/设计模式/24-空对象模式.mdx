@@ -2,4 +2,132 @@ import WordCount from '../../../src/components/WordCount/WordCount';
 
 <WordCount>
 
+## 空对象模式
+
+空对象模式（Null Object Pattern）是一种行为型设计模式，它用一个"什么都不做但接口一致"的对象来代替 `null`，把散在各处的空值判断收拢到统一入口。核心思想是：**用一个哑对象消灭 `if (x != null)`**。
+
+> 通俗理解：就像哑铃举不动的时候，教练会说"没关系，先拿个空杆练动作"——空杆什么重量都没有，但形状和真哑铃一样，你练动作的流程不用变。空对象就是这根空杆：它满足调用方对"对象"的所有语法要求，但方法体是空的（或返回中性值）。
+
+角色只有 3 个：
+
+1. 抽象类型（AbstractObject）：定义所有对象共享的接口。
+
+2. 真实对象（RealObject）：有实际行为的实现。
+
+3. 空对象（NullObject）：实现同一接口，方法体为空或返回默认值。
+
+## 一个直观的例子：日志
+
+假设有个模块允许注入自定义 Logger，不注入时也要能正常运行。**没用空对象**的写法：
+
+```java
+class Service {
+    private Logger logger;   // 可能为 null
+
+    public void doWork() {
+        // 每一处都要判空
+        if (logger != null) logger.info("start");
+        // ...
+        if (logger != null) logger.info("done");
+    }
+}
+```
+
+用空对象重写：
+
+```java
+// 抽象类型
+interface Logger {
+    void info(String msg);
+    void error(String msg);
+}
+
+// 真实对象
+class ConsoleLogger implements Logger {
+    @Override
+    public void info(String msg)  { System.out.println("[INFO] " + msg); }
+    @Override
+    public void error(String msg) { System.err.println("[ERROR] " + msg); }
+}
+
+// 空对象：什么都不做
+class NoOpLogger implements Logger {
+    @Override
+    public void info(String msg)  { /* 静默 */ }
+    @Override
+    public void error(String msg) { /* 静默 */ }
+}
+
+// 服务
+class Service {
+    private Logger logger;
+
+    public Service(Logger logger) {
+        // 传 null 就换成空对象，让业务代码彻底不用判空
+        this.logger = (logger != null) ? logger : new NoOpLogger();
+    }
+
+    public void doWork() {
+        logger.info("start");
+        // ...
+        logger.info("done");
+    }
+}
+```
+
+`Service.doWork()` 里再也没有 `if (logger != null)`，读起来像"logger 一定存在"。这是空对象模式最大的价值：**让调用方假设对象永远非空**。
+
+## 空对象常用的三种做法
+
+1. **静默做法**：方法体空实现（如上例 `NoOpLogger`）。适合"这个功能可选，缺了就什么都不做"的场景。
+
+2. **返回中性值**：查询类方法返回中性/空值。比如 `Iterator` 的空实现返回一个 `hasNext()` 永远为 false 的迭代器；`getAmount()` 的空实现返回 0；`getChildren()` 的空实现返回 `Collections.emptyList()`。
+
+3. **单例**：空对象通常是无状态的，做成单例复用一份即可，省掉重复创建的开销：
+
+```java
+public class NoOpLogger implements Logger {
+    public static final NoOpLogger INSTANCE = new NoOpLogger();
+    private NoOpLogger() {}
+    @Override public void info(String msg) {}
+    @Override public void error(String msg) {}
+}
+```
+
+## 集合与流里的等价物
+
+Java 标准库里有一堆"空对象"的现成实现，理解它们能帮你识别这个模式：
+
+- `Collections.emptyList()` / `emptySet()` / `emptyMap()`：不可变的空集合，方法体上是"空对象"。
+- `Optional.empty()`：本质上就是"值缺失的对象"版空对象。
+- `Stream.empty()`：什么元素都没有的流。
+- 空 `Iterator`：`Collections.emptyIterator()`。
+
+它们的共同点：**接口和真身完全一致，调用方不需要额外判空**。
+
+## 空对象 vs Optional
+
+Java 8 引入 `Optional` 后，很多"用空对象"的场景可以直接用 `Optional`。两者的取舍：
+
+- **Optional**：调用方**知道**"这个值可能没有"，需要显式 `orElse` / `ifPresent` 处理。适合返回值。
+- **空对象**：调用方**不需要知道**"值可能没有"，写起来像"值一定存在"。适合协作对象（依赖注入的组件、监听器、日志器等）。
+
+一个粗略的判断：如果调用方**必须区分**"有 vs 没有"，用 `Optional`；如果调用方希望"有没有都一样能跑"，用空对象。
+
+## 使用场景
+
+- **可选依赖**：日志器、指标收集器、审计器等——注入的是空对象时业务代码零感知。
+- **默认行为**：`Comparator`、`Formatter`、`Handler` 等接口的默认实现。
+- **占位对象**：领域模型里的"未登录用户"、"未选择的商品"、"空账户"——它们有和真实对象一样的方法，但都返回中性值（比如 `Guest.canAccess(resource)` 永远返回 `false`）。
+- **递归结构的终止**：树的叶子节点用空对象代替 `null`，遍历代码不用写 `if (node.left != null)`。
+
+## 注意事项
+
+空对象最容易被误用成"吞掉错误"。如果本该抛异常或至少发告警的地方，被静默的空对象接管了，问题就被藏起来了。所以**空对象适合"这个动作可选"的语义**——比如日志、监控、审计；如果是"这个东西必须存在"（比如数据库连接为 null 时应该失败），用空对象反而会掩盖故障。
+
+另一个陷阱是**过多的空对象类**。每种接口都造一个 `NoOpXxx` 会把类的数量翻倍。工程里可以用几个折中：
+
+- 用 Java 接口的 `default` 方法给"什么都不做"提供默认实现，需要空对象时直接 `new Xxx() {}` 拿一个匿名实现。
+- 用 Mockito 之类的库在测试里创建"空实现"，业务代码里只保留必要的几个 NoOp 类。
+
 </WordCount>

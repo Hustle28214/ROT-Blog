@@ -2,4 +2,164 @@ import WordCount from '../../../src/components/WordCount/WordCount';
 
 <WordCount>
 
+## 代理模式
+
+代理模式（Proxy Pattern）是一种结构型设计模式，它让你能够提供一个对象的替身或占位符。代理对象和真实对象实现同一个接口，客户端不感知自己拿到的是代理还是真身，代理可以在转发调用前后做点额外的事情——延迟加载、访问控制、日志、缓存、远程调用……
+
+> 通俗理解：就像找中介买房——你想要的其实是房子（真实对象），但你不直接接触房东，而是通过中介（代理）来处理带看、议价、签约。中介有和房子相关的一切能力（对外看起来像"房子"的入口），但中间他可能帮你砍价、可能拒绝某些不合适的看房请求、可能记录你看过的房源。
+
+代理模式的角色只有 3 个：
+
+1. 主题接口（Subject）：定义真实对象和代理对象的共同接口，让代理能"以假乱真"。
+
+2. 真实主题（RealSubject）：真正干活的对象。
+
+3. 代理（Proxy）：持有真实主题的引用，实现同一个接口，转发调用前后加自己的逻辑。
+
+## 一个直观的例子：图片延迟加载
+
+假设你在做一个文档浏览器，图片资源很大，全部预加载会拖慢启动。用代理可以做到"用到时才真正读盘"：
+
+```java
+// 1. 主题接口
+interface Image {
+    void display();
+}
+
+// 2. 真实主题：真正的高分辨率图片
+class RealImage implements Image {
+    private String filename;
+
+    public RealImage(String filename) {
+        this.filename = filename;
+        loadFromDisk();  // 构造时就加载，代价很高
+    }
+
+    private void loadFromDisk() {
+        System.out.println("[慢] 从磁盘加载图片 " + filename);
+    }
+
+    @Override
+    public void display() {
+        System.out.println("显示图片 " + filename);
+    }
+}
+
+// 3. 代理：延迟加载版
+class ImageProxy implements Image {
+    private String filename;
+    private RealImage realImage;  // 只在真正需要时才创建
+
+    public ImageProxy(String filename) {
+        this.filename = filename;
+    }
+
+    @Override
+    public void display() {
+        if (realImage == null) {
+            realImage = new RealImage(filename);  // 首次访问才加载
+        }
+        realImage.display();
+    }
+}
+
+// 客户端
+public class Client {
+    public static void main(String[] args) {
+        Image img = new ImageProxy("big-photo.jpg");
+        System.out.println("代理已创建，但真实图片还没加载");
+        img.display();  // 首次调用，触发加载
+        img.display();  // 第二次调用，直接用已加载的
+    }
+}
+```
+
+`ImageProxy` 对外的接口和 `RealImage` 一模一样，所以客户端根本不需要知道自己拿到的是代理。加载被推迟到第一次真正用到时，这就是最经典的**虚代理**。
+
+## 代理的常见变体
+
+代理模式最有意思的地方是它可以在不改变接口的前提下，往调用的前后插各种能力：
+
+- **虚代理（Virtual Proxy）**：延迟初始化重量级对象，如上例。
+- **保护代理（Protection Proxy）**：在调用前做权限校验，无权限的调用直接拒绝。
+- **远程代理（Remote Proxy）**：调用本地代理时其实是发起了一次远程调用（RMI、gRPC 客户端存根都是这个模式）。
+- **缓存代理（Cache Proxy）**：把上次调用结果缓存起来，下次同样的入参直接返回缓存。
+- **智能引用（Smart Reference）**：在访问真实对象时执行附加操作，比如引用计数、日志、指标。
+
+用同一个接口 + 一层包装，能干的事情非常多。这也是为什么很多框架的"拦截器/切面/中间件"底层都是代理的变种。
+
+## 保护代理的小例子
+
+```java
+interface Database {
+    void query(String sql);
+}
+
+class RealDatabase implements Database {
+    @Override
+    public void query(String sql) {
+        System.out.println("执行 SQL: " + sql);
+    }
+}
+
+class ProtectedDatabase implements Database {
+    private RealDatabase db = new RealDatabase();
+    private String userRole;
+
+    public ProtectedDatabase(String userRole) { this.userRole = userRole; }
+
+    @Override
+    public void query(String sql) {
+        if (sql.toLowerCase().startsWith("select") || "admin".equals(userRole)) {
+            db.query(sql);
+        } else {
+            System.out.println("拒绝：只有 admin 才能执行写操作");
+        }
+    }
+}
+```
+
+## 代理 vs 装饰 vs 外观
+
+三者都是"一个对象持有另一个对象的引用并转发调用"，但**意图不同**：
+
+- **代理**：接口和被代理者一致，重点是"控制/管理对被代理对象的访问"。
+- **装饰**：接口和被装饰者一致，重点是"在不改接口的前提下动态叠加职责"。
+- **外观**：接口不同于子系统，重点是"给一群类提供一个统一入口"。
+
+结构像，意图不同——这是 GoF 里非常经典的三兄弟。
+
+## 动态代理
+
+Java 里最常见的代理其实是**动态代理**，你不需要为每个接口手写一个代理类，运行时按需生成：
+
+```java
+Image proxy = (Image) Proxy.newProxyInstance(
+    Image.class.getClassLoader(),
+    new Class<?>[]{Image.class},
+    (Object p, Method method, Object[] args) -> {
+        System.out.println("调用前打个点：" + method.getName());
+        RealImage real = new RealImage("big-photo.jpg");
+        Object result = method.invoke(real, args);
+        System.out.println("调用后再打一个");
+        return result;
+    }
+);
+proxy.display();
+```
+
+Spring AOP、MyBatis Mapper、各种 RPC 客户端存根，几乎都是通过 JDK 动态代理或 CGLIB 生成运行时代理来实现的。这也是代理模式在真实工程里最重要的形态。
+
+## 使用场景
+
+代理模式最典型的三大用途：
+
+1. **延迟初始化 / 惰性加载**：ORM 里的 lazy loading、图形界面里的懒渲染。
+2. **访问控制**：权限校验、频控、限流、熔断。
+3. **横切增强**：AOP、日志、监控、事务、缓存——这些能力都不属于业务本身，用代理插进去正合适。
+
+## 注意事项
+
+代理是一层间接，间接层多了就有性能与调试成本。所以代理适合"改造少量核心入口"，而不是"每个方法都要包一层"。另外要注意：动态代理默认只能代理接口，代理具体类需要用 CGLIB 之类的字节码方案，被代理类的 `final` 方法拦不住、构造函数不会走代理逻辑，这些边界要提前想清楚。
+
 </WordCount>

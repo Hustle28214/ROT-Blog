@@ -2,4 +2,129 @@ import WordCount from '../../../src/components/WordCount/WordCount';
 
 <WordCount>
 
+## 备忘录模式
+
+备忘录模式（Memento Pattern）是一种行为型设计模式，它可以在不破坏对象封装的前提下捕获并对外保存对象的内部状态，之后再把对象恢复到之前的某个状态。核心问题是：**怎么在保存/恢复状态的同时，不把对象内部字段暴露给外部**。
+
+> 通俗理解：就像游戏的存档功能——你在关键关卡前存个档，如果 Boss 打输了就读档回到之前的状态。存档文件里包含了你的血量、装备、位置等一堆信息，但你不需要（也不应该）自己去手写这些内部字段，游戏引擎帮你打包和还原。
+
+备忘录模式有 3 个角色：
+
+1. 原发器（Originator）：需要保存状态的对象。它知道如何创建自己的备忘录，也知道如何用备忘录恢复自己。
+
+2. 备忘录（Memento）：状态快照。对原发器透明（可以访问所有字段），对外部不透明（不暴露字段）。
+
+3. 管理者（Caretaker）：负责保管备忘录，但不看备忘录里到底存了什么。通常是一个栈或列表，用来支持撤销/重做。
+
+## 一个直观的例子：文本编辑器的撤销
+
+```java
+// 1. 备忘录：只对原发器开放读取，对外不可访问字段
+class EditorMemento {
+    private final String content;
+    private final int cursorPos;
+
+    // 包私有构造函数，只有 TextEditor 能创建
+    EditorMemento(String content, int cursorPos) {
+        this.content = content;
+        this.cursorPos = cursorPos;
+    }
+
+    // 包私有 getter，只有 TextEditor 能读
+    String getContent()   { return content; }
+    int    getCursorPos() { return cursorPos; }
+}
+
+// 2. 原发器：文本编辑器
+class TextEditor {
+    private StringBuilder content = new StringBuilder();
+    private int cursorPos = 0;
+
+    public void type(String text) {
+        content.insert(cursorPos, text);
+        cursorPos += text.length();
+    }
+
+    public void moveCursor(int pos) {
+        cursorPos = Math.max(0, Math.min(content.length(), pos));
+    }
+
+    public String getContent() { return content.toString(); }
+
+    // 保存当前状态到备忘录
+    public EditorMemento save() {
+        return new EditorMemento(content.toString(), cursorPos);
+    }
+
+    // 从备忘录恢复状态
+    public void restore(EditorMemento m) {
+        this.content = new StringBuilder(m.getContent());
+        this.cursorPos = m.getCursorPos();
+    }
+}
+
+// 3. 管理者：撤销栈
+class UndoManager {
+    private Deque<EditorMemento> stack = new ArrayDeque<>();
+
+    public void save(TextEditor editor) {
+        stack.push(editor.save());
+    }
+
+    public void undo(TextEditor editor) {
+        if (!stack.isEmpty()) {
+            editor.restore(stack.pop());
+        }
+    }
+}
+
+// 客户端
+public class Client {
+    public static void main(String[] args) {
+        TextEditor editor = new TextEditor();
+        UndoManager history = new UndoManager();
+
+        history.save(editor);
+        editor.type("Hello");
+        history.save(editor);
+        editor.type(" World");
+        System.out.println(editor.getContent()); // Hello World
+
+        history.undo(editor);
+        System.out.println(editor.getContent()); // Hello
+
+        history.undo(editor);
+        System.out.println(editor.getContent()); // (空)
+    }
+}
+```
+
+`EditorMemento` 的构造函数和 getter 都是包私有的，`UndoManager` 只知道自己保管了一个 `EditorMemento`，但读不出里面的 content 和 cursorPos——这就是"不破坏封装"的关键。只有 `TextEditor` 自己能从备忘录里取值来恢复自己。
+
+## 备忘录 vs 命令模式的撤销
+
+命令模式的撤销靠"逆动作"——每个 `Command` 知道怎么反向执行自己（关灯 vs 开灯）。备忘录的撤销靠"存快照"——不管前面做了什么，直接把整个状态还原。
+
+- 命令模式的撤销栈存的是"操作序列"，撤销时逐个反向执行。
+- 备忘录的撤销栈存的是"状态快照"，撤销时直接换回旧状态。
+
+两者可以结合使用。工程里常见的模式是：命令对象内部持有一个执行前的备忘录，`undo()` 时用备忘录恢复。这样命令不需要真的写出精确的"反向逻辑"，只要能恢复状态即可。
+
+## 使用场景
+
+- **撤销/重做**：编辑器、绘图工具、游戏存档，最典型的应用。
+- **事务回滚**：一段流程中做了多次修改，某一步失败时用备忘录把对象整体回滚到入口状态。
+- **快照调试**：把关键节点的状态保存下来，出问题时事后回放。
+- **分支尝试**：AI 搜索、模拟推演里，先存档、尝试一条路径、失败就回档、换条路径继续。
+
+## 注意事项
+
+备忘录最大的成本是**内存**。每一次保存都要复制一份状态，长时间运行的程序可能积累大量快照。工程里常见的做法：
+
+- **只存增量**：不存完整状态，而是存"和上一版比变了什么"。这在文档编辑器里很常见。
+- **限制历史长度**：撤销栈最多保留 N 条，老的自动丢弃。
+- **共享不可变字段**：字符串、大数组这些不可变的字段可以在多个备忘录之间共享引用，避免复制。
+
+另一个坑是**深浅拷贝**。如果对象里嵌套了可变引用（列表、Map），浅拷贝出来的备忘录会跟原对象共享子对象——之后修改原对象，备忘录跟着变，撤销就失效了。所以备忘录里保存的必须是"真正的快照"，要么用不可变对象，要么做深拷贝，要么用序列化。
+
 </WordCount>

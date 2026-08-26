@@ -2,4 +2,145 @@ import WordCount from '../../../src/components/WordCount/WordCount';
 
 <WordCount>
 
+## 业务代表模式
+
+业务代表模式（Business Delegate Pattern）是一种**J2EE 分层架构里的经典模式**，它在客户端（表现层）和后端业务服务之间加入一个"代表"对象，把服务查找、远程调用、异常转换等技术细节屏蔽在代表层里，让客户端只面对一个语义清晰的业务接口。核心思想是：**把"怎么访问服务"和"要做什么业务"分开**。
+
+> 通俗理解：就像跨国公司里的驻外代表——你在国外要谈业务，不需要自己搞签证、订机票、找翻译、租办公室，找当地代表处，他们帮你把这些事都办了，你只管说"我要谈这个合作"。业务代表就是这个"代表处"。
+
+业务代表模式有 4 个角色：
+
+1. **客户端（Client）**：表现层组件，比如 JSP、Servlet、桌面 UI、移动端。它只调用业务代表，不关心背后的服务位置和调用方式。
+
+2. **业务代表（BusinessDelegate）**：客户端看到的入口。它把请求转交给合适的业务服务，同时处理服务查找、缓存、异常转换等。
+
+3. **查找服务（LookupService）**：负责通过 JNDI、注册中心、DNS 等定位到具体的业务服务实例。
+
+4. **业务服务（BusinessService）**：真正处理业务的接口，通常是 EJB、Web Service 或者微服务的远程调用点。
+
+## 一个直观的例子
+
+假设有两种业务服务——EJB 和 REST——客户端不希望知道细节，只想调"下单"：
+
+```java
+// 业务服务接口
+interface BusinessService {
+    void doProcessing();
+}
+
+// 具体服务：EJB
+class EJBService implements BusinessService {
+    @Override
+    public void doProcessing() {
+        System.out.println("EJB 服务处理中...");
+    }
+}
+
+// 具体服务：REST
+class RESTService implements BusinessService {
+    @Override
+    public void doProcessing() {
+        System.out.println("REST 服务处理中...");
+    }
+}
+
+// 查找服务
+class BusinessLookUp {
+    public BusinessService getBusinessService(String serviceType) {
+        if ("EJB".equalsIgnoreCase(serviceType)) {
+            return new EJBService();
+        } else {
+            return new RESTService();
+        }
+    }
+}
+
+// 业务代表
+class BusinessDelegate {
+    private BusinessLookUp lookUp = new BusinessLookUp();
+    private BusinessService service;
+    private String serviceType;
+
+    public void setServiceType(String serviceType) {
+        this.serviceType = serviceType;
+    }
+
+    public void doTask() {
+        // 客户端不用管服务在哪、怎么创建
+        service = lookUp.getBusinessService(serviceType);
+        service.doProcessing();
+    }
+}
+
+// 客户端
+class Client {
+    private BusinessDelegate delegate;
+    public Client(BusinessDelegate delegate) { this.delegate = delegate; }
+
+    public void doTask() {
+        delegate.doTask();  // 只调代表，不关心底层
+    }
+}
+
+// 主函数
+public class Main {
+    public static void main(String[] args) {
+        BusinessDelegate delegate = new BusinessDelegate();
+        delegate.setServiceType("EJB");
+
+        Client client = new Client(delegate);
+        client.doTask();
+
+        delegate.setServiceType("REST");
+        client.doTask();
+    }
+}
+```
+
+客户端只知道 `delegate.doTask()`，运行时选哪种服务、去哪找、怎么调，全都在 `BusinessDelegate` 内部解决。
+
+## 业务代表能帮客户端挡掉哪些东西
+
+这个模式的价值在于它是"防火墙"，把技术复杂性挡在客户端之外：
+
+1. **服务位置的变化**：JNDI 名字变了、URL 改了、微服务从 A 集群搬到 B 集群——只改代表层。
+2. **通信协议的差异**：EJB 用 RMI、Web Service 用 SOAP、微服务用 HTTP/gRPC——代表层内部差异化处理，客户端接口不变。
+3. **远程异常的转换**：`RemoteException`、`NamingException` 这些"技术型异常"在代表层里被转成有业务含义的异常抛出，客户端只处理业务异常。
+4. **缓存与优化**：查找到的服务引用可以在代表层里缓存，避免每次都走一次 JNDI 查找。
+5. **技术升级**：从 EJB 迁移到 REST、从 REST 迁移到 gRPC，只改代表层，客户端无感知。
+
+## 业务代表 vs 门面 / 代理 / 服务定位器
+
+这四个模式常常放在一起讨论，因为都涉及"在客户端和服务之间加一层"：
+
+- **门面（Facade）**：给一堆子系统提供一个统一入口，**在服务端**用，简化子系统对外的调用。
+- **业务代表（Business Delegate）**：给客户端提供一个业务入口，**在客户端**用，屏蔽远程调用的复杂性。
+- **代理（Proxy）**：和被代理者接口一致，重点是"控制访问"。业务代表可以内部使用代理，但代表更侧重"业务组织"。
+- **服务定位器（Service Locator）**：专门负责"根据名字找到服务实例"，业务代表通常内部持有一个服务定位器。
+
+一句话记忆：**服务端有 Facade，客户端有 Business Delegate，两者中间可能夹一个 Service Locator 和一堆 Proxy**。
+
+## 使用场景
+
+业务代表模式是**Java EE 时代的产物**。在那个 EJB / RMI / JNDI 满地跑的年代，客户端和服务端之间的技术鸿沟很深，业务代表是标配。
+
+在**现代云原生 / 微服务架构**里，同样的诉求依然存在，只是名字变了：
+
+- **SDK 客户端**：AWS SDK、云厂商 SDK、支付网关 SDK——本质上就是业务代表，帮你屏蔽鉴权、重试、地域切换、协议细节。
+- **Feign / OpenFeign / gRPC 客户端存根**：接口就是"业务代表"的骨架，底层的服务发现、负载均衡、超时重试都在实现里。
+- **BFF（Backend For Frontend）**：给移动端 / Web 端提供的定制化聚合层，某种意义上是团队级别的业务代表。
+- **网关**：把跨服务的鉴权、限流、路由、协议转换收拢在一处。
+
+## 注意事项
+
+业务代表在中小型项目里往往是**过度设计**。如果客户端和服务在同一个 JVM 里、调用方式统一、异常语义清晰，硬加一层代表只会多出几个中转类，没什么实质收益。
+
+但只要出现下面几种情况，代表层就开始值得投入：
+
+1. 客户端要**同时接入多种后端**（本地服务、远程服务、旧系统），且未来还会新增。
+2. 后端服务位置和协议**可能会变**，客户端数量又大，不希望每次都跟着改。
+3. 想在客户端侧统一做**跨切能力**（重试、熔断、监控、鉴权），需要一个天然的注入点。
+
+写代表层时最容易犯的错是把它写成"直接透传"的一层——所有方法都是 `service.foo()` 的直接转发。这样的代表毫无价值。一个真正有用的业务代表至少要做到：**方法名是业务语言**（"下单"而非"invokeEjb"）、**异常经过转换**（对外是业务异常）、**跨切能力有落点**（能加日志、缓存、重试而不污染客户端）。
+
 </WordCount>

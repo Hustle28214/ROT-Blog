@@ -2,4 +2,171 @@ import WordCount from '../../../src/components/WordCount/WordCount';
 
 <WordCount>
 
+## 命令模式
+
+命令模式（Command Pattern）是一种行为型设计模式，它把"请求"封装成一个独立的对象，从而让你可以用不同的请求对调用者进行参数化、把请求排队或记录日志、以及支持可撤销的操作。
+
+> 通俗理解：就像餐厅点单——顾客把想吃的东西写在小票上（命令对象），服务员（调用者）把小票递给后厨（接收者），后厨照做就行。顾客不用直接冲进厨房，服务员也不需要知道每道菜怎么做。
+
+命令模式的核心是把"做什么"和"谁来做"解耦：调用者只管发命令，接收者只管执行动作，两者之间通过命令对象牵线。
+
+命令模式有 4 个关键角色：
+
+1. 命令接口（Command）：声明一个执行操作的方法，通常叫 `execute()`，需要撤销时还会有 `undo()`。
+
+2. 具体命令（ConcreteCommand）：实现命令接口，持有接收者引用，`execute()` 时调用接收者的具体方法。
+
+3. 接收者（Receiver）：真正干活的对象，具体命令会调用它的方法。
+
+4. 调用者（Invoker）：持有命令对象，触发时调用命令的 `execute()`，它不关心命令具体做了什么。
+
+假设你在做一个智能家居遥控器，一个按钮可以控制不同的电器：
+
+```java
+// 1. 命令接口
+interface Command {
+    void execute();
+    void undo();
+}
+
+// 2. 接收者：电灯
+class Light {
+    private String location;
+    public Light(String location) { this.location = location; }
+    public void on()  { System.out.println(location + " 的灯打开了"); }
+    public void off() { System.out.println(location + " 的灯关闭了"); }
+}
+
+// 接收者：空调
+class AirConditioner {
+    private int temperature = 26;
+    public void turnOn()  { System.out.println("空调打开，当前温度 " + temperature + "°C"); }
+    public void turnOff() { System.out.println("空调关闭"); }
+    public void setTemperature(int t) {
+        this.temperature = t;
+        System.out.println("空调温度调整到 " + t + "°C");
+    }
+    public int getTemperature() { return temperature; }
+}
+
+// 3. 具体命令：开灯
+class LightOnCommand implements Command {
+    private Light light;
+    public LightOnCommand(Light light) { this.light = light; }
+    @Override
+    public void execute() { light.on(); }
+    @Override
+    public void undo()    { light.off(); }
+}
+
+// 具体命令：关灯
+class LightOffCommand implements Command {
+    private Light light;
+    public LightOffCommand(Light light) { this.light = light; }
+    @Override
+    public void execute() { light.off(); }
+    @Override
+    public void undo()    { light.on(); }
+}
+
+// 具体命令：设定空调温度（撤销时恢复原温度）
+class SetTemperatureCommand implements Command {
+    private AirConditioner ac;
+    private int newTemp;
+    private int prevTemp;  // 保存执行前的状态，便于撤销
+    public SetTemperatureCommand(AirConditioner ac, int newTemp) {
+        this.ac = ac;
+        this.newTemp = newTemp;
+    }
+    @Override
+    public void execute() {
+        prevTemp = ac.getTemperature();
+        ac.setTemperature(newTemp);
+    }
+    @Override
+    public void undo() {
+        ac.setTemperature(prevTemp);
+    }
+}
+
+// 4. 调用者：遥控器
+class RemoteControl {
+    private Command[] slots = new Command[4];
+    private Deque<Command> history = new ArrayDeque<>();  // 历史栈，用来撤销
+
+    public void setCommand(int slot, Command command) {
+        slots[slot] = command;
+    }
+
+    public void pressButton(int slot) {
+        if (slots[slot] != null) {
+            slots[slot].execute();
+            history.push(slots[slot]);
+        }
+    }
+
+    public void pressUndo() {
+        if (!history.isEmpty()) {
+            history.pop().undo();
+        }
+    }
+}
+
+// 客户端
+public class Client {
+    public static void main(String[] args) {
+        Light livingRoom = new Light("客厅");
+        AirConditioner ac = new AirConditioner();
+
+        RemoteControl remote = new RemoteControl();
+        remote.setCommand(0, new LightOnCommand(livingRoom));
+        remote.setCommand(1, new LightOffCommand(livingRoom));
+        remote.setCommand(2, new SetTemperatureCommand(ac, 22));
+
+        remote.pressButton(0);   // 客厅的灯打开了
+        remote.pressButton(2);   // 空调温度调整到 22°C
+        remote.pressUndo();      // 空调温度调整到 26°C（撤销）
+        remote.pressUndo();      // 客厅的灯关闭了（撤销开灯）
+    }
+}
+```
+
+这段代码里，遥控器 `RemoteControl` 完全不知道按钮背后到底连着灯、空调还是别的什么，它只认识 `Command` 接口。你想扩展新电器，只需要新增一个 `Receiver` 和一个 `Command` 实现类，遥控器一行都不用动。命令对象自己保存了"回退所需的上下文"（比如 `SetTemperatureCommand` 里的 `prevTemp`），撤销栈的实现就变得非常自然。
+
+## 命令模式的常见变体
+
+**宏命令（Macro Command）**：把多个命令组合成一个执行。比如"回家模式"要一次性开灯、开空调、拉窗帘——用一个 `MacroCommand` 把所有子命令 `execute()` 依次调用即可。
+
+```java
+class MacroCommand implements Command {
+    private List<Command> commands;
+    public MacroCommand(List<Command> commands) { this.commands = commands; }
+    @Override
+    public void execute() { commands.forEach(Command::execute); }
+    @Override
+    public void undo()    {
+        // 撤销要反向执行，先撤销最后一个
+        for (int i = commands.size() - 1; i >= 0; i--) {
+            commands.get(i).undo();
+        }
+    }
+}
+```
+
+**队列/异步执行**：把命令扔到线程池或消息队列里延迟执行，请求方不阻塞。这就是很多任务调度、消息中间件的雏形。
+
+**日志与重放**：把每次 `execute()` 的命令序列化并落盘，系统崩溃时回放日志就能恢复状态。数据库的 redo log、事件溯源（Event Sourcing）的核心思想都与之相通。
+
+## 使用场景
+
+命令模式最典型的场景是**需要参数化、排队、撤销、日志化**的操作。GUI 里的按钮/菜单项/快捷键各自绑定一个命令对象，是最经典的例子；文本编辑器里的撤销/重做栈几乎就是命令模式的直译；游戏中把玩家输入抽象成命令后，回放、录像、AI 也就有了统一的驱动方式。
+
+在后端系统里，命令模式常常隐身在别的名字下——任务队列里的 `Job`、事件驱动架构里的 `Command`（对比 `Event`）、CQRS 里的写模型命令、事务脚本模式里的一个个业务动作，本质上都在做同一件事：把一次"要做什么"打包成对象，让谁在什么时候执行它变得可插拔。
+
+## 注意事项
+
+命令模式最容易被过度使用。如果调用者与接收者之间没有解耦需求、也没有排队/撤销/日志的诉求，硬塞一层命令对象只会增加类的数量。一个判断标准是："这个动作有没有可能被延迟、重试、撤销、组合、记录？"只要有其中一条，命令模式的收益就开始显现。
+
+另一个坑是**撤销的状态管理**。撤销的前提是命令对象持有执行前的必要状态，如果状态是共享可变的（比如多个命令改同一个字段），撤销顺序就必须严格按栈来，否则会得到一个诡异的中间态。所以撤销栈通常成对出现在"每一步都可回滚"的编辑器/事务型场景里，跨系统的分布式撤销则往往用补偿事务而非简单栈。
+
 </WordCount>

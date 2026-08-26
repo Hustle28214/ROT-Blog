@@ -2,4 +2,157 @@ import WordCount from '../../../src/components/WordCount/WordCount';
 
 <WordCount>
 
+## 观察者模式
+
+观察者模式（Observer Pattern）是一种行为型设计模式，它定义了对象之间一对多的依赖关系：当一个对象（被观察者）的状态发生变化时，所有依赖它的对象（观察者）都会自动收到通知并更新。目的是把"变化"和"响应变化"解耦——被观察者不需要知道有哪些观察者，观察者也不需要主动去轮询状态。
+
+> 通俗理解：就像订阅一个公众号——你只要订阅了，作者更新文章时系统就会给你推送。作者不需要知道具体是谁在看，你也不需要每天刷新几十次。
+
+观察者模式有 4 个角色：
+
+1. 抽象被观察者（Subject）：定义 `attach`/`detach`/`notify` 三个基本操作，维护观察者列表。
+
+2. 具体被观察者（ConcreteSubject）：状态发生变化时通知所有观察者。
+
+3. 抽象观察者（Observer）：定义一个 `update()` 方法作为被通知时的回调。
+
+4. 具体观察者（ConcreteObserver）：实现 `update()`，收到通知后做自己的事。
+
+## 经典例子：气象站
+
+假设有一个气象站，几个显示屏（当前温度、气压趋势、明日预报）需要在数据变化时同步刷新：
+
+```java
+// 1. 抽象观察者
+interface Observer {
+    void update(float temperature, float humidity, float pressure);
+}
+
+// 2. 抽象被观察者
+interface Subject {
+    void registerObserver(Observer o);
+    void removeObserver(Observer o);
+    void notifyObservers();
+}
+
+// 3. 具体被观察者：气象站
+class WeatherStation implements Subject {
+    private List<Observer> observers = new ArrayList<>();
+    private float temperature;
+    private float humidity;
+    private float pressure;
+
+    @Override
+    public void registerObserver(Observer o) { observers.add(o); }
+    @Override
+    public void removeObserver(Observer o)   { observers.remove(o); }
+    @Override
+    public void notifyObservers() {
+        for (Observer o : observers) {
+            o.update(temperature, humidity, pressure);
+        }
+    }
+
+    // 数据变化时触发通知
+    public void setMeasurements(float t, float h, float p) {
+        this.temperature = t;
+        this.humidity = h;
+        this.pressure = p;
+        notifyObservers();
+    }
+}
+
+// 4. 具体观察者：当前温度显示
+class CurrentDisplay implements Observer {
+    @Override
+    public void update(float t, float h, float p) {
+        System.out.printf("当前温度显示：%.1f°C，湿度 %.0f%%%n", t, h);
+    }
+}
+
+// 具体观察者：统计显示
+class StatsDisplay implements Observer {
+    private float sum = 0;
+    private int count = 0;
+    @Override
+    public void update(float t, float h, float p) {
+        sum += t;
+        count++;
+        System.out.printf("统计显示：平均温度 %.1f°C%n", sum / count);
+    }
+}
+
+// 客户端
+public class Client {
+    public static void main(String[] args) {
+        WeatherStation station = new WeatherStation();
+        station.registerObserver(new CurrentDisplay());
+        station.registerObserver(new StatsDisplay());
+
+        station.setMeasurements(26.5f, 65, 1013);
+        station.setMeasurements(27.2f, 70, 1012);
+    }
+}
+```
+
+`WeatherStation` 完全不知道具体有哪些显示屏订阅了自己，它只维护一个 `Observer` 列表。想加一种新的显示（比如"发温度告警"），只需要新增一个 `Observer` 实现，`WeatherStation` 一行都不用改。
+
+## 推模型 vs 拉模型
+
+上面这种在 `update()` 里把所有数据都推过去的写法，叫**推模型**：被观察者主动把变化的数据推给观察者。它简单直接，但耦合略强——如果新增一个字段，`Observer` 接口就得改。
+
+**拉模型**则相反：`update()` 只通知"我变了"，观察者拿到被观察者的引用后自己去拉需要的数据：
+
+```java
+interface Observer {
+    void update(Subject subject);  // 只传引用，不传具体数据
+}
+```
+
+拉模型更灵活，但每个观察者要自己写"取数据"的代码。工程里推模型和拉模型都在用，取决于观察者和被观察者的耦合程度、以及数据量。
+
+## Java 里的观察者
+
+JDK 早期有 `java.util.Observable`/`Observer`，但 Java 9 之后已经被标记为过时——因为它是抽象类而非接口（限制了继承）、也不支持类型安全。现代 Java 更推荐直接用 `PropertyChangeListener`、Reactor/RxJava 的响应式流，或者干脆用 Guava/自己实现的事件总线。
+
+一段简化的事件总线看起来像这样：
+
+```java
+class EventBus {
+    private Map<Class<?>, List<Consumer<Object>>> handlers = new HashMap<>();
+
+    @SuppressWarnings("unchecked")
+    public <T> void subscribe(Class<T> eventType, Consumer<T> handler) {
+        handlers.computeIfAbsent(eventType, k -> new ArrayList<>())
+                .add((Consumer<Object>) handler);
+    }
+
+    public void publish(Object event) {
+        List<Consumer<Object>> list = handlers.get(event.getClass());
+        if (list != null) list.forEach(h -> h.accept(event));
+    }
+}
+```
+
+看起来更松散，但本质仍是观察者模式——只是把"注册 + 通知"抽象成了通用的发布/订阅机制。
+
+## 使用场景
+
+观察者模式几乎渗透在所有 UI 框架、消息系统、响应式编程库里：
+
+- **UI 事件**：按钮点击、表单变化、路由变更，都是"被观察者发通知，多个组件响应"。
+- **发布/订阅**：Kafka、Redis pub/sub、消息队列的核心思想。
+- **响应式流**：RxJS、Reactor、Combine，把观察者模式包装成流式 API。
+- **模型-视图分离**：Model 变了，多个 View 自动刷新，就是 MVC/MVVM 的血液。
+
+## 注意事项
+
+观察者最容易出问题的三个点：
+
+1. **通知顺序**：如果观察者之间有依赖（B 依赖 A 的更新结果），通知顺序错了就出 bug。观察者应该尽量互相独立，避免顺序敏感。
+
+2. **同步 vs 异步**：默认的 `notifyObservers()` 是同步串行的——任何一个观察者阻塞或抛异常都会影响其他人。生产环境常常要把通知放到线程池或消息队列里异步分发，代价是失去了"通知完成即状态一致"的保证。
+
+3. **内存泄漏**：观察者忘了取消订阅（尤其是短生命周期的 UI 组件订阅长生命周期的 Model），会一直被引用而无法回收。用弱引用或者在生命周期结束时显式 `removeObserver()` 是常见对策。
+
 </WordCount>

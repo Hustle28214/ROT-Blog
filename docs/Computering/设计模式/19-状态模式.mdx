@@ -2,4 +2,193 @@ import WordCount from '../../../src/components/WordCount/WordCount';
 
 <WordCount>
 
+## 状态模式
+
+状态模式（State Pattern）是一种行为型设计模式，它允许一个对象在其内部状态改变时改变自己的行为，看起来就像这个对象换了个类一样。状态模式的核心思想是：**用类代替 if/else 分支**，把每种状态下的行为封装到独立的状态类里，让对象通过切换持有的状态对象来切换行为。
+
+> 通俗理解：就像自动贩卖机——投币前按下按钮没反应；投够币后按下按钮出货；出货中再按按钮也没用；卖光了投币会退币。同一个"按按钮"的动作，在不同状态下行为完全不同。状态模式把这些"状态相关行为"分开写，而不是全塞在一个方法里 if/else。
+
+状态模式有 3 个角色：
+
+1. 上下文（Context）：持有当前状态的引用，把外部请求委派给当前状态对象。
+
+2. 抽象状态（State）：定义状态相关行为的接口。
+
+3. 具体状态（ConcreteState）：实现具体状态下的行为，同时决定"下一个状态"是什么。
+
+## 一个直观的例子：订单状态机
+
+订单常见状态有：待支付、已支付、已发货、已完成、已取消。不同状态下允许的操作不同，操作后进入的新状态也不同。
+
+先看**没用状态模式**的写法，会长成一坨 if/else：
+
+```java
+// 反例：状态分支散在方法里
+class Order {
+    private String status = "PENDING";
+
+    public void pay() {
+        if ("PENDING".equals(status)) {
+            System.out.println("支付成功");
+            status = "PAID";
+        } else if ("PAID".equals(status)) {
+            System.out.println("已支付过了");
+        } else if ("SHIPPED".equals(status)) {
+            System.out.println("已发货，不能重复支付");
+        }
+        // ...还有 cancel(), ship(), complete() 每个都要重复类似的 if/else
+    }
+}
+```
+
+方法一多、状态一多，分支组合就会爆炸。用状态模式重写：
+
+```java
+// 1. 抽象状态
+interface OrderState {
+    void pay(Order order);
+    void ship(Order order);
+    void cancel(Order order);
+    String name();
+}
+
+// 2. 具体状态：待支付
+class PendingState implements OrderState {
+    @Override
+    public void pay(Order order) {
+        System.out.println("支付成功");
+        order.setState(new PaidState());
+    }
+    @Override
+    public void ship(Order order)   { System.out.println("未支付不能发货"); }
+    @Override
+    public void cancel(Order order) {
+        System.out.println("取消订单");
+        order.setState(new CancelledState());
+    }
+    @Override
+    public String name() { return "PENDING"; }
+}
+
+// 具体状态：已支付
+class PaidState implements OrderState {
+    @Override
+    public void pay(Order order)  { System.out.println("已支付过了"); }
+    @Override
+    public void ship(Order order) {
+        System.out.println("开始发货");
+        order.setState(new ShippedState());
+    }
+    @Override
+    public void cancel(Order order) {
+        System.out.println("已支付订单取消，走退款流程");
+        order.setState(new CancelledState());
+    }
+    @Override
+    public String name() { return "PAID"; }
+}
+
+// 具体状态：已发货
+class ShippedState implements OrderState {
+    @Override
+    public void pay(Order order)   { System.out.println("已发货，无需重复支付"); }
+    @Override
+    public void ship(Order order)  { System.out.println("已发货，勿重复操作"); }
+    @Override
+    public void cancel(Order order){ System.out.println("已发货，不能直接取消，请走退货流程"); }
+    @Override
+    public String name() { return "SHIPPED"; }
+}
+
+// 具体状态：已取消
+class CancelledState implements OrderState {
+    @Override
+    public void pay(Order order)   { System.out.println("订单已取消"); }
+    @Override
+    public void ship(Order order)  { System.out.println("订单已取消"); }
+    @Override
+    public void cancel(Order order){ System.out.println("订单已取消"); }
+    @Override
+    public String name() { return "CANCELLED"; }
+}
+
+// 3. 上下文
+class Order {
+    private OrderState state = new PendingState();  // 初始状态
+
+    public void setState(OrderState s) { this.state = s; }
+    public String currentState() { return state.name(); }
+
+    public void pay()    { state.pay(this); }
+    public void ship()   { state.ship(this); }
+    public void cancel() { state.cancel(this); }
+}
+
+// 客户端
+public class Client {
+    public static void main(String[] args) {
+        Order order = new Order();
+        order.pay();       // 支付成功
+        order.pay();       // 已支付过了
+        order.ship();      // 开始发货
+        order.cancel();    // 已发货，不能直接取消...
+        System.out.println("当前状态：" + order.currentState()); // SHIPPED
+    }
+}
+```
+
+这样每个状态类只关心自己的行为，`Order` 本身完全没有 if/else，加新状态只要新增一个类。状态迁移的逻辑也集中在每个状态的方法里，读起来就像一张展开的状态转移表。
+
+## 状态 vs 策略
+
+这两个的类图几乎一样——都是"上下文持有一个接口对象、把请求委派过去"。区别在于**语义**：
+
+- **策略**：由外部选择用哪种算法，多种算法之间是**平等的、可替换的**，策略之间通常不知道彼此。
+- **状态**：由**当前状态自身**决定下一个状态是什么，状态之间**互相知道**（PendingState 里就写死了"支付后进入 PaidState"）。
+
+一个简单判别法：如果算法切换是"从外部选一个"，是策略；如果切换是"内部触发的、状态之间自动跳转"，是状态。
+
+## 让状态之间不互相依赖
+
+上面写法有个小缺点：每个状态类都写死了"下一个状态是谁"，状态类之间彼此耦合。想集中管理状态迁移可以引入一张状态转移表：
+
+```java
+enum OrderStatus { PENDING, PAID, SHIPPED, COMPLETED, CANCELLED }
+enum OrderEvent  { PAY, SHIP, COMPLETE, CANCEL }
+
+// 用一张 Map 描述所有合法迁移
+Map<OrderStatus, Map<OrderEvent, OrderStatus>> transitions = Map.of(
+    OrderStatus.PENDING, Map.of(
+        OrderEvent.PAY,    OrderStatus.PAID,
+        OrderEvent.CANCEL, OrderStatus.CANCELLED
+    ),
+    OrderStatus.PAID, Map.of(
+        OrderEvent.SHIP,   OrderStatus.SHIPPED,
+        OrderEvent.CANCEL, OrderStatus.CANCELLED
+    ),
+    OrderStatus.SHIPPED, Map.of(
+        OrderEvent.COMPLETE, OrderStatus.COMPLETED
+    )
+);
+```
+
+这就是**状态机**的形态。行为逻辑还是可以放到具体状态类里，但"能不能迁移、迁到哪"由表说了算。规则一多、状态一多，这种"状态类 + 状态表"的组合会比纯状态模式更清晰。
+
+## 使用场景
+
+状态模式最适合"对象有明显生命周期、每种状态下行为差异较大"的场景：
+
+- **订单/工单/审批流**：每个环节都有一组允许的操作。
+- **网络连接/协议状态机**：TCP 连接的 SYN\_SENT / ESTABLISHED / FIN\_WAIT / CLOSED 就是标准状态机。
+- **游戏角色/AI**：待机、追击、攻击、逃跑、死亡——每种状态下的行为完全不同。
+- **UI 组件**：按钮的普通/悬停/按下/禁用四态、播放器的播放/暂停/缓冲/停止。
+
+## 注意事项
+
+用状态模式之前先掂量：状态种类会不会变多？每种状态下行为差异是不是够大？如果只有两三种状态、行为差异也不大，一层 if/else 反而更清晰。
+
+另一个常见坑是**状态数据的归属**。状态类是"行为"的封装，具体的业务数据（订单金额、发货地址）还是要留在 `Context` 上，避免每个状态类都持有一份数据副本。状态类之间的切换如果需要传递上下文数据，通过 `Context` 的 setter 或方法参数来传，比让状态类之间互相拿引用更清晰。
+
+如果状态迁移逻辑非常复杂（分支多、事件多），别犹豫，直接上正式的状态机库（Spring StateMachine、Squirrel 等），或者用**表驱动**的方式代替满地散的状态类。设计模式是骨架，不是必须坚持的语法。
+
 </WordCount>

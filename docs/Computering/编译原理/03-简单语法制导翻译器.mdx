@@ -2,4 +2,158 @@ import WordCount from '../../../src/components/WordCount/WordCount';
 
 <WordCount>
 
+## 简单语法制导翻译器
+
+语法制导翻译（Syntax-Directed Translation）是编译前端最核心的思想之一：先用一套文法描述源语言的结构，再把"翻译动作"挂在文法的每条产生式上，翻译过程就跟着语法分析同步进行。它把"识别代码"和"处理代码"编织在一起，是词法分析之后、中间代码生成之前的一座桥梁。
+
+> 通俗理解：语法制导翻译就像翻译一本外文书——先按句子结构（主谓宾）把句子拆开，然后每识别出一个成分就顺手把它对应的中文写下来。识别和翻译不是两遍工作，而是一边读一边译。
+
+## 语法基础
+
+一个上下文无关文法（CFG）由四部分组成：
+
+- **终结符（terminal）**：语言里实际出现的记号，比如 `+`、`*`、数字、标识符，通常由词法分析器产出。
+- **非终结符（non-terminal）**：代表某种"结构"的符号，比如 `E`（表达式）、`T`（项）、`F`（因子），是文法内部的"变量"。
+- **开始符号（start symbol）**：非终结符中被指定为起点的那一个，整棵语法树从它出发。
+- **产生式（production）**：形如 `A -> α` 的规则，说明非终结符 `A` 可以被替换成右侧的符号串。
+
+以四则表达式为例，一个经典的文法长这样：
+
+```
+E -> E + T | T
+T -> T * F | F
+F -> ( E ) | num
+```
+
+这里 `E`、`T`、`F` 是非终结符，`+`、`*`、`(`、`)`、`num` 是终结符，开始符号是 `E`。三条产生式合起来精确表达了运算符的优先级（`*` 比 `+` 优先）和结合性（左结合）。
+
+## 语法分析树与抽象语法树
+
+按照上面的文法解析 `3 + 5 * 2`，得到的**语法分析树（parse tree）**会把每一步产生式都保留下来：根是 `E`，向下派生出 `E + T`，`E` 再派生 `T` 再派生 `F` 再派生 `num=3`，`T` 派生出 `T * F`……最终数字 `3`、`5`、`2` 都躺在叶子上。这棵树忠实地记录了推导过程，但也非常臃肿——每一层非终结符都是一个节点，很多节点只是"直通"。
+
+**抽象语法树（AST）**则把语法噪音去掉，只保留语义相关的信息。上面的表达式对应的 AST 只有三个节点：
+
+```
+    +
+   / \
+  3   *
+     / \
+    5   2
+```
+
+运算符成了内部节点，操作数成了叶子，非终结符 `E`、`T`、`F` 全部消失，括号也不再需要（结构本身已经表达了优先级）。
+
+> 通俗理解：语法分析树像会议纪要，一字不落地记录了每句话是怎么说出来的；抽象语法树像会议摘要，只留下决策和结论。真实编译器几乎都在 AST 上做后续处理——它更小、更贴合语义、也更容易遍历。
+
+## 语法制导定义
+
+**语法制导定义（SDD，Syntax-Directed Definition）**把每条产生式和一组**语义规则**绑定在一起。每个文法符号可以带若干**属性**，属性分两类：
+
+- **综合属性（synthesized attribute）**：由子节点计算，向上传递给父节点。比如"表达式的值"就是典型的综合属性。
+- **继承属性（inherited attribute）**：由父节点或兄弟节点决定，向下或横向传递。比如"当前所处的作用域"就是典型的继承属性。
+
+给四则表达式文法附上"求值"的语义规则，就是这样：
+
+```
+产生式              语义规则
+E -> E1 + T         E.val = E1.val + T.val
+E -> T              E.val = T.val
+T -> T1 * F         T.val = T1.val * F.val
+T -> F              T.val = F.val
+F -> ( E )          F.val = E.val
+F -> num            F.val = num.lexval
+```
+
+这里 `val` 是综合属性。语法分析每归约一次，就顺手计算一次属性，等到根节点 `E` 归约完成，`E.val` 就是整个表达式的值。翻译动作被"制导"在文法上，这就是名字的来历。
+
+## 一个具体翻译器示例
+
+下面用**递归下降**的方式实现一个把中缀表达式翻译成后缀表达式（逆波兰式）的翻译器。文法先做左递归改写（递归下降不能处理直接左递归）：
+
+```
+E -> T E'
+E' -> + T { print('+') } E' | ε
+T -> F T'
+T' -> * F { print('*') } T' | ε
+F -> ( E ) | num { print(num) }
+```
+
+花括号里的就是**语义动作**——识别到相应结构时立即执行。把动作放在运算符的 `T` 之后，就自然产出了后缀式。对应的 Python 实现：
+
+```python
+class Parser:
+    def __init__(self, tokens):
+        self.tokens = tokens
+        self.pos = 0
+
+    def peek(self):
+        return self.tokens[self.pos] if self.pos < len(self.tokens) else None
+
+    def eat(self, tok):
+        assert self.peek() == tok, f"期望 {tok}，实际 {self.peek()}"
+        self.pos += 1
+
+    def E(self):
+        self.T()
+        self.E_prime()
+
+    def E_prime(self):
+        if self.peek() == '+':
+            self.eat('+')
+            self.T()
+            print('+', end=' ')          # 语义动作
+            self.E_prime()
+
+    def T(self):
+        self.F()
+        self.T_prime()
+
+    def T_prime(self):
+        if self.peek() == '*':
+            self.eat('*')
+            self.F()
+            print('*', end=' ')          # 语义动作
+            self.T_prime()
+
+    def F(self):
+        t = self.peek()
+        if t == '(':
+            self.eat('('); self.E(); self.eat(')')
+        else:
+            print(t, end=' ')            # 语义动作
+            self.pos += 1
+
+# 输入：3 + 5 * 2
+Parser(['3', '+', '5', '*', '2']).E()
+# 输出：3 5 2 * +
+```
+
+递归下降的每个函数对应一个非终结符，函数体的执行顺序就是对 AST 的一次深度优先遍历，语义动作嵌在合适的位置，翻译就随着遍历自动完成了。
+
+## 简单符号表
+
+翻译器很快就要面对标识符——变量、函数、类型名。它们需要一张**符号表（symbol table）**统一管理。最简单的符号表就是一个哈希表，键是名字，值是一条条记录：
+
+```python
+class Symbol:
+    def __init__(self, name, type_, offset):
+        self.name = name       # 名字，如 "x"
+        self.type = type_      # 类型，如 "int"
+        self.offset = offset   # 相对栈帧的偏移或地址
+
+class SymbolTable:
+    def __init__(self):
+        self.table = {}
+        self.next_offset = 0
+
+    def put(self, name, type_):
+        self.table[name] = Symbol(name, type_, self.next_offset)
+        self.next_offset += 4   # 假设 int 占 4 字节
+
+    def get(self, name):
+        return self.table.get(name)
+```
+
+在语法制导翻译中，每识别到一个变量声明就 `put` 一条记录，每识别到一个变量引用就 `get` 出对应符号并检查类型、拿到地址。随着语言引入作用域、函数、类，符号表会长成一棵嵌套的树——这些内容会在下一章展开。
+
 </WordCount>

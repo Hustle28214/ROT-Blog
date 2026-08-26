@@ -2,4 +2,145 @@ import WordCount from '../../../src/components/WordCount/WordCount';
 
 <WordCount>
 
+## 访问者模式
+
+访问者模式（Visitor Pattern）是一种行为型设计模式，它允许你在不修改一个对象结构（比如一棵树）的情况下，向这个结构中的每个元素添加新的操作。核心思想是：**把"数据结构"和"作用在数据上的算法"分开**，通过"双分派"让算法可以针对不同类型的元素做出不同响应。
+
+> 通俗理解：就像一个博物馆里各种展品——不同的参观者（考古学家、艺术评论家、导游）对同一件展品的关注点完全不同。展品本身不用为每种参观者都开一个方法，而是让参观者自己带着"如何解读展品"的知识过来。
+
+访问者模式有 4 个角色：
+
+1. 访问者接口（Visitor）：为每种具体元素类型定义一个 `visit(ConcreteElement)` 方法。
+
+2. 具体访问者（ConcreteVisitor）：实现访问者接口，封装对每种元素类型的具体处理。
+
+3. 元素接口（Element）：定义 `accept(Visitor)` 方法。
+
+4. 具体元素（ConcreteElement）：实现 `accept()`，在里面回调 `visitor.visit(this)`——**这一步是关键，把类型信息传给访问者**。
+
+## 一个直观的例子：文件系统统计
+
+假设有一棵文件树，节点分文件和文件夹。你想统计"总大小"、导出"目录结构"、生成"HTML 报告"——这些操作对文件和文件夹的处理方式各不相同：
+
+```java
+// 1. 元素接口
+interface FileSystemNode {
+    void accept(FileSystemVisitor visitor);
+}
+
+// 3. 具体元素：文件
+class File implements FileSystemNode {
+    String name;
+    long size;
+    public File(String name, long size) {
+        this.name = name; this.size = size;
+    }
+    @Override
+    public void accept(FileSystemVisitor visitor) {
+        visitor.visit(this);  // 双分派的关键：把自己的类型信息交给访问者
+    }
+}
+
+// 具体元素：文件夹
+class Directory implements FileSystemNode {
+    String name;
+    List<FileSystemNode> children = new ArrayList<>();
+    public Directory(String name) { this.name = name; }
+    @Override
+    public void accept(FileSystemVisitor visitor) {
+        visitor.visit(this);
+        // 通常在访问者里递归处理孩子，这里也可以在元素里递归
+    }
+}
+
+// 2. 访问者接口
+interface FileSystemVisitor {
+    void visit(File file);
+    void visit(Directory dir);
+}
+
+// 具体访问者 1：总大小统计
+class SizeCalculator implements FileSystemVisitor {
+    long total = 0;
+    @Override
+    public void visit(File file) {
+        total += file.size;
+    }
+    @Override
+    public void visit(Directory dir) {
+        for (FileSystemNode child : dir.children) {
+            child.accept(this);  // 递归下去
+        }
+    }
+}
+
+// 具体访问者 2：打印目录树
+class TreePrinter implements FileSystemVisitor {
+    int depth = 0;
+    @Override
+    public void visit(File file) {
+        System.out.println("  ".repeat(depth) + "- " + file.name + " (" + file.size + "B)");
+    }
+    @Override
+    public void visit(Directory dir) {
+        System.out.println("  ".repeat(depth) + "+ " + dir.name + "/");
+        depth++;
+        for (FileSystemNode child : dir.children) {
+            child.accept(this);
+        }
+        depth--;
+    }
+}
+
+// 客户端
+public class Client {
+    public static void main(String[] args) {
+        Directory root = new Directory("root");
+        Directory sub = new Directory("src");
+        root.children.add(new File("README.md", 100));
+        root.children.add(sub);
+        sub.children.add(new File("Main.java", 300));
+        sub.children.add(new File("Utils.java", 500));
+
+        SizeCalculator sizer = new SizeCalculator();
+        root.accept(sizer);
+        System.out.println("总大小：" + sizer.total + "B");
+
+        System.out.println("---");
+        root.accept(new TreePrinter());
+    }
+}
+```
+
+新增操作（比如"检查有没有病毒"、"导出 XML"）时，只要新写一个 `FileSystemVisitor` 实现类，一行都不动 `File` 和 `Directory`。相反，如果直接在 `File`/`Directory` 里加方法，每加一个功能都要改所有元素类。
+
+## 双分派（Double Dispatch）
+
+访问者模式的精髓在于"双分派"。Java 这样的语言只支持**单分派**——`visitor.visit(node)` 只会根据 `visitor` 的运行时类型选择方法，`node` 是编译时类型（这里是 `FileSystemNode`），无法根据它是 File 还是 Directory 分派到不同的重载。
+
+模板方法怎么解决？靠 `node.accept(visitor)` 里的一句 `visitor.visit(this)`：
+
+1. 第一次分派：`node.accept(visitor)`，Java 根据 `node` 的**运行时类型**选择走 `File.accept` 还是 `Directory.accept`。
+2. 第二次分派：在 `accept` 内部，`this` 的编译时类型是明确的（`File` 或 `Directory`），所以 `visitor.visit(this)` 能选中重载版本里对应的那个。
+
+两次分派叠起来，达到了"根据两个对象的运行时类型选择方法"的效果。这在没有多方法（multi-methods）语言支持的情况下是标准解法。
+
+## 使用场景
+
+访问者模式的门槛不低，用得好的场景通常有这几个特征：
+
+- **对象结构相对稳定，操作却经常增删**：编译器 AST、DOM 树、语法树遍历，元素类型（表达式、语句、声明）几年不变，但要不断新增"求值"、"类型检查"、"代码生成"、"格式化"等操作。
+- **需要对整棵结构做统一处理**：一次遍历完成多种统计、报表、导出。
+- **想避免在元素类里堆积各种方法**：把行为搬到访问者里，元素类保持"纯数据"。
+
+Java 的 `Files.walkFileTree(Path, FileVisitor)`、编译器的各种 Visitor（javac 里的 `TreeVisitor`）都是这个模式的直接应用。
+
+## 注意事项
+
+访问者最大的缺点是**元素类型难以扩展**。加一种新元素类型意味着要改所有访问者接口和所有实现——这是访问者模式的**双刃剑**：操作易加（新写 Visitor），元素难加（改所有 Visitor）。所以只有当"元素类型稳定、操作多变"时才值得用；如果元素类型也在频繁增删，访问者会变成负担。
+
+另一个坑是**破坏封装**。为了让访问者处理元素，元素往往要暴露内部字段（`file.name`、`file.size` 都是 public 的）。这和面向对象里"数据和行为绑在一起"的原则天生对立。用访问者就意味着接受这种取舍——把类型分离得干净，代价是访问者能看到元素的内部。
+
+如果你只需要"对树遍历做几件事"、且元素类型可能会变，用**函数式的 fold/traversal** 或者**模式匹配**（Java 21 的 `switch` 模式匹配、Scala/Kotlin 的 `when`）更轻。访问者模式的价值在"面向对象语言里模拟双分派"，脚本语言、支持多重分派的语言里往往有更自然的写法。
+
 </WordCount>

@@ -2,4 +2,128 @@ import WordCount from '../../../src/components/WordCount/WordCount';
 
 <WordCount>
 
+## 外观模式
+
+外观模式（Facade Pattern）是一种结构型设计模式，它为一组复杂的子系统提供一个统一的高层接口，让外部客户端只需要面对一个"门面"，而不必了解子系统内部各种类之间的调用关系。
+
+> 通俗理解：就像酒店前台——你不需要知道客房部、餐饮部、洗衣房、叫车服务分别怎么运作，只要拨一个前台电话，前台就会帮你把事情安排到位。前台就是那个"外观"。
+
+外观模式的关键不在于"隐藏"，而在于"归拢"：把散在多个类里的调用序列封装成一个语义清晰的方法，让常用路径变得开箱即用。子系统本身可以照常直接用，只是有了一个更方便的入口。
+
+角色只有 2 个：
+
+1. 外观（Facade）：知道各个子系统类的存在，负责把客户端请求委派给合适的子系统。
+
+2. 子系统（Subsystem）：真正实现功能的一堆类。它们不知道外观的存在，也不依赖外观。
+
+假设有一个家庭影院系统，包含 DVD 播放机、投影仪、音响、灯光等等，看一部电影要一大堆操作：
+
+```java
+// 子系统：DVD 播放机
+class DvdPlayer {
+    public void on()  { System.out.println("DVD 打开"); }
+    public void play(String movie) { System.out.println("播放电影：" + movie); }
+    public void stop() { System.out.println("停止播放"); }
+    public void off()  { System.out.println("DVD 关闭"); }
+}
+
+// 子系统：投影仪
+class Projector {
+    public void on()   { System.out.println("投影仪打开"); }
+    public void wideScreenMode() { System.out.println("投影仪切换到宽屏模式"); }
+    public void off()  { System.out.println("投影仪关闭"); }
+}
+
+// 子系统：音响
+class SoundSystem {
+    public void on()  { System.out.println("音响打开"); }
+    public void setVolume(int level) { System.out.println("音响音量调整到 " + level); }
+    public void off() { System.out.println("音响关闭"); }
+}
+
+// 子系统：灯光
+class Lights {
+    public void dim(int level) { System.out.println("灯光调暗到 " + level + "%"); }
+    public void on() { System.out.println("灯光全开"); }
+}
+
+// 外观：家庭影院控制器
+class HomeTheaterFacade {
+    private DvdPlayer dvd;
+    private Projector projector;
+    private SoundSystem sound;
+    private Lights lights;
+
+    public HomeTheaterFacade(DvdPlayer dvd, Projector projector,
+                             SoundSystem sound, Lights lights) {
+        this.dvd = dvd;
+        this.projector = projector;
+        this.sound = sound;
+        this.lights = lights;
+    }
+
+    // 一键"看电影"
+    public void watchMovie(String movie) {
+        System.out.println("准备看电影...");
+        lights.dim(10);
+        projector.on();
+        projector.wideScreenMode();
+        sound.on();
+        sound.setVolume(6);
+        dvd.on();
+        dvd.play(movie);
+    }
+
+    // 一键"结束观影"
+    public void endMovie() {
+        System.out.println("结束观影...");
+        dvd.stop();
+        dvd.off();
+        sound.off();
+        projector.off();
+        lights.on();
+    }
+}
+
+// 客户端
+public class Client {
+    public static void main(String[] args) {
+        HomeTheaterFacade home = new HomeTheaterFacade(
+            new DvdPlayer(), new Projector(),
+            new SoundSystem(), new Lights()
+        );
+        home.watchMovie("盗梦空间");
+        System.out.println("---");
+        home.endMovie();
+    }
+}
+```
+
+一句 `home.watchMovie("...")` 就把原本需要 7、8 步的调用序列封成了一个动作，客户端读起来干净很多。想直接用子系统里某个类（比如单独调节音量）也完全可以，外观并没有把它们藏起来。
+
+## 外观 vs 中介者 vs 代理
+
+这三个都长得像"引入一个中间对象"，但意图不同：
+
+- **外观**：单向委派，客户端 → 外观 → 子系统，简化调用。
+- **中介者**：多个平等对象通过中介互相通信，重点是把网状交互变成星型。
+- **代理**：和被代理对象接口一致，重点是控制访问（延迟加载、权限校验、远程调用等）。
+
+外观通常"接口不同于子系统"，代理"接口等同于被代理者"，中介者"关注对象间协作"。
+
+## 使用场景
+
+外观模式在真实项目里几乎无处不在，只是很多时候人们没把它命名成"Facade"：
+
+- **应用服务层（Application Service）**：常见于 DDD 分层里，应用服务的每个方法组合领域对象、仓储、事件发布，暴露给上层 Controller 一个业务动作入口。这就是标准的外观。
+- **SDK 封装**：把复杂 API（比如云服务、支付网关）里几十个类打包成一个 `Client`，用户只面对少量高层方法。
+- **老系统迁移的适配层**：不改动老代码，前面套一层 Facade 提供新接口，让新老共存或逐步替换。
+- **测试友好**：Facade 是一个天然的注入点，可以在集成测试里替换成假的实现，避免逐个 mock 子系统。
+
+## 注意事项
+
+外观最容易长成"上帝对象"——什么方法都往里塞，最后变成一个几百行的巨类。避免的办法是**按业务动作切分**：每个外观类只服务一个明确的场景，而不是把整个子系统的能力清单都堆进去。
+
+另一个坑是外观和子系统之间的耦合。外观必然依赖子系统的具体类，如果子系统本身接口不稳定，外观就会跟着改。所以外观通常只放在"子系统结构相对稳定"的地方，或者反过来说：**外观是子系统一致性的一部分承诺**。
+
 </WordCount>

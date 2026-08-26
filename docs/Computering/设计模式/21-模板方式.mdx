@@ -2,4 +2,126 @@ import WordCount from '../../../src/components/WordCount/WordCount';
 
 <WordCount>
 
+## 模板方法模式
+
+模板方法模式（Template Method Pattern）是一种行为型设计模式，它在父类中定义一个算法的骨架，把其中一些具体步骤延迟到子类去实现。父类固定"要做哪些步骤、按什么顺序"，子类只负责"其中某几步具体怎么做"。核心思想是：**流程稳定、细节多变**。
+
+> 通俗理解：就像做菜的通用流程——洗菜、切菜、下锅、翻炒、装盘。所有菜都是这五步，但每道菜切什么、放什么调料、火候多久各不相同。菜谱就是模板方法，具体一道菜是子类。
+
+模板方法有 2 个角色：
+
+1. 抽象类（AbstractClass）：定义模板方法（骨架流程）和一组抽象/钩子方法。模板方法通常用 `final` 修饰，防止子类改流程。
+
+2. 具体类（ConcreteClass）：实现抽象方法，可以选择性地覆盖钩子方法。
+
+## 一个直观的例子：饮料制作
+
+咖啡和茶都遵循同一个"泡饮料"的流程：烧水 → 冲泡 → 倒入杯子 → 加调料。但冲泡和加调料的细节不同：
+
+```java
+// 抽象类：饮料
+abstract class Beverage {
+
+    // 模板方法：固定流程，用 final 防止被覆盖
+    public final void prepareRecipe() {
+        boilWater();
+        brew();
+        pourInCup();
+        if (customerWantsCondiments()) {  // 钩子
+            addCondiments();
+        }
+    }
+
+    // 通用步骤
+    private void boilWater() { System.out.println("烧水"); }
+    private void pourInCup() { System.out.println("倒入杯子"); }
+
+    // 子类必须实现的步骤
+    protected abstract void brew();
+    protected abstract void addCondiments();
+
+    // 钩子方法：子类可以选择性覆盖，默认为 true
+    protected boolean customerWantsCondiments() { return true; }
+}
+
+// 具体类：咖啡
+class Coffee extends Beverage {
+    @Override
+    protected void brew()          { System.out.println("冲泡咖啡粉"); }
+    @Override
+    protected void addCondiments() { System.out.println("加糖和牛奶"); }
+}
+
+// 具体类：茶
+class Tea extends Beverage {
+    @Override
+    protected void brew()          { System.out.println("浸泡茶叶"); }
+    @Override
+    protected void addCondiments() { System.out.println("加柠檬"); }
+}
+
+// 具体类：不加调料的黑咖啡（通过钩子决定）
+class BlackCoffee extends Beverage {
+    @Override
+    protected void brew()          { System.out.println("冲泡咖啡粉"); }
+    @Override
+    protected void addCondiments() { /* 不会走到这里 */ }
+    @Override
+    protected boolean customerWantsCondiments() { return false; }
+}
+
+// 客户端
+public class Client {
+    public static void main(String[] args) {
+        new Coffee().prepareRecipe();
+        System.out.println("---");
+        new Tea().prepareRecipe();
+        System.out.println("---");
+        new BlackCoffee().prepareRecipe();
+    }
+}
+```
+
+`prepareRecipe()` 就是模板方法——它把流程写死了，子类不能改顺序、不能跳步骤。但流程里的几个"空槽"（`brew`、`addCondiments`）由子类填。`customerWantsCondiments()` 是一个"钩子"（Hook），有默认实现，子类可以选择覆盖它来影响流程走向。
+
+## 三种可覆盖的方法
+
+在模板方法里，父类通常会定义三类可被子类填充的方法，分工要清楚：
+
+1. **抽象方法**：子类必须实现，缺了就编译不过。适合"每个子类都有自己独特做法"的步骤。
+2. **钩子方法（Hook）**：有默认实现，子类可选择覆盖。适合"通常不需要改，但偶尔要变"的地方。
+3. **可覆盖的普通方法**：有默认实现，允许子类调整。用得少，因为容易被滥用改变父类语义。
+
+模板方法本身应该是 `final` 的（Java 里显式加 `final`，C++ 里避免声明为 `virtual`），否则子类一旦覆盖它，"流程稳定"这个前提就没了。
+
+## 好莱坞原则
+
+模板方法模式是"好莱坞原则"（Don't call us, we'll call you）的典型体现：**别你来调我，是我来调你**。父类掌握主动权，规定何时调用子类填的方法；子类只负责被动地实现"该我上场时该做什么"。
+
+这种反向控制在很多框架里都能看到：Spring 的 `@Before`/`@After`、JUnit 的 `setUp`/`tearDown`、Servlet 的 `doGet`/`doPost`、Android Activity 的生命周期方法……都是框架规定"什么时候调你"，你只负责写"到那时候做什么"。
+
+## 模板方法 vs 策略
+
+两者都可以做到"骨架不变、细节可变"，但机制不同：
+
+- **模板方法**：靠**继承**——子类通过重写父类方法来定制细节，绑定关系在编译期。
+- **策略**：靠**组合**——上下文持有一个策略引用，可以在运行时替换，绑定关系在运行期。
+
+一般来说，需要在运行时切换实现的用策略，需要在类型层面固化流程的用模板方法。策略更灵活，模板方法更简单。
+
+## 使用场景
+
+- **框架/库设计**：几乎所有需要用户"填坑"的框架都用了模板方法。JDBC 里 `HibernateTemplate`、`JdbcTemplate` 把连接、事务、异常处理的骨架固定，业务代码只写 SQL 和结果映射；Spring 的各种 `*Template` 是这种模式的教科书级用法。
+- **工作流骨架**：入职流程、报表生成流程、数据处理流水线（校验 → 清洗 → 计算 → 输出），流程稳定但每步实现各异。
+- **测试基类**：`AbstractIntegrationTest` 里固定"启动容器 → 灌数据 → 跑测试 → 清理"，具体测试类只写业务用例。
+- **UI 组件生命周期**：`onCreate`/`onStart`/`onResume` 一整套回调。
+
+## 注意事项
+
+模板方法最大的问题是**继承的紧耦合**。子类和父类深度绑定，父类改一步、所有子类都可能受影响。同时 Java 里一个类只能继承一个父类，模板方法会"占掉"这个宝贵的继承槽位。
+
+所以现代设计更多用策略、函数式回调来实现"填坑"的效果：把每一步做成一个 `Function` 或 `Consumer`，通过组合装到主流程里。Spring 里 `TransactionTemplate.execute(TransactionCallback)` 就是模板方法 + 回调的组合体——外层是模板方法固定事务边界，中间的"业务代码"用回调传进去，避免了继承。
+
+另一个坑是**钩子太多**。如果一个模板方法里有五六个钩子，子类要覆盖哪些、覆盖后流程会走成什么样，读起来会非常头疼。钩子数量控制在 2-3 个以内，超过就该反思是不是应该拆成多个更小的抽象。
+
 </WordCount>

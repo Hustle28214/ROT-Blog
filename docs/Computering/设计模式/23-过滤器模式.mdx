@@ -2,4 +2,160 @@ import WordCount from '../../../src/components/WordCount/WordCount';
 
 <WordCount>
 
+## 过滤器模式
+
+过滤器模式（Filter Pattern），也叫**标准模式**（Criteria Pattern），是一种结构型设计模式，它把"筛选条件"从"数据集合"里解耦出来，让不同的筛选逻辑可以独立定义、自由组合。核心思想是：**把"怎么选"抽成一个接口，"选什么"用组合来搭**。
+
+> 通俗理解：就像招聘筛简历——学历、工作年限、期望薪资、地点每一项都是一个"筛子"。你可以只用其中一个，也可以把它们串起来（"本科以上 且 3 年经验 且 在北京"），甚至偶尔用"或"关系（"研究生 或 5 年经验以上"）。每个筛子本身是独立的，组合方式取决于场景。
+
+过滤器模式有 3 个角色：
+
+1. 数据对象（Target）：被筛选的实体。
+
+2. 过滤器接口（Criteria）：定义一个 `meetCriteria(List<T>)` 方法，返回符合条件的子集。
+
+3. 具体过滤器 + 组合过滤器：单条件过滤器实现基础规则，组合过滤器（And/Or/Not）通过组合基础过滤器构造复合规则。
+
+## 一个直观的例子：员工筛选
+
+```java
+// 数据对象
+class Employee {
+    String name;
+    String gender;
+    int age;
+    boolean married;
+
+    public Employee(String name, String gender, int age, boolean married) {
+        this.name = name;
+        this.gender = gender;
+        this.age = age;
+        this.married = married;
+    }
+
+    @Override
+    public String toString() {
+        return name + "(" + gender + "," + age + "," + (married ? "已婚" : "未婚") + ")";
+    }
+}
+
+// 过滤器接口
+interface Criteria {
+    List<Employee> meetCriteria(List<Employee> employees);
+}
+
+// 具体过滤器：男性
+class MaleCriteria implements Criteria {
+    @Override
+    public List<Employee> meetCriteria(List<Employee> list) {
+        return list.stream()
+                .filter(e -> "M".equals(e.gender))
+                .collect(Collectors.toList());
+    }
+}
+
+// 具体过滤器:女性
+class FemaleCriteria implements Criteria {
+    @Override
+    public List<Employee> meetCriteria(List<Employee> list) {
+        return list.stream()
+                .filter(e -> "F".equals(e.gender))
+                .collect(Collectors.toList());
+    }
+}
+
+// 具体过滤器：单身
+class SingleCriteria implements Criteria {
+    @Override
+    public List<Employee> meetCriteria(List<Employee> list) {
+        return list.stream()
+                .filter(e -> !e.married)
+                .collect(Collectors.toList());
+    }
+}
+
+// 组合过滤器：与
+class AndCriteria implements Criteria {
+    private Criteria a, b;
+    public AndCriteria(Criteria a, Criteria b) { this.a = a; this.b = b; }
+    @Override
+    public List<Employee> meetCriteria(List<Employee> list) {
+        return b.meetCriteria(a.meetCriteria(list));
+    }
+}
+
+// 组合过滤器：或
+class OrCriteria implements Criteria {
+    private Criteria a, b;
+    public OrCriteria(Criteria a, Criteria b) { this.a = a; this.b = b; }
+    @Override
+    public List<Employee> meetCriteria(List<Employee> list) {
+        List<Employee> first = a.meetCriteria(list);
+        List<Employee> second = b.meetCriteria(list);
+        for (Employee e : second) {
+            if (!first.contains(e)) first.add(e);
+        }
+        return first;
+    }
+}
+
+// 客户端
+public class Client {
+    public static void main(String[] args) {
+        List<Employee> list = List.of(
+            new Employee("Alice", "F", 26, false),
+            new Employee("Bob",   "M", 30, true),
+            new Employee("Carol", "F", 24, false),
+            new Employee("David", "M", 28, false)
+        );
+
+        Criteria male   = new MaleCriteria();
+        Criteria single = new SingleCriteria();
+        Criteria singleMale = new AndCriteria(male, single);
+        Criteria femaleOrSingle = new OrCriteria(new FemaleCriteria(), single);
+
+        System.out.println("单身男：" + singleMale.meetCriteria(list));
+        System.out.println("女性或单身：" + femaleOrSingle.meetCriteria(list));
+    }
+}
+```
+
+新增筛选条件只需要新增一个 `Criteria` 实现，`And`/`Or`/`Not` 三个组合器就能覆盖大部分复合场景。业务代码里就是 `new AndCriteria(a, b).meetCriteria(list)` 这种把条件拼起来的形态。
+
+## 现代 Java 的函数式写法
+
+Java 8 之后有 `Predicate<T>`，本质上就是过滤器模式的函数式版本，并且自带 `and`/`or`/`negate` 组合方法：
+
+```java
+Predicate<Employee> male   = e -> "M".equals(e.gender);
+Predicate<Employee> single = e -> !e.married;
+
+List<Employee> singleMale = list.stream()
+        .filter(male.and(single))
+        .collect(Collectors.toList());
+
+List<Employee> femaleOrSingle = list.stream()
+        .filter(male.negate().or(single))
+        .collect(Collectors.toList());
+```
+
+一行代码搞定过滤器 + 组合，几乎不需要专门写 Criteria 类。`Predicate` 就是过滤器模式在语言层面的支持，语义完全一致。
+
+## 使用场景
+
+- **规则引擎/权限校验**：一堆条件组合成访问策略，条件可以按场景启用禁用。
+- **风控/反欺诈**：单条规则简单，规则组合起来构成风险画像。
+- **报表/数据筛选**：BI 系统里让用户在 UI 上勾选多个维度，后端拼接成一个复合过滤器。
+- **搜索与推荐**：召回层的多路条件组合、后置过滤规则。
+
+## 注意事项
+
+过滤器模式看起来清爽，但要注意几个细节：
+
+1. **AND / OR 的短路**：如果单个过滤器代价很高（比如查数据库），应该让廉价的条件先跑。可以给 `Criteria` 加一个"成本"信息，或者组合器自己做重排。
+2. **性能**：`AndCriteria` 会先算 A 再算 B，如果每次都返回新集合，中间会产生大量临时列表。数据量大的时候直接用 `Stream.filter` 的短路特性会更高效。
+3. **相等性**：`OrCriteria` 里的去重靠 `contains`，元素必须正确实现 `equals`/`hashCode`，否则会出现重复。
+
+如果你的过滤规则来自用户输入或存储在数据库里，通常会演化成"规则表 + 引擎"的形态——过滤器模式仍然是底层抽象，但外层多了规则的持久化、组合树的序列化、DSL 解析等。别硬把这一切都塞进过滤器模式，规则一多就该考虑规则引擎（Drools、Aviator）或表达式引擎（Spring EL）。
+
 </WordCount>

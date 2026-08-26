@@ -2,4 +2,125 @@ import WordCount from '../../../src/components/WordCount/WordCount';
 
 <WordCount>
 
+## 桥接模式
+
+桥接模式（Bridge Pattern）是一种结构型设计模式，它把一个类中会独立变化的两个维度拆开，让它们各自继承演化，再通过组合关系"搭桥"连起来。核心目的是避免"两个维度同时变化时子类爆炸"。
+
+> 通俗理解：就像遥控器和电视机——遥控器（抽象）有多种形态（简易款、带语音、带触摸），电视机（实现）也有多种品牌（小米、索尼、华为）。如果每种组合都造一个类，会得到 M × N 个子类；桥接模式让遥控器和电视机分别演化，用一根"引用线"把它们连起来，只需要 M + N 个类。
+
+如果一个类里既要按"功能类型"分类，又要按"平台/实现"分类，就非常适合桥接模式。它把继承关系里的一根维度换成了组合关系，让两个维度都能独立扩展。
+
+桥接模式有 4 个角色：
+
+1. 抽象（Abstraction）：定义抽象部分的接口，持有一个实现部分的引用。
+
+2. 扩展抽象（Refined Abstraction）：抽象的具体子类，可以复用或扩展抽象。
+
+3. 实现接口（Implementor）：定义实现部分的接口，注意它不必和抽象接口一致。
+
+4. 具体实现（Concrete Implementor）：实现接口的具体类。
+
+假设要开发一个跨平台的图形绘制系统，需要在不同操作系统上画不同形状：
+
+```java
+// 1. 实现接口：绘图 API
+interface DrawingAPI {
+    void drawCircle(double x, double y, double radius);
+    void drawRectangle(double x, double y, double w, double h);
+}
+
+// 2. 具体实现：Windows 平台
+class WindowsDrawingAPI implements DrawingAPI {
+    @Override
+    public void drawCircle(double x, double y, double radius) {
+        System.out.printf("[Windows] 画圆 (%.1f, %.1f) 半径 %.1f%n", x, y, radius);
+    }
+    @Override
+    public void drawRectangle(double x, double y, double w, double h) {
+        System.out.printf("[Windows] 画矩形 (%.1f, %.1f) 宽%.1f 高%.1f%n", x, y, w, h);
+    }
+}
+
+// 具体实现:Linux 平台
+class LinuxDrawingAPI implements DrawingAPI {
+    @Override
+    public void drawCircle(double x, double y, double radius) {
+        System.out.printf("[Linux] 画圆 (%.1f, %.1f) 半径 %.1f%n", x, y, radius);
+    }
+    @Override
+    public void drawRectangle(double x, double y, double w, double h) {
+        System.out.printf("[Linux] 画矩形 (%.1f, %.1f) 宽%.1f 高%.1f%n", x, y, w, h);
+    }
+}
+
+// 3. 抽象：形状
+abstract class Shape {
+    protected DrawingAPI api;   // 桥接：持有实现接口的引用
+    protected Shape(DrawingAPI api) { this.api = api; }
+    public abstract void draw();
+    public abstract void resize(double factor);
+}
+
+// 4. 扩展抽象：圆形
+class Circle extends Shape {
+    private double x, y, radius;
+    public Circle(double x, double y, double r, DrawingAPI api) {
+        super(api);
+        this.x = x; this.y = y; this.radius = r;
+    }
+    @Override
+    public void draw() { api.drawCircle(x, y, radius); }
+    @Override
+    public void resize(double factor) { radius *= factor; }
+}
+
+// 扩展抽象：矩形
+class Rectangle extends Shape {
+    private double x, y, w, h;
+    public Rectangle(double x, double y, double w, double h, DrawingAPI api) {
+        super(api);
+        this.x = x; this.y = y; this.w = w; this.h = h;
+    }
+    @Override
+    public void draw() { api.drawRectangle(x, y, w, h); }
+    @Override
+    public void resize(double factor) { w *= factor; h *= factor; }
+}
+
+// 客户端
+public class Client {
+    public static void main(String[] args) {
+        Shape[] shapes = {
+            new Circle(1, 2, 3, new WindowsDrawingAPI()),
+            new Rectangle(0, 0, 10, 20, new LinuxDrawingAPI())
+        };
+        for (Shape s : shapes) {
+            s.resize(2);
+            s.draw();
+        }
+    }
+}
+```
+
+如果不用桥接，同样支持 2 种形状和 2 种平台就要写 `WindowsCircle`、`LinuxCircle`、`WindowsRectangle`、`LinuxRectangle` 共 4 个类。再加一种"三角形"或者"MacOS"，类数量以乘法增长。用桥接后，形状 + 平台是加法关系。
+
+## 桥接和适配器的区别
+
+这两者常常被搞混，因为它们都涉及"一个类持有另一个类的引用"。区别在于**意图**：
+
+- **适配器**：解决"接口不兼容"的问题，让两个原本合不来的接口协作，通常是事后补救。
+- **桥接**：解决"多维度独立变化"的问题，从一开始就把两个维度设计成解耦的，属于事前规划。
+
+一个简单判别法：如果你是在改造已有代码把它接到别的接口上，那是适配器；如果你是在设计新代码，主动把两个维度拆成两条继承线，那是桥接。
+
+## 使用场景
+
+桥接模式最典型的场景是**跨平台/多渠道**的抽象。JDBC 是一个经典例子：`DriverManager` 提供统一 API（抽象），底层是 MySQL、PostgreSQL、Oracle 各自的驱动实现（实现）。日志框架 SLF4J 也是同一思路——上层写代码用 SLF4J API，底层可以桥到 Logback、Log4j、JUL 等。
+
+GUI 框架里"控件类型 × 渲染后端"、消息推送里"通知类型 × 通道（微信/邮件/短信）"、支付系统里"业务场景 × 支付渠道"，都是桥接的天然应用场景。
+
+## 注意事项
+
+桥接不是万能药，只在两个维度**都会独立变化**时才有意义。如果一个维度基本不变，硬拆两条继承线只会平白多一层间接。所以在动手前先问一句：这两个维度是不是都可能长出新的子类？如果答案是否定的，直接用继承或者组合就够了。
+
 </WordCount>

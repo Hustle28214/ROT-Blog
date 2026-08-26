@@ -1,0 +1,221 @@
+import WordCount from '../../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+上一章我们讲完了预训练——最后你手里有个 base model。它有个非常尴尬的问题：**它不会对话**。
+
+你输入"你是谁？"，它可能给你续写出"你是谁？这个问题在哲学上被讨论了几千年……"。它没有"接到问题就该给回答"这个概念。它只是在做续写。
+
+要让它变成 ChatGPT 那种会对话的助手，第一步是 **SFT（Supervised Fine-Tuning，监督微调）**。这一章讲清楚 SFT 是什么、数据长什么样、怎么算 loss、和预训练有什么区别。
+
+## 1. SFT 干的一件事
+
+**SFT 就是继续做"下一个词预测"，只不过换了数据**。
+
+预训练的数据是"通用文本"——网页、书籍、代码。SFT 的数据是"高质量的对话示例"——问题-回答对。
+
+一个 SFT 样本长这样：
+
+```
+<|im_start|>user
+请解释一下什么是光合作用。<|im_end|>
+<|im_start|>assistant
+光合作用是植物、藻类等生物利用光能，把二氧化碳和水转化为
+有机物并释放氧气的过程。它主要发生在叶绿体的类囊体膜上……<|im_end|>
+```
+
+这就是一段普通文本——只不过里面有一些特殊 token（`<|im_start|>`、`<|im_end|>`）标记角色。模型继续按"下一个词预测"训练，但**训练目标只在 assistant 的回答部分算 loss**。
+
+结果就是：**模型学会了"看到 user 的问题，接下来该按 assistant 的方式回答"**。这个 pattern 一旦学到，模型就变成了一个能对话的助手。
+
+## 2. Chat Template：把对话转成序列
+
+不同模型有不同的对话格式（chat template）。举几个常见的：
+
+**OpenAI（ChatML）**：
+
+```
+<|im_start|>system
+You are a helpful assistant.<|im_end|>
+<|im_start|>user
+你好<|im_end|>
+<|im_start|>assistant
+你好！有什么可以帮你的？<|im_end|>
+```
+
+**LLaMA-2**：
+
+```
+<s>[INST] <<SYS>>
+You are a helpful assistant.
+<</SYS>>
+
+你好 [/INST] 你好！有什么可以帮你的？ </s>
+```
+
+**LLaMA-3**：
+
+```
+<|begin_of_text|><|start_header_id|>system<|end_header_id|>
+
+You are helpful.<|eot_id|><|start_header_id|>user<|end_header_id|>
+
+你好<|eot_id|><|start_header_id|>assistant<|end_header_id|>
+
+你好！<|eot_id|>
+```
+
+看起来五花八门，本质做的事情一样——**用特殊 token 把 system/user/assistant 的边界标出来**。
+
+**用错 template 是新手最常见的坑**。你训练时用了一个 template，推理时用了另一个，模型就懵了。**HuggingFace 的 `tokenizer.apply_chat_template()` 会自动帮你处理**，直接用它就好。
+
+## 3. Loss Mask：只学 assistant 的部分
+
+这是 SFT 和预训练的**唯一实质差异**——loss 怎么算。
+
+预训练是每个 token 都算 loss——所有 token 都参与训练。
+
+SFT 是只让 **assistant 那部分的 token** 参与 loss 计算。user 和 system 部分虽然也过前向传播，但**梯度不通过它们回传**。
+
+实现上很简单，就是一个 `loss_mask`——一个和序列等长的 0/1 mask，只有 assistant 部分是 1，其余是 0。算 loss 时按 mask 加权。
+
+**为什么这样做？** 因为我们希望模型学会"接到问题给回答"，而不是"学会怎么提问"。如果 user 那部分也参与训练，模型会去优化"生成用户问题"的概率——这不是我们想要的能力。而且用户输入的分布很杂乱，让模型学它没什么好处。
+
+**大多数框架**（TRL、LLaMA-Factory、Axolotl）都有一个开关 `train_on_completions_only=True`——就是在做这件事。默认打开。
+
+## 4. SFT 数据长什么样
+
+一份好的 SFT 数据集应该有这些特征：
+
+**质量高**。每一条问答都应该是"你希望模型将来回答成这样"的样子。语气、结构、深度、语言风格——SFT 学的是"回答的分布"，你喂什么风格模型就变什么风格。
+
+**多样**。覆盖各种任务：问答、总结、翻译、写作、推理、代码、对话。单一任务的数据训出来的模型只会那一件事。
+
+**规模适中**。这里有个常见误解——"SFT 数据越多越好"。实际上很多研究发现 **1 万到 10 万条高质量数据**就足够，再多边际收益低，甚至负收益。
+
+- LLaMA-2 用了 **28k** SFT 数据；
+- LIMA 论文（Meta）用了 **1000 条**手写数据训出了不错的对话模型；
+- 一些开源模型（OpenChat、Nous）用了 30-50 万条。
+
+**质量比数量重要得多**。1000 条精挑细选比 100 万条从 GPT 蒸馏出来的杂质高的效果好。
+
+数据来源大致几类：
+
+1. **人写的**——最贵但质量最高（InstructGPT 早期数据）；
+2. **人-模型协作生成**（人写 prompt，模型写回答，人审核）；
+3. **从更强模型蒸馏**——比如用 GPT-4 生成，让小模型学（Alpaca、Vicuna 都是这路子）；
+4. **从真实用户对话里提取**——ShareGPT 之类；
+5. **合成数据**——通过模板、种子话题批量生成。
+
+## 5. 训练配置：和预训练有什么不一样
+
+SFT 的技术栈基本和预训练一样——AdamW、混合精度、并行策略。但有几个关键区别：
+
+**学习率小很多**。预训练用 3e-4，SFT 用 1e-5 到 5e-5。你已经在一个很好的初始化上，只需要"轻微地调整"，动作大就把预训练好的参数破坏了。
+
+**Epoch 数少**。1-3 个 epoch 足够。跑 5 个以上通常开始过拟合——模型学会照抄 SFT 数据的具体表达，泛化能力反而下降。
+
+**Batch size 小**。相比预训练动辄几百万 token 一个 batch，SFT 一般几万到几十万 token 一个 batch 就够了。
+
+**warmup 和 cosine 依然要**。但 warmup 只要几百 step、cosine 降到 0 或者 10% 都行。
+
+**参数量不变**。SFT 就是继续在同一个模型上更新参数，模型架构、大小都不变。这一点后面 LoRA 会不一样——LoRA 是给模型加一小块可训练的插件，冻结原参数。
+
+## 6. Base 模型 → Chat 模型
+
+很多开源模型仓库里你会看到**两个版本**：
+
+- `Qwen-7B` / `LLaMA-3-8B`：**base 模型**，只做过预训练；
+- `Qwen-7B-Chat` / `LLaMA-3-8B-Instruct`：**指令模型**，做过 SFT（可能还有 RLHF）。
+
+选哪个？
+
+- **要直接对话**：选 Chat/Instruct 版；
+- **要自己 SFT**：选 base 版——SFT 是在 base 之上做的，不要在别人 SFT 过的模型上再 SFT，效果不稳定；
+- **要做 few-shot 提示**：两者都行，但很多情况下 base 版更"听话"，因为它没被"礼貌回答"的模式过度约束。
+
+## 7. 一个完整的 SFT 训练脚本长什么样
+
+用 HuggingFace 的 TRL 库，一个最小 SFT 训练大概几十行代码：
+
+```python
+from datasets import load_dataset
+from transformers import AutoTokenizer, AutoModelForCausalLM
+from trl import SFTTrainer, SFTConfig
+
+model_name = "Qwen/Qwen2.5-7B"
+tokenizer = AutoTokenizer.from_pretrained(model_name)
+model = AutoModelForCausalLM.from_pretrained(model_name, torch_dtype="bfloat16")
+
+# 数据集，每条是 {"messages": [{"role": "user", "content": "..."}, {"role": "assistant", "content": "..."}]}
+dataset = load_dataset("json", data_files="sft_data.jsonl")["train"]
+
+trainer = SFTTrainer(
+    model=model,
+    train_dataset=dataset,
+    args=SFTConfig(
+        output_dir="./output",
+        num_train_epochs=2,
+        per_device_train_batch_size=4,
+        gradient_accumulation_steps=8,
+        learning_rate=2e-5,
+        lr_scheduler_type="cosine",
+        warmup_ratio=0.03,
+        bf16=True,
+        logging_steps=10,
+        save_steps=500,
+        completion_only_loss=True,   # 只在 assistant 部分算 loss
+    ),
+    tokenizer=tokenizer,
+)
+
+trainer.train()
+```
+
+这就是完整的一个 SFT 流程。真正跑起来还要加分布式配置（accelerate config、deepspeed 之类），但核心逻辑就这么点。
+
+## 8. SFT 常见的坑
+
+**Loss 一开始就很高**。这几乎肯定是 chat template 用错了，或者 loss_mask 没配好——模型看到的 pattern 和它预训练时完全不一样。检查 tokenizer.apply_chat_template 的输出，检查 mask 是否只覆盖了 assistant 部分。
+
+**训练 loss 平稳下降但推理效果很差**。可能是数据格式和推理时不一致。比如训练时你在 user 后面加了个 `\n`、推理时没加。或者 stop token 不匹配。**要在训练时的相同 template 下推理**。
+
+**回答变短、变模板化**。SFT 数据里如果大部分回答都是短句、公式化，模型会学会"回答就应该这样"。要保证 SFT 数据里回答长度、结构、语气有变化。
+
+**灾难性遗忘**。如果 SFT 数据集只有单一领域（比如只有代码），模型在其他任务上的能力会退化。解决办法：**多领域混合数据**、或者**加一点通用预训练数据**（比如 10%）进 SFT，防止遗忘。
+
+**多轮对话时 loss 只计算最后一轮**。老框架经常只在最后一个 assistant 回答上算 loss，前面几轮 assistant 的输出不参与训练——这是浪费。现在主流做法是**所有 assistant 回答都算 loss**（每个都是一个训练信号），显著提升数据利用率。
+
+**过拟合 vs 学习率**。SFT 数据比预训练小几个数量级，很容易过拟合。看 loss 曲线，训练 loss 一路降但验证 loss 早早触底反弹——过拟合。解决办法：减 epoch、减学习率、加正则。
+
+## 9. SFT 之后模型变成什么样
+
+一次成功的 SFT 会让模型：
+
+- **会对话**：接到问题就给回答，不再是漫无目的的续写；
+- **听指令**：能理解 "请用 100 字总结" 这类操作；
+- **有格式感**：会自己加换行、列表、代码块；
+- **有基础的礼貌**：不会突然骂人；
+
+但 SFT 后模型还有几个明显问题，需要 RLHF 或 DPO 进一步解决：
+
+- **偶尔幻觉**——SFT 数据里如果有错误答案，模型学得很认真；
+- **不知道"我不知道"**——SFT 只教它"看到问题就回答"，从不教它"没把握就说不确定"；
+- **风格偏移**——不同标注员的风格不一致，会影响模型的输出稳定性；
+- **对齐弱**——偶尔会输出不合适的内容，因为 SFT 里没有明确的"负样本"信号。
+
+这些问题的解法就是下一章的主题——**RLHF 和偏好对齐**。
+
+## 10. 一句话总结
+
+SFT 本质上是**换了数据的预训练**：
+
+- 目标：让模型学会"用户提问 → 助手回答"这个模式；
+- 数据：几万条高质量的对话示例；
+- 损失：只在 assistant 部分算 loss；
+- 参数：小学习率、少 epoch、防过拟合；
+- 输出：一个会对话的模型，但还不够"对齐"。
+
+SFT 是把 base model 变成 chat model 的第一步，也是最关键的一步——**没有 SFT 就没有会对话的模型**。但要让模型进一步"懂人心"，就得看下一章的 RLHF。
+
+</WordCount>

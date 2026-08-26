@@ -1,0 +1,225 @@
+import WordCount from '../../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+FlashAttention 是 2022 年出的一个工作，作者 Tri Dao。这个东西没改任何数学——注意力还是那个注意力，公式一个字都没变——但**它把 attention 的实际显存开销从 O(n²) 降到 O(n)，速度提到 2-4 倍**。这一切靠的是"重新组织计算顺序"。
+
+理解 FlashAttention 会让你对"GPU 上真正的性能瓶颈是什么"有更深的直觉——这个直觉对整个 LLM 系统优化都极其有用。
+
+## 1. 朴素 Attention 到底慢在哪
+
+回到 attention 的公式：
+
+$$
+\text{Attention}(Q, K, V) = \text{softmax}\left(\frac{QK^\top}{\sqrt{d_k}}\right) V
+$$
+
+标准实现按公式一步一步来：
+
+**第 1 步**：算 $S = QK^\top / \sqrt{d}$。Q、K 是 `(n, d)`，S 是 `(n, n)`。
+**第 2 步**：$P = \text{softmax}(S)$。P 是 `(n, n)`。
+**第 3 步**：$O = P V$。O 是 `(n, d)`。
+
+看起来非常干净。**问题在于中间的 S、P 都是 `(n, n)` 大小的**。
+
+n=8192、BF16，一个 (n, n) 矩阵就是 128MB。一个 Transformer 有 32 层、每层 8 个头，每层每头都要算一个这样的矩阵——**几十 GB 的中间数据**。这些数据要在**HBM（GPU 主显存）**里存来存去。
+
+## 2. 为什么 HBM 是瓶颈
+
+GPU 上有两种"内存"：
+
+- **HBM（High Bandwidth Memory）**：几十 GB，带宽约 1.5-3 TB/s；
+- **SRAM / Shared Memory / L1 Cache**：只有几十 MB，但带宽极高（20 TB/s+），延迟极低。
+
+真正的高速计算发生在 SRAM 里——数据从 HBM 搬到 SRAM，SM（Streaming Multiprocessor）在 SRAM 里做运算，结果写回 HBM。
+
+**HBM 的带宽比 SRAM 慢一个数量级**。所以你的算法如果频繁读写 HBM，就是"访存瓶颈"。
+
+朴素 attention 干什么？
+
+- 把 Q、K 从 HBM 读到 SRAM，算 S；
+- **把 S 写回 HBM**；
+- 再把 S 从 HBM 读到 SRAM，算 softmax；
+- **把 P 写回 HBM**；
+- 再把 P、V 从 HBM 读到 SRAM，算 O；
+- 把 O 写回 HBM。
+
+**中间矩阵 S、P 被反复搬进搬出 HBM**——大量时间浪费在数据传输上，SM 一大半时间在等数据。
+
+这就是朴素 attention 慢的真正原因：**不是算不动，是搬不快**。
+
+## 3. FlashAttention 的核心想法
+
+**能不能让 S 和 P 完全不落回 HBM？**
+
+想法很简单：**把 Q、K、V 切成小块，一块一块算，每次算完直接把该块的贡献累加到 O 上，中间的 S、P 只在 SRAM 里存在**。
+
+但这里有个数学难题——**softmax 需要看整行**。你算第 j 块的 softmax 时，需要知道整行 S 的最大值和归一化系数——但整行 S 你没算完（其他块还没算）！
+
+## 4. Online Softmax：让 softmax 也能分块
+
+FlashAttention 的关键在于**在线更新 softmax**。
+
+先复习一下 softmax 的稳定实现：
+
+$$
+\text{softmax}(x_i) = \frac{\exp(x_i - m)}{\sum_j \exp(x_j - m)}
+$$
+
+其中 $m = \max_j x_j$——减去最大值防止指数溢出。
+
+**问题是我们分块算，看不到全局的 m**。怎么办？
+
+**在线更新**：假设我们已经处理完前 k 个块，维护三个状态：
+
+- $m_k$：前 k 个块见过的最大值；
+- $\ell_k$：$\sum \exp(x - m_k)$，也就是"到目前为止的归一化系数"；
+- $O_k$：到目前为止的输出。
+
+来了第 k+1 个块，我们算它的最大值 $m'$ 和局部指数和 $\ell'$。**新的全局 m 是** $m_{k+1} = \max(m_k, m')$。
+
+**旧的 ℓ 需要修正**——因为 m 变了，之前的 ℓ 是相对于旧 m 的。用一个缩放因子：
+
+$$
+\ell_{k+1} = \ell_k \cdot e^{m_k - m_{k+1}} + \ell' \cdot e^{m' - m_{k+1}}
+$$
+
+**输出 O 也一样要修正**：
+
+$$
+O_{k+1} = O_k \cdot e^{m_k - m_{k+1}} + \text{PartialO}(k+1) \cdot e^{m' - m_{k+1}}
+$$
+
+处理完所有块之后，$O_N / \ell_N$ 就是最终结果——**和一次性算 softmax 完全等价**。
+
+这就是"online softmax"的魔法：它允许你**只维护常量大小的中间状态**，就能正确算出全局 softmax。
+
+## 5. FlashAttention 的完整流程
+
+有了 online softmax，FlashAttention 就顺理成章了：
+
+```
+for i in Q_blocks:                    # Q 分块（外层循环）
+    O_i = 0
+    l_i = 0
+    m_i = -∞
+    for j in K_blocks:                # K/V 分块（内层循环）
+        1. 从 HBM 读 K_j, V_j 到 SRAM
+        2. 在 SRAM 里算 S_ij = Q_i @ K_j^T
+        3. 用 online softmax 更新 m_i, l_i, O_i
+    把 O_i 归一化 (÷ l_i)，写回 HBM
+```
+
+**关键点**：
+
+- **中间矩阵 S_ij 只在 SRAM 里存在**——它的大小是 `(block_size × block_size)`，几 KB 到几 MB，塞得下 SRAM；
+- **HBM 只读写 Q、K、V、O 各一次**——O(n·d) 的访存，不是 O(n²)；
+- **总计算量不变**——还是 O(n²·d)，只是内存布局变了。
+
+## 6. 收益：多快、多省
+
+**显存**：朴素 attention 的 S、P 是 O(n²) 的显存。FlashAttention 完全不物化 S、P，只需要 O(n) 的 O 和一些辅助状态。
+
+- 一个 n=8192 的注意力，朴素实现要 128MB 中间显存；FlashAttention 只要几 MB。
+- **上下文长度直接被解锁**：以前 8K 已经吃力，FlashAttention 让 32K、128K 变得可行。
+
+**速度**：因为 HBM 访问变少了，attention 的实际速度**在长序列下能到 2-4 倍**。序列越长，收益越大——因为朴素 attention 的 HBM 访问是 O(n²)、FlashAttention 是 O(n)。
+
+**训练稳定性**：**FlashAttention 是数学上完全等价的**。它不是近似，不是量化——同样的输入输出，只是计算路径不同。你可以放心地在训练时用它，不会引入任何 numerical drift。
+
+## 7. FlashAttention-2 和 FlashAttention-3
+
+**FlashAttention-2**（2023）：改进了 FA-1 的几个工程细节：
+
+- **减少非矩阵运算**：softmax 里的 exp、mul、rescale 挪出内层循环；
+- **更好的并行**：外层循环沿 Q 分块，让不同的 Q block 可以独立并行到不同的 SM；
+- **循环顺序调整**：Q 外层、K 内层。
+
+结果：**再快 2 倍**——从 25% 打满 A100 变成 50-70% 打满。
+
+**FlashAttention-3**（2024）：面向 H100 的 FP8 优化：
+
+- 利用 H100 的 **异步 tensor core**——计算和数据搬运真正重叠；
+- **FP8 支持**——利用 H100 上的 FP8 tensor core；
+- **Warp-specialization**——把线程分工，一部分专门搬数据、一部分专门算；
+
+结果：**在 H100 上又快 1.5-2 倍**——攻上 75% 峰值算力。
+
+## 8. FlashAttention 在推理里的作用
+
+前面 KV Cache 那一章讲过，**推理有 prefill 和 decode 两个阶段**：
+
+- **Prefill**：一次算 n 个 token 的 attention。这是标准的 attention 操作，**FlashAttention 大幅加速**。
+- **Decode**：一次一个新 token 的 attention。Q 只有一行、K/V 是完整的 cache。**这里 FA 的优势不如 prefill 明显**——因为中间矩阵 S 只有 `(1, n)` 一行，本来就不大。
+
+所以：**FlashAttention 主要救 prefill 和训练**。对 decode 阶段贡献不大。
+
+针对 decode 阶段的类似优化有 **FlashDecoding**——它在 K/V 维度上并行，让长上下文的 decode 也能吃满 GPU。
+
+## 9. 一些配套优化
+
+FlashAttention 出来后带动了一整套"IO-aware"的思想：
+
+**Fused LayerNorm、Fused RMSNorm**：把归一化的多个小 kernel 融合成一个大 kernel，减少 HBM 读写。
+
+**Fused Rotary Embedding**：RoPE 也不物化中间张量，直接在 SRAM 里做。
+
+**Fused MLP**：SwiGLU 的三次矩阵乘和逐元素乘融合成一个 kernel。
+
+**Fused CrossEntropy**：训练时最后 softmax + loss 融合。
+
+这些 fusion 的思想都是一样的——**把小 op 合并成大 op，减少 HBM 往返**。PyTorch 2 的 `torch.compile` 和 xformers、TransformerEngine 都在做这类优化。
+
+## 10. 什么时候能用、什么时候用不了
+
+**能用的场景**：
+
+- 训练所有 Transformer 类模型；
+- 推理 prefill 阶段；
+- 任何标准的 attention（causal / non-causal / sliding window）。
+
+**限制**：
+
+- **依赖 GPU**：FlashAttention 是 CUDA kernel，CPU / MPS / TPU 没有原生支持（一些平台有对应变种）；
+- **head_dim 支持有限**：主流库支持 head_dim ≤ 256，超过要 fallback；
+- **修改注意力形式麻烦**：如果你想改 attention 公式（比如加个自定义 mask），需要自己写 kernel；
+- **旧显卡不支持**：FlashAttention-2 要 SM80（A100 及以上），FA-3 要 H100。
+
+**在 HuggingFace 里怎么开**：
+
+```python
+model = AutoModelForCausalLM.from_pretrained(
+    "Qwen/Qwen2.5-7B",
+    attn_implementation="flash_attention_2",
+    torch_dtype=torch.bfloat16,
+)
+```
+
+绝大部分主流模型都支持。默认没开是因为兼容性——手动打开就好。
+
+## 11. 一个更宏观的启示
+
+FlashAttention 不只是一个技术优化，它带来了一个更根本的方法论：
+
+> 现代深度学习的性能瓶颈几乎从不是"算力不够"，而是**数据搬运不够快**。
+
+一个 A100 的 BF16 峰值是 312 TFLOPS。但普通训练/推理 kernel 能到 30% 峰值就不错了。剩下的 70% 时间都在等数据——从 HBM 搬到 SRAM。
+
+**优化 GPU 程序的核心思路，从"减少计算量"变成了"减少 HBM 访问"**。这个视角下 FlashAttention 就是一个很自然的解——它是从"IO-aware 算法"的视角重新推导 attention。
+
+这个思路能推广。任何时候你看到一个 kernel 反复读写大中间张量，都可以问自己：**能不能让这个中间张量只在 SRAM 里存在？** 很多深度学习的性能优化都源于这个问题。
+
+## 12. 一句话总结
+
+FlashAttention 是 Transformer 系统里最漂亮的性能优化之一：
+
+- **原理**：分块 + online softmax，让中间矩阵不落 HBM；
+- **收益**：显存 O(n²) → O(n)，速度 2-4 倍，且数学等价；
+- **核心洞察**：GPU 瓶颈是访存不是计算；
+- **广泛影响**：解锁了 32K/128K 长上下文，也带动了整个 fusion 优化的浪潮。
+
+它本身是个 kernel 级的工程，但背后的思想——**IO-aware**——是所有 LLM 系统优化的基本方法。
+
+下一章讲 LLM 系统里最"作弊"的一个优化——**投机采样**：怎么让大模型的输出速度接近小模型。
+
+</WordCount>

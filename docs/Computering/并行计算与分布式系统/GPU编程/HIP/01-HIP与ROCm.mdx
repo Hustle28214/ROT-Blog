@@ -1,0 +1,311 @@
+import WordCount from '../../../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+前面十章讲了 CUDA——NVIDIA GPU 编程的事实标准。但世界上不只有 NVIDIA。这一章开始我们进入 **HIP** 的世界——**AMD 的 GPU 编程接口**。
+
+HIP 和 CUDA 长得极像——**这是刻意为之**。理解它，你能低成本地把 CUDA 知识迁移到 AMD 硬件上，甚至写一份代码同时跑在两家 GPU 上。
+
+## 1. 为什么要学 HIP
+
+**AMD 也在做 GPU**。而且随着以下三件事，AMD 的 GPU 越来越值得关注：
+
+**第一，AI 硬件多样化**。这几年数据中心 AI 训练也在往 AMD MI250/MI300 迁移——它的显存大（MI300X 有 192GB）、FP8 峰值不输 H100、价格相对便宜。
+
+**第二，Meta / Microsoft / OpenAI 都在部署 AMD GPU**。**PyTorch、vLLM、SGLang** 官方都支持 ROCm 后端。生态越来越完整。
+
+**第三，避免供应商锁定**。写一份能跑在 CUDA 和 ROCm 上的代码，比只能跑在一家硬件上更值钱。
+
+**HIP 就是让这件事变可能的接口**。
+
+## 2. HIP 是什么
+
+**HIP（Heterogeneous-computing Interface for Portability）** 是 AMD 提出的**"和 CUDA 长得几乎一样"的 GPU 编程接口**。
+
+它的设计目标非常明确——**让你能把 CUDA 代码几乎无痛地迁移到 AMD 硬件上**。
+
+看一段 HIP 代码：
+
+```cpp
+#include <hip/hip_runtime.h>
+
+__global__ void add(int *a, int *b, int *c) {
+    *c = *a + *b;
+}
+
+int main() {
+    int *d_a, *d_b, *d_c;
+    hipMalloc(&d_a, sizeof(int));
+    hipMalloc(&d_b, sizeof(int));
+    hipMalloc(&d_c, sizeof(int));
+
+    add<<<1, 1>>>(d_a, d_b, d_c);
+
+    hipDeviceSynchronize();
+    hipFree(d_a); hipFree(d_b); hipFree(d_c);
+    return 0;
+}
+```
+
+**和 CUDA 对比一下**：几乎所有 `cuda*` 前缀换成 `hip*`。`__global__`、`__shared__`、`<<<>>>` 语法一模一样。
+
+**这不是巧合**——HIP 就是把 CUDA 的 API 一个个对应过来的。**学过 CUDA 你就已经会 90% 的 HIP 了**。
+
+## 3. HIP 是可以跑在两家硬件上的
+
+**HIP 是"跨平台"接口**：
+
+- **在 AMD GPU 上**：HIP → 直接编译到 AMD 硬件（用 amdgcn LLVM）；
+- **在 NVIDIA GPU 上**：HIP → 底层调用 CUDA 运行时（相当于 CUDA 的一层薄封装）。
+
+**同一份 HIP 代码可以跑在两家 GPU 上**。这就是"portability"的含义。
+
+**编译命令**：
+
+```bash
+hipcc your_program.cpp -o your_program
+```
+
+`hipcc` 会自动检测目标平台——NVIDIA 上编译成 CUDA、AMD 上编译成 amdgcn。**代码一份、平台两个**。
+
+## 4. ROCm 是什么
+
+**ROCm（Radeon Open Compute）** 是 AMD 的**整个 GPU 计算软件栈**。类比一下：
+
+- **NVIDIA**：CUDA Toolkit（编译器、库、工具）+ CUDA driver + cuBLAS/cuDNN/TensorRT/Nsight……
+- **AMD**：ROCm 平台（编译器、库、工具）+ ROCm driver + rocBLAS/MIOpen/hipBLASLt/rocprof……
+
+**ROCm 包含**：
+
+- **HIP**：编程接口；
+- **HIPCC**：编译器；
+- **hip-runtime**：运行时；
+- **rocBLAS**：BLAS 库（对应 cuBLAS）；
+- **MIOpen**：深度学习原语库（对应 cuDNN）；
+- **rocFFT / rocSPARSE / rocRAND**：其他数学库；
+- **rocprof / rocm-smi**：性能分析和监控；
+- **hipify**：CUDA 代码转 HIP 的工具。
+
+**ROCm 是 AMD 的整个"CUDA 平台等价物"**。
+
+## 5. HIP 和 CUDA 的关系
+
+一句话解释：**HIP 是"精心设计的 CUDA API 复制品"**。
+
+- 90%+ 的 CUDA API 都有一对一的 HIP 对应；
+- 名字规则简单：**`cuda*` → `hip*`**（`cudaMalloc` → `hipMalloc`）；
+- 部分不能直接对应的会有"HIP 特有"或者"CUDA 特有"标记，需要条件编译；
+- CUDA 的 `<<<>>>` 语法、`__global__` 等关键字 HIP 都完全支持。
+
+**这个设计的意义**：**AMD 承认 CUDA 的语法优势**，不搞发明创造，直接抄——但保留自己的硬件优化空间。这让**CUDA 用户的迁移成本极低**。
+
+（对比一下 OpenCL——它试图和 CUDA "彻底不同"，语法结构完全另起炉灶。结果是学习成本高、生态弱、最终没竞争过 CUDA。**HIP 的"贴近 CUDA"是聪明的**。）
+
+## 6. AMD GPU 的硬件差异
+
+虽然 HIP 语法像 CUDA，但**底层硬件不一样**。写 HIP 代码要意识到几个关键差异：
+
+**Wavefront 大小**：AMD 的 wavefront（对应 NVIDIA 的 warp）传统上是 **64**（不是 32）。
+
+- CDNA 系列（数据中心）：还是 64；
+- RDNA 系列（消费级）：可选 32 或 64；
+- 一个 warp = 32、一个 wavefront = 64——**很多 warp-level 代码需要调整**。
+
+**共享内存布局**：Bank 数量、bank 冲突规则和 NVIDIA 略有不同。
+
+**Tensor Core → Matrix Core**：AMD 在 CDNA 上叫 **Matrix Core**，功能类似 NVIDIA 的 Tensor Core，但指令是 `mfma`（Matrix Fused Multiply-Add）系列。
+
+**内存层次**：整体架构类似，但 L2 cache 大小、shared memory 大小等具体数字不同。
+
+**指令 ISA**：AMD 用 **amdgcn** ISA，SASS 之类的分析工具不通用。
+
+这些差异不会让 HIP 代码"跑不了"，但**要达到峰值性能需要针对性优化**。
+
+## 7. HIP 和 ROCm 的现状
+
+**成熟度**：CUDA 已经十几年了，生态完善。**ROCm 起步晚（2016 左右），但这几年成熟很快**。
+
+**深度学习支持**：
+
+- **PyTorch**：官方支持 ROCm，能直接跑在 MI250/MI300 上；
+- **TensorFlow**：支持；
+- **JAX**：支持；
+- **vLLM / SGLang / TGI**：都已经支持 ROCm；
+- **绝大多数模型无需修改代码，切换后端就能跑**。
+
+**硬件支持**：
+
+- **数据中心**：MI200 系列、MI300X、MI300A——**主战场**；
+- **消费级**：Radeon RX 7000 系列部分支持 ROCm，一直有些问题；
+- **旧型号**：早期 Vega 之类支持有限。
+
+**驱动质量**：ROCm 5.x 之后驱动稳定性大幅提升。**MI300 上现在能跑得很稳定**。
+
+**性能**：MI300X vs H100 在很多深度学习负载上五五开，甚至部分场景（大内存、大 batch）反超。**FP8 支持已经上线**。
+
+## 8. 一些具体的对应关系
+
+给一个快速参照表：
+
+| CUDA | HIP |
+|------|-----|
+| `cudaMalloc` | `hipMalloc` |
+| `cudaMemcpy` | `hipMemcpy` |
+| `cudaFree` | `hipFree` |
+| `cudaMemcpyHostToDevice` | `hipMemcpyHostToDevice` |
+| `cudaDeviceSynchronize` | `hipDeviceSynchronize` |
+| `cudaStreamCreate` | `hipStreamCreate` |
+| `cudaEventCreate` | `hipEventCreate` |
+| `__global__` | `__global__` |
+| `__shared__` | `__shared__` |
+| `<<<grid, block>>>` | `<<<grid, block>>>` |
+| `threadIdx.x` | `threadIdx.x` |
+| `blockDim.x` | `blockDim.x` |
+| `__syncthreads()` | `__syncthreads()` |
+| `warpSize` | `warpSize`（**注意值不同**） |
+| `__shfl_sync` | `__shfl_sync` 或 `__shfl` |
+| `cuBLAS` | `rocBLAS` / `hipBLAS` |
+| `cuDNN` | `MIOpen` |
+| `cuFFT` | `rocFFT` |
+| `nvcc` | `hipcc` |
+| `nvprof` / `ncu` | `rocprof` |
+
+绝大部分名字规则一致，替换后就能用。
+
+## 9. 一个"hello world"对比
+
+**CUDA 版**：
+
+```cpp
+#include <cuda_runtime.h>
+#include <cstdio>
+
+__global__ void hello() { printf("Hello from GPU\n"); }
+
+int main() {
+    hello<<<1, 1>>>();
+    cudaDeviceSynchronize();
+    return 0;
+}
+
+// 编译：nvcc hello.cu -o hello
+```
+
+**HIP 版**：
+
+```cpp
+#include <hip/hip_runtime.h>
+#include <cstdio>
+
+__global__ void hello() { printf("Hello from GPU\n"); }
+
+int main() {
+    hello<<<1, 1>>>();
+    hipDeviceSynchronize();
+    return 0;
+}
+
+// 编译：hipcc hello.cpp -o hello
+```
+
+**唯一区别**：头文件、cudaDeviceSynchronize 换成 hipDeviceSynchronize、扩展名习惯用 `.cpp` 而不是 `.cu`——**几个符号换名字，其他一样**。
+
+## 10. 从 CUDA 迁移到 HIP：hipify
+
+AMD 提供了一个自动转换工具——**hipify**。可以自动把 CUDA 代码转成 HIP：
+
+```bash
+# 转单个文件
+hipify-perl your_code.cu > your_code.hip.cpp
+
+# 转整个项目
+hipify-clang --output-dir converted src/*.cu
+```
+
+它做的事：
+
+- 所有 `cuda*` 替换成 `hip*`；
+- 头文件替换；
+- 一些编译器 flag 转换；
+- 一些不能直接翻译的地方留下 warning。
+
+**大部分项目 hipify 后能直接编译**。少数复杂项目（比如用了 CUDA 特有的 warp intrinsic）需要手工调整。
+
+后面章节我们会专门讲 hipify 的用法和限制。
+
+## 11. HIP 的一些独特特性
+
+虽然 HIP 主要是"复刻 CUDA"，但也有些自己的东西：
+
+**`hipLaunchKernelGGL`**：一种 C 风格的 kernel 启动方式，不用 `<<<>>>` 语法：
+
+```cpp
+hipLaunchKernelGGL(kernel, grid, block, shmem, stream, arg1, arg2);
+```
+
+（现在也支持 `<<<>>>`，两种方式都行）
+
+**`__HIP_PLATFORM_HCC__` / `__CUDA_ARCH__`**：条件编译宏，让你在同一份代码里分别处理两个平台的特殊逻辑。
+
+**`hipDeviceProp_t`**：设备属性，比 `cudaDeviceProp` 多几个 AMD 特有字段（比如 `gcnArchName`）。
+
+## 12. 什么时候用 HIP、什么时候用 CUDA
+
+**用 CUDA**：
+
+- 只跑 NVIDIA GPU；
+- 需要用最新 NVIDIA 特性（比如 Hopper 独有的 WGMMA、TMA）；
+- 生态：cuBLAS、cuDNN、TensorRT、CUTLASS——都在 NVIDIA 侧最强；
+- 大多数商业和学术研究还是 CUDA 主导。
+
+**用 HIP**：
+
+- 希望代码跨平台；
+- 目标是 AMD 硬件（MI300 之类）；
+- 想避免供应商锁定；
+- 在做 rocm 生态的开发。
+
+**用 CUDA + hipify**：先写 CUDA，需要时用 hipify 转 HIP——**这是很多"顺带支持 AMD"的项目采取的路径**。
+
+## 13. HIP 版本和 ROCm 版本
+
+**ROCm 版本迭代快**——从 4.x 到 6.x 已经几年过去，很多东西在变。选版本时要注意：
+
+- **ROCm 5.7+**：稳定的 MI200 / MI250 支持；
+- **ROCm 6.0+**：MI300 系列支持；
+- **ROCm 6.1+**：Transformer 优化、FP8 完善。
+
+**硬件-软件对应**：
+
+- 消费卡：**"能用不代表官方支持"**。比如 RX 6600 XT 之类，很多 kernel 能跑但不保证。
+- 数据中心：**MI250 / MI300 是 ROCm 的第一优先级**。
+
+## 14. 一些坑
+
+**Wavefront 大小忽略**。CUDA 里 `warpSize=32`，很多 warp-level 归约、shuffle 都基于这个。**HIP 上如果没考虑 wavefront=64**，代码可能仍能跑但性能不对，或者结果错。**永远用 `warpSize` 而不是 hardcode 32/64**。
+
+**Intrinsic 名字不匹配**。一些 CUDA intrinsic 在 HIP 上没有直接对应或者行为略不同（比如 `__ballot_sync` 在 wavefront=64 时返回 64-bit）。
+
+**性能 profile 工具不同**。CUDA 用 nsys/ncu，HIP 用 rocprof + omnitrace。工具差异导致优化流程需要重新学习。
+
+**编译时的 gpu-arch**。CUDA 里 `-arch=sm_80`，HIP 里 `--offload-arch=gfx90a`（MI200）或 `gfx942`（MI300）。**指定错了编不出可执行的代码**。
+
+**PyTorch ROCm 版**。装 pytorch-rocm 才行，不是普通版。`pip install torch --index-url https://download.pytorch.org/whl/rocm6.0`。
+
+**Header 的选择**。HIP 有两种 backend 模式——nvcc 后端和 amdgcn 后端。头文件路径要写对，别混。
+
+## 15. 一句话总结
+
+HIP 和 ROCm 是 AMD 的 GPU 生态：
+
+- **HIP**：CUDA API 的"复制品"，语法几乎一样；
+- **ROCm**：整个软件栈（HIP + 数学库 + 工具）；
+- **跨平台**：HIP 代码可跑 AMD 和 NVIDIA 硬件；
+- **迁移工具**：hipify 自动把 CUDA 转 HIP；
+- **成熟度**：这几年大幅提升，深度学习框架全部支持；
+- **主战场**：MI250、MI300 系列数据中心 GPU；
+- **学习成本**：会 CUDA 的话，学 HIP 只需要几个小时熟悉命名和工具链。
+
+如果你已经会 CUDA，学 HIP 是"性价比极高的投资"——**几乎零成本学习，多一个平台的话语权**。后面章节会一个一个把 HIP 的细节和 AMD 硬件特色讲清楚。
+
+</WordCount>

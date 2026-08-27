@@ -1,0 +1,320 @@
+import WordCount from '../../../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+写 GPU 应用 90% 的场景不需要你手写 kernel——**用官方库更快、更稳、更省事**。这一章过一遍 ROCm 生态里的主要数学库和深度学习库，让你知道"想干这件事用哪个"。
+
+## 1. rocBLAS vs hipBLAS
+
+**rocBLAS**：AMD 原生的 BLAS 实现——**只跑 AMD GPU**。
+
+**hipBLAS**：跨平台包装——**同一份代码可以跑 AMD 和 NVIDIA**。底层：
+
+- 在 AMD 上 → 调 rocBLAS；
+- 在 NVIDIA 上 → 调 cuBLAS。
+
+**API 差别**：命名规则相同，前缀不同：
+
+```cpp
+// rocBLAS
+rocblas_handle handle;
+rocblas_create_handle(&handle);
+rocblas_sgemm(handle, rocblas_operation_none, rocblas_operation_none,
+              M, N, K, &alpha, A, lda, B, ldb, &beta, C, ldc);
+
+// hipBLAS
+hipblasHandle_t handle;
+hipblasCreate(&handle);
+hipblasSgemm(handle, HIPBLAS_OP_N, HIPBLAS_OP_N,
+             M, N, K, &alpha, A, lda, B, ldb, &beta, C, ldc);
+```
+
+**选哪个**：
+
+- **只跑 AMD**：rocBLAS，稍快一点点、API 更 AMD-native；
+- **跨平台**：hipBLAS，代码写一份跑两个平台。
+
+**性能**：MI300X 上 rocBLAS SGEMM 能到 ~85% 峰值——**和 cuBLAS 在 H100 上表现相当**。
+
+## 2. hipBLASLt：新一代 GEMM
+
+**hipBLASLt** 是 AMD 版的 cuBLASLt——**为 Matrix Core 优化的高级 GEMM API**。
+
+**特点**：
+
+- **Epilogue fusion**：GEMM 之后接的 bias 加、activation（ReLU、GeLU）可以融合进 kernel——省一次访存；
+- **精度控制**：明确指定输入 / 输出 / 累加精度；
+- **workspace 管理**：内部会申请 workspace 加速；
+- **可搜索最优算法**：给定 problem，自动挑最快的实现。
+
+**使用**：
+
+```cpp
+hipblasLtHandle_t handle;
+hipblasLtCreate(&handle);
+
+hipblasLtMatmulDesc_t matmulDesc;
+hipblasLtMatmulDescCreate(&matmulDesc, HIPBLAS_COMPUTE_16F, HIP_R_16F);
+
+// 设置 epilogue（比如 GELU）
+hipblasLtEpilogue_t epilogue = HIPBLASLT_EPILOGUE_GELU;
+hipblasLtMatmulDescSetAttribute(matmulDesc, HIPBLASLT_MATMUL_DESC_EPILOGUE, &epilogue, sizeof(epilogue));
+
+// 执行
+hipblasLtMatmul(handle, matmulDesc, ..., A, ..., B, ..., C, ..., D, ...);
+```
+
+**深度学习框架内部越来越依赖 hipBLASLt**——PyTorch、Triton 等都在集成。**手写 kernel 里做 GEMM 融合的场景**，直接用 hipBLASLt 就行。
+
+## 3. MIOpen：AMD 版 cuDNN
+
+**MIOpen** 是 AMD 的深度学习原语库——对应 NVIDIA 的 **cuDNN**。
+
+**提供的 API**：
+
+- **卷积**：forward、backward data、backward weights；
+- **池化**：max、average；
+- **激活**：ReLU、Sigmoid、Tanh 等；
+- **归一化**：BatchNorm、LayerNorm、GroupNorm；
+- **RNN**：LSTM、GRU；
+- **Reduce、Softmax、Dropout** 等。
+
+**用户一般不直接调**——PyTorch/TF 内部会用。**如果你写自己的 DL 框架或者定制层，才需要直接用 MIOpen**。
+
+**性能**：卷积和归一化性能已经和 cuDNN 相当。**RNN 上 MIOpen 有时略弱**（这是 NVIDIA 优化了很多年的强项）。
+
+**特有功能**：**Kernel 自动调优（auto-tune）**——第一次跑某个 problem size 会试很多种实现选最快的，结果缓存起来下次直接用。类似 cuDNN 的 tuning cache。
+
+## 4. rocFFT vs hipFFT
+
+**FFT 库**：
+
+- **rocFFT**：AMD 原生；
+- **hipFFT**：跨平台包装（走 rocFFT 或 cuFFT）。
+
+**API 类似 cuFFT**：
+
+```cpp
+hipfftHandle plan;
+hipfftPlan1d(&plan, N, HIPFFT_C2C, 1);
+hipfftExecC2C(plan, input, output, HIPFFT_FORWARD);
+hipfftDestroy(plan);
+```
+
+**性能**：主流场景（1D、2D、3D FFT）性能和 cuFFT 接近。
+
+## 5. rocRAND：随机数
+
+**rocRAND**（原生）和 **hipRAND**（跨平台）：
+
+```cpp
+hiprandGenerator_t gen;
+hiprandCreateGenerator(&gen, HIPRAND_RNG_PSEUDO_DEFAULT);
+hiprandSetPseudoRandomGeneratorSeed(gen, 1234);
+hiprandGenerateUniform(gen, dev_ptr, N);
+```
+
+支持多种 RNG：philox、xorwow、mrg32k3a、mtgp32 等。
+
+## 6. rocSPARSE
+
+**稀疏矩阵**运算——对应 cuSPARSE：
+
+- SpMV（稀疏矩阵 × 稠密向量）；
+- SpMM（稀疏矩阵 × 稠密矩阵）；
+- Sparse GEMM；
+- 稀疏求解器接口。
+
+**用于**：图神经网络、稀疏 attention、科学计算。
+
+**hipSPARSE**：跨平台包装。
+
+## 7. rocPRIM 和 hipCUB
+
+**rocPRIM**：AMD 原生的低层并行原语——**归约、扫描、排序、shuffle 之类**。类似 CUB。
+
+**hipCUB**：跨平台包装。**用 CUB 的 API 但底层可以是 rocPRIM 或 CUB**。
+
+**示例**：
+
+```cpp
+#include <hipcub/hipcub.hpp>
+
+// Device-wide reduce
+size_t temp_bytes;
+hipcub::DeviceReduce::Sum(nullptr, temp_bytes, input, output, N);
+hipMalloc(&temp_storage, temp_bytes);
+hipcub::DeviceReduce::Sum(temp_storage, temp_bytes, input, output, N);
+```
+
+**推荐**：写通用并行原语，用 hipCUB——CUDA 侧的等价代码也能直接用。
+
+## 8. rocThrust
+
+**Thrust** 的 ROCm 实现。**用 Thrust 的 API 但底层跑在 AMD 上**。
+
+```cpp
+#include <thrust/device_vector.h>
+#include <thrust/sort.h>
+
+thrust::device_vector<int> d_vec(N);
+thrust::sequence(d_vec.begin(), d_vec.end());
+thrust::sort(d_vec.begin(), d_vec.end());
+```
+
+**跨平台代码里，Thrust 是最好用的高层 API**——你写 STL 风格的代码，底层在 CUDA 或 ROCm 上都能跑。
+
+## 9. RCCL：多 GPU 通信
+
+**RCCL**（ROCm Collective Communication Library）——对应 NCCL。
+
+**API 完全兼容 NCCL**：
+
+```cpp
+#include <rccl/rccl.h>
+
+ncclComm_t comm;
+ncclCommInitRank(&comm, world_size, id, rank);
+
+// All-Reduce
+ncclAllReduce(sendbuff, recvbuff, count, ncclFloat, ncclSum, comm, stream);
+
+// All-Gather
+ncclAllGather(sendbuff, recvbuff, sendcount, ncclFloat, comm, stream);
+```
+
+**性能**：MI300X 8 卡节点上，RCCL 的 all-reduce 带宽 ~450 GB/s——**和 H100 上的 NCCL 相当**。
+
+**PyTorch 分布式**：`torch.distributed.init_process_group("nccl", ...)` 在 ROCm 上会自动用 RCCL——**代码不用改**。
+
+## 10. Composable Kernel (CK)
+
+**CK** 是 AMD 版的 **CUTLASS**——一个高性能矩阵运算和 attention 的模板库。
+
+**特点**：
+
+- 提供**从底到高**的多层抽象——从 MFMA intrinsic 到完整 GEMM；
+- 让你定制矩阵乘的每个细节——tile size、pipeline stages、data layout；
+- 支持复杂的 fusion——GEMM + activation + bias + norm 全在一个 kernel；
+- 目标是"手工调优的性能，模板化的开发效率"。
+
+**代价**：学习曲线陡——**CUTLASS 什么样，CK 就什么样**。**只在追极致性能时用**。
+
+**FlashAttention on AMD** 大量基于 CK 实现。
+
+## 11. MIGraphX
+
+**MIGraphX** 是 AMD 版的 **TensorRT**——**推理优化引擎**。
+
+**功能**：
+
+- 加载 ONNX / TF / PyTorch 模型；
+- 做图优化（kernel fusion、常量折叠、shape 传播）；
+- 生成优化后的 ROCm 执行代码；
+- 提供 Python / C++ API 做推理。
+
+**用户场景**：想部署一个静态模型到 AMD GPU 上做高性能推理——**MIGraphX 是首选**。类似 TensorRT 的定位。
+
+**成熟度**：**比 TensorRT 落后一些**——对新模型、复杂 op 的支持不如 TensorRT 完善。**主流 CNN 和一部分 Transformer 支持得不错**。
+
+## 12. 深度学习框架的 ROCm 支持
+
+**PyTorch**：
+
+- 官方支持；
+- 装 `torch --index-url https://download.pytorch.org/whl/rocm6.0`；
+- **代码里依然用 `torch.cuda.*` API**——这只是命名遗留；
+- 主流模型（Transformer、CNN、Diffusion）都能跑。
+
+**JAX**：
+
+- 支持，`jax[rocm]`；
+- 稳定性 OK。
+
+**TensorFlow**：
+
+- 支持但用户少；
+- 主要维护 TF 1.x 兼容和一些 TF 2 场景。
+
+**Triton**：
+
+- **AMD 官方支持**——写一份 Triton kernel 能跑 AMD 和 NVIDIA；
+- Triton 生成的 AMD kernel 性能已经接近手写 CUDA；
+- **这是"跨平台 GPU kernel"的一个重要选择**。
+
+**vLLM / SGLang / TGI**：都有 ROCm 后端，生产可用。
+
+## 13. 一个决策表
+
+给一个"想干这件事、用哪个库"的粗略对照：
+
+| 想干的事 | AMD 上用什么 | CUDA 对应 |
+|---------|-------------|----------|
+| 矩阵乘 | rocBLAS / hipBLAS / hipBLASLt | cuBLAS / cuBLASLt |
+| 卷积、norm、pooling | MIOpen | cuDNN |
+| FFT | rocFFT / hipFFT | cuFFT |
+| 稀疏 | rocSPARSE / hipSPARSE | cuSPARSE |
+| 随机数 | rocRAND / hipRAND | cuRAND |
+| Reduce/Scan/Sort | rocPRIM / hipCUB | CUB |
+| 高层 STL | rocThrust | Thrust |
+| 多 GPU 通信 | RCCL | NCCL |
+| 高性能矩阵模板 | Composable Kernel | CUTLASS |
+| 推理引擎 | MIGraphX | TensorRT |
+| 跨平台 kernel | Triton | Triton |
+| DL 框架 | PyTorch-ROCm | PyTorch-CUDA |
+
+## 14. 一些实操建议
+
+**跨平台代码用 hip*系列**（hipBLAS、hipFFT、hipCUB）——一份代码适配两个平台。
+
+**极致性能场景用 roc*系列**——直接跳过一层抽象。
+
+**永远优先用库，别自己写 kernel**——除非有非常特殊的需求。库的性能已经很高，自己写很难打平。
+
+**关注 ROCm 版本兼容性**——ROCm 6.x 之间偶尔有 breaking change。生产环境固定一个版本。
+
+**查文档**：ROCm 官方文档在 `https://rocm.docs.amd.com/`——比早期的一堆分散文档好太多。
+
+**跟社区**：ROCm 官方 GitHub、AMD 的 Discord 都是获取更新和求助的地方。
+
+## 15. Kernel 库生态的一些差距
+
+**AMD 生态相比 CUDA 生态还是有差距**：
+
+- **kernel 数量**：cuDNN 支持的 op 更多、更细；
+- **文档**：CUDA 文档更完善、示例更多；
+- **社区**：CUDA 相关的 Stack Overflow 答案多得多；
+- **前沿模型支持**：新论文的官方实现基本都是 CUDA-first——AMD 版要等社区移植；
+- **调优**：AMD 侧调优工具没 Nsight 那么成熟。
+
+**但这些差距在缩小**：
+
+- ROCm 生态每年在明显进步；
+- 主流 workload（LLM 训练/推理、Diffusion、CNN）已经能得到接近 CUDA 的体验；
+- **前沿 workload 的差距是关键**——如果你追新论文、要跑刚出的 model，CUDA 依然更省事。
+
+## 16. 一句话总结
+
+ROCm 生态的核心库：
+
+- **rocBLAS / hipBLAS / hipBLASLt**：矩阵乘，主力；
+- **MIOpen**：深度学习原语；
+- **rocFFT / rocSPARSE / rocRAND**：科学计算；
+- **RCCL**：多 GPU 通信；
+- **CK**：类 CUTLASS 的高性能模板；
+- **MIGraphX**：推理引擎；
+- **Triton on AMD**：跨平台 kernel 开发。
+
+**用好这些库，你不需要自己写 kernel 也能得到接近峰值的性能**。这也是 HIP 生态的关键——**不是要求每个用户都手写 CUDA/HIP 级别的代码**，而是通过库和框架把复杂性藏起来。
+
+---
+
+到这里，GPU 编程栏目的两个大部分——**CUDA**（10 章）和 **HIP**（8 章）——都讲完了。整体覆盖：
+
+**CUDA 侧**：CUDA 基础、内存模型、共享内存、Warp SIMT、归约、SGEMM、Stream、Profile、Tensor Core、CUDA Graph。
+
+**HIP 侧**：HIP 与 ROCm、HIP 与 CUDA 对照、Wavefront 与 AMD GPU、内存模型、hipify、CDNA/MI 系列、HIP 性能调优、ROCm 数学库。
+
+写完这两组，你对现代 GPU 编程的两个主要生态都有了完整的知识地图。**具体到某个 kernel 应该怎么写、某个应用应该怎么部署，都能从这些章节里找到起点**。
+
+</WordCount>

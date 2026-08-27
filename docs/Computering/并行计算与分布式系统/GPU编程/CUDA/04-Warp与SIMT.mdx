@@ -1,0 +1,300 @@
+import WordCount from '../../../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+前面两章讲了内存。这一章讲计算——**GPU 到底是怎么执行一个 kernel 的**。
+
+搞清楚这件事很重要。你可能听说过"GPU 是 SIMD"、"GPU 有几万个核心"这类说法。这些不能算错，但都不精确。真正的执行模型叫 **SIMT（Single Instruction, Multiple Threads）**，它有自己的一套规则，理解它才能写出真正快的 kernel。
+
+## 1. Warp：GPU 的调度单位
+
+**Warp 是 GPU 执行的最小单位——32 个线程绑在一起，同步执行同一条指令。**
+
+你写 CUDA 时看到的是"线程"，但硬件其实不是一个个调度线程的。**它是 32 个线程一组一起调度**，这一组就叫 warp。
+
+- 你启动一个 `<<<1, 128>>>` 的 kernel——block 里 128 个线程会自动分成 **4 个 warp**（0-31、32-63、64-95、96-127）；
+- 一个 warp 里 32 个线程**共用一个 program counter**，同一时刻执行同一条指令；
+- 不同 warp 之间独立调度，可以处于不同的执行位置。
+
+**为什么是 32？** 是 NVIDIA 硬件的历史选择。AMD 的对应概念叫 **wavefront**，通常是 64（老架构）或 32（RDNA、CDNA3+）。
+
+**为什么要这样绑一起**：**一次取一条指令让 32 个线程执行**，比"每线程独立解码指令"省 32 倍的控制逻辑。GPU 用一个 warp 一次访存、一次算指令，硬件设计极简单，才能在同样面积下堆几千个核心。
+
+## 2. SIMT vs SIMD
+
+这两个词经常混用，但**严格说不是一回事**：
+
+**SIMD（Single Instruction Multiple Data）**：一条指令、多个数据槽。x86 的 AVX 就是——一条 `_mm256_add_ps` 加 8 个 float。程序员**看到向量寄存器**，编程时必须"想成向量"。
+
+**SIMT（Single Instruction Multiple Threads）**：**硬件在下面是 SIMD，但暴露给程序员的是"独立线程"**。你写的是"每个线程做什么"，硬件负责把 32 个线程绑一起执行。
+
+**SIMT 的好处**：编程简单——每个线程你想成独立的一段代码，硬件负责合并成 SIMD 执行。
+
+**SIMT 的代价**：**当 warp 里的线程走不同分支时，性能会崩**——这就是分支发散。
+
+## 3. Warp Divergence（分支发散）
+
+一个 warp 里 32 线程共用一个 PC。如果代码里有 `if / else`——**不同线程可能走不同分支**——怎么办？
+
+硬件的做法叫 **predication**：
+
+- 先让所有"走 if 分支"的线程执行 if 内的指令，其他线程用 mask 屏蔽（不做任何事，但要"等着"）；
+- 然后让"走 else 分支"的线程执行 else 内的指令，其他线程屏蔽。
+
+**结果**：if 和 else 分支**串行执行**。原本一个 warp 一次搞定 32 个数据，现在可能变成两次——**理论慢 2 倍**。如果分支嵌套很深，可能慢得更多。
+
+**举个坏例子**：
+
+```cpp
+__global__ void bad_kernel(int *A) {
+    int tid = threadIdx.x;
+    if (tid % 2 == 0) {
+        // 分支 A：偶数线程
+        expensive_op_A(A, tid);
+    } else {
+        // 分支 B：奇数线程
+        expensive_op_B(A, tid);
+    }
+}
+```
+
+**同一个 warp 里 16 个偶数线程、16 个奇数线程**——两个分支都要跑，性能减半。
+
+**好的做法**：**让分支按 warp 对齐**。比如：
+
+```cpp
+if (threadIdx.x < 32) {   // 整个 warp 0 走这里
+    // ...
+} else {                   // 整个 warp 1+ 走这里
+    // ...
+}
+```
+
+或者用 `warpSize`（=32）：
+
+```cpp
+int warp_id = threadIdx.x / 32;
+if (warp_id == 0) { ... }
+```
+
+**只要一个 warp 里 32 线程走同一分支，就没有 divergence**。
+
+## 4. 隐式发散：更容易踩的坑
+
+明显的 `if` 好办。**隐式发散**才是杀手。
+
+**循环长度不同**：
+
+```cpp
+for (int i = 0; i < some_variable[tid]; i++) {  // 每线程循环次数不同
+    ...
+}
+```
+
+**warp 里最慢的线程决定 warp 完成的时间**。如果 31 个线程循环 10 次、1 个循环 100 次——**整个 warp 等那个 100 次的**。
+
+**数据依赖的分支**：
+
+```cpp
+if (A[tid] > 0) { ... } else { ... }
+```
+
+看起来是分支发散，其实**取决于数据**。数据规律的话可能全 warp 一致（就没事），数据随机的话就发散。
+
+**降低 divergence 的常见套路**：
+
+- **数据重排**：把相似的数据分到同一个 warp（比如 sort by branch condition）；
+- **提前退出**：`if (mask) continue;` ——只影响那些"没事的"线程，快速跳过；
+- **无分支实现**：用位运算/算术运算代替分支——比如 `x = max(a, 0)` 而不是 `if (a > 0) x = a`。
+
+## 5. 独立线程调度（Independent Thread Scheduling）
+
+Volta（V100）架构引入了一个变化：**每个线程有自己独立的 PC 和栈**。
+
+**这之前**：一个 warp 共用一个 PC，divergence 时硬件必须"重收敛"到某个点。程序员写代码要考虑"这些线程什么时候合流"——有些微妙的假设建立在"线程会自动同步"上。
+
+**Volta 之后**：每个线程独立走。**理论上更灵活**——但有个副作用：**你不能再假设"warp 里的线程会自动同步"**。
+
+举个例子。Volta 之前，很多代码在同一个 warp 内的操作**不需要显式同步**，因为硬件保证同 warp 线程步调一致。Volta 之后这个假设不成立了——**你必须显式用 `__syncwarp()`**。
+
+**这也是为什么 CUDA 10+ 里所有 shuffle 指令都必须带 `_sync` 后缀**：
+
+- 老 API：`__shfl(...)`（deprecated）；
+- 新 API：`__shfl_sync(mask, ...)`——显式指定要同步哪些线程。
+
+**结论**：写现代 CUDA 代码，**warp 内操作永远显式同步**。别偷懒。
+
+## 6. Warp Shuffle：warp 内快速通信
+
+Shared memory 是 block 内通信。**Warp 内通信**有个更快的方式——**warp shuffle**。
+
+**Shuffle 指令让 warp 里的线程直接交换寄存器值，不走 memory**。速度接近寄存器访问，比 shared 还快。
+
+四个基本指令：
+
+**`__shfl_sync(mask, val, srcLane)`**：把 srcLane 那个线程的 val 广播给参与的所有线程。
+
+**`__shfl_up_sync(mask, val, delta)`**：每个线程收到 `tid - delta` 那个线程的 val。
+
+**`__shfl_down_sync(mask, val, delta)`**：每个线程收到 `tid + delta` 那个线程的 val。
+
+**`__shfl_xor_sync(mask, val, laneMask)`**：每个线程和 `tid ^ laneMask` 那个线程互相交换 val。
+
+**Warp 归约用 shuffle**：
+
+```cpp
+// 一个 warp 内求和
+float sum = my_value;
+for (int offset = 16; offset > 0; offset /= 2) {
+    sum += __shfl_down_sync(0xffffffff, sum, offset);
+}
+// sum 现在在 lane 0 里
+```
+
+这只用了寄存器操作，无需 shared memory，无需 `__syncthreads()`。**Warp 内归约、扫描、广播全都可以这么写**。
+
+`0xffffffff` 是 32 位 mask，代表"参与的 32 个线程"。如果 warp 里某些线程不该参与，把对应位设 0。
+
+## 7. SM 上的调度
+
+一个 SM 上同时可以跑**多个 block、多个 warp**。SM 内部有一个调度器，每个 cycle 选一批 warp 去执行。
+
+**关键点**：一个 warp 如果因为访存或者其他原因**卡住**（等 200-800 cycle 等 memory），SM 会**换一个其他 warp 上去执行**——**这就是 GPU 隐藏延迟的方式**。
+
+CPU 一个核心一次只跑一个线程，遇到 cache miss 就干等。GPU 一个 SM 上有几十个 warp 排队，一个 warp 等待就换一个——**通过大量并发隐藏延迟**。
+
+**这也是 occupancy 重要的原因**——SM 上活跃 warp 越多，越能隐藏延迟。
+
+## 8. Occupancy（占用率）
+
+**Occupancy** = 一个 SM 上"活跃的 warp 数" / "硬件支持的最大 warp 数"。
+
+A100 每个 SM 支持最多 64 warp。如果你的 kernel 每个 SM 只跑 16 warp，occupancy 是 25%。
+
+**决定 occupancy 的因素**：
+
+- **每 block 线程数**（block 太小或太大都不好）；
+- **寄存器用量**（每线程用太多寄存器，SM 上能塞的 block 就少）；
+- **shared memory 用量**（一个 block 用太多 shared，能并行的 block 数受限）。
+
+**看寄存器和 shared 用量**：
+
+```bash
+nvcc -Xptxas=-v kernel.cu
+```
+
+**看 occupancy**：
+
+```cpp
+int max_active_blocks;
+cudaOccupancyMaxActiveBlocksPerMultiprocessor(&max_active_blocks, kernel, block_size, shmem_bytes);
+```
+
+**注意**：**occupancy 高不等于快**。有些 kernel 低 occupancy（比如 25%）反而更快——因为寄存器用得多、每线程能算的更快。**关键是 SM 是不是被"喂饱"了**。
+
+**Vasily Volkov 的经验**（很有名的一句）："Higher occupancy is often a wrong optimization target."
+
+## 9. Warp 调度对性能的影响
+
+一个 SM 上多个 warp 排队被调度。你的 kernel 可能受几种因素影响：
+
+**计算受限**：warp 全部在算 FLOP、没有等 memory——**很好，SM 打满**。
+
+**访存受限**：warp 一直在等 memory——**说明访问模式不好，或者 occupancy 太低不足以隐藏延迟**。
+
+**同步受限**：太多 `__syncthreads()`——**每次同步整个 block 都卡住**。
+
+**指令受限**：kernel 里有大量 int64 除法、rsqrt、atomic 这类慢指令。
+
+用 Nsight Compute 的 warp state 分析能看到具体是哪种原因导致 warp 空转。
+
+## 10. Lane、Mask、Active Threads
+
+一些概念澄清：
+
+**Lane**：warp 里 32 个线程的位置索引（0-31）。`threadIdx.x % 32` 就是 lane id。
+
+**Active mask**：warp 里当前"活跃"的线程集合。分支发散时，一半线程激活、一半屏蔽——这个屏蔽状态就是 mask。
+
+**`__ballot_sync(mask, predicate)`**：返回一个 32 位整数，第 i 位表示 lane i 的 predicate 是否为真。可以用来做 warp 级投票。
+
+**`__any_sync(mask, predicate)`**：warp 内 predicate 有一个为真就返回 true。
+
+**`__all_sync(mask, predicate)`**：warp 内 predicate 全为真才返回 true。
+
+这些 warp 级原语让你能写出**极其高效的 warp 内协作代码**——比如"warp 内找非零元素的第一个位置"、"warp 内做二分查找"等。
+
+## 11. Cooperative Groups：更抽象的接口
+
+CUDA 9 引入了 **cooperative groups**——一套更清晰的 API 来管理线程组：
+
+```cpp
+#include <cooperative_groups.h>
+namespace cg = cooperative_groups;
+
+__global__ void kernel() {
+    cg::thread_block block = cg::this_thread_block();
+    cg::thread_block_tile<32> warp = cg::tiled_partition<32>(block);
+
+    // 现在可以用抽象 API
+    warp.sync();
+    int val = warp.shfl(x, 0);
+    int reduce_result = cg::reduce(warp, x, cg::plus<int>());
+}
+```
+
+**优点**：代码更清晰，不用手写 mask。
+
+**缺点**：需要 CUDA 9+ 和相对新的硬件。
+
+**推荐**：新代码优先用 cooperative groups，读老代码熟悉传统的 `_sync` API。
+
+## 12. 编译器优化和 SASS
+
+CUDA 编译分两阶段：**nvcc → PTX → SASS**。
+
+- **PTX**：一种虚拟 ISA，跨代码通用；
+- **SASS**：真正在硬件上跑的机器码，架构相关。
+
+你写的 CUDA C++ 会被编译成 PTX，运行时或者装载时会由 GPU 驱动进一步编译成 SASS。
+
+**当你怀疑一段代码没被编译好**，可以看看 SASS：
+
+```bash
+cuobjdump --dump-sass ./your_program
+```
+
+或者用 nsight compute 的源码级分析。
+
+有时你以为"该发生的向量化"没发生、"该消除的分支"还在——只有看 SASS 才能确认。这是深度调优的必备工具。
+
+## 13. 一些实践建议
+
+**写 kernel 时脑子里想 warp**。别想"我有 1024 个线程"，想"我有 32 个 warp"。
+
+**尽量让分支按 warp 对齐**。`if (threadIdx.x < 32)` 好于 `if (some_condition_per_thread)`。
+
+**Warp 内通信优先用 shuffle**。比 shared 快，不需要 sync。
+
+**归约、扫描、broadcast** 都有 warp 级最优实现——搜"warp reduce shuffle"就有一堆。
+
+**看 occupancy 但不迷信**。它是一个参考，不是目标。真正的目标是 kernel 跑得快。
+
+**大量 `atomic` 会串行化**。同一个 SM 上多个 warp 都 atomic 加同一个地址——变成串行。有 atomic 就想想能不能用 warp reduce 先合并再 atomic。
+
+## 14. 一句话总结
+
+Warp 和 SIMT 是 GPU 执行的骨架：
+
+- **32 线程 = 1 warp**，硬件调度的最小单位；
+- **同 warp 共用 PC**（Volta 之前）；Volta 之后独立 PC，但要显式 sync；
+- **分支发散**：warp 里线程走不同分支时，性能减半——**永远尽量让 warp 内一致**；
+- **Warp shuffle**：warp 内极快通信，替代 shared；
+- **Occupancy**：活跃 warp 数决定延迟隐藏能力，但高 occupancy 不等于快；
+- **Cooperative Groups**：新的抽象 API，更清晰。
+
+理解了 warp，你写 CUDA 时的直觉就上了一个档次——**不再是"我在写并行 CPU 程序"，而是"我在指挥一群绑好的 32 人小队"**。
+
+下一章讲一个经典的 warp 应用——**归约**：怎么用 warp shuffle 写出接近硬件峰值的 sum 操作。
+
+</WordCount>

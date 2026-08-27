@@ -1,0 +1,269 @@
+import WordCount from '../../../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+前面我们一直假设 kernel 启动是免费的——写个 `kernel<<<grid, block>>>()`，GPU 就跑起来。**但每次启动其实有几微秒的 CPU 开销**——CUDA 运行时要把启动参数传给驱动、驱动打包成命令送给 GPU、GPU 从命令队列里读出来。这个开销单次很小，但**当 kernel 特别多、特别小时会成为瓶颈**。
+
+**CUDA Graph** 就是解决这个问题的——**把一整个"kernel 序列"预先构建成一个图，然后一次性提交给 GPU**。这一章讲清楚它是什么、什么时候用、怎么用。
+
+## 1. 一个真实场景：Launch Overhead 主导
+
+想象你在跑一个小规模 Transformer 推理——batch=1、模型 100M 参数：
+
+- 每层：QKV 投影、attention、FFN——大概 10-20 个 kernel；
+- 32 层 → **总共 300-500 个 kernel**；
+- 每个 kernel 本身几十微秒；
+- **CPU 端 launch 开销 5-10 μs / kernel**；
+- 500 kernel × 10 μs = **5 ms 纯启动开销**。
+
+**如果 kernel 本身平均 30 μs，整体 tot 大概 15 ms——那 launch 开销占了 33%**。**这 5 ms 就是"CPU 端 CUDA 运行时"的开销**，和 GPU 干活无关。
+
+**这个问题在什么场景下明显**：
+
+- **小 batch 推理**（LLM decode 阶段、语音识别、实时视频）；
+- **每个 kernel 都很短**（几十 μs 以下）；
+- **kernel 数量多**（几百到几千个）。
+
+这种时候，**GPU 不忙，CPU 在忙着 launch**——GPU 大量空转。
+
+## 2. CUDA Graph 的想法
+
+**如果这一串 kernel 每次跑都一模一样，为什么每次都要 CPU 逐个 launch？**
+
+**CUDA Graph 的思路**：
+
+1. **第一次跑**——用一个特殊的"capture"模式，把所有 kernel 调用记录下来，形成一个 **graph**；
+2. **实例化**——把这个 graph 编译成 GPU 可以直接执行的形式；
+3. **后面每次跑**——**一次 `cudaGraphLaunch` 调用就够**，几百个 kernel 全都被 GPU 侧调度器处理，几乎没有 CPU 侧开销。
+
+**这就是 CUDA Graph**。
+
+## 3. 三种构建方式
+
+**方式 A：Stream Capture（最简单）**——把一段现有代码"录制"成 graph：
+
+```cpp
+cudaStream_t stream;
+cudaStreamCreate(&stream);
+
+// 开始录制
+cudaStreamBeginCapture(stream, cudaStreamCaptureModeGlobal);
+
+// 正常的 kernel 调用（不会真的执行，只是记录）
+kernel_1<<<..., stream>>>();
+kernel_2<<<..., stream>>>();
+cudaMemcpyAsync(..., stream);
+kernel_3<<<..., stream>>>();
+// ... 更多 kernel
+
+// 结束录制，得到 graph
+cudaGraph_t graph;
+cudaStreamEndCapture(stream, &graph);
+
+// 实例化
+cudaGraphExec_t graphExec;
+cudaGraphInstantiate(&graphExec, graph, nullptr, nullptr, 0);
+
+// 后面每次跑
+for (int i = 0; i < 1000; i++) {
+    cudaGraphLaunch(graphExec, stream);
+}
+cudaStreamSynchronize(stream);
+```
+
+**这是最实用的方式**——**几乎不用改代码**，只是加了 begin/end capture 包一下。
+
+**方式 B：Explicit Graph API**——用 API 显式构建节点和边：
+
+```cpp
+cudaGraph_t graph;
+cudaGraphCreate(&graph, 0);
+
+cudaGraphNode_t node1;
+cudaKernelNodeParams params = {...};
+cudaGraphAddKernelNode(&node1, graph, nullptr, 0, &params);
+
+cudaGraphNode_t node2;
+cudaGraphAddKernelNode(&node2, graph, &node1, 1, &params);  // 依赖 node1
+// ...
+```
+
+**这个方式麻烦但灵活**——能构建复杂的 DAG，比如"a, b 并行，c 依赖 a 和 b"这种。
+
+**方式 C：Framework 自动化**（PyTorch, JAX）——底层自动做 graph capture，用户几乎不用管。
+
+## 4. 一个 PyTorch 例子
+
+PyTorch 有 `torch.cuda.CUDAGraph`：
+
+```python
+import torch
+
+model = ...   # 你的模型
+input = torch.randn(1, 1024).cuda()
+
+# Warmup
+for _ in range(3):
+    output = model(input)
+
+# 捕获
+g = torch.cuda.CUDAGraph()
+with torch.cuda.graph(g):
+    output = model(input)
+
+# 后续调用
+for step in range(1000):
+    new_input = ...
+    input.copy_(new_input)   # 更新输入（原地）
+    g.replay()               # 快速 replay 整个 graph
+    result = output.cpu()
+```
+
+**关键点**：graph 里的**内存地址是固定的**——每次 replay 用的都是同一批 tensor。所以要修改输入时**必须原地拷贝**（`input.copy_(new_input)`），不能改指针。
+
+**收益**：LLM decode 阶段用 CUDA Graph 后，token 吞吐量能提升 20-50%。
+
+## 5. Graph 的好处
+
+**减少 launch overhead**：几百个 kernel 一次 launch，节省 CPU 端时间。
+
+**降低 CPU-GPU 同步**：GPU 有一整套指令预取，能更好地 pipeline。
+
+**允许更激进的调度**：GPU 拿到整个图，能优化调度顺序（比如识别独立的分支并行）。
+
+**在小 kernel 场景下极其明显**：kernel 越小、数量越多，收益越大。
+
+## 6. 一些限制
+
+**Graph 里的 kernel 参数是"固定"的**：capture 时抓的是"kernel 指针 + 参数指针"。**每次 replay 都用同一个指针**——所以：
+
+- 想改**内存里的数据**：可以（原地更新）；
+- 想改**指针**：不行，需要重新 capture；
+- 想改**kernel 的启动配置**（grid、block）：不行。
+
+**动态形状不支持**：LLM decode 里每步 KV Cache 长度变化——**要么 capture 一堆不同长度的 graph，要么用不同 API**。
+
+**Capture 期间不能有非法操作**：capture 模式下不能调用 `cudaMalloc`、不能同步 host。所有分配要在 capture 之前完成。
+
+**Debug 困难**：Kernel 出错在 replay 时定位不太方便——错在 graph 里的哪个 kernel 得手动查。
+
+## 7. 什么时候用 CUDA Graph
+
+**特别适合**：
+
+- **推理服务**（尤其小 batch、LLM decode）；
+- **训练循环**里的固定 pipeline（forward + backward + optimizer）；
+- **多次跑同一个计算图**——比如 RL 环境模拟里的每一步；
+
+**不适合**：
+
+- **每次 kernel 参数不同**（比如输入尺寸变化大）；
+- **需要 CPU 决策的分支**（if-then 依赖 CPU 判断）；
+- **只跑一次的计算**——capture 开销比省下的 launch 开销大；
+
+## 8. 组合使用：Multi-Stream + Graph
+
+一个 graph 可以有多个 stream 上的操作——**graph 内部的分支能真正并发执行**：
+
+```cpp
+cudaStreamBeginCapture(main_stream, cudaStreamCaptureModeGlobal);
+
+// 分叉
+cudaEvent_t fork;
+cudaEventRecord(fork, main_stream);
+cudaStreamWaitEvent(side_stream, fork, 0);
+
+// main 和 side 并发
+kernel_A<<<..., main_stream>>>();
+kernel_B<<<..., side_stream>>>();
+
+// 合并
+cudaEvent_t join;
+cudaEventRecord(join, side_stream);
+cudaStreamWaitEvent(main_stream, join, 0);
+
+kernel_C<<<..., main_stream>>>();
+
+cudaStreamEndCapture(main_stream, &graph);
+```
+
+Graph 里就有了"A 和 B 并行、C 依赖两者"的 DAG——**执行时 GPU 会自动调度这些分支并发**。
+
+## 9. 动态 Graph：更灵活的方案
+
+**Conditional Graph**（CUDA 12+）：图里能有条件节点——按 host 或 device 的判断动态选择分支。
+
+**Graph Nodes 动态更新**（`cudaGraphExecKernelNodeSetParams`）：可以在不重新 capture 的情况下改某个节点的参数。
+
+这些 API 让 CUDA Graph 逐渐从"只支持完全固定的图"变成"支持一定程度的动态"。**不过复杂度上升快**，一般应用用 basic capture 就够。
+
+## 10. 实测收益
+
+一些实际数字（每个数字都是"启用 CUDA Graph 之后相对于纯 stream 的加速"）：
+
+- **LLM decode（batch=1）**：加速 20-50%；
+- **Diffusion 模型推理**：加速 10-30%；
+- **RL 训练环境模拟**：加速 30-100%（小 kernel 极多）；
+- **大规模 batch 训练**：加速 5-15%（kernel 本身够大，launch 开销占比小）；
+- **CUDA Graph 不适用的场景**：0%（可能负收益，因为多了一层间接）。
+
+**规律**：**kernel 越小、越多、越规则，收益越大**。
+
+## 11. Framework 级的自动化
+
+现代深度学习框架都在把 CUDA Graph 集成进底层：
+
+**PyTorch**：`torch.compile` 里的 `mode="reduce-overhead"` 会自动启用 CUDA Graph。
+
+**JAX**：`jax.jit` 编译后自动会用类似的 graph capture 机制。
+
+**TensorRT**：本质就是一个"全 graph 化的推理引擎"——所有 kernel 编排好后一次执行。
+
+**vLLM / TGI**：LLM 推理引擎里 decode 阶段几乎全用 CUDA Graph。
+
+**结论**：如果你在用 PyTorch，多数情况下**开个 `torch.compile(..., mode="reduce-overhead")`** 就获得了 CUDA Graph 收益。**手写 graph 只在非常规场景下才需要**。
+
+## 12. 一些坑
+
+**Capture 时用了非确定性操作**：比如某些老的 kernel 内部有 CPU 端 malloc——会 fail。**要求所有内存在 capture 前分配好**。
+
+**用 default stream capture**：不行——CUDA Graph capture **必须用 non-default stream**。
+
+**输入没原地更新**：修改指针再 replay——用的还是老指针指向的内存。**一定要 `.copy_` 原地**。
+
+**Capture 后动态 shape 变化**：graph 里的 kernel launch 参数是固定的，动态 shape 需要多套 graph。
+
+**Warmup 少**：GPU 上有些运行时状态（比如 workspace）第一次运行才分配。**capture 之前至少跑 2-3 次相同代码 warmup**。
+
+**版本兼容**：CUDA Graph 是 CUDA 10 引入、CUDA 11-12 大量增强的功能。老版本 CUDA 支持有限或者有 bug。**用 CUDA 12+ 最稳**。
+
+## 13. Debug 技巧
+
+**看 nsys 时间线**：capture 前的时间线 vs. graph launch 后的时间线——能明显看到 launch overhead 是不是被压下来了。
+
+**验证功能**：capture 完 replay 一次，输出和"非 graph 版本"比较——**确保数值一致**。
+
+**分段 capture**：整个模型 capture 失败？**先 capture 一小段试试**——比如只 capture 一层。逐段排查。
+
+**Kernel node fail 定位**：ncu 里可以针对 graph 里的具体 kernel 分析——不用 disable graph 也能看单个 kernel 的指标。
+
+## 14. 一句话总结
+
+CUDA Graph 是解决"小 kernel launch overhead"的杀手锏：
+
+- **原理**：一整段 kernel 序列预先构建成图，一次 launch 全都跑；
+- **实现**：Stream Capture 最简单，几行代码搞定；
+- **场景**：LLM decode、推理服务、RL simulation 这类"重复跑小 kernel"的场景；
+- **典型收益**：20-50% 的速度提升，甚至更多；
+- **限制**：kernel 参数固定、动态形状难处理、debug 稍麻烦；
+- **框架侧**：`torch.compile(mode="reduce-overhead")` 或 TensorRT 等已自动化。
+
+CUDA Graph 是深度学习推理系统里"最后一块拼图"——**把 Tensor Core 榨干了、把 KV Cache 优化好了、把 stream 并发做了**，最后要压缩的就是 CPU 端启动开销。
+
+---
+
+到这里，CUDA 章节讲完了。从最朴素的线程模型（01），到内存层次（02-03），到执行模型（04），到经典 kernel 优化（05 归约、06 矩阵乘），到系统级优化（07 stream、08 profiler），到专用硬件（09 Tensor Core、10 CUDA Graph）——**一整套现代 GPU 编程需要的知识都在这里了**。
+
+下一章我们跳到另一个战场——**AMD 的 GPU 生态**。CUDA 已经是事实标准了，但市场上不只有 NVIDIA。**HIP 和 ROCm** 是 AMD 的答案——同样值得一学。
+
+</WordCount>

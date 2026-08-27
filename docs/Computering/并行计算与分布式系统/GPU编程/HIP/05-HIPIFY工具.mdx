@@ -1,0 +1,345 @@
+import WordCount from '../../../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+你手上有一份 CUDA 代码，想让它跑在 AMD 硬件上——最直接的路径就是用 **hipify** 自动转成 HIP。这一章讲这个工具的用法、能做什么、不能做什么，以及迁移过程中最常见的坑。
+
+## 1. 为什么要有 hipify
+
+HIP 的核心设计是"和 CUDA 长得几乎一样"——大部分 API 只是把 `cuda*` 换成 `hip*`。**这种"名字替换"的工作量虽然大，但是机械的**——完全可以自动化。
+
+**hipify** 就是这么一个工具——**扫描你的 CUDA 代码，自动做 API 名字替换、头文件替换、编译 flag 调整**。绝大多数 CUDA 项目 hipify 完就能编译，再手工调整少数不能自动转换的地方。
+
+**用得好的话，一个几万行的 CUDA 项目**能在几小时内跑起来 HIP 版本。
+
+## 2. 两个版本：hipify-perl vs hipify-clang
+
+AMD 提供两种 hipify 实现：
+
+**hipify-perl**：**基于正则替换的脚本**。快、简单、但不理解 C++ 语义。适合快速转换。
+
+**hipify-clang**：**基于 Clang AST 的转换**。慢一些但准确——真正理解 C++ 结构，能处理复杂情况。
+
+**用哪个**：
+
+- **快速试试**：用 hipify-perl；
+- **正经项目**：用 hipify-clang；
+- **只做 header 里的替换**：hipify-perl 也够。
+
+## 3. 基本用法
+
+**hipify-perl 转单个文件**：
+
+```bash
+hipify-perl vector_add.cu > vector_add.hip.cpp
+```
+
+**hipify-perl 转整个目录**（打印计划、不实际改）：
+
+```bash
+find src -name "*.cu" -o -name "*.cuh" | xargs -I {} hipify-perl {} -print-stats
+```
+
+**hipify-clang 转整个项目**：
+
+```bash
+hipify-clang --print-stats --inplace src/*.cu
+# --inplace 直接修改原文件（危险，用前先 git commit）
+# --print-stats 打印转换统计
+```
+
+**手动指定 include 路径**（大项目通常需要）：
+
+```bash
+hipify-clang -I/path/to/cuda -I./include src/*.cu
+```
+
+## 4. hipify 到底改了什么
+
+一个简单的 CUDA kernel：
+
+```cpp
+// vector_add.cu
+#include <cuda_runtime.h>
+#include <cstdio>
+
+__global__ void vec_add(const float *A, const float *B, float *C, int N) {
+    int tid = blockIdx.x * blockDim.x + threadIdx.x;
+    if (tid < N) C[tid] = A[tid] + B[tid];
+}
+
+int main() {
+    int N = 1 << 20;
+    size_t bytes = N * sizeof(float);
+
+    float *h_A, *h_B, *h_C;
+    cudaMallocHost(&h_A, bytes);
+    cudaMallocHost(&h_B, bytes);
+    cudaMallocHost(&h_C, bytes);
+    for (int i = 0; i < N; i++) { h_A[i] = i; h_B[i] = i; }
+
+    float *d_A, *d_B, *d_C;
+    cudaMalloc(&d_A, bytes);
+    cudaMalloc(&d_B, bytes);
+    cudaMalloc(&d_C, bytes);
+
+    cudaMemcpy(d_A, h_A, bytes, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_B, h_B, bytes, cudaMemcpyHostToDevice);
+
+    vec_add<<<(N+255)/256, 256>>>(d_A, d_B, d_C, N);
+    cudaDeviceSynchronize();
+
+    cudaMemcpy(h_C, d_C, bytes, cudaMemcpyDeviceToHost);
+
+    cudaFreeHost(h_A); cudaFreeHost(h_B); cudaFreeHost(h_C);
+    cudaFree(d_A); cudaFree(d_B); cudaFree(d_C);
+    return 0;
+}
+```
+
+**hipify 之后**：
+
+```cpp
+// vector_add.hip.cpp
+#include <hip/hip_runtime.h>
+#include <cstdio>
+
+__global__ void vec_add(const float *A, const float *B, float *C, int N) {
+    int tid = blockIdx.x * blockDim.x + threadIdx.x;
+    if (tid < N) C[tid] = A[tid] + B[tid];
+}
+
+int main() {
+    int N = 1 << 20;
+    size_t bytes = N * sizeof(float);
+
+    float *h_A, *h_B, *h_C;
+    hipHostMalloc(&h_A, bytes);
+    hipHostMalloc(&h_B, bytes);
+    hipHostMalloc(&h_C, bytes);
+    for (int i = 0; i < N; i++) { h_A[i] = i; h_B[i] = i; }
+
+    float *d_A, *d_B, *d_C;
+    hipMalloc(&d_A, bytes);
+    hipMalloc(&d_B, bytes);
+    hipMalloc(&d_C, bytes);
+
+    hipMemcpy(d_A, h_A, bytes, hipMemcpyHostToDevice);
+    hipMemcpy(d_B, h_B, bytes, hipMemcpyHostToDevice);
+
+    vec_add<<<(N+255)/256, 256>>>(d_A, d_B, d_C, N);
+    hipDeviceSynchronize();
+
+    hipMemcpy(h_C, d_C, bytes, hipMemcpyDeviceToHost);
+
+    hipHostFree(h_A); hipHostFree(h_B); hipHostFree(h_C);
+    hipFree(d_A); hipFree(d_B); hipFree(d_C);
+    return 0;
+}
+```
+
+**差别**：
+
+- `#include <cuda_runtime.h>` → `#include <hip/hip_runtime.h>`；
+- 所有 `cuda*` 变 `hip*`；
+- 所有枚举值（`cudaMemcpyHostToDevice`）也变了；
+- kernel 语法一字不改。
+
+**编译**：
+
+```bash
+hipcc vector_add.hip.cpp -o vector_add
+./vector_add
+```
+
+跑起来！这就是 hipify 的日常。
+
+## 5. hipify 能自动处理的东西
+
+- **运行时 API**：`cudaMalloc` → `hipMalloc` 等；
+- **头文件**：`cuda_runtime.h` → `hip/hip_runtime.h` 等；
+- **常量枚举**：`cudaSuccess` → `hipSuccess`；
+- **结构体和类型**：`cudaStream_t` → `hipStream_t`；
+- **数学函数**：一般 CUDA 的 device 函数在 HIP 里都能用；
+- **常见的 CUDA 库**：cuBLAS → hipBLAS/rocBLAS；cuDNN → MIOpen（部分）；
+- **PTX inline asm**：**大部分不能自动转**——需要手工改成 amdgcn 版或者绕开。
+
+## 6. hipify 不能处理的东西
+
+有些代码 hipify 会跳过或者留 warning，需要人工介入：
+
+**PTX / SASS 内联汇编**：CUDA 允许 `asm volatile("...")` 里嵌汇编。**这些无法自动翻译**——hipify 会保留代码但生成 warning，你要手动改成 amdgcn 或者用 HIP intrinsic 替代。
+
+**Warp-level intrinsics with 32-bit mask**：CUDA 的 `__shfl_sync(0xffffffff, ...)` 的 mask 假设 warp 是 32。**在 AMD 上 wavefront 可能是 64——mask 要改成 64-bit 或者去掉 mask**。
+
+**Cooperative Groups 的高级用法**：`grid_group::sync()` 等——**HIP 上有对应但可能有 bug 或者限制**。
+
+**CUDA 特定的 API**：一些 CUDA 独有的东西，比如 `cudaMallocAsync`（stream-ordered memory allocator）、Hopper 的 TMA 指令——**HIP 上没有直接对应**，要重新设计。
+
+**Header file paths**：CUDA 项目里的 include 路径可能写死了——hipify 会尽力改，但复杂项目可能要手动修 CMakeLists。
+
+## 7. 转换后的 CMake 修改
+
+CUDA 项目一般是这样：
+
+```cmake
+enable_language(CUDA)
+add_executable(myapp main.cu)
+target_link_libraries(myapp CUDA::cudart CUDA::cublas)
+```
+
+HIP 版：
+
+```cmake
+find_package(hip REQUIRED)
+enable_language(HIP)   # ROCm 5.x+
+add_executable(myapp main.hip.cpp)
+target_link_libraries(myapp hip::device roc::rocblas)
+```
+
+或者用 hipcc 直接编：
+
+```cmake
+set(CMAKE_CXX_COMPILER hipcc)
+add_executable(myapp main.hip.cpp)
+```
+
+**hipify-clang 有个 flag `--cuda-path` 和 `--rocm-path`** 帮你处理头文件和链接。
+
+## 8. 一些实操 tips
+
+**先 git commit**。`hipify --inplace` 会覆盖文件，出错想恢复只能靠 git。
+
+**先转小项目**。别一上来就转 5 万行代码库——先试个几百行的 subproject，熟悉工具的行为。
+
+**看 stats**。`--print-stats` 会告诉你多少行被替换、多少 warning、多少不能替换的地方。**warning 部分是重点**。
+
+**逐个文件转，逐个测**。转一个编译一个测一个，别一次转完再统一测——一次转完出错就不知道是哪里的锅。
+
+**保留 CUDA 版本**。转 HIP 后**不要立刻删除 CUDA 版本**——你的目标是"跨平台"而不是"迁移"。用条件编译让一份代码支持两个平台。
+
+**用 `HIP_SYMBOL` 或宏抽象**：
+
+```cpp
+#ifdef __HIPCC__
+    #define GPU_MALLOC hipMalloc
+    #include <hip/hip_runtime.h>
+#else
+    #define GPU_MALLOC cudaMalloc
+    #include <cuda_runtime.h>
+#endif
+```
+
+**批量处理**：
+
+```bash
+find src include -name "*.cu" -o -name "*.cuh" | while read f; do
+    dst=$(echo $f | sed 's/\.cu/\.hip.cpp/' | sed 's/\.cuh/\.hip.h/')
+    hipify-perl $f > $dst
+done
+```
+
+## 9. 常见的转换问题
+
+**问题 1**：warp shuffle 的 mask 不对
+
+```cpp
+// 原 CUDA
+val = __shfl_down_sync(0xffffffff, val, 16);
+
+// hipify 转换后
+val = __shfl_down_sync(0xffffffff, val, 16);  // 保留，但 mask 假设 wave32
+```
+
+**手动修复**：
+
+```cpp
+#if defined(__HIP_PLATFORM_AMD__)
+    val = __shfl_down(val, 16);   // 无 mask 版本
+#else
+    val = __shfl_down_sync(0xffffffff, val, 16);
+#endif
+```
+
+**问题 2**：`warpSize` 硬编码
+
+```cpp
+// 假设 warp 是 32
+if (threadIdx.x < 32) { ... }
+```
+
+**修复**：改成 `if (threadIdx.x < warpSize)`。
+
+**问题 3**：cuBLAS 特殊调用
+
+CUDA 里有一些 cuBLAS-specific 的 API 或行为，比如 `cublasSetMathMode` 的 flag。hipify 转 hipBLAS 时可能没有完全对应。**手动查 hipBLAS 文档**。
+
+**问题 4**：thrust 用法
+
+hipify 会把 `thrust::` 转成 `thrust::`（其实 rocThrust 就直接 wrap 了），大部分能用。但一些 `thrust::device_vector` 底层行为可能不完全相同——**测试为准**。
+
+**问题 5**：Kernel 里的 asm
+
+```cpp
+asm("mov.u32 %0, %%laneid;" : "=r"(lane_id));
+```
+
+**这是 PTX 汇编，hipify 无法转换**。改成：
+
+```cpp
+#if defined(__HIP_PLATFORM_AMD__)
+    int lane_id = __lane_id();   // HIP intrinsic
+#else
+    int lane_id;
+    asm("mov.u32 %0, %%laneid;" : "=r"(lane_id));
+#endif
+```
+
+## 10. hipify 之后的性能验证
+
+**转好之后不要立刻宣布胜利**。做几件事：
+
+**功能验证**：跑一遍 unit test，输出结果和 CUDA 版本对比——**数值一致（浮点允许小误差）**。
+
+**基础性能**：跑几个 benchmark，看和 CUDA 版本相比性能怎样。**HIP 在 AMD 上第一次跑通常比同代 CUDA 慢 20-50%**——因为没做 AMD 特定优化。
+
+**Profile**：用 rocprof、omniperf 看瓶颈——**通常是 wavefront-level 代码没优化、shared memory 布局不适合 AMD、或者用了非最优 library**。
+
+**调优**：针对 AMD 硬件重写热点 kernel（下一章"HIP 性能调优"会展开）。
+
+## 11. 实战案例：大项目的 hipify
+
+真实的 CUDA 项目 hipify 迁移经验：
+
+**PyTorch**：官方的 ROCm 版就是 hipify 出来的。**PyTorch 内部有 `tools/amd_build/build_amd.py`** 专门做这个事——不是纯 hipify，是 hipify + 手工调整。
+
+**vLLM**：ROCm 后端也是 hipify 起手，然后大量手工调 kernel。
+
+**FlashAttention**：AMD 有自己的 fork（Flash-Attention-AMD），基于 hipify + 手写 amdgcn kernel 优化。
+
+**规模感**：一个 10 万行的 CUDA 项目，hipify 完能编译大概花 1-3 天，能跑通所有测试大概再花 1-2 周，达到 CUDA 版本 80%+ 性能大概再花 1-2 个月。**这是行业里"移植 CUDA 项目"的典型工作量**。
+
+## 12. hipify 之外的迁移工具
+
+**HIPCC**：AMD 官方的 HIP 编译器。基于 clang++，能编 HIP、也能编 CUDA。
+
+**CHIP-SPV**：一个更激进的项目——**让 HIP 代码跑在 Intel GPU / OpenCL 设备上**。跨供应商的野心。
+
+**oneAPI**（Intel）：Intel 的答卷，用 SYCL 语法。**和 HIP 是不同的路线**。
+
+**Kokkos / RAJA**：更高层的抽象——你写一份"高级"代码，底层可以映射到 CUDA、HIP、OpenMP、SYCL。**科学计算里常用**。
+
+## 13. 一句话总结
+
+hipify 是 CUDA → HIP 迁移的自动化利器：
+
+- **两个版本**：hipify-perl（快）、hipify-clang（准）；
+- **能做**：90% 的 API 名字替换、头文件替换、库替换；
+- **不能做**：PTX 汇编、warp mask、CUDA 独有 API 需要手工；
+- **实操**：**先 git、再 stats、再逐文件、最后测试**；
+- **迁移后**：调 wavefront-level 代码、tune AMD 硬件特性——才能达到峰值性能；
+- **跨平台**：用条件编译让一份代码同时支持两个平台，比纯迁移更长远。
+
+下一章讲 CDNA 架构和 MI 系列——AMD 数据中心 GPU 的具体特色，尤其 MI300 的巨大显存和 Matrix Core 能力。
+
+</WordCount>

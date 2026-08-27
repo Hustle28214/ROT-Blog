@@ -1,0 +1,310 @@
+import WordCount from '../../../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+共享内存是 CUDA 编程里最关键的一块——**用好它，一个 kernel 能快 10-100 倍；用错了，反而比不用还慢**。这一章把共享内存的核心用法讲清楚，重点是它最容易出问题的地方——**Bank 冲突**。
+
+## 1. 共享内存是干嘛的
+
+回顾一下：一个 block 里的所有线程能读写一小块 SM 上的高速内存，这就是共享内存。特点：
+
+- **速度接近寄存器**（比 global 快 100 倍）；
+- **只在一个 block 内可见**——block 间不能共享；
+- **手动管理**——不是 CPU 那种"自动 cache"，你得显式加载数据。
+
+**它解决的核心问题**：**数据复用**。
+
+比如矩阵乘 `C = A × B`，同一个 A 行会被 C 的一整行所有元素用到，同一个 B 列会被 C 的一整列用到。**如果每次都从 global 读，同一份数据要被读几百次**。如果先合作把 A 的一小块、B 的一小块搬到共享内存，然后**在共享内存里反复用**——访存量减到几百分之一。
+
+## 2. 基本用法
+
+**静态声明**（大小编译期定）：
+
+```cpp
+__global__ void kernel(float *A, float *B) {
+    __shared__ float sA[256];
+    __shared__ float sB[256];
+
+    int tid = threadIdx.x;
+    // 从 global 拷到 shared（合并访存）
+    sA[tid] = A[blockIdx.x * blockDim.x + tid];
+    sB[tid] = B[blockIdx.x * blockDim.x + tid];
+
+    __syncthreads();  // 等所有线程加载完
+
+    // 现在可以在 shared 上反复计算
+    float sum = 0;
+    for (int i = 0; i < 256; i++) sum += sA[i] * sB[tid];
+
+    __syncthreads();  // 再一次同步（如果后面还要用 shared）
+}
+```
+
+**动态声明**（大小 kernel 启动时定）：
+
+```cpp
+extern __shared__ float shmem[];
+
+__global__ void kernel(float *A, int n) {
+    // shmem 大小由启动参数决定
+    ...
+}
+
+// 启动时：
+kernel<<<grid, block, shared_bytes>>>(A, n);
+```
+
+**多个动态数组共存**（有个技巧）：
+
+```cpp
+extern __shared__ char shmem[];
+
+__global__ void kernel(int n, int m) {
+    float *sA = (float*)shmem;
+    float *sB = (float*)&sA[n];
+    int   *sC = (int*)&sB[m];
+    ...
+}
+```
+
+只能有**一个** `extern __shared__` 声明，多数据要手动切分。
+
+## 3. `__syncthreads()`：同步的必要性
+
+Shared memory 一定要和 `__syncthreads()` 配合。
+
+**没同步会怎样**？
+
+```cpp
+__shared__ float s[256];
+s[tid] = A[tid];        // 线程 0 已经写完了
+// 这里如果不同步 — 线程 0 读 s[128]，但线程 128 可能还没写！
+float x = s[(tid + 128) % 256];
+```
+
+**结果**：读到未初始化的数据。**这个 bug 极其隐蔽**——大部分时候似乎能跑，因为线程调度顺序碰巧对了。**只有在压力大或不同硬件上才崩**。
+
+**规则**：
+
+- 写完 shared 要读它 → **中间 `__syncthreads()`**；
+- 读完 shared 要写它 → **中间 `__syncthreads()`**；
+- 只读、只写、没有前后依赖 → 不需要。
+
+**注意**：`__syncthreads()` 必须**所有线程都执行到**。如果放在 `if` 里，某些线程不进去，剩下的会永远等——**死锁**。
+
+```cpp
+if (threadIdx.x < 128) {
+    __syncthreads();   // 危险！只有半个 block 到这里
+}
+```
+
+## 4. Bank 冲突：Shared Memory 的核心陷阱
+
+好，现在到最重要的部分。你已经用了 shared memory，但**发现它并没有想象中那么快**——很可能就是 bank 冲突。
+
+**Shared memory 的物理结构**：它不是"一块连续的 RAM"，而是被切成 **32 个 bank**（针对 warp 里的 32 线程）：
+
+```
+   Bank:   0    1    2    3   ...  31
+   Addr:   0    4    8   12   ...  124
+           128  132  136 140  ...  252
+           256  260  264 268  ...  380
+           ...
+```
+
+也就是说：**32 个 4 字节 word 循环分配到 32 个 bank**。地址 0 属于 bank 0、地址 4 属于 bank 1、地址 128 又回到 bank 0。
+
+**每个 bank 在一个 cycle 里只能服务一次访问**。
+
+- 如果 warp 里 32 线程访问的地址属于 **32 个不同的 bank** → **一次搞定，完美**；
+- 如果多个线程访问**同一个 bank 的不同地址** → **冲突**，硬件要串行处理，一次 warp 访问变成 N 次，慢 N 倍；
+- 如果多个线程访问**同一个 bank 的同一个地址** → **广播**，不算冲突，一次搞定。
+
+## 5. 一个经典的 bank 冲突例子
+
+**共享内存的二维数组访问**——最常见的冲突场景。
+
+假设我们要做转置：
+
+```cpp
+__shared__ float tile[32][32];
+
+// 读入
+int x = blockIdx.x * 32 + threadIdx.x;
+int y = blockIdx.y * 32 + threadIdx.y;
+tile[threadIdx.y][threadIdx.x] = input[y * width + x];  // 按行读
+
+__syncthreads();
+
+// 写回（转置）
+output[x * width + y] = tile[threadIdx.x][threadIdx.y];  // 按列读
+```
+
+**分析这两次访问**：
+
+**读入**：`tile[y][x]`——一个 warp 里 y 相同、x 从 0 到 31。地址是 `y * 32 * 4 + x * 4`。对应 32 个 bank。**没有冲突**。
+
+**写回**：`tile[x][y]`——一个 warp 里 x 从 0 到 31、y 相同。地址是 `x * 32 * 4 + y * 4`。**都在同一个 bank！** 一次 warp 变 32 次串行——**32 路 bank 冲突**。
+
+**症状**：写回慢 32 倍。整个 kernel 变得非常慢。
+
+## 6. 修复：Padding
+
+**经典解决方案**：在数组的一维加个"填充"，打乱 bank 布局：
+
+```cpp
+__shared__ float tile[32][33];   // 一维大小改成 33（而不是 32）
+```
+
+现在一行 33 个元素、132 字节。**bank 布局被"错位"了**：
+
+- `tile[0][0]` 在 bank 0；
+- `tile[1][0]` 地址 = 132 = 4 × 33，模 32 = bank 1；
+- `tile[2][0]` 在 bank 2；
+- ...
+- 一个"列"访问覆盖 32 个不同的 bank——**无冲突**。
+
+代价：多用了 32 个 float 的共享内存（4 × 32 = 128 字节）。**几乎白送的加速**。
+
+**这是 CUDA 里最有名的一个小技巧**——`[32][32]` → `[32][33]`，能带来数十倍的速度提升。
+
+## 7. Bank 大小
+
+标准 bank 宽度是 **4 字节**（32 bit）。有些架构上可以切换到 8 字节（针对 double）：
+
+```cpp
+cudaDeviceSetSharedMemConfig(cudaSharedMemBankSizeEightByte);
+```
+
+现代 CUDA 版本里这个 API 用得少，硬件默认已经处理好 double 的对齐。
+
+## 8. 广播机制
+
+**当 warp 里所有 32 个线程读同一个 bank 的同一个地址** —— 硬件会广播这一个 word 给所有线程，**不算冲突，一次完成**。
+
+```cpp
+__shared__ float scalar;
+if (threadIdx.x == 0) scalar = input[0];
+__syncthreads();
+float x = scalar;   // 所有线程读同一个位置 — 广播，一次搞定
+```
+
+这也是"常量传播"的一种实现方式。
+
+如果**多个不同 warp 都读同一个位置**，硬件也能广播——**多播（multicast）**。
+
+## 9. Volta 之后的变化
+
+从 Volta 架构（V100）开始，硬件对 shared memory 的一致性做了改进：
+
+- **partitioned camping** 问题减轻了；
+- **不同 warp 的写入之间的一致性**由硬件保证；
+- **wavefront-wide broadcast** 更高效。
+
+现在的实用建议是：
+
+- 依然要**避免 bank 冲突**——它还是主要瓶颈；
+- **不要过度担心 partition camping**——现代硬件已经处理得比较好；
+- **测量为准**——用 `nsys` 或 `ncu` 看 shared memory 效率。
+
+## 10. 一个实际优化案例
+
+**矩阵乘 SGEMM 的 shared memory tile 加载**。
+
+Naive 版本：
+
+```cpp
+__shared__ float sA[BLOCK][BLOCK];
+__shared__ float sB[BLOCK][BLOCK];
+
+// 加载 tile：每线程一个元素
+sA[threadIdx.y][threadIdx.x] = A[...];
+sB[threadIdx.y][threadIdx.x] = B[...];
+__syncthreads();
+
+// 计算
+for (int k = 0; k < BLOCK; k++) {
+    sum += sA[threadIdx.y][k] * sB[k][threadIdx.x];
+}
+```
+
+分析：
+
+- **加载 sA / sB**：一个 warp 里线程按行分布，`sA[y][x]` 里 y 相同、x 变化——**同行不同 bank，无冲突**；
+- **计算里读 sA**：`sA[threadIdx.y][k]`——一个 warp 里 y 相同、k 循环，**都同一位置——广播，无冲突**；
+- **计算里读 sB**：`sB[k][threadIdx.x]`——一个 warp 里 k 相同、x 变化，**同行不同 bank，无冲突**。
+
+**这个 pattern 本身就是 bank 冲突 friendly 的**。
+
+## 11. 用 ncu 看 bank 冲突
+
+**Nsight Compute** 能直接告诉你哪里有 bank 冲突：
+
+```bash
+ncu --set full ./your_program
+```
+
+关键指标：
+
+- **smsp__l1tex_data_bank_conflicts_pipe_lsu_mem_shared_op_ld**：Load 的 bank 冲突次数；
+- **smsp__l1tex_data_bank_conflicts_pipe_lsu_mem_shared_op_st**：Store 的 bank 冲突次数；
+- **l1tex__data_bank_conflicts_pipe_lsu_mem_shared_op_ldst.sum.pct_of_peak_burst_active**：冲突占比。
+
+看到 bank 冲突次数 > 0，就要回去修。
+
+## 12. Shared Memory 的容量取舍
+
+一个 SM 上的 shared memory 是**所有活跃 block 共享**的。
+
+**A100 每个 SM 有 164 KB shared memory**。如果你一个 block 用 32 KB，那一个 SM 上最多 5 个 block 并行——**Occupancy** 就受限了。
+
+**Occupancy（占用率）** 是"活跃 warp 数 / 硬件最大 warp 数"。它衡量硬件的并行度利用率。
+
+**shared memory 用得越多，occupancy 越低**。这是一个取舍：
+
+- 更多 shared memory → 每个 block 缓存更多数据 → 减少访问 global memory；
+- 更少 block 并行 → occupancy 下降 → 隐藏访存延迟能力下降。
+
+**没有标准答案**。要根据具体 kernel 做实验。一般建议 shared memory 用量控制在**每 block 16-32 KB**是比较均衡的。
+
+## 13. 常见的错误
+
+**忘记 `__syncthreads()`**。老生常谈但天天有人踩。
+
+**动态大小 shared memory 忘记传大小**。启动 kernel 的第三个参数忘了，kernel 里 `extern __shared__` 就变成 0 字节——大概率崩。
+
+**多个 extern shared 数组之间没算对偏移**。切分手动做，一算错整体错位。
+
+**在 if 里 sync**。死锁。
+
+**跨 block 用 shared 通信**。共享内存**只在 block 内可见**，跨 block 通信必须走 global memory。
+
+**Bank 冲突却不知道**。不看 profiler 就"感觉快了"——不靠谱。**至少跑一次 ncu 看看**。
+
+## 14. 一些小 tips
+
+**Warp shuffle 是 shared 的替代**。Volta 之后有 `__shfl_sync` 等指令，让 warp 内 32 线程直接互相交换寄存器值——**比 shared 还快**。做 warp 级归约、broadcast 等，优先用 shuffle 不用 shared。
+
+**Bank 冲突不是每个 warp 都同样**。有些 warp 访问模式对齐得好、有些不好。ncu 报告是"平均"，实际情况可能更复杂。
+
+**Shared 也支持向量化**。`__shared__ float4 sA[128]` + `float4 val = sA[tid]` 能一次加载 16 字节，比逐个读快。
+
+**Kernel 里数组访问出界不报错**。如果你 `sA[tid]` 里 tid > 数组大小——**未定义行为**，可能读到别人的 shared，可能崩。**别越界**。
+
+## 15. 一句话总结
+
+Shared memory 是 CUDA 性能优化里最关键的一块：
+
+- **用途**：block 内数据共享和复用；
+- **核心规则**：
+  - **一定要 `__syncthreads()`**；
+  - **避免 bank 冲突**（32 个 bank，同 bank 不同 addr = 冲突）；
+- **经典技巧**：`[32][32]` 加 padding 变 `[32][33]`；
+- **profile**：用 ncu 看 bank 冲突数；
+- **占用率取舍**：shared 用得多，occupancy 就低。
+
+写快 CUDA 的第一步就是学会用 shared memory。这个东西没什么魔法，但对新手来说最容易踩坑。多写多测多看 profiler，慢慢就有直觉了。
+
+下一章讲 CUDA 执行模型里另一个核心概念——**Warp 与 SIMT**，这决定了你的 kernel "为什么是这样执行的"。
+
+</WordCount>

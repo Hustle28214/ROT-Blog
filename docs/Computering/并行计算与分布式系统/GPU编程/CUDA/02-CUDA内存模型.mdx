@@ -1,0 +1,304 @@
+import WordCount from '../../../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+上一章把线程模型讲清楚了——网格、线程块、线程索引怎么算。但一个 GPU 程序真正要跑起来，除了"谁在算"，还得回答**"数据在哪、怎么访问"**。这一章就把 CUDA 的内存模型讲清楚。
+
+理解内存模型是写出**快 GPU 程序**的第一步——绝大多数 CUDA 优化，本质都在解决"数据放哪、怎么搬"这两个问题。
+
+## 1. 为什么 GPU 上内存这么重要
+
+我们先做个观察。一张 A100 GPU 的算力约 **19.5 TFLOPS**（FP32），显存带宽约 **1.5 TB/s**。
+
+- FP32 一个数 4 字节。
+- 假设一次运算要读 2 个操作数、写 1 个结果——**3 个数 12 字节**。
+- 想让计算不停，每秒要给它送多少数据？19.5T × 12 = **234 TB/s**。
+
+**显存带宽只有 1.5 TB/s，差 150 倍**。也就是说，如果你的 kernel 每次运算都要从显存读两个数写一个数，GPU 的计算单元有 **99% 的时间在等数据**。
+
+所以 GPU 编程的核心真相是：**内存访问是瓶颈，不是计算**。所有优化的思路都是——**让每份从显存读上来的数据被更多次地复用**。
+
+## 2. CUDA 的多层内存
+
+CUDA 里有一整套内存层次，从"离核心近、快、小"到"远、慢、大"：
+
+```
+    速度快 ▲ ┌──────────────────┐
+              │ 寄存器 (Register)  │  KB 级/线程
+              ├──────────────────┤
+              │ 共享内存 (Shared) │  几十 KB/SM
+              ├──────────────────┤
+              │ L1 Cache          │
+              ├──────────────────┤
+              │ L2 Cache          │  几 MB/GPU
+              ├──────────────────┤
+              │ 常量 / 纹理内存   │
+              ├──────────────────┤
+              │ 全局显存 (Global) │  GB 级
+              ├──────────────────┤
+     慢 ▼   │ 主机内存 (Host)   │  通过 PCIe 传输
+             └──────────────────┘
+```
+
+**具体带宽数字（A100 参考）**：
+
+- **Register**：接近 20 TB/s，延迟 1 cycle；
+- **Shared memory / L1**：约 12 TB/s，延迟约 20 cycle；
+- **L2 Cache**：约 4 TB/s，延迟约 200 cycle；
+- **Global memory**：约 1.5 TB/s，延迟 400-800 cycle；
+- **Host memory (via PCIe)**：约 25-50 GB/s。
+
+**每往下一级带宽差 5-10 倍、延迟差 10 倍**。所以我们的目标很清晰——**尽量把数据放在层次的顶端**。
+
+## 3. 全局显存（Global Memory）
+
+**Global memory** 是 GPU 上最大的一片内存——A100 有 80GB，H100 有 80/141GB。所有线程都能读写它，**跨 block 也能通信**。
+
+**它是最慢的**。虽然带宽已经是 CPU DDR 的 20+ 倍，但相对于 SM 的算力，还是"喂不动"。所有 CUDA 优化的核心都是**减少对 global memory 的访问**。
+
+**申请与释放**：
+
+```cpp
+float *d_A;
+cudaMalloc(&d_A, N * sizeof(float));
+// ...
+cudaFree(d_A);
+```
+
+**主机-设备传输**：
+
+```cpp
+cudaMemcpy(d_A, h_A, N * sizeof(float), cudaMemcpyHostToDevice);
+```
+
+**关键性能特性：Coalesced Access（合并访存）**。
+
+这是 CUDA 里最重要的性能规则。GPU 一次不是取 1 个数，而是**一个 warp（32 线程）同时取一批数**——32 个 4 字节 = 128 字节。这 128 字节被一次访存操作打包送出去。
+
+**如果 warp 里 32 个线程访问的地址是连续的**，一次事务就能取回来——**完美合并**。
+
+**如果它们访问的是分散的位置**——GPU 要发起多次访存事务，性能骤降。
+
+举个例子。假设有个数组 `float A[N]`，warp 里 32 个线程分别读 `A[tid]`：
+
+```cpp
+int tid = blockIdx.x * blockDim.x + threadIdx.x;
+float x = A[tid];  // 合并访存 — 32 线程访问 A[0..31]，连续
+```
+
+这是完美的。如果换成：
+
+```cpp
+float x = A[tid * 32];  // 32 线程访问 A[0], A[32], A[64] ... 步长 32
+```
+
+**32 次访存事务**——性能崩溃。
+
+**写 CUDA 时永远优先设计合并访存**。这是最基础也最有效的优化。
+
+## 4. 共享内存（Shared Memory）
+
+**Shared memory** 是每个 SM 上的一小块高速内存——A100 每个 SM 有 164 KB。它的特点：
+
+- **速度接近寄存器**，比 global memory 快 100 倍；
+- **只在一个 block 内可见**——block 间不能通过 shared memory 通信；
+- **手动管理**——不是 cache，由程序员显式加载/使用。
+
+**它是 GPU 编程的"手动 cache"**。**能把 global memory 里反复用的数据搬到 shared memory 里复用，就已经完成了 80% 的优化**。
+
+**声明**：
+
+```cpp
+__global__ void kernel(float *A) {
+    __shared__ float s_data[256];
+    int tid = threadIdx.x;
+    s_data[tid] = A[blockIdx.x * blockDim.x + tid];
+    __syncthreads();     // 等所有线程都加载完
+    // 现在整块 shared memory 都是"这个 block 需要的数据"
+    // 后面可以反复读它，比读 global memory 快得多
+}
+```
+
+**动态申请**（大小在 kernel 启动时确定）：
+
+```cpp
+kernel<<<grid, block, shmem_bytes>>>(...);
+
+__global__ void kernel(...) {
+    extern __shared__ float s_data[];  // 大小由启动参数决定
+    ...
+}
+```
+
+**共享内存后面章节还会展开讲——尤其"bank 冲突"这个大坑**。
+
+## 5. 寄存器（Registers）
+
+每个线程有一批**专属寄存器**——延迟 1 cycle、带宽最高。CUDA 编译器会把 kernel 里的局部变量放进寄存器：
+
+```cpp
+__global__ void kernel(float *A) {
+    float x = A[threadIdx.x];   // x 会被放进寄存器
+    float y = x * x + 1.0f;     // 中间量也在寄存器里
+    A[threadIdx.x] = y;
+}
+```
+
+**每个 SM 的寄存器总数是有限的**（A100：64K 个 32-bit 寄存器 / SM）。如果每个线程用得太多寄存器，一个 SM 上能并行跑的 block 数就会减少——**降低 occupancy（占用率）**。
+
+**当寄存器不够用**，编译器会把变量"溢出（register spill）"到 **local memory**——这个东西名字叫"local"但实际存在 global memory 里，非常慢。你的 kernel 突然变慢，可能就是 register spill 引起的。
+
+**如何看寄存器用量**：
+
+```bash
+nvcc --ptxas-options=-v kernel.cu
+# 输出: ptxas info: Used 42 registers, ...
+```
+
+## 6. Local Memory：一个陷阱
+
+**Local memory** 这个名字非常误导——它实际不"local"，**在 global memory 里开辟**，是每个线程私有的空间。
+
+什么时候会用 local memory？
+
+- **寄存器溢出**：变量太多、寄存器不够；
+- **动态索引的数组**：`float arr[10]; arr[threadIdx.x % 10] = ...;` ——编译器不能提前知道访问的元素，只好放 local memory；
+- **大数组**：`float big[128];` ——放不进寄存器，落到 local memory。
+
+**Local memory 慢得像 global memory**。要避免它，就少用大数组、少用动态索引、避免过多寄存器变量。
+
+## 7. 常量内存（Constant Memory）
+
+**Constant memory** 是一小块（64KB）**只读**的显存，带有专门的缓存。
+
+**它的特点**：
+
+- 所有线程都能读、但都不能写；
+- 有专门的 **constant cache**——如果 warp 里所有线程读同一个地址，只要一次读、广播到 32 线程；
+- 大小限制 64 KB。
+
+**适合放什么**：查表、系数、掩码——**每个线程读同一个位置的数据**。
+
+**声明和使用**：
+
+```cpp
+__constant__ float coeffs[64];  // 声明常量
+
+int main() {
+    float h_coeffs[64] = {...};
+    cudaMemcpyToSymbol(coeffs, h_coeffs, sizeof(h_coeffs));
+    // ... 后面 kernel 里可以直接读 coeffs[i]
+}
+```
+
+**注意**：如果 warp 里不同线程读不同的地址，广播机制就用不上，退化成慢的 serial access。**常量内存只在"所有线程读同一个"的场景下有优势**。
+
+## 8. 纹理内存（Texture Memory）
+
+**Texture memory** 是从图形硬件继承下来的一种只读缓存。
+
+**它的特点**：
+
+- 有 2D/3D 空间局部性缓存——**读相邻位置的数据很快**；
+- 内建过滤（bilinear filter）、边界处理（clamp、wrap）；
+- 硬件插值——可以按浮点坐标读，硬件自动做双线性插值。
+
+**适合场景**：图像处理、需要 2D 空间局部性、需要硬件插值。**深度学习不太用**——CNN 的 im2col 效果比 texture 好，直接用 global memory + shared memory 就够。
+
+现代 CUDA 里 texture 用得越来越少，主要活在图形和一些遗留代码里。
+
+## 9. Unified Memory（统一内存）
+
+**Unified Memory** 是 CUDA 6.0 引入的抽象——**让 CPU 和 GPU 看到同一片"逻辑内存"**。
+
+```cpp
+float *A;
+cudaMallocManaged(&A, N * sizeof(float));   // 分配统一内存
+// CPU 侧直接写
+for (int i = 0; i < N; i++) A[i] = i;
+// GPU 侧直接读
+kernel<<<grid, block>>>(A);
+cudaDeviceSynchronize();
+// CPU 侧再读
+printf("%f\n", A[0]);
+```
+
+**它省去了显式的 `cudaMemcpy`**。CUDA 运行时会在需要时自动做数据迁移。
+
+**优点**：代码简洁，尤其原型开发。
+
+**缺点**：
+
+- **性能不如手动管理**——运行时不知道你的访问模式，迁移可能不最优；
+- **隐藏的性能问题难 debug**——你不知道数据什么时候被搬来搬去。
+
+**推荐**：**原型和学习用 Unified Memory，生产代码用 `cudaMalloc + cudaMemcpy`**——你能明确控制数据流。
+
+## 10. 内存分配的其他技巧
+
+**Pinned memory（锁页内存）**：主机端分配的、不会被交换出去的内存。
+
+```cpp
+float *h_A;
+cudaMallocHost(&h_A, N * sizeof(float));
+// 或者
+cudaHostAlloc(&h_A, N * sizeof(float), cudaHostAllocDefault);
+```
+
+**为什么用它**：普通 `malloc` 的内存可能被 OS 换出，PCIe 传输必须先把它拷到 pinned 缓冲区再走 DMA——**两次拷贝**。Pinned memory 可以直接 DMA，**主机-设备传输速度快 2-3 倍**。
+
+**Zero-copy memory**：主机内存直接映射到 GPU 地址空间，GPU 可以直接访问（走 PCIe）。适合数据量小、只用一次的场景。
+
+**Peer memory**：多 GPU 时，一张 GPU 可以直接读写另一张的显存（通过 NVLink 或 PCIe）。
+
+## 11. 内存模型直觉总结
+
+给一个使用建议的直觉表：
+
+| 内存类型 | 用途 | 大小 | 速度 |
+|---------|------|------|------|
+| Register | 局部变量、中间量 | 每线程几十-几百 | 最快 |
+| Shared | Block 内数据共享/复用 | 每 SM 几十 KB | 快 |
+| Constant | 全线程共享的常数 | 64 KB | 快（广播时）|
+| Global | 主数据、结果 | GB 级 | 慢 |
+| Local | 寄存器溢出 | Global 里 | 慢 |
+| Texture | 2D 图像、插值 | GB 级 | 中（有缓存）|
+| Unified | 简化编程 | GB 级 | 变化 |
+
+**优化的普遍套路**：
+
+1. **数据先在 global memory**——从 CPU 拷进来；
+2. **一个 block 里的线程协同把它搬到 shared memory**——一次合并读；
+3. **在 shared memory 里反复计算、复用**——比读 global 快 100 倍；
+4. **最终结果写回 global memory**——一次合并写。
+
+99% 的 CUDA kernel 都遵循这个模式。矩阵乘法、卷积、归约、扫描——都是它的变体。
+
+## 12. 常见的坑
+
+**用普通 malloc 分配 host memory 再 cudaMemcpy**：能跑但慢。生产代码用 `cudaMallocHost`。
+
+**动态数组导致 register spill**：`float arr[128]; arr[threadIdx.x] = ...` ——被打入 local memory。改成 shared memory 或者减小数组。
+
+**忘记 `__syncthreads()`**：block 里的线程各干各的，某个线程还没把数据写进 shared memory，别的线程就开始读——**数据竞争**。这个 bug 非常难 debug，因为大部分时候似乎能跑。
+
+**不合并的访存**：写 kernel 时不假思索地 `A[tid * stride]`，跑一下发现慢 100 倍。**永远优先设计合并访存**。
+
+**Shared memory 大小超过 SM 上限**：kernel 启动失败，报错 "too much shared memory required"。
+
+**多 GPU 之间没打开 Peer Access**：`cudaMemcpyPeer` 会先绕道主机再拷回来，很慢。用前先 `cudaDeviceEnablePeerAccess`。
+
+## 13. 一句话总结
+
+CUDA 的内存模型是一切优化的基础：
+
+- **GPU 的瓶颈是访存**，不是计算；
+- **多层内存**：register / shared / L1 / L2 / global；
+- **优化套路**：把 global 数据搬到 shared，在 shared 里复用，最后写回 global；
+- **两个关键规则**：合并访存 + 显式使用 shared memory；
+- **少用**：local memory、unified memory（生产环境）；
+- **多用**：pinned memory、shared memory、寄存器。
+
+下一章我们把最重要的一块——**共享内存**——单独拿出来讲：怎么用好、怎么避免它的核心陷阱 "bank 冲突"。
+
+</WordCount>

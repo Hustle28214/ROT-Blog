@@ -1,0 +1,291 @@
+import WordCount from '../../../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+HIP 的内存模型和 CUDA 大致一致——全局显存、共享内存、常量内存、寄存器都有。但具体的**大小、带宽、缓存行为**和 AMD 硬件相关，不能直接照搬 CUDA 上的调优经验。这一章讲清楚 HIP 里的内存层次，以及 AMD 硬件特有的一些优化点。
+
+## 1. 内存层次概览
+
+HIP 上的内存层次（以 MI300X 为例）：
+
+```
+    速度快 ▲ ┌──────────────────┐
+              │ VGPR / SGPR      │  向量/标量寄存器
+              ├──────────────────┤
+              │ LDS (128 KB/CU)  │  共享内存
+              ├──────────────────┤
+              │ L1 Cache (~32KB) │
+              ├──────────────────┤
+              │ L2 Cache (~4-8MB)│
+              ├──────────────────┤
+              │ Infinity Cache   │  MI300 有一层新的 cache
+              ├──────────────────┤
+              │ HBM3 (192 GB)    │  全局显存
+              ├──────────────────┤
+              │ Host RAM         │  通过 PCIe 5 或 Infinity Fabric
+              └──────────────────┘
+     慢 ▼
+```
+
+**具体带宽数字（MI300X）**：
+
+- **HBM3**：**5.3 TB/s**（是 A100 的 3-4 倍）；
+- **Infinity Cache**：数十 TB/s；
+- **LDS**：~15 TB/s / CU；
+- **VGPR**：接近核心带宽。
+
+**关键点**：**AMD 数据中心 GPU 的 HBM 带宽显著高于同代 NVIDIA**——这是 AMD 在访存密集型负载（比如 LLM 推理 decode 阶段）的优势来源之一。
+
+## 2. 全局显存
+
+**API 完全对应 CUDA**：
+
+```cpp
+float *d_A;
+hipMalloc(&d_A, N * sizeof(float));
+hipMemcpy(d_A, h_A, N * sizeof(float), hipMemcpyHostToDevice);
+// ...
+hipFree(d_A);
+```
+
+**Coalesced Access（合并访存）** 的规则和 CUDA 一样——**一个 wavefront 里的线程访问连续地址，硬件一次传输就能拿回来**。
+
+但**AMD 上是 64 线程一个 wavefront**，一次事务的字节数不同：
+
+- NVIDIA 一个 warp 访问 = 32 × 4 = **128 字节**；
+- AMD 一个 wavefront 访问 = 64 × 4 = **256 字节**。
+
+**对齐要求**：**首地址最好按 256 字节对齐**，`hipMalloc` 默认返回的地址已经对齐好。
+
+**合并访存代码写法**：
+
+```cpp
+int tid = blockIdx.x * blockDim.x + threadIdx.x;
+float x = A[tid];   // 完美：wavefront 内连续访问
+```
+
+这个规则**跨平台一致**——写 HIP 代码时的合并访存直觉和 CUDA 相同。
+
+## 3. LDS（Local Data Share）
+
+LDS 就是 AMD 上的 shared memory。**API 也一样**：
+
+```cpp
+__shared__ float sdata[256];
+```
+
+**大小**：
+
+- CDNA1/2（MI100/MI250）：**每 CU 64KB**；
+- CDNA3（MI300）：**每 CU 128KB**；
+- 每 block 最多可用：一般是 CU 上限，或者可能被硬件划分成几段。
+
+**Bank 结构**：LDS 有 **32 个 bank**，每 bank 4 字节。**访问规则和 NVIDIA 类似**——一个 wavefront 内如果多个线程访问同 bank 不同地址，就冲突。
+
+**但 wavefront 是 64，warp 是 32**——AMD 上一个 wavefront 里 64 个 lane，需要**用 2 个 cycle 完成 LDS 访问**（因为 bank 只有 32 个）。理想情况下每个 cycle 32 个 lane 访问 32 个不同 bank。
+
+**Padding 技巧**在 AMD 上依然有效：
+
+```cpp
+__shared__ float tile[32][33];  // 加 padding 破坏 bank 对齐
+```
+
+## 4. 寄存器：VGPR 和 SGPR
+
+**AMD 特有的一个概念**：寄存器分成**向量寄存器（VGPR）**和**标量寄存器（SGPR）**。
+
+- **VGPR**：wavefront 里每个 lane 一份，用来存"每 lane 不同的数据"。
+- **SGPR**：wavefront 里所有 lane 共享一份，用来存"整个 wavefront 相同的数据"——比如 pointer、循环上界、常量。
+
+**这是 AMD 相对 NVIDIA 的一个优化**——**很多变量其实"每 lane 相同"**（比如 `blockIdx.x`），存进 SGPR 就省了大量 VGPR。**编译器自动做**，用户不用管。
+
+**寄存器总数**：
+
+- 一个 CU 上 VGPR 大概 **65K 个 32-bit**——4 个 SIMD 各一份寄存器堆；
+- SGPR 大概 **800 个**——比较少但每 wavefront 只用一份，够用。
+
+**Register spill**：VGPR 用完会 spill 到 global memory（叫 scratch memory），非常慢。**编译时看寄存器用量**：
+
+```bash
+hipcc -Rpass=kernel-resource-usage kernel.cpp
+```
+
+**如果 VGPR 高于约 200 就该警觉**——低 occupancy 或者 spill。
+
+## 5. 常量内存（Constant Memory）
+
+**API 和 CUDA 一样**：
+
+```cpp
+__constant__ float coeffs[64];
+hipMemcpyToSymbol(coeffs, h_coeffs, sizeof(h_coeffs));
+```
+
+**大小**：AMD 一般是 **32-64 KB**（比 CUDA 略小或类似）。
+
+**广播机制**：wavefront 里所有 lane 读同一地址 → 一次广播。
+
+在 AMD 上 constant memory 通常也**由 SGPR 支持**——因为常量是"所有 lane 共享"的性质天然对应 SGPR。这也是为什么它这么快。
+
+## 6. 纹理内存
+
+HIP 支持纹理内存，API 类似 CUDA。**用途和限制也一样**——图像处理有用，深度学习基本不用。跳过。
+
+## 7. Unified Memory 和 HMM
+
+**HMM（Heterogeneous Memory Management）**：Linux 内核支持的一个特性，允许 CPU 和 GPU 共享地址空间。
+
+在 ROCm 上：
+
+```cpp
+float *A;
+hipMallocManaged(&A, N * sizeof(float));   // 统一内存
+// CPU 和 GPU 都能直接访问 A
+```
+
+**跨设备迁移**：默认按 page fault 自动迁移。可以显式 prefetch：
+
+```cpp
+hipMemPrefetchAsync(A, N * sizeof(float), device_id, stream);
+```
+
+**MI300A 的特殊性**：CPU + GPU 集成，共享 HBM——**Unified Memory 是硬件保证的、零拷贝的**。这在 HPC 场景下极其方便——**你的科学计算代码可以像在 CPU 上一样写，实际 GPU 加速**。
+
+## 8. Pinned Memory 与异步
+
+**Pinned host memory**：
+
+```cpp
+float *h_A;
+hipHostMalloc(&h_A, N * sizeof(float));
+// 或者
+hipHostAlloc(&h_A, N * sizeof(float), hipHostMallocDefault);
+```
+
+（注意 CUDA 里叫 `cudaMallocHost`/`cudaHostAlloc`，HIP 里统一叫 `hipHostMalloc`）
+
+**为什么用它**：`hipMemcpyAsync` 只在 pinned memory 上才真正异步——同 CUDA 规则。
+
+**Peer memory**：多 GPU 直接互访：
+
+```cpp
+hipDeviceEnablePeerAccess(peer_id, 0);
+// 之后 hipMemcpyPeer 会直接走 IF/PCIe，不经过 host
+```
+
+## 9. Infinity Cache（MI300 独有）
+
+**Infinity Cache** 是 MI300 引入的一层新缓存——**位于 L2 和 HBM 之间**，容量几十 MB。
+
+- 它的作用类似 CPU 的 L3 cache——**捕获跨 CU 共享的访问**；
+- 对**深度学习访存模式很友好**——很多 tensor 会被多个 CU 反复访问，Infinity Cache 能命中；
+- **用户不用做任何事**——硬件自动 cache。
+
+**这是 MI300 相对 MI250 的一个重要提升**。测量上，能显著提升带宽敏感 kernel 的性能。
+
+## 10. 关键差异总结
+
+对写 HIP 代码的实际影响：
+
+| 项目 | CUDA (NVIDIA) | HIP (AMD CDNA) |
+|------|--------------|----------------|
+| Warp/Wavefront | 32 | 64 |
+| 一次事务字节数 | 128 | 256 |
+| Shared memory / SM/CU | 164 KB (A100) | 128 KB (MI300) |
+| L2 cache | 40-60 MB (H100) | 4-8 MB (MI300) |
+| 中间 cache | 无 | Infinity Cache (~256MB) |
+| HBM 带宽 | 3.35 TB/s (H100) | 5.3 TB/s (MI300X) |
+| VGPR / lane | ~256 | 类似 |
+| SGPR | 无（NVIDIA 无此概念）| 每 wavefront 800 个 |
+
+**几个观察**：
+
+- AMD 的 L2 cache 小，但 Infinity Cache 弥补；
+- AMD 的 HBM 带宽高——**LLM 推理这类 memory-bound 场景 AMD 占优**；
+- AMD 的 shared memory 略小——**极限优化时要注意**。
+
+## 11. 一些实用的性能建议
+
+**用 hipHostMalloc**，别用 `malloc + hipMemcpy`——异步才有效。
+
+**block size 用 64 的倍数**（256、512 都行）——匹配 wavefront。
+
+**避免 wavefront 内 divergence**——影响更大（64 线程 vs 32 线程）。
+
+**SGPR 是免费的**——编译器会尽量把 `blockIdx.x`、`gridDim` 这类值放 SGPR，你不用管，但可以有意识地避免"看起来一样但用了不同变量存储"的写法。
+
+**LDS bank 冲突要 profile 看**——不要凭直觉。用 `omniperf` 或 `rocprof` 检查。
+
+**大量小 kernel 时开 HIP Graph**——和 CUDA Graph 类似，HIP 也支持。
+
+**MI300 上要充分利用 192GB 显存**——大 batch、大 KV cache、大模型直接塞进单卡。
+
+## 12. 一个具体的内存优化对比
+
+**Baseline**：naive 向量加
+
+```cpp
+__global__ void vec_add(const float *A, const float *B, float *C, int N) {
+    int tid = blockIdx.x * blockDim.x + threadIdx.x;
+    if (tid < N) C[tid] = A[tid] + B[tid];
+}
+
+// Launch: <<<(N+255)/256, 256>>>
+```
+
+**在 MI300X 上跑 1B float**：
+
+- 3 × 4 GB 访存；
+- 期望时间 = 12 GB / 5.3 TB/s = **2.3 ms**；
+- 实测大概 **2.5-3.0 ms**（接近带宽峰值）。
+
+**这就是"访存密集型 kernel 在 AMD 上的表现"**——**很容易打满 HBM 带宽**。同样的 kernel 在 A100 上 12 GB / 1.5 TB/s = **8 ms**。**AMD 快 3 倍多**——纯粹靠带宽。
+
+## 13. 内存分析工具
+
+**rocprof**：
+
+```bash
+rocprof --stats ./your_program
+# 输出 kernel 时长、访存统计
+```
+
+**omniperf**：更详细的分析工具，能看每个 kernel 的 memory throughput、cache hit rate 等。
+
+```bash
+omniperf profile -n my_run -- ./your_program
+omniperf analyze -p ./workloads/my_run/
+```
+
+**关键指标**：
+
+- **HBM Read/Write Bandwidth**：实际 HBM 带宽；
+- **L2 Cache Hit Rate**：L2 命中率；
+- **LDS Bank Conflicts**：LDS 冲突次数；
+- **Occupancy**：CU 占用率。
+
+## 14. 一些坑
+
+**用 `warpSize` 而不是硬编码 32**：一个内存 kernel 里如果按"每 32 元素一组"处理——AMD 上一个 wavefront 是 64 lane，你的逻辑会错。
+
+**Shared memory 大小**：CDNA1/2 只有 64KB，别按 A100 的 164KB 写代码。跨平台代码用 `sharedMemPerBlock` 动态查。
+
+**Peer access 忘开**：多 GPU 之间的 `hipMemcpyPeer` 需要 `hipDeviceEnablePeerAccess`——忘开会走 host bounce buffer，慢很多。
+
+**LDS 访问延迟不总是被隐藏**：AMD 一个 wavefront 分 4 cycle 完成 SIMD 操作——期间的 LDS 访问可能撞车。要看 profile。
+
+**Infinity Cache 不显式管理**：它是全自动的 cache，不像 shared memory 可以显式加载。但可以影响访问模式（比如让访问局部性更好）。
+
+## 15. 一句话总结
+
+HIP 内存模型基本对应 CUDA，但有 AMD 硬件的独特之处：
+
+- **API 一致**：`hipMalloc`、`__shared__`、`__constant__` 都能直接对应；
+- **Wavefront 大小影响事务**：64 lane 一次事务 256 字节；
+- **AMD 独有**：SGPR（免费）、Infinity Cache、可能更大的 HBM；
+- **性能特色**：**HBM 带宽很强**，memory-bound kernel 在 AMD 上跑得很快；
+- **优化 tips**：用 `warpSize` 表达 wavefront、block size 用 64 的倍数、profile 用 omniperf。
+
+下一章讲**代码迁移工具 hipify**——把 CUDA 项目搬到 HIP 上的自动化利器。
+
+</WordCount>

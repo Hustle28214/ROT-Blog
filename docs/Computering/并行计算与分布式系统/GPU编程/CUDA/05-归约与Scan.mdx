@@ -1,0 +1,334 @@
+import WordCount from '../../../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+**归约（Reduction）** 是 GPU 编程里最经典的一个题目——**给你一个数组，求它所有元素的和（或者 max、min、product……）**。看起来是个玩具问题，但里面几乎覆盖了 CUDA 优化的所有核心技巧——**从共享内存到 warp shuffle，从访存合并到指令级并行**。写好归约，等于把 CUDA 的基本功打扎实。
+
+这一章我们把归约从最朴素的版本一步步优化到接近硬件峰值。
+
+## 1. 问题定义
+
+给一个 float 数组 `A[N]`，输出 `sum = A[0] + A[1] + ... + A[N-1]`。
+
+**在 CPU 上**：一个 for 循环搞定，一个核心几秒钟能加几十亿个数——**很简单**。
+
+**在 GPU 上**：我们要用几万个线程并行来做这件事。**但求和本身是有依赖的**——每一步都要基于前一步的结果——GPU 怎么并行？
+
+答案是**树形归约（tree reduction）**：
+
+```
+[a0, a1, a2, a3, a4, a5, a6, a7]
+   \  /   \  /   \  /   \  /
+   a01    a23    a45    a67
+      \    /       \    /
+       a0123        a4567
+           \       /
+            全部
+```
+
+每一步用一半线程加一对相邻的元素，一直到只剩一个。N 个元素需要 log₂(N) 步。
+
+## 2. Naive 版本
+
+先写个"能跑就行"的版本：
+
+```cpp
+__global__ void reduce_v1(const float *input, float *output, int N) {
+    __shared__ float sdata[BLOCK_SIZE];
+    int tid = threadIdx.x;
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+
+    // 每个线程负责加载一个元素到 shared
+    sdata[tid] = (idx < N) ? input[idx] : 0.0f;
+    __syncthreads();
+
+    // 树形归约
+    for (int s = 1; s < blockDim.x; s *= 2) {
+        if (tid % (2 * s) == 0) {
+            sdata[tid] += sdata[tid + s];
+        }
+        __syncthreads();
+    }
+
+    // 第一个线程写出结果
+    if (tid == 0) output[blockIdx.x] = sdata[0];
+}
+```
+
+**分析**：
+
+- 一个 block 处理 `BLOCK_SIZE` 个元素，输出一个 partial sum；
+- 后面再启动一次归约把这些 partial sum 加起来（或者在 CPU 上加）。
+
+**它能跑**。但里面有一堆问题——**每个问题都对应一次优化**。
+
+## 3. 问题 1：warp divergence
+
+看这一行：`if (tid % (2 * s) == 0)`。
+
+在第一轮 s=1，条件是 tid % 2 == 0——**偶数线程干活，奇数不干**。**同一个 warp 里 16 个偶数、16 个奇数线程走不同分支——分支发散！**
+
+分支发散会让 warp 变慢一倍。**这个 kernel 每一步都有 divergence**——第一步一半、第二步四分之三、……
+
+**修复**：改用**连续的线程**做归约，而不是间隔的：
+
+```cpp
+for (int s = 1; s < blockDim.x; s *= 2) {
+    int index = 2 * s * tid;
+    if (index < blockDim.x) {
+        sdata[index] += sdata[index + s];
+    }
+    __syncthreads();
+}
+```
+
+现在活跃的线程是 `0, 2, 4, 6, ...`——**warp 内前 16 个线程活跃、后 16 个不活跃**——**没有 divergence**。
+
+**但引入了新问题**：访问 `sdata[index]` 里 index 步长 2s，**产生 bank 冲突**！
+
+## 4. 问题 2：bank 冲突
+
+上一版的访问模式：`sdata[0] += sdata[1]`, `sdata[2] += sdata[3]`, `sdata[4] += sdata[5]`, ...
+
+第一轮：不同线程写 sdata[0]、sdata[2]、sdata[4]、...——**都在 bank 0、2、4、...**——完全不冲突。
+
+第二轮：s=2，不同线程写 sdata[0]、sdata[4]、sdata[8]、...——**都在 bank 0、4、8、...**——不冲突。
+
+第三轮：s=4，不同线程写 sdata[0]、sdata[8]、sdata[16]、...——bank 0、8、16、24——**开始冲突了**（大 stride 时 bank 会重复）。
+
+**修复**：不用 stride 从 1 开始翻倍，而是**从 `blockDim/2` 开始减半**——**stride 越小、bank 越分散**：
+
+```cpp
+for (int s = blockDim.x / 2; s > 0; s >>= 1) {
+    if (tid < s) {
+        sdata[tid] += sdata[tid + s];
+    }
+    __syncthreads();
+}
+```
+
+现在：
+
+- 第一轮 s=128：线程 0 加 sdata[128] 到 sdata[0]，线程 1 加 sdata[129] 到 sdata[1]……**bank 完全分散**；
+- 第二轮 s=64：线程 0 加 sdata[64] 到 sdata[0]……仍然分散；
+- ……
+
+**又没有 bank 冲突了，也没有 divergence**（每轮活跃线程都是 `tid < s`，即前 s 个线程——warp 对齐）。
+
+## 5. 问题 3：一半线程闲着
+
+现在 kernel 里第一步就有一半线程没事干——线程 128 到 255 加载完数据就闲着（我们在做 s=128 的归约，只有前 128 线程活跃）。
+
+**为什么不让每个线程一开始就加两个元素？**——这样一个 block 处理 2 × BLOCK_SIZE 个元素，同样的线程数干两倍的活。
+
+```cpp
+int idx = blockIdx.x * (2 * blockDim.x) + tid;
+sdata[tid] = ((idx < N) ? input[idx] : 0)
+           + ((idx + blockDim.x < N) ? input[idx + blockDim.x] : 0);
+__syncthreads();
+```
+
+**再进一步**：**每线程加载更多元素**——比如加 8 个、16 个。这叫**每线程更多工作（more work per thread）**。
+
+- 减少 block 数，减少启动开销；
+- 每线程算的更多，摊薄 sync 开销；
+- 提升算数强度（arithmetic intensity）——每个访存对应更多计算。
+
+```cpp
+float sum = 0;
+for (int i = 0; i < N_PER_THREAD; i++) {
+    int idx = blockIdx.x * (blockDim.x * N_PER_THREAD) + i * blockDim.x + tid;
+    if (idx < N) sum += input[idx];
+}
+sdata[tid] = sum;
+__syncthreads();
+```
+
+**这一步能带来 2-4 倍的加速**。
+
+## 6. 问题 4：最后几步 warp 内还在 sync
+
+我们的循环：
+
+```cpp
+for (int s = blockDim.x / 2; s > 0; s >>= 1) {
+    if (tid < s) sdata[tid] += sdata[tid + s];
+    __syncthreads();
+}
+```
+
+**当 s ≤ 32 时，所有活跃线程都在同一个 warp 里**——同 warp 内本来就是"步调一致"（Volta 之前）或者可以用 `__syncwarp()` 快速同步——**没必要用 `__syncthreads()` 让整个 block 等**。
+
+**用 warp shuffle 直接做最后几步的归约**：
+
+```cpp
+for (int s = blockDim.x / 2; s > 32; s >>= 1) {   // 只做到 s > 32
+    if (tid < s) sdata[tid] += sdata[tid + s];
+    __syncthreads();
+}
+
+if (tid < 32) {
+    float val = sdata[tid];
+    val += __shfl_down_sync(0xffffffff, val, 16);
+    val += __shfl_down_sync(0xffffffff, val, 8);
+    val += __shfl_down_sync(0xffffffff, val, 4);
+    val += __shfl_down_sync(0xffffffff, val, 2);
+    val += __shfl_down_sync(0xffffffff, val, 1);
+    if (tid == 0) output[blockIdx.x] = val;
+}
+```
+
+**最后 5 步全部在寄存器里做，无 shared memory、无 sync**——**又快一大截**。
+
+## 7. 一个完整的高效版本
+
+综合以上四步优化：
+
+```cpp
+template<int BLOCK_SIZE, int N_PER_THREAD>
+__global__ void reduce_final(const float *input, float *output, int N) {
+    __shared__ float sdata[BLOCK_SIZE];
+    int tid = threadIdx.x;
+
+    // 每线程加 N_PER_THREAD 个元素
+    float sum = 0;
+    int idx = blockIdx.x * (BLOCK_SIZE * N_PER_THREAD) + tid;
+    #pragma unroll
+    for (int i = 0; i < N_PER_THREAD; i++) {
+        if (idx < N) sum += input[idx];
+        idx += BLOCK_SIZE;
+    }
+    sdata[tid] = sum;
+    __syncthreads();
+
+    // Shared memory 归约（到 warp 大小）
+    #pragma unroll
+    for (int s = BLOCK_SIZE / 2; s > 32; s >>= 1) {
+        if (tid < s) sdata[tid] += sdata[tid + s];
+        __syncthreads();
+    }
+
+    // Warp 内用 shuffle
+    if (tid < 32) {
+        float val = sdata[tid];
+        if (BLOCK_SIZE >= 64) val += sdata[tid + 32];
+        val += __shfl_down_sync(0xffffffff, val, 16);
+        val += __shfl_down_sync(0xffffffff, val, 8);
+        val += __shfl_down_sync(0xffffffff, val, 4);
+        val += __shfl_down_sync(0xffffffff, val, 2);
+        val += __shfl_down_sync(0xffffffff, val, 1);
+        if (tid == 0) output[blockIdx.x] = val;
+    }
+}
+```
+
+**性能对比**（A100，1M float 求和）：
+
+| 版本 | 耗时 | 加速 |
+|------|-----|------|
+| CPU 单线程 | ~2 ms | 1× |
+| Naive GPU（有 divergence） | ~0.15 ms | 13× |
+| 修 divergence 但 bank 冲突 | ~0.10 ms | 20× |
+| 修 bank 冲突 | ~0.06 ms | 33× |
+| 每线程多元素 | ~0.02 ms | 100× |
+| + warp shuffle | ~0.012 ms | 170× |
+
+**接近硬件峰值**——A100 显存带宽 1.5 TB/s，1M float 就是 4 MB，理论最短读取时间约 3 μs。加上写和 kernel 启动等开销，10-15 μs 是合理范围。
+
+## 8. 什么时候要做二次归约
+
+**Reduce_final 一个 block 只产出一个 partial sum**。如果输入 1M 元素、每 block 处理 2K 元素，会有 512 个 partial sums 需要再合并。
+
+**方案 A**：CPU 上做最后合并。512 个数 CPU 加一下瞬间。**但需要 cudaMemcpy 拿回来，不友好**。
+
+**方案 B**：再启动一次 kernel 归约 512 个 partial sums——**推荐**。用同一个 reduce_final，改个参数。
+
+**方案 C**：一次 kernel 里做完——**Grid-stride loop + atomic**：
+
+```cpp
+__global__ void reduce_grid_stride(const float *input, float *output, int N) {
+    // ... warp reduction ...
+    if (tid == 0) atomicAdd(output, val);   // 直接 atomic 累加到最终结果
+}
+```
+
+atomicAdd 上现代 GPU 上非常快（只针对少量 block 数级别的 atomic）。**如果 partial sum 数量不多，atomic 就够用**。
+
+## 9. 归约的推广：其他操作
+
+**求 max、min、product……** 一样的模板，把 `+` 换成对应操作：
+
+```cpp
+sum = max(sum, val);         // reduce max
+sum = min(sum, val);         // reduce min
+sum *= val;                  // reduce product
+```
+
+**求 argmax（最大值和它的索引）**：需要同时归约两个字段。可以用一个 pair 或者一个 int64 打包（value 在高位，index 在低位）。
+
+**求 norm、方差** 之类的两阶段操作：先归约 `sum` 和 `sum_sq`，然后在 CPU 或另一个 kernel 里合成结果。
+
+## 10. Scan（前缀和）：归约的近亲
+
+**Scan（Prefix Sum）**：给一个数组，输出每个位置"从头到该位置的累加和"。
+
+- **Inclusive scan**：`out[i] = A[0] + A[1] + ... + A[i]`；
+- **Exclusive scan**：`out[i] = A[0] + A[1] + ... + A[i-1]`（第 0 位是 0）。
+
+Scan 比 reduce 复杂——每个输出位置都要一个值，不是最终一个总和。经典算法 **Hillis-Steele Scan** 和 **Blelloch Scan** 是 GPU scan 的两种主流实现。
+
+**CUDA 里直接用 Thrust 或 CUB**：
+
+```cpp
+#include <cub/cub.cuh>
+
+// Reduce
+size_t temp_bytes;
+cub::DeviceReduce::Sum(nullptr, temp_bytes, input, output, N);
+cudaMalloc(&temp_storage, temp_bytes);
+cub::DeviceReduce::Sum(temp_storage, temp_bytes, input, output, N);
+
+// Inclusive scan
+cub::DeviceScan::InclusiveSum(nullptr, temp_bytes, input, output, N);
+```
+
+**CUB 是当前最快的 CUDA 归约和扫描库**——比手写快、比 Thrust 快。生产代码里直接用它。
+
+## 11. 数值精度问题
+
+**浮点归约的顺序会影响结果**——因为浮点加法不满足结合律。GPU 归约的顺序和 CPU 单线程不同，得到的结果**通常最后几位不一样**。
+
+- 单精度可能差 1e-4 量级；
+- 归约几百万个数时，误差累积可能更大。
+
+**对精度敏感的场景**（比如科学计算），用 **Kahan summation** 或者 **pairwise summation** 保证精度。
+
+**深度学习**里一般不太在意这个 1e-5 级别的误差——训练过程本身有随机性，比这大得多。
+
+## 12. 常见的坑
+
+**Race condition**：把归约结果直接 `output[blockIdx.x] = ...` 是对的。但如果多个 block 都写 `output[0]`——必须 atomic 或者第二阶段归约。
+
+**输入的最后一批不足**。N 不是 block_size 的整数倍——**必须处理越界**（`if (idx < N)`）。忘记就是段错误或结果错。
+
+**block_size 不是 warp 的倍数**。比如 block_size=100——warp 里线程 100-127 是"死的"，但你的 mask 得处理它们。**建议 block_size 永远是 32 的倍数**（一般是 128 或 256）。
+
+**Warp shuffle 的 mask 用错**。默认用 `0xffffffff`（全 32 位）——但如果 warp 尾巴不满（`if (tid < n)`），要用正确的 mask，否则读到未定义值。
+
+**shared memory 静态大小不够**。BLOCK_SIZE 是模板参数就好；用 `blockDim.x` 就要动态 shared memory。
+
+## 13. 一句话总结
+
+归约是 CUDA 的第一个"必须写会"的经典问题：
+
+- **朴素版本**：树形归约 + shared memory，能跑但慢；
+- **优化四步**：修 divergence → 修 bank 冲突 → 每线程多元素 → 最后 warp shuffle；
+- **完整版本**：能到 100-200 倍加速；
+- **推广**：max、min、product……模板一样；
+- **生产用**：CUB / Thrust，别自己写（除非要极致定制）。
+
+写完这个 kernel 你就理解了 CUDA 优化的**所有基本套路**。后面的矩阵乘、卷积、softmax……**万变不离其宗**。
+
+下一章讲另一个经典——**矩阵乘法（SGEMM）**。归约是"多个数变成一个"，矩阵乘是"多个数变成多个数"——CUDA 最重要的 kernel，深度学习里 80% 的时间都在它上面。
+
+</WordCount>

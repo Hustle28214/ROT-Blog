@@ -1,0 +1,340 @@
+import WordCount from '../../../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+**矩阵乘法（SGEMM）** 是 GPU 计算里最重要的一个 kernel。深度学习几乎所有计算——全连接、卷积、attention——最终都会落到矩阵乘。它性能上是不是"能到硬件峰值"，直接决定了你的模型跑多快。
+
+写好 SGEMM 就是把 CUDA 优化的所有技巧综合起来。这一章我们从最朴素的实现一步一步优化到接近 cuBLAS 的水平。
+
+## 1. 问题定义与基线
+
+**问题**：给定矩阵 A（M×K）、B（K×N），求 C = A × B（M×N）。
+
+**朴素 CPU 版本**：三重循环，O(MNK)。
+
+**最朴素 CUDA**：每个线程算 C 的一个元素——
+
+```cpp
+__global__ void sgemm_naive(const float *A, const float *B, float *C, int M, int N, int K) {
+    int row = blockIdx.y * blockDim.y + threadIdx.y;
+    int col = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if (row < M && col < N) {
+        float sum = 0.0f;
+        for (int k = 0; k < K; k++) {
+            sum += A[row * K + k] * B[k * N + col];
+        }
+        C[row * N + col] = sum;
+    }
+}
+```
+
+启动配置：`dim3 block(16, 16); dim3 grid((N+15)/16, (M+15)/16);`
+
+**测一下**（A100，M=N=K=4096）：**~500 GFLOPS**。
+
+**A100 FP32 峰值是 19.5 TFLOPS**——**只用了 2.5% 的算力**。差得远。
+
+**为什么这么慢**？看这一行：`sum += A[row * K + k] * B[k * N + col]`。**每次 K 循环都要从 global memory 读两个数、做一次乘加**。
+
+- 读 2 个 float = 8 字节；
+- 做 2 个 FLOP（一个乘、一个加）；
+- 每字节访存能算 2/8 = 0.25 FLOP/byte。
+
+**A100 的显存带宽 1.5 TB/s，峰值算力 19.5 TFLOPS**——**需要每字节能算 13 FLOP** 才不撑爆带宽。我们只有 0.25——**带宽瓶颈，慢 50 倍是正常的**。
+
+**核心问题**：**数据没被复用**。
+
+## 2. Tile：用 Shared Memory 复用
+
+一个 C 元素要用 K 个 A 的元素、K 个 B 的元素。**但相邻的 C 元素共享很多 A 和 B**——比如 C[0][0..15] 都用 A[0][:]，如果每个都从 global 读，同一份 A[0][:] 被读了 16 次。
+
+**Tile 化**：**一个 block 计算 C 的一个 tile（比如 128×128），把 A 和 B 的对应块预取到 shared memory，然后在 shared 里反复用**。
+
+```cpp
+#define BM 128
+#define BN 128
+#define BK 8
+
+__global__ void sgemm_shared(const float *A, const float *B, float *C, int M, int N, int K) {
+    __shared__ float sA[BM][BK];
+    __shared__ float sB[BK][BN];
+
+    int bx = blockIdx.x, by = blockIdx.y;
+    int tx = threadIdx.x, ty = threadIdx.y;
+
+    // 这个线程算 C 的一个元素
+    int row = by * BM + ty;
+    int col = bx * BN + tx;
+
+    float sum = 0.0f;
+
+    // 沿 K 方向 tile
+    for (int t = 0; t < K; t += BK) {
+        // 协作加载 A 和 B 的 tile 到 shared
+        sA[ty][tx / (BM/BK)] = A[row * K + t + tx / (BM/BK)];   // 简化写法
+        sB[ty / (BN/BK)][tx] = B[(t + ty / (BN/BK)) * N + col];
+        __syncthreads();
+
+        // 在 shared 里累加
+        for (int k = 0; k < BK; k++) {
+            sum += sA[ty][k] * sB[k][tx];
+        }
+        __syncthreads();
+    }
+
+    if (row < M && col < N) C[row * N + col] = sum;
+}
+```
+
+**思路**：
+
+- 一个 block（比如 16×16 线程）算 C 的一个 128×128 tile；
+- 沿 K 方向分块，每次加载 A 的 128×8、B 的 8×128 到 shared；
+- 在 shared 里做小型矩阵乘。
+
+**性能**：~2-3 TFLOPS。**加速 4-6 倍**。但离峰值还很远。
+
+## 3. 每线程算更多元素（Register Tiling）
+
+现在每个线程只算 1 个 C 元素。**如果每个线程算 8×8=64 个 C 元素呢？**
+
+一个线程算多个元素时，会**大量复用寄存器里的 A 和 B**——比如你已经加载了 A 的 8 个值到寄存器，可以和 B 的 8 个值组合出 64 个乘加。**访存/计算比大幅改善**。
+
+这就是 **register tiling** 或者叫 **thread tile**：
+
+```cpp
+#define TM 8   // 每线程算 8×8 个 C 元素
+#define TN 8
+
+__global__ void sgemm_reg_tile(...) {
+    // sA, sB 加载略
+    // ...
+
+    float c_reg[TM][TN] = {0};   // 寄存器中的 C 累加
+    float a_reg[TM], b_reg[TN];
+
+    for (int k = 0; k < BK; k++) {
+        // 加载 A 的 8 个值和 B 的 8 个值到寄存器
+        #pragma unroll
+        for (int i = 0; i < TM; i++) a_reg[i] = sA[ty * TM + i][k];
+        #pragma unroll
+        for (int j = 0; j < TN; j++) b_reg[j] = sB[k][tx * TN + j];
+
+        // 8×8=64 个乘加，全在寄存器里
+        #pragma unroll
+        for (int i = 0; i < TM; i++)
+            #pragma unroll
+            for (int j = 0; j < TN; j++)
+                c_reg[i][j] += a_reg[i] * b_reg[j];
+    }
+
+    // ... 写回 C ...
+}
+```
+
+**块尺寸新配置**：
+
+- Block tile：BM=128, BN=128, BK=8；
+- Thread tile：TM=8, TN=8；
+- Block 里线程数：(BM/TM) × (BN/TN) = 16 × 16 = 256 个线程。
+
+**性能**：~8-10 TFLOPS。**又加速 3-4 倍**。
+
+**为什么这么大提升**：算术强度显著上升——每次从 shared 加载 A 的 8 个 + B 的 8 个（16 个数），能做 64 个乘加。**FLOP/byte 从 0.25 涨到 1.0**。
+
+## 4. 向量化访存（float4）
+
+CUDA 支持 `float4` 类型——**一次读/写 16 字节**。用它做 shared memory 加载能减少指令数：
+
+```cpp
+float4 val = reinterpret_cast<const float4*>(&A[...])[0];
+sA[...] = val.x;
+sA[...+1] = val.y;
+sA[...+2] = val.z;
+sA[...+3] = val.w;
+```
+
+或者直接用 `__ldg`（只读缓存加载）：
+
+```cpp
+float4 val = __ldg(reinterpret_cast<const float4*>(&A[idx]));
+```
+
+**向量化 + 只读加载** 通常再带 20-40% 提升。
+
+## 5. Double Buffering（双缓冲）
+
+现在 kernel 长这样：
+
+```
+for (t = 0; t < K; t += BK):
+    加载 A、B 到 shared   ← 访存
+    __syncthreads()
+    在 shared 里累加       ← 计算
+    __syncthreads()
+```
+
+**访存和计算是串行的**——计算的时候访存 idle，访存的时候计算 idle。
+
+**Double buffering**：**两个 shared buffer 交替使用**——一个正在算的时候，另一个在预取下一批数据。
+
+```cpp
+__shared__ float sA[2][BM][BK];   // 双缓冲
+__shared__ float sB[2][BK][BN];
+
+// 预加载第一批
+load(sA[0], sB[0], 0);
+__syncthreads();
+
+for (t = 0; t < K; t += BK) {
+    int cur = (t/BK) & 1;
+    int next = 1 - cur;
+
+    // 异步预加载下一批
+    if (t + BK < K) load(sA[next], sB[next], t + BK);
+
+    // 用当前批做计算
+    compute(sA[cur], sB[cur]);
+    __syncthreads();
+}
+```
+
+**这个技巧让访存和计算重叠**——GPU 一边算一边预取。再快 20-30%。
+
+## 6. Async Copy（Ampere 之后）
+
+**Ampere（A100）** 引入了 `cp.async` 指令：**从 global 到 shared 的加载不占用寄存器，可以真正后台异步进行**。
+
+用 `cuda::memcpy_async`：
+
+```cpp
+#include <cuda/barrier>
+#include <cuda/pipeline>
+
+auto pipe = cuda::make_pipeline();
+
+pipe.producer_acquire();
+cuda::memcpy_async(&sA[dst], &A[src], sizeof(float) * BM * BK, pipe);
+pipe.producer_commit();
+// ... 别的计算 ...
+pipe.consumer_wait();
+// sA 里的数据已经就绪
+```
+
+**cp.async 是 A100 之后 SGEMM 达到峰值的关键**。它比手写 double buffering 更好——**真正利用了硬件的异步访存能力**。
+
+## 7. Bank 冲突处理
+
+我们的 shared memory 布局：
+
+```cpp
+__shared__ float sA[BM][BK];   // BM=128, BK=8
+__shared__ float sB[BK][BN];   // BK=8,  BN=128
+```
+
+**读 sA 的模式**：`sA[ty * TM + i][k]`——一个 warp 里 ty 相同、tx 变化。**但访问 sA 时用的是 ty 不是 tx**——所以一个 warp 里 32 线程访问的都是 `sA[ty][k]` 附近——**同 bank 冲突**！
+
+**修复**：在 sA 的 BK 维度加 padding，或者调换 sA 的存储顺序（转置存 sA）。
+
+**读 sB**：`sB[k][tx * TN + j]`——一个 warp 里 tx 变化，访问 sB[k][不同列]——**不同 bank，无冲突**。
+
+**这些 bank 冲突要用 profiler 才能发现**。用 ncu 看 `smsp__l1tex_data_bank_conflicts_pipe_lsu_mem_shared_op_ld`。
+
+## 8. Warp-Level Tiling
+
+再往下钻，最先进的 SGEMM 会在**warp 级别**分块：
+
+- Block tile（128×128）→ Warp tile（比如 64×32）→ Thread tile（8×8）；
+- 一个 warp 负责一小块 warp tile，warp 内的 32 线程更细分。
+
+这样能让"warp 内的访存模式"完美对齐 bank 布局、"warp 间的访存"完美对齐 memory transaction——**每一层都最优**。
+
+CUTLASS 库就是围绕这套 hierarchical tiling 展开的。手写这个层次极难，一般直接用 CUTLASS 或者 cuBLAS。
+
+## 9. cuBLAS 和 CUTLASS
+
+**cuBLAS**：NVIDIA 官方线性代数库。SGEMM 直接一个调用：
+
+```cpp
+cublasSgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N,
+            N, M, K, &alpha, B, N, A, K, &beta, C, N);
+```
+
+（注意 cuBLAS 是**列主序**，用的时候要转置参数）
+
+**性能**：在 A100 上能到 **17 TFLOPS 以上**（>85% 峰值）。**手写基本达不到**。
+
+**CUTLASS**：NVIDIA 开源的 C++ template 库。它是 cuBLAS 的开源近亲，让你可以定制矩阵乘的各种细节（数据类型、tile 大小、epilogue）。适合"想要 cuBLAS 快、但需要定制"的场景。
+
+**结论**：**如果只是做标准 FP32 矩阵乘，直接用 cuBLAS**。手写练练可以，生产别自己写。
+
+## 10. 半精度（FP16/BF16）和 Tensor Core
+
+**Tensor Core** 是 Volta 之后加入的专用硬件——**专门做 4×4 矩阵乘累加**。它的算力比普通 CUDA Core **高 8-16 倍**。
+
+- A100 FP16 Tensor Core：**312 TFLOPS**（FP32 只有 19.5）；
+- H100 FP16 Tensor Core：**989 TFLOPS**；
+- H100 FP8 Tensor Core：**1979 TFLOPS**。
+
+**深度学习几乎全用 Tensor Core**——因为你算的是 FP16/BF16 矩阵乘，且尺寸大到能有效利用。
+
+**用 Tensor Core**：
+
+- 用 cuBLAS 的 half/bf16 GEMM——自动用；
+- 用 CUTLASS 的 wmma / mma API——手动写；
+- 用 WMMA API（`nvcuda::wmma::fragment`）——CUDA 内建。
+
+**FP16 SGEMM 的性能**（A100，M=N=K=4096）：
+
+- cuBLAS SGEMM (FP32)：17 TFLOPS；
+- cuBLAS HGEMM (FP16)：**200 TFLOPS+**；
+- 手写 FP16 + Tensor Core：能到 250 TFLOPS。
+
+**结论**：Tensor Core 是现代 GPU 上矩阵乘的绝对主力。深度学习里"跑不快"多半是没用 Tensor Core。
+
+## 11. 一个完整的性能演进图
+
+对同一个 4096×4096×4096 SGEMM：
+
+| 版本 | 性能（TFLOPS） | 相对峰值 |
+|------|--------------|---------|
+| Naive | 0.5 | 3% |
+| Shared memory tile | 2.5 | 13% |
+| + register tile | 8 | 40% |
+| + double buffer + vectorized | 12 | 60% |
+| + async copy (A100) | 15 | 75% |
+| cuBLAS | 17 | 85% |
+| cuBLAS FP16 (Tensor Core) | 200 | 60% of 312 TFLOPS |
+
+**每一步优化都对应 CUDA 里一个具体的知识点**。SGEMM 是学 CUDA 的"最好教材"——它把所有技巧串起来了。
+
+## 12. 一些实用建议
+
+**不要重复造轮子**。生产环境用 cuBLAS/cuDNN/CUTLASS。手写 SGEMM 只作学习。
+
+**Batch 起来**。深度学习里矩阵乘经常是 batched——用 `cublasSgemmStridedBatched` 或者 grouped GEMM。
+
+**小矩阵慢**。如果 M 或 N 很小（< 128），普通 SGEMM kernel 效率会差。用 **cuBLAS 的 tall-skinny / small GEMM** 或者 vendor-provided 的小矩阵 kernel。
+
+**注意数据类型**。**BF16 比 FP16 数值稳定**（更大指数范围），现代深度学习基本转向 BF16。矩阵乘性能一样。
+
+**注意 alignment**。矩阵起始地址要 16 字节对齐（float4 对齐）——不然向量化访存会退化。cuBLAS 会自动处理，手写要自己保证。
+
+**Kernel 融合**：矩阵乘之后经常接激活函数、bias 加。**epilogue fusion**（在写 C 之前做完这些）能省一次访存——cuBLAS Lt 和 CUTLASS 都支持。
+
+## 13. 一句话总结
+
+矩阵乘是 CUDA 里最重要的 kernel：
+
+- **朴素版**：< 3% 峰值——因为无数据复用；
+- **优化四层**：Block tile → Register tile → Async copy → Warp tile；
+- **手写上限**：60-80% 峰值——非常费劲；
+- **生产用 cuBLAS/CUTLASS**：85%+ 峰值；
+- **Tensor Core**：FP16/BF16 才是深度学习真正的战场。
+
+学完 SGEMM，你就把 CUDA 的核心优化都摸过一遍了——**内存层次、访存合并、shared memory 复用、bank 冲突、寄存器 tiling、异步访存**。写别的 kernel（softmax、layernorm、attention）都是这些技巧的重新组合。
+
+下一章讲一个更"系统层面"的话题——**Stream 与异步执行**。上面所有 kernel 都是在一个"CPU 等 GPU 干活"的默认模式里跑的，stream 能让 CPU、GPU、多个 kernel 之间的调度真正并行起来。
+
+</WordCount>

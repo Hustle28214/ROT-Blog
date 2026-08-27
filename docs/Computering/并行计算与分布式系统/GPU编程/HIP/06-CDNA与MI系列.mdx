@@ -1,0 +1,288 @@
+import WordCount from '../../../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+AMD 的数据中心 GPU 叫 **MI 系列**（Instinct），架构叫 **CDNA**（Compute DNA）。这一章把 CDNA 各代的演进和 MI 系列的具体规格讲清楚——**你要知道自己在写代码给什么硬件**。
+
+## 1. CDNA vs RDNA：AMD 的两条路
+
+AMD 在 GPU 上分了两个方向：
+
+**CDNA**：**只做计算，不做图形**。数据中心、HPC、AI 用。特点：
+
+- 去掉图形单元（rasterizer、tessellator、显示输出）；
+- 大显存（HBM）；
+- 强 FP64；
+- Matrix Core；
+- Wave64 为主。
+
+**RDNA**：**消费级和工作站图形**。RX 6000/7000 系列。特点：
+
+- 完整图形单元；
+- GDDR6 显存；
+- Wave32 为主；
+- 无 FP64 加速；
+- 也支持 ROCm，但不是官方主战场。
+
+**AI 和 HPC 用户主要关心 CDNA**。**RDNA 上跑 ROCm 是"能跑但不保证"的状态**——很多 kernel 会遇到 bug 或性能问题。
+
+## 2. MI 系列演进
+
+| 系列 | 架构 | 年份 | 型号 | 主要用途 |
+|------|------|-----|------|---------|
+| MI50/MI60 | Vega20 | 2018-2019 | MI50, MI60 | HPC，已淘汰 |
+| MI100 | CDNA1 | 2020 | MI100 | 第一代 Matrix Core |
+| MI200 | CDNA2 | 2021 | MI210, MI250, MI250X | 双 GCD 设计 |
+| MI300 | CDNA3 | 2023 | MI300X, MI300A | 大显存、FP8 |
+| MI325 | CDNA3+ | 2024 | MI325X | MI300X 升级版，288GB |
+| MI350/MI355 | CDNA4 | 2025 | MI350X, MI355X | 下一代 |
+
+现在市场上**最主流的是 MI300X**，最新的是 **MI325X**。老一点的 MI250 也还在用。
+
+## 3. CDNA1: MI100
+
+**2020 年发布**。AMD 第一款真正的"数据中心 AI GPU"。
+
+- **120 CU** (7680 stream processors)；
+- **32 GB HBM2**；
+- **1.2 TB/s** HBM 带宽；
+- **11.5 TFLOPS** FP64；
+- **185 TFLOPS** FP16 Matrix Core；
+- **300W** TDP。
+
+**意义**：AMD 第一次上 Matrix Core，让 AI 训练能用。但当时软件生态很弱——**跑通深度学习模型都是挑战**，性能也比 A100 落后。
+
+**现在**：基本被淘汰，只有一些老 HPC 集群还在用。
+
+## 4. CDNA2: MI200 系列
+
+**2021 年发布**。AMD 首次做**双 GCD 设计**——**一个 GPU 里有两个 die**，通过 Infinity Fabric 高速互联。
+
+**MI250X（顶级款）**：
+
+- **2 GCD × 110 CU = 220 CU**（总）；
+- **128 GB HBM2e**（每 GCD 64GB）；
+- **3.2 TB/s** HBM 带宽；
+- **47.9 TFLOPS** FP64（Matrix）；
+- **383 TFLOPS** FP16/BF16 Matrix Core；
+- **560W** TDP。
+
+**双 GCD 的取舍**：
+
+- **优点**：显存大、算力高；
+- **缺点**：从软件看它是**两个独立的 GPU**——一个 GCD 一份 KV Cache、一份 model。想让两个 GCD 协作需要显式的多 GPU 编程（NCCL/RCCL）。
+
+**El Capitan、Frontier 等 exascale 超算**用的都是 MI250X——AMD 在 HPC 高端占有一席之地。
+
+**MI250（不带 X）**：单 GCD 版，110 CU、64GB HBM2e。工作站产品。
+
+**MI210**：更进一步的降级版，一个更小的封装。
+
+## 5. CDNA3: MI300 系列
+
+**2023 年年底发布**。AMD 的**"H100 挑战者"**。
+
+**MI300X（GPU 版）**：
+
+- **304 CU**（单 die 设计，chiplet 但看起来是一个 GPU）；
+- **192 GB HBM3**——**是 H100 的 2 倍多**；
+- **5.3 TB/s** HBM 带宽；
+- **163 TFLOPS** FP64/FP32 Matrix Core；
+- **1307 TFLOPS** BF16/FP16 Matrix Core；
+- **2615 TFLOPS** FP8 Matrix Core；
+- **750W** TDP。
+
+**规格看**：**MI300X 在几乎所有精度上都追上或超过 H100**。加上 2× 的显存，很有竞争力。
+
+**MI300A（APU 版）**：**CPU 和 GPU 集成在同一封装里**——**24 个 Zen4 核 + 228 CU**，共享 128GB HBM3。
+
+**MI300A 的应用**：El Capitan 超算的第二代节点用它。**"CPU 和 GPU 共享内存"**在科学计算里有独特价值——很多计算不需要显式 CPU-GPU 传输，性能大幅提升。
+
+## 6. Matrix Core 的演进
+
+**CDNA1 (MI100)**：第一代 Matrix Core。
+
+- 支持 FP16、BF16、INT8；
+- 峰值 185 TFLOPS FP16。
+
+**CDNA2 (MI200)**：增强。
+
+- 加入 FP64 Matrix Core（HPC 用户狂喜）；
+- 383 TFLOPS FP16；
+- INT8 到 383 TOPS。
+
+**CDNA3 (MI300)**：大幅升级。
+
+- 加入 FP8（E4M3 / E5M2）；
+- 加入 TF32；
+- 峰值 1307 TFLOPS BF16、2615 TFLOPS FP8；
+- 结构化稀疏 2:4 支持。
+
+**这个进度和 NVIDIA 类似**——每代增加一种新的低精度类型。**Matrix Core 和 Tensor Core 现在功能上非常接近**。
+
+## 7. Infinity Cache
+
+**MI300 引入的一个新缓存层**：位于 L2 和 HBM 之间，大约 **256 MB**（不同型号数值不同）。
+
+**作用**：捕获跨 CU 的访问模式——**很多深度学习 tensor 会被多个 CU 反复读**，Infinity Cache 能命中，减少 HBM 访问。
+
+**用户不管理**——硬件自动做。但访问模式友好的 kernel 会天然受益。
+
+**测量上**：一些 memory-bound 的 kernel 在 MI300 上比 MI250 快 2-3 倍，一半原因是 Infinity Cache 命中。
+
+## 8. Infinity Fabric
+
+**AMD 版本的 NVLink**——GPU 之间的高速互联。
+
+**MI300 平台**（比如 MI300X 的 8 卡节点）：
+
+- 8 张 GPU 全连接（每张连其他 7 张）；
+- 每对 GPU 之间约 **~896 GB/s**（4 条 IF × 224 GB/s）；
+- 对比 H100 SXM 的 NVLink 4：每对 900 GB/s——**基本相当**。
+
+**All-Reduce 性能**：8 张 MI300X 做 all-reduce 的带宽和 8 张 H100 相当，甚至更好——**多卡分布式训练 AMD 完全能玩**。
+
+## 9. 深度学习性能实测
+
+一些公开的对比数字（大致方向，具体数字看具体 workload）：
+
+**LLM 推理（大 batch throughput）**：
+
+- MI300X 单卡能装下 70B 模型（BF16）；
+- H100 SXM 只能装 34B（BF16）；
+- **在"能塞下"的场景下 MI300X 优势明显**。
+
+**LLM 训练**：
+
+- 大约五五开或者 H100 略优；
+- 视具体框架和优化程度而定；
+- **PyTorch + ROCm 6+ 的支持已经生产可用**。
+
+**HPC (FP64)**：
+
+- MI300X 的 FP64 Matrix Core 峰值 163 TFLOPS，**是 H100 的 2.4 倍**；
+- 科学计算领域 MI300X 有显著优势。
+
+**Cost per FLOP**：
+
+- MI300X 目前价格比 H100 低 20-40%；
+- 单位算力更便宜。
+
+**综合**：**MI300X 是 H100 之外的一个 serious alternative**。选它主要看：软件生态是否够用、你的工作负载对显存需求大不大、供应链是否有货。
+
+## 10. 一些实际的 MI300X 使用注意
+
+**驱动版本**：ROCm 6.0+ 才对 MI300X 有稳定支持。**ROCm 5.x 别用 MI300**。
+
+**多 GPU 拓扑**：一个 MI300X 平台是 8 卡节点。**没有 NVSwitch 类似的组件**——全靠 Infinity Fabric 8 卡全连接。**16 卡以上需要跨节点，走 InfiniBand**。
+
+**功耗**：750W——比 H100 (700W) 略高。**散热要求高**，一个机柜通常最多 8-16 卡。
+
+**PyTorch 用法**：装 pytorch-rocm：
+
+```bash
+pip install torch --index-url https://download.pytorch.org/whl/rocm6.0
+```
+
+**代码基本无需修改**：
+
+```python
+import torch
+device = "cuda"   # PyTorch 里 "cuda" 也代表 ROCm GPU（不是笔误）
+model = model.to(device)
+```
+
+PyTorch 在 ROCm 后端下依然使用 `torch.cuda.*` API——是命名遗留问题。
+
+**vLLM 用法**：`vllm-rocm` 或者主线 vLLM 加 `--device rocm`。**已经生产可用**。
+
+## 11. MI325X 和更新
+
+**MI325X**（2024 年下半年）：
+
+- MI300X 的显存升级版；
+- **288 GB HBM3e**（是 MI300X 的 1.5 倍）；
+- **6 TB/s** 带宽；
+- 算力提升不大——**主要卖点是显存**。
+
+**LLM 推理场景下 MI325X 的意义**：**单卡塞 405B 模型（LLaMA-3.1）** 变得可能——原本要多卡。
+
+**MI350X（2025）**：CDNA4 架构，进一步升级。具体规格看 AMD 后续官方发布。
+
+## 12. 什么时候选 MI 而不是 H100
+
+**MI 系列的优势**：
+
+- **显存大**：单卡装大模型有明显优势；
+- **HBM 带宽**：memory-bound 场景快；
+- **FP64 强**：科学计算优势；
+- **价格**：单位算力便宜；
+- **供应**：H100 长期缺货时是替代方案。
+
+**MI 系列的劣势**：
+
+- **软件生态**：CUDA 生态 15 年积累，ROCm 只有几年；
+- **工具链**：Nsight vs omniperf——Nsight 更成熟；
+- **社区**：CUDA 教程、示例、Stack Overflow 答案多得多；
+- **驱动稳定性**：ROCm 这两年才稳定，早期版本有各种 bug。
+
+**结论**：**如果你的团队愿意投入学习成本、你的负载适合 AMD、供应链有 MI 的货**——就是一个理性的选择。**追求"零风险、最省心"还是选 CUDA + H100**。
+
+## 13. 硬件-软件矩阵
+
+给一个粗略的对应关系：
+
+| 硬件代 | ROCm 版本 | Pytorch 版本 | 稳定性 |
+|--------|----------|-------------|-------|
+| MI100 | 4.x-5.x | 1.x-2.x | 老，别用了 |
+| MI200 | 5.x-6.x | 2.x | 稳定 |
+| MI300 | 6.0+ | 2.1+ | 稳定 |
+| MI325 | 6.2+ | 2.4+ | 较新 |
+
+**升级 ROCm 有时会 break 老驱动或者老 kernel**——生产环境用一个版本先测试透彻，别追最新。
+
+## 14. 一些实用小贴士
+
+**看 GPU 状态**：
+
+```bash
+rocm-smi
+```
+
+**看拓扑**：
+
+```bash
+rocm-smi --showtopo
+# 会打印所有 GPU 之间的连接类型和带宽
+```
+
+**看 GPU 具体型号和架构**：
+
+```bash
+rocminfo | grep -E "gfx|Marketing"
+```
+
+**监控功耗、温度**：
+
+```bash
+watch -n 1 rocm-smi
+```
+
+**Docker 里跑 ROCm**：AMD 官方镜像 `rocm/pytorch:latest`，`docker run --device=/dev/kfd --device=/dev/dri` 挂载 GPU 设备。
+
+## 15. 一句话总结
+
+CDNA 和 MI 系列是 AMD 在数据中心 GPU 的答卷：
+
+- **CDNA1/MI100**：起点，已淘汰；
+- **CDNA2/MI200**：双 GCD、110-220 CU，超算用；
+- **CDNA3/MI300X**：**当前主力**，192GB、1307 TFLOPS BF16，H100 竞品；
+- **CDNA3+/MI325X**：MI300X 的显存升级版，288GB；
+- **主要优势**：**大显存、高带宽、FP64 强、价格便宜**；
+- **主要不足**：软件生态和工具链仍落后 CUDA。
+
+选 MI 意味着接受软件生态的一些成熟度差距，换来硬件上的独特优势——**对愿意投入的团队来说是划算的**。
+
+下一章讲**如何针对 AMD 硬件调优 HIP 代码**——把移植过来的 kernel 从"能跑"提升到"性能峰值"。
+
+</WordCount>

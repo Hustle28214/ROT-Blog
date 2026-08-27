@@ -1,0 +1,364 @@
+import WordCount from '../../../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+前面几章讲了 HIP 是什么、AMD GPU 长什么样。这一章讲实操——**你有一份 HIP 代码，怎么让它在 AMD 上跑到峰值**。
+
+前面 CUDA 章节里讲的很多技巧（合并访存、shared memory、warp shuffle 归约、Tensor Core）在 HIP 上依然适用——但**具体数字、细节、profile 工具都换了**。这一章把 AMD 特色的调优点讲清楚。
+
+## 1. 调优的第一步：profile
+
+**不 profile 不调优**——这条规则在 AMD 上和 NVIDIA 上一样。AMD 侧的工具主要有三个：
+
+**rocprof**：类似 nvprof/nsys，记录 kernel 时长和基础 metric。
+
+```bash
+rocprof --stats --hip-trace ./your_program
+# 输出 CSV 文件，里面有每个 kernel 的时间统计
+```
+
+**omnitrace**：类似 Nsight Systems，系统级 tracing——看时间线、CPU-GPU 同步、stream 并发。
+
+```bash
+omnitrace-instrument -o instrumented -- ./your_program
+omnitrace-run -- instrumented
+```
+
+**omniperf**：类似 Nsight Compute，kernel 级深度分析——占用率、L1/L2 hit rate、bank 冲突、访存效率。
+
+```bash
+omniperf profile -n my_run -- ./your_program
+omniperf analyze -p ./workloads/my_run/
+```
+
+**关键指标**：
+
+- **VGPR / SGPR usage**：寄存器用量；
+- **LDS usage**：LDS 用量；
+- **Occupancy**：CU 占用率；
+- **VALU utilization**：向量算力利用；
+- **HBM bandwidth**：显存带宽利用；
+- **L2 cache hit rate**：L2 命中；
+- **LDS Bank Conflicts**：LDS bank 冲突。
+
+## 2. Wavefront-Level 代码：最重要的调整
+
+从 CUDA 迁移过来的代码，**最容易出问题的地方是 warp-level 逻辑**。
+
+**问题 1**：硬编码 warp 大小
+
+```cpp
+// 从 CUDA 抄过来
+for (int offset = 16; offset > 0; offset /= 2) {
+    val += __shfl_down_sync(0xffffffff, val, offset);
+}
+```
+
+**在 AMD wave64 上**：这个循环只做了半个 wavefront 的归约，另一半没做。**结果错**（或者性能减半）。
+
+**修复**：
+
+```cpp
+for (int offset = warpSize / 2; offset > 0; offset /= 2) {
+#ifdef __HIP_PLATFORM_AMD__
+    val += __shfl_down(val, offset);
+#else
+    val += __shfl_down_sync(0xffffffff, val, offset);
+#endif
+}
+```
+
+**问题 2**：block size 不是 wavefront 倍数
+
+```cpp
+// CUDA 上 block=100 也能跑（3.125 个 warp，最后 warp 部分闲置）
+kernel<<<grid, 100>>>(...);
+```
+
+**AMD 上**：wavefront 是 64，block=100 会分成 wave64 + wave36——**后面 36 lane 的 wavefront 一半闲置**。**block 用 64 的倍数**：128、256、512。
+
+**问题 3**：`__ballot_sync` 的返回类型
+
+```cpp
+// CUDA (wave32)
+unsigned mask = __ballot_sync(0xffffffff, cond);
+
+// AMD (wave64)
+unsigned long long mask = __ballot(cond);   // 64-bit！
+```
+
+**用错类型**：mask 被截断，高 32 位丢失。
+
+## 3. VGPR 用量：AMD 上更敏感
+
+**AMD 上每个 CU 的 VGPR 总数**：约 65K。一个 wavefront 用得多，能同时跑的 wavefront 就少。
+
+**观察 VGPR 用量**：
+
+```bash
+hipcc -Rpass=kernel-resource-usage --save-temps kernel.cpp
+# 输出里会有 "VGPRs: N" 信息
+```
+
+或者用 omniperf 直接看。
+
+**经验值**：
+
+- **VGPR < 32**：occupancy 最高（10 wavefronts / SIMD）；
+- **VGPR 32-63**：稍降（8 wavefronts / SIMD）；
+- **VGPR 64-127**：中等（4-5 wavefronts / SIMD）；
+- **VGPR > 128**：低 occupancy，可能 spill。
+
+**降低 VGPR**：
+
+- 减少局部变量数量；
+- 用 `__restrict__` 提示编译器；
+- 拆分复杂 kernel；
+- 用 shared memory 存"临时数据"代替寄存器。
+
+## 4. LDS Bank 冲突
+
+AMD 的 LDS 也是 32 bank、4 字节宽。**Bank 冲突规则和 CUDA 类似**，但**具体的 bank swizzling 硬件不同**——一些 NVIDIA 上的 padding 技巧在 AMD 上不一定完全 optimal。
+
+**检测**：omniperf 里 `LDSBankConflict` metric。
+
+**修复**：
+
+- 加 padding（`[32][33]` 而不是 `[32][32]`）——**对 AMD 也有效**；
+- 改数据布局，让 wavefront 内访问分散到不同 bank；
+- 用 `ds_read_b64` / `ds_read_b128` 指令一次读多个 word——省事务次数。
+
+## 5. Matrix Core 的使用
+
+如果你的 kernel 有矩阵乘操作，**必须用 Matrix Core**——不然性能只有 Matrix Core 的 1/10。
+
+**方式 1：用 rocBLAS/hipBLAS**（推荐）：
+
+```cpp
+hipblasHandle_t handle;
+hipblasCreate(&handle);
+hipblasHgemm(handle, HIPBLAS_OP_N, HIPBLAS_OP_N,
+             M, N, K, &alpha, A, M, B, K, &beta, C, M);
+```
+
+自动用 Matrix Core，达到 ~85% peak。
+
+**方式 2：用 Composable Kernel (CK)**——AMD 的类 CUTLASS 库：
+
+```cpp
+#include "ck/tensor_operation/gpu/device/impl/device_gemm_xdl.hpp"
+
+using DeviceGemm = ck::tensor_operation::gpu::device::DeviceGemmXdl<...>;
+DeviceGemm gemm;
+gemm.Run(...);
+```
+
+CK 让你定制矩阵乘的各种参数——tile size、精度、layout。学习曲线陡但灵活。
+
+**方式 3：直接用 MFMA intrinsic**：
+
+```cpp
+using floatx16 = __attribute__((__vector_size__(16 * 4))) float;
+using bf16x4 = __attribute__((__vector_size__(4 * 2))) bfloat16;
+
+floatx16 c = {0};
+c = __builtin_amdgcn_mfma_f32_16x16x16bf16_1k(a, b, c, 0, 0, 0);
+```
+
+**直接写 MFMA 门槛高，需要理解硬件寄存器布局**。一般人别自己写。
+
+## 6. 内存访问优化
+
+**HBM 带宽优化**：
+
+- **合并访存**：wavefront 内 64 线程访问连续 256 字节——一次事务；
+- **对齐**：地址按 256 字节对齐（`hipMalloc` 默认给你）；
+- **向量化**：用 `float4`、`double2` 等类型一次读多个数；
+- **减少数量**：能用 shared memory 复用的就复用。
+
+**MI300 特色：Infinity Cache**：
+
+- **不需要显式管理**——硬件自动 cache；
+- **访问模式友好会天然受益**——避免"每次访问都跳一大段"的 stride 模式；
+- Profile 里的 `L3 HitRate`（Infinity Cache）> 50% 就很好。
+
+**Peer memory**：多 GPU 访问：
+
+```cpp
+hipDeviceEnablePeerAccess(peer_id, 0);   // 打开 peer access
+hipMemcpyPeerAsync(dst, dst_dev, src, src_dev, N, stream);
+```
+
+**不开 peer access**，`hipMemcpyPeer` 会走 host bounce buffer，慢 10 倍。
+
+## 7. Kernel Launch 优化
+
+**HIP 也支持 CUDA Graph 类似的东西**——**HIP Graph**：
+
+```cpp
+hipStreamBeginCapture(stream, hipStreamCaptureModeGlobal);
+
+kernel1<<<..., stream>>>(...);
+kernel2<<<..., stream>>>(...);
+kernel3<<<..., stream>>>(...);
+
+hipGraph_t graph;
+hipStreamEndCapture(stream, &graph);
+
+hipGraphExec_t graphExec;
+hipGraphInstantiate(&graphExec, graph, nullptr, nullptr, 0);
+
+for (int i = 0; i < 1000; i++) {
+    hipGraphLaunch(graphExec, stream);
+}
+```
+
+**HIP Graph 在 LLM 推理场景下能带来 20%+ 加速**——和 CUDA Graph 一样，减少 launch overhead。
+
+## 8. RCCL：AMD 的 NCCL
+
+多 GPU 训练时用 **RCCL**（ROCm Communication Collectives Library）：
+
+```cpp
+#include <rccl/rccl.h>
+
+ncclComm_t comm;
+ncclCommInitRank(&comm, world_size, id, rank);
+
+// All-Reduce
+ncclAllReduce(sendbuf, recvbuf, count, ncclFloat, ncclSum, comm, stream);
+```
+
+**RCCL 的 API 完全兼容 NCCL**——PyTorch 分布式代码几乎不用改。
+
+**性能**：在 MI300X 8 卡节点上，RCCL 的 all-reduce 带宽和 NCCL 在 H100 上相当，甚至略优。
+
+## 9. 一些具体的调优 case
+
+**Case 1**：LLM inference decode
+
+- 每步一个新 token；
+- 主要瓶颈是访存（模型权重从 HBM 搬到 SM）；
+- **AMD 的高 HBM 带宽自然占优**；
+- **优化重点**：KV Cache 量化、HIP Graph 减少 launch overhead、Continuous batching。
+
+**Case 2**：Attention
+
+- FlashAttention 的 AMD 版本叫 **CK Attention** 或 **rocmSoftwarePlatform/flash-attention** 的 fork；
+- MI300 上性能已经和 H100 相当；
+- 手写 attention kernel 会很复杂——**用现成的库**。
+
+**Case 3**：GEMM（矩阵乘）
+
+- **用 rocBLAS / hipBLAS**——已经调好；
+- 手写会比 rocBLAS 慢 20-50%；
+- 如果一定要手写，用 Composable Kernel 起手。
+
+## 10. Occupancy 调节
+
+一个 CU 上 wavefront 数由几个因素决定：
+
+- **VGPR usage**（每 wavefront）；
+- **SGPR usage**；
+- **LDS usage**（每 block）；
+- **Block size**（每 block wavefront 数）。
+
+用 API 查：
+
+```cpp
+int active_waves;
+hipOccupancyMaxActiveBlocksPerMultiprocessor(&active_waves, kernel, block_size, lds_bytes);
+```
+
+**目标 occupancy**：50%+ 通常够。**不迷信高 occupancy**——有时候 25% 反而更快，因为寄存器多了每线程算得更快。
+
+## 11. 编译优化选项
+
+**优化级别**：`-O3` 默认开启（hipcc）。别忘了 release build，debug build 慢很多。
+
+**架构专有**：
+
+```bash
+hipcc --offload-arch=gfx90a -O3 kernel.cpp
+```
+
+一定要指定 arch。**用错 arch 编出来的代码要么跑不了、要么慢**。
+
+**`__restrict__`**：告诉编译器指针无别名，能启用更多优化：
+
+```cpp
+__global__ void kernel(const float * __restrict__ A, float * __restrict__ C) { ... }
+```
+
+**Unroll**：
+
+```cpp
+#pragma unroll
+for (int i = 0; i < 8; i++) { ... }
+```
+
+编译器展开循环，减少循环开销。**只适合小循环**（<16 次），太大会 register 爆炸。
+
+## 12. 常见问题与调优 checklist
+
+**问题：kernel 慢 3-5 倍相比 CUDA 版**
+
+1. Wavefront 大小对了吗？block size 是 64 的倍数吗？
+2. warp shuffle 用了正确的 mask？
+3. LDS 有 bank 冲突吗？
+4. VGPR 有 spill 吗？
+5. 用 Matrix Core 了吗（如果是矩阵乘）？
+6. 用了正确的库（rocBLAS 而不是自己写）？
+
+**问题：训练时 loss 曲线和 CUDA 不一致**
+
+1. 浮点归约顺序不同——正常，前几位不同不奇怪；
+2. 混合精度实现（AMP）在两个平台可能略有不同；
+3. 一些数学函数（如 `expf`、`logf`）实现细节可能不同。
+
+**问题：多 GPU 训练卡住或者慢**
+
+1. RCCL 装好了吗？`ldd` 检查链接；
+2. Peer access 开了吗？
+3. 拓扑对不对？`rocm-smi --showtopo` 看看；
+4. GPU 之间是通过 Infinity Fabric 还是 PCIe？
+
+**问题：显存不够**
+
+1. AMD 版本经常显存管理和 CUDA 略不同——碎片可能更严重；
+2. 试试 `HIP_LAUNCH_BLOCKING=1` 检查是不是有 stream 泄漏；
+3. MI300X 有 192GB，正常情况下应该够。
+
+## 13. 生态和库的现状
+
+一些常用组件的 AMD 版本：
+
+- **PyTorch**：官方支持，稳定；
+- **TensorFlow**：支持，用得少；
+- **JAX**：支持（`jax[rocm]`），稳定；
+- **Triton**：**支持 AMD**——可以写跨平台的高性能 kernel；
+- **vLLM / SGLang / TGI**：都支持 ROCm；
+- **DeepSpeed**：支持；
+- **FlashAttention**：AMD 有自己的 fork，性能 OK；
+- **xformers**：部分支持；
+- **CUTLASS**：**没有直接对应**——用 Composable Kernel（CK）代替。
+
+**结论**：**主流深度学习工作负载在 AMD 上都能跑**。真正的差距在"自定义 CUDA kernel"——那种代码需要人工移植和优化。
+
+## 14. 一句话总结
+
+HIP 性能调优的核心：
+
+- **profile 第一**：rocprof / omniperf / omnitrace；
+- **wavefront-level 代码**：`warpSize`、64-bit mask、block size 64 的倍数；
+- **VGPR 用量**：避免 spill，控制 occupancy；
+- **LDS bank 冲突**：加 padding，检查访问模式；
+- **Matrix Core**：矩阵乘用 rocBLAS/hipBLAS/CK，别手写；
+- **HIP Graph**：减少 launch overhead；
+- **RCCL**：多卡通信，替代 NCCL。
+
+从 CUDA 迁移过来的代码，一般第一次跑通性能只有 50-70%——**做完上面几个方向的调优能到 80-90%**。**再往上就是针对 AMD 硬件独有特性做深度定制**——比如手写 MFMA、tune LDS 布局。
+
+下一章讲 AMD 的**数学库和深度学习库**——rocBLAS、MIOpen、hipBLASLt 等，是你写 HIP 应用的基础组件。
+
+</WordCount>

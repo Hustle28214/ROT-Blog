@@ -1,0 +1,283 @@
+import WordCount from '../../../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+前面几章讲了一堆优化技巧。**但优化的前提是"能测出来"**——你以为改了 shared memory 布局能提速，实际不知道是不是真的？你觉得 kernel 是访存瓶颈，也许其实是 divergence？
+
+**Profiler 才能给你确定的答案**。这一章讲 CUDA 生态里两个最主要的工具——**Nsight Systems** 和 **Nsight Compute**——以及基础的性能分析框架。
+
+## 1. 优化的第一原则：先测量
+
+**优化的头号规则：不测量就不要优化**。
+
+新手最常犯的错：看到 kernel 里有 divergence，直接改；看到有 branch，就想去掉；看到 shared 用了，就觉得已经优化了。**你不知道这一改到底带来了什么变化**——可能变快，可能变慢，可能没影响。
+
+**正确流程**：
+
+1. 跑一遍原版，测 baseline（时间、带宽、算力占比）；
+2. 修改一处；
+3. 再测；
+4. 对比，决定这次改动值不值。
+
+**别一次改一堆再测**——出问题都不知道是哪里的锅。
+
+## 2. 两个主要的 profiler
+
+**Nsight Systems（nsys）**：**系统级**分析。关注整体时间线——CPU 和 GPU 上各种操作何时开始、何时结束、是否重叠。适合看**"stream 有没有并发"、"H2D 传输是否遮住了 kernel"**这类宏观问题。
+
+**Nsight Compute（ncu）**：**Kernel 级**分析。关注单个 kernel 内部——占用率、访存效率、指令混合、bank 冲突……适合看**"这个 kernel 的瓶颈是什么"**。
+
+两个是互补的。**先用 nsys 找到"哪个 kernel 慢"，再用 ncu 分析"为什么慢"**。
+
+（老版本还有 `nvprof` 和 `nvvp`，Turing 之后被 Nsight 系列替代。新代码用 Nsight。）
+
+## 3. Nsight Systems 基础
+
+**跑一次**：
+
+```bash
+nsys profile -o output ./your_program
+```
+
+会生成 `output.nsys-rep` 文件，用 Nsight Systems GUI 打开。
+
+**你能看到**：
+
+- **时间线**：CPU 线程、GPU 各 stream 的活动；
+- **kernel 时长**：每个 kernel 什么时候开始、多久；
+- **memcpy 时长**：数据传输占用；
+- **CPU-GPU 同步**：cudaDeviceSynchronize 之类的等待；
+- **API 调用**：CPU 端每个 CUDA API 调用的时间。
+
+**看什么**：
+
+- **GPU 是不是被喂饱了**——看时间线上 GPU 是不是一直在忙。空隙多说明 CPU 是瓶颈；
+- **stream 是不是真的并发**——多个 stream 上的 kernel 是不是重叠；
+- **哪些 kernel 占了大部分时间**——找 top 5，重点优化它们；
+- **有没有明显的同步开销**——大段 CPU 等 GPU。
+
+**命令行输出**：
+
+```bash
+nsys stats output.nsys-rep
+```
+
+给出汇总——每个 kernel 累计时间、次数、平均时长，非常有用。
+
+## 4. Nsight Compute 基础
+
+**分析单个 kernel**：
+
+```bash
+ncu --set full -o report ./your_program
+```
+
+`--set full` 收集所有 metric（比较慢）。`--set basic` 只收集常用的（快很多）。
+
+**GUI 打开 report.ncu-rep**，你能看到每个 kernel 的详细分析。
+
+**核心几个 section**：
+
+**Speed Of Light（关键）**：一张图告诉你"你的 kernel 用了多少计算 / 多少访存"。类似 roofline 模型：
+
+- 如果 SM Utilization 高、Memory 低 → **计算瓶颈**（少见）；
+- 如果 Memory 高、SM 低 → **访存瓶颈**（最常见）；
+- 都低 → **latency 瓶颈**——warp 不够，SM 空转；
+- 都高 → **接近峰值**，恭喜。
+
+**Compute Workload Analysis**：算力用在哪些指令上——FP32、FP64、Tensor Core、INT、Memory、Branch……看有没有意外的开销。
+
+**Memory Workload Analysis**：内存层次的详细数据——global load 有多少事务、L1 hit 率、L2 hit 率、shared memory 冲突数。
+
+**Warp State Analysis**：warp 为什么 idle——是等 memory？等同步？等指令依赖？这个 section 非常有用。
+
+**Instruction Statistics**：SASS 级别的指令分布，占比。
+
+**Launch Statistics**：kernel 启动配置——block 大小、grid 大小、寄存器用量、shared 用量、occupancy。
+
+## 5. 关键指标：怎么判断瓶颈
+
+以下几个指标是最重要的，记下来：
+
+**Achieved Occupancy**：实际占用率。想 > 25% 就有基本的延迟隐藏能力，> 50% 一般够用。低了要看**是什么限制了 occupancy**——寄存器、shared 还是 block size。
+
+**Memory Throughput**：显存带宽利用率。> 80% 说明你已经在打 memory 峰值——**这个 kernel 是纯访存瓶颈，只能减少访存**。
+
+**Compute Throughput**：算力利用率。> 80% 说明你在打计算峰值——不能再让它算更快，只能减少计算量。
+
+**L1/TEX Cache Hit Rate**：L1 命中率。低于 30% 说明访存模式不友好。
+
+**Global Load/Store Efficiency**：合并访存效率。低于 50% 说明有大量非合并访存——**这是最容易改进的**。
+
+**Shared Memory Bank Conflicts**：> 0 就有冲突，需要修 padding 或者布局。
+
+**Warp Divergence**：分支发散率。> 10% 说明分支被 diverge 严重。
+
+## 6. Roofline 模型
+
+**Roofline** 是判断 kernel 能不能优化下去的经典模型。
+
+在一张图上：
+
+- **横轴**：算术强度 AI = FLOP / 访存字节数；
+- **纵轴**：性能（FLOPS）；
+- **屋顶线**：由**内存带宽 × AI**（斜线）和**计算峰值**（水平线）交叠而成。
+
+任何 kernel 的性能都在这个 roofline 之下：
+
+- 如果 AI 小（比如 SGEMM naive 的 0.25），你的性能受**斜线**限制（memory-bound）；
+- 如果 AI 大（比如 SGEMM 优化后的 100），你受**水平线**限制（compute-bound）。
+
+**Roofline 告诉你**：
+
+- 你当前性能距离 roofline 多远——**离得远说明还能优化**；
+- 你处在 memory-bound 还是 compute-bound——**方向明确**。
+
+**A100 的 roofline**：
+
+- FP32 峰值 19.5 TFLOPS，带宽 1.5 TB/s → 转折点 AI = 13 FLOP/byte；
+- 也就是说 AI < 13 都是 memory-bound、AI > 13 才是 compute-bound；
+- 你的 kernel 的 AI 是多少？可以用 ncu 直接读出来。
+
+## 7. 一个实战流程
+
+假设你写了一个 CUDA kernel，跑了下觉得慢。分析步骤：
+
+**Step 1**：`nsys` 跑一次，看时间线：
+
+- kernel 占了多少总时间？
+- 有没有大量 memcpy 或者 CPU 等 GPU？
+
+**Step 2**：如果 kernel 是主要瓶颈，`ncu` 深入：
+
+- 看 Speed of Light——memory bound 还是 compute bound？
+- 看 Occupancy——是不是太低？
+- 看 Memory Analysis——合并访存效率、L1 hit rate、bank conflicts；
+- 看 Warp State——warp 在等什么？
+
+**Step 3**：根据发现改一处：
+
+- 合并访存差 → 改数据布局；
+- Bank 冲突 → 加 padding；
+- Divergence → 重排分支；
+- Register spill → 减少局部变量；
+- Occupancy 低 → 减少 shared / register 用量。
+
+**Step 4**：再跑一次 ncu，对比数字。
+
+## 8. 常见诊断 → 修复对照表
+
+| 诊断（ncu 看到的） | 可能的问题 | 常见修复 |
+|-------------------|----------|---------|
+| Global Load Efficiency < 50% | 非合并访存 | 改数据布局，让 warp 内连续访问 |
+| L1 Hit Rate 低 | 数据没缓存 | 加 shared memory 缓存 |
+| Bank Conflicts > 0 | Shared 布局差 | 加 padding，改访问模式 |
+| Occupancy < 25% | Register/Shared 过多 | 降低单线程资源、拆 kernel |
+| High Long Scoreboard | 等 memory | 增加算数强度，或者用更多 warp 隐藏 |
+| High Short Scoreboard | 等指令依赖 | 展开循环、ILP |
+| Warp Stall on Barrier | `__syncthreads()` 太多 | 减少同步、改结构 |
+| Compute > 90%, Memory low | 已经打满算力 | 减少 FLOP 或用 Tensor Core |
+| Memory > 90%, Compute low | 访存瓶颈 | 减少访存，提升算数强度 |
+| Kernel launch overhead 高 | 太多小 kernel | Kernel fusion 或者 CUDA Graph |
+
+## 9. 简单的 CPU 侧计时
+
+不用 profiler、只想快速测个数：
+
+```cpp
+cudaEvent_t start, stop;
+cudaEventCreate(&start);
+cudaEventCreate(&stop);
+
+cudaEventRecord(start);
+your_kernel<<<grid, block>>>(...);
+cudaEventRecord(stop);
+cudaEventSynchronize(stop);
+
+float ms;
+cudaEventElapsedTime(&ms, start, stop);
+printf("Kernel took %f ms\n", ms);
+```
+
+**注意几点**：
+
+- 用 CUDA event 而不是 `clock()` 或者 `chrono`——CUDA event 是 GPU 内部时钟，最准；
+- **要 warmup**：第一次 kernel 启动有 JIT 编译等开销，先跑几次热身；
+- **重复多次取平均**：单次噪声大，10 次以上求平均或中位数；
+- **别忘记 sync**：如果不 sync 就读 event，可能还没跑完；
+- **不能测异步 pipeline 的整体**：想测多个 stream 的总时间要用 nsys 或者外层的 CPU 时间。
+
+## 10. Deep Learning 里的 Profiler
+
+如果你在写 PyTorch 或 TF，可以直接用它们的 profiler：
+
+**PyTorch**：
+
+```python
+with torch.profiler.profile(
+    activities=[torch.profiler.ProfilerActivity.CPU, torch.profiler.ProfilerActivity.CUDA],
+    record_shapes=True,
+) as prof:
+    output = model(input)
+
+print(prof.key_averages().table(sort_by="cuda_time_total"))
+```
+
+**Nsight Systems 也支持直接 profile PyTorch 程序**——只要用 nsys 启动 python 脚本。
+
+对深度学习特别有用的一件事：**看是不是"launcher overhead 主导"**——小 kernel 太多，每个都要几 μs 启动开销，加起来能占比很高。这时候 **CUDA Graph** 有奇效（下一章讲）。
+
+## 11. 一些坑
+
+**没预热就测**：第一次 kernel 启动会有 JIT、context init 等开销，慢一倍多。**至少跑 3-5 次 warmup**。
+
+**测的是 host 时间**：`std::chrono::high_resolution_clock` 加 `cudaMemcpy`——你测的是"从发起到 CPU 拿到结果"，不是"kernel 本身"。用 CUDA event 才准。
+
+**Debug build 测性能**：`nvcc -O0 -g` 编译出来慢好几倍。**测性能一定要 `-O3` 或者 release build**。
+
+**在虚拟机、共享 GPU 上测**：结果不稳定。**独占物理机测**。
+
+**ncu 会显著减慢程序**：full analysis 可能慢 100 倍。**用 nsys 找到问题 kernel，再用 ncu 只 profile 那一个**（`--kernel-name`）。
+
+**GPU 时钟被限速**：热保护、电源管理会降频。**长时间跑的测试要看 nvidia-smi 里的时钟是不是在 base clock**——不是的话结果不可比。
+
+## 12. 一个实用的调优 checklist
+
+写 CUDA kernel 想调优时，按顺序过一遍：
+
+1. **跑对**——先保证结果正确；
+2. **测 baseline**——用 event 或者 nsys 得到当前性能；
+3. **看 profiler**——ncu 一次，知道是 memory-bound 还是 compute-bound；
+4. **优化访存**（如果 memory-bound）：
+   - 合并访存
+   - Shared memory
+   - 减少 global 访问
+   - 向量化（float4）
+5. **优化 shared memory**：
+   - 消除 bank 冲突
+   - 加 padding
+6. **优化计算**（如果 compute-bound）：
+   - Warp divergence
+   - ILP（循环展开）
+   - 用 intrinsic（__fmul_rn、__fma 等）
+7. **优化调度**：
+   - Occupancy 调整
+   - Stream 并发
+   - CUDA Graph（大量小 kernel 时）
+8. **再测**——每一步都验证。
+
+## 13. 一句话总结
+
+Profiler 是 CUDA 优化的眼睛：
+
+- **nsys**：系统级、时间线视图，找"哪个 kernel 慢、有没有并发"；
+- **ncu**：kernel 级，找"这个 kernel 为什么慢"；
+- **Roofline 模型**：判断 memory-bound / compute-bound；
+- **关键指标**：Achieved Occupancy、Memory Throughput、Compute Throughput、Bank Conflicts、Efficiency；
+- **原则**：**先测再改**，一次改一处，反复验证。
+
+写 CUDA 时"感觉快了"是没意义的——**数字才算数**。养成"每次改动都用 profiler 验证"的习惯，你的 CUDA 水平会以肉眼可见的速度上涨。
+
+下一章讲一个专用硬件——**Tensor Core**。它把矩阵乘的性能又推高了一个数量级，深度学习几乎离不开它。
+
+</WordCount>

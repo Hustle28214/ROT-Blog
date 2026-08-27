@@ -1,0 +1,243 @@
+import WordCount from '../../../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+前面讲 SGEMM 的时候提到了 **Tensor Core**——现代 NVIDIA GPU 上专门做矩阵乘累加的硬件单元。它的算力比普通 CUDA Core 高一个数量级，是深度学习几乎所有性能提升的来源。
+
+这一章讲清楚 Tensor Core 是什么、怎么用它、以及它对你写代码的影响。
+
+## 1. 为什么会有 Tensor Core
+
+先看一下 SM 内部的算力分布。A100 一个 SM 有：
+
+- **64 个 FP32 CUDA Core**：每 cycle 做 64 个 FP32 MAC；
+- **4 个 Tensor Core**：每 cycle 做 4×256 = **1024 个 FP16 MAC**。
+
+**Tensor Core 单位面积算力比 CUDA Core 高 16 倍**——因为它专门做**小矩阵乘累加**，硬件设计极简单。
+
+**为什么值得专门做**：深度学习几乎全是矩阵乘。**如果 95% 的运算都是矩阵乘，那专门做一个矩阵乘的硬件**——就能把算力密度做到极致。
+
+Tensor Core 从 **Volta（V100，2017）** 开始有。之后的 Turing、Ampere、Hopper 每一代都在扩它——**支持更多精度、更大的 tile、更高的密度**。
+
+## 2. Tensor Core 到底算什么
+
+一个 Tensor Core 一次做的操作：
+
+$$
+D = A \cdot B + C
+$$
+
+其中 A、B、C、D 都是小矩阵。**具体尺寸依架构而定**：
+
+- **Volta**：`4×4 × 4×4 → 4×4` 累加，FP16 输入、FP32 累加；
+- **Ampere**：`16×16 × 16×8 → 16×8` 等多种 shape；
+- **Hopper**：`64×256 × 256×256` 之类的更大 tile。
+
+**输入类型**：FP16、BF16、TF32、INT8、FP8、INT4、二进制……**每一代增加**。
+
+**输出/累加类型**：FP16 或 FP32（更精确）。
+
+**一次 Tensor Core 操作等价于几十上百个 CUDA Core 操作**——但硬件只用一个 cycle 完成。
+
+## 3. 支持的精度：现代 GPU 的 alphabet soup
+
+**FP16（Half）**：5 位指数、10 位尾数。范围小（~65504 是上限），精度较高。**训练时数值稳定性差**——梯度容易溢出或下溢。
+
+**BF16 (Brain Float 16)**：8 位指数、7 位尾数。范围和 FP32 一样，精度略差。**训练稳定性远好于 FP16**——现代深度学习基本转向 BF16。
+
+**TF32**：Ampere 特有——外部看起来是 FP32，内部 Tensor Core 计算时截断到 10 位尾数。**你写 FP32 代码，Ampere 自动帮你加速**——不用改代码就能获得 8 倍加速。
+
+**FP8 (E4M3 / E5M2)**：Hopper 引入。8 位浮点。精度更差但算力更高——**大规模训练里越来越常见**。
+
+**INT8 / INT4**：整数量化。推理场景常用。
+
+**每种精度对应不同的算力峰值**：
+
+| 精度 | A100 峰值 | H100 峰值 |
+|------|----------|----------|
+| FP32 (CUDA Core) | 19.5 TFLOPS | 51 TFLOPS |
+| TF32 (Tensor Core) | 156 | 378 |
+| FP16 / BF16 (Tensor Core) | 312 | 989 |
+| FP8 (Tensor Core) | — | 1979 |
+| INT8 (Tensor Core) | 624 | 1979 |
+
+**从 FP32 到 FP8，算力增加 100 倍**——不是硬件更快，是同样硬件做的操作更简单。
+
+## 4. 怎么用 Tensor Core
+
+**三种主要方式**：
+
+**方式 1：用 cuBLAS/cuDNN**。所有主流 BLAS/DNN 库都会自动用 Tensor Core——只要你的输入是 FP16/BF16/TF32/INT8。
+
+```cpp
+// cuBLAS FP16 GEMM，自动用 Tensor Core
+cublasSetMathMode(handle, CUBLAS_TENSOR_OP_MATH);
+cublasHgemm(...);
+```
+
+**方式 2：用 CUTLASS**。NVIDIA 的开源模板库，让你能定制矩阵乘的每个层次，同时利用 Tensor Core。
+
+**方式 3：用 WMMA API 或 MMA PTX**。CUDA 内建的低层 API，让你直接写 Tensor Core 指令。**手写门槛高，只在做非常规矩阵操作时用**。
+
+## 5. WMMA API：手写 Tensor Core
+
+WMMA（Warp Matrix Multiply Accumulate）让**一个 warp 里的 32 线程协同完成一个 Tensor Core 操作**：
+
+```cpp
+#include <mma.h>
+using namespace nvcuda::wmma;
+
+__global__ void wmma_kernel(const half *A, const half *B, float *C, int M, int N, int K) {
+    // 声明 fragment
+    fragment<matrix_a, 16, 16, 16, half, row_major> a_frag;
+    fragment<matrix_b, 16, 16, 16, half, col_major> b_frag;
+    fragment<accumulator, 16, 16, 16, float> c_frag;
+
+    fill_fragment(c_frag, 0.0f);
+
+    // 累加 K 维度
+    for (int k = 0; k < K; k += 16) {
+        load_matrix_sync(a_frag, A + blockIdx.y * 16 * K + k, K);
+        load_matrix_sync(b_frag, B + k * N + blockIdx.x * 16, N);
+        mma_sync(c_frag, a_frag, b_frag, c_frag);
+    }
+
+    // 写回 C
+    store_matrix_sync(C + blockIdx.y * 16 * N + blockIdx.x * 16, c_frag, N, mem_row_major);
+}
+```
+
+**关键点**：
+
+- **fragment** 是抽象数据结构——warp 里 32 线程共享一份 fragment，具体存储位置由硬件决定；
+- **load_matrix_sync**：warp 协作从 memory 或 shared 加载一个 tile 到 fragment；
+- **mma_sync**：一次 Tensor Core 操作——`c_frag = a_frag * b_frag + c_frag`；
+- **store_matrix_sync**：warp 协作把 fragment 写回 memory。
+
+**这些操作都是 warp 级的**——32 线程一起调用，缺一个就不对。
+
+## 6. Tensor Core 编程的常见陷阱
+
+**Tile size 固定**：Tensor Core 的操作尺寸有限（16×16×16 等），你的问题尺寸必须能被 tile 整除或者手动 padding。
+
+**内存对齐**：Tensor Core 加载要求特定对齐（一般 128-bit 对齐）。**内存地址不对齐会退化到慢路径**。
+
+**Fragment 数据不能直接访问**：你不能像普通数组那样 print 或者随便处理 fragment 里的元素——它的布局是硬件私有的。
+
+**Load/Store 的 stride 要对**：`load_matrix_sync` 的 stride 参数（一行有多少元素）如果错了，加载的数据就错。
+
+## 7. Sparsity：结构化稀疏
+
+**Ampere 之后**，Tensor Core 还支持**2:4 结构化稀疏**——每 4 个 element 里只有 2 个非零。**理论算力再翻倍**。
+
+用法：先把权重稀疏化（在训练后处理成 2:4 pattern），Tensor Core 硬件跳过零元素直接算。**在 cuBLAS、cuSPARSE 里都有 API**。
+
+但注意：**结构化稀疏对精度有影响**，不是"免费的午餐"——需要专门的 sparse-aware fine-tuning。
+
+## 8. 深度学习中的 Tensor Core
+
+**PyTorch / TF 里怎么用**：
+
+**方式 A：AMP（自动混合精度）**：
+
+```python
+from torch.cuda.amp import autocast
+
+with autocast(dtype=torch.bfloat16):
+    output = model(input)
+    loss = criterion(output, target)
+```
+
+**AMP 会自动把安全的操作转成 BF16，让 Tensor Core 起作用**。这是深度学习里最常用的方式——**加速 2-4 倍、几乎不掉精度**。
+
+**方式 B：直接用 half/bfloat16 tensor**：
+
+```python
+model = model.half()   # 或 model.bfloat16()
+input = input.half()
+```
+
+**这是"全 FP16 训练"**——效果不错，但数值稳定性风险高。
+
+**方式 C：TF32**：
+
+```python
+torch.backends.cuda.matmul.allow_tf32 = True
+```
+
+**只要你用 FP32 tensor，Ampere/Hopper 会自动用 TF32 Tensor Core**——**代码不改，速度快 8 倍**。默认打开。
+
+## 9. 一个直观对比
+
+同样一个 4096×4096×4096 矩阵乘：
+
+| 实现 | 精度 | 时间（A100）| 算力占比 |
+|------|-----|-----------|---------|
+| CUDA Core FP32 (cuBLAS) | FP32 | ~14 ms | ~85% peak |
+| Tensor Core TF32 | FP32(TF32) | ~2 ms | ~85% peak |
+| Tensor Core BF16 | BF16 | ~1 ms | ~85% peak |
+| Tensor Core FP8 (H100) | FP8 | ~0.2 ms | — |
+
+**从 FP32 到 FP8，同一个矩阵乘快了 70 倍**。深度学习为什么这些年"变便宜"，一半原因在这里。
+
+## 10. Hopper 的新东西
+
+**H100 上的 Tensor Core** 又有了新特性：
+
+**FP8 支持**：加速一半。
+
+**Transformer Engine**：自动在 FP16 和 FP8 之间切换——把不稳定的层用 FP16 算、稳定的用 FP8。**软件包装好了，用户不用手工调**。
+
+**Warp Group Matrix Multiply (WGMMA)**：**一次 Tensor Core 操作跨 4 个 warp**——更大的 tile，更高的效率。这个是 Hopper 独有的，前代硬件不支持。
+
+**FLASH Attention 3 用了 WGMMA**——这是它在 H100 上比 FA2 快 2 倍的关键。
+
+## 11. Tensor Core 什么时候不适用
+
+**输入太小**：Tensor Core 的最小操作是 16×16×16。矩阵尺寸小于这个，直接用普通 CUDA Core 更快——启动 Tensor Core 的开销大于收益。
+
+**尺寸不对齐**：不能被 tile 整除时要 padding，padding 太多也划不来。
+
+**精度敏感场景**：科学计算、金融——FP64 才够。Tensor Core 在 FP64 上有支持但优势小。
+
+**非矩阵乘**：Tensor Core 只做矩阵乘累加。其他操作（比如 element-wise、reduce）没它的份。
+
+## 12. cuBLAS Lt：轻量级 cuBLAS
+
+**cuBLAS Lt** 是新一代 cuBLAS 接口，专门为 Tensor Core 设计。特点：
+
+- 更细的精度控制（TF32、BF16、FP8）；
+- Epilogue fusion——矩阵乘后接的 bias、activation 可以融合进 kernel；
+- 更好的支持 batched GEMM。
+
+**深度学习框架内部越来越依赖 cublasLt**。写自己的定制层时也可以调用。
+
+## 13. 一些实际的建议
+
+**默认打开 TF32**：`torch.backends.cuda.matmul.allow_tf32 = True`——免费加速。
+
+**训练用 BF16 混合精度**：`with autocast(dtype=torch.bfloat16)`——最稳的选项。
+
+**推理用 FP16 或 INT8**：更快、显存更省。BF16 也行但优势没训练大。
+
+**Tile size 选对**：让你的矩阵尺寸能被 16 或 128 整除。深度学习里模型尺寸经常故意选 128 的倍数就是为这个。
+
+**用 cuBLAS，别手写**：手写 Tensor Core kernel 极难达到 cuBLAS 水平。除非要极度定制（比如稀疏、非常规 layout）。
+
+**Profile 看有没有 Tensor Core 生效**：ncu 里有个 metric `sm__pipe_tensor_op_hmma_cycles_active`——为零就是没用上。
+
+## 14. 一句话总结
+
+Tensor Core 是现代 GPU 深度学习性能的绝对核心：
+
+- **硬件**：专用矩阵乘累加单元，单位面积算力 10-100 倍于 CUDA Core；
+- **精度**：FP16 / BF16 / TF32 / FP8 / INT8——**用越低精度算越快**；
+- **使用方式**：cuBLAS / cuDNN（推荐）、CUTLASS（定制）、WMMA（手写）；
+- **深度学习**：AMP 混合精度 + BF16——训练标准；TF32 是免费加速；
+- **H100 新特性**：FP8、WGMMA、Transformer Engine——性能又翻一倍。
+
+如果你的 GPU 工作负载是深度学习——**利用 Tensor Core 是没有任何理由不做的事**。不用它就等于把 90% 的算力扔了。
+
+下一章讲一个"减少 CPU 端开销"的新技术——**CUDA Graph**。当你有大量小 kernel 时它会带来惊人的收益。
+
+</WordCount>

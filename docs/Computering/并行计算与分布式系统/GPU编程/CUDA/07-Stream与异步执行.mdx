@@ -1,0 +1,294 @@
+import WordCount from '../../../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+前面几章讲的 kernel 都是这么用的：CPU 发一个 `cudaMemcpy`、发一个 `kernel<<<>>>`、发一个 `cudaMemcpy`——**串行下来**。这样跑当然能跑，但很多时候 GPU 有大量闲置——**上一个 kernel 结束到下一个开始之间的时间**，GPU 什么都没干。
+
+**Stream** 是 CUDA 里让**多个操作真正并行**的机制。这一章讲清楚它，以及和它配合的 event、异步 API、multi-stream 编程。
+
+## 1. Default Stream 和它的问题
+
+默认情况下，所有 CUDA 调用都在**默认流（stream 0）**上排队执行：
+
+```cpp
+kernel1<<<...>>>(A);
+cudaMemcpy(B, ..., cudaMemcpyDeviceToHost);
+kernel2<<<...>>>(C);
+```
+
+这三个操作**严格按顺序**：kernel1 结束才开始 memcpy，memcpy 结束才开始 kernel2。**GPU 一个时刻只有一件事在跑**。
+
+问题在哪？
+
+**问题 1**：kernel1 和 memcpy 明明可以并行——kernel1 不依赖 memcpy 的数据。但 default stream 把它们串了。
+
+**问题 2**：kernel1 用的 SM 可能不多，剩下的 SM 空闲。kernel2 独立于 kernel1，本可以同时跑。但 default stream 不行。
+
+**问题 3**：CPU 端 `cudaMemcpy` **默认是同步的**——CPU 会一直等到 GPU 传完。CPU 在这段时间也在等，什么都没干。
+
+## 2. 什么是 Stream
+
+**Stream 就是一个"操作队列"**。一个 stream 里的操作按发起顺序串行执行；**不同 stream 之间没有隐式的顺序关系**——**可以并行**。
+
+**创建 stream**：
+
+```cpp
+cudaStream_t s1, s2;
+cudaStreamCreate(&s1);
+cudaStreamCreate(&s2);
+
+// 在 s1 上做一系列操作
+kernel1<<<grid, block, 0, s1>>>(A);           // 第 4 个参数是 stream
+cudaMemcpyAsync(B, ..., cudaMemcpyDeviceToHost, s1);
+
+// 在 s2 上做另一批
+kernel2<<<grid, block, 0, s2>>>(C);
+cudaMemcpyAsync(D, ..., cudaMemcpyHostToDevice, s2);
+```
+
+**s1 里的操作严格按顺序、s2 里的操作严格按顺序，但 s1 和 s2 之间的操作可以并行**——只要硬件资源允许。
+
+**销毁**：
+
+```cpp
+cudaStreamDestroy(s1);
+cudaStreamDestroy(s2);
+```
+
+## 3. 异步 API：那些带 Async 的函数
+
+要让 stream 真正跑起来，还得用**异步版本**的 API：
+
+- `cudaMemcpy` → **`cudaMemcpyAsync`**（要指定 stream）；
+- `kernel<<<..., stream>>>()`：本来就是异步的，加个 stream 参数就行；
+- `cudaMemsetAsync`；
+- `cudaMemPrefetchAsync`（unified memory 用）；
+- ……
+
+**注意**：**`cudaMemcpyAsync` 只在 pinned memory 上真的异步**——普通 malloc 的内存，async 版本也会退化成同步。这是新手最常见的坑之一。
+
+**Pinned memory 分配**：
+
+```cpp
+float *h_A;
+cudaMallocHost(&h_A, N * sizeof(float));
+// 或者
+cudaHostAlloc(&h_A, N * sizeof(float), cudaHostAllocDefault);
+```
+
+**记住这个规律**：**要真正的 async，主机端内存必须是 pinned 的**。
+
+## 4. 一个经典应用：拷贝和计算重叠
+
+假设你要处理一个大数据——比如 128 MB 的输入，做一些 GPU 计算，把结果拷回来。**同步方式**：
+
+```cpp
+cudaMemcpy(d_in, h_in, N, cudaMemcpyHostToDevice);   // 100 ms
+kernel<<<grid, block>>>(d_in, d_out, N);              // 50 ms
+cudaMemcpy(h_out, d_out, N, cudaMemcpyDeviceToHost); // 100 ms
+// 总耗时 250 ms
+```
+
+**用 stream + chunk**：把数据切成 4 块，每块用一个 stream 处理：
+
+```cpp
+for (int i = 0; i < 4; i++) {
+    int offset = i * (N / 4);
+    cudaMemcpyAsync(&d_in[offset], &h_in[offset], N/4, cudaMemcpyHostToDevice, streams[i]);
+    kernel<<<..., streams[i]>>>(&d_in[offset], &d_out[offset], N/4);
+    cudaMemcpyAsync(&h_out[offset], &d_out[offset], N/4, cudaMemcpyDeviceToHost, streams[i]);
+}
+```
+
+**时间线**：
+
+```
+stream 0:   H2D0 ─── K0 ─── D2H0
+stream 1:       H2D1 ─── K1 ─── D2H1
+stream 2:           H2D2 ─── K2 ─── D2H2
+stream 3:               H2D3 ─── K3 ─── D2H3
+```
+
+**H2D、K、D2H 全部在不同 stream 上并行**。总耗时接近**最慢那一段** × 4/4 + 少量 overlap——**理论上可能到 125 ms**（如果三种操作各占 1/3 时间）。
+
+**这就是异步和 stream 带来的实际收益**：**同样的工作，靠调度做到接近一半时间**。
+
+## 5. 硬件如何支持并发
+
+GPU 上有几个"引擎"：
+
+- **1 个计算引擎**（执行 kernel）；
+- **1-2 个 copy engine**（做 host-device、device-host 传输）；
+- **多个 SM**（真正跑 kernel 的硬件）。
+
+**在同一时刻**，这些引擎可以并行：
+
+- Copy engine 在传数据 → Compute engine 在跑 kernel；
+- Copy engine 上行、下行方向的传输可以并行（如果 GPU 有 2 个 copy engine）；
+- 多个 kernel 可以同时跑（只要 SM 资源够）。
+
+**Stream 就是暴露这些并行能力的接口**。你把不相关的操作放不同 stream，硬件调度器就会尽量让它们并发。
+
+## 6. Stream 之间的同步：Event
+
+有时候 stream 之间需要有依赖——比如 stream B 的一个操作必须等 stream A 的某个操作完成。用 **event**：
+
+```cpp
+cudaEvent_t event;
+cudaEventCreate(&event);
+
+// stream A 上做点事
+kernel_A<<<..., streamA>>>();
+cudaEventRecord(event, streamA);   // 在 A 上打一个 event
+
+// stream B 上等 A 的这个 event
+cudaStreamWaitEvent(streamB, event, 0);
+kernel_B<<<..., streamB>>>();      // B 上的 kernel 会等 A 打完 event 再跑
+```
+
+**Event 也可以用来测时间**：
+
+```cpp
+cudaEvent_t start, stop;
+cudaEventCreate(&start);
+cudaEventCreate(&stop);
+
+cudaEventRecord(start, stream);
+kernel<<<..., stream>>>();
+cudaEventRecord(stop, stream);
+cudaEventSynchronize(stop);
+
+float ms;
+cudaEventElapsedTime(&ms, start, stop);
+printf("Kernel took %f ms\n", ms);
+```
+
+**这是测 GPU 时间最准确的方法**——比 `cudaDeviceSynchronize + CPU 计时` 精确得多。
+
+## 7. Stream 的同步操作
+
+**等某个 stream 里的��有操作结束**：
+
+```cpp
+cudaStreamSynchronize(stream);
+```
+
+**等 GPU 上所有操作结束**（所有 stream）：
+
+```cpp
+cudaDeviceSynchronize();
+```
+
+**Async 结束了但结果还没准备好**：常犯的错——`cudaMemcpyAsync` 返回后 CPU 立即读取 host memory，但数据还没拷完。**必须显式 sync 才能保证 CPU 可以安全读**。
+
+## 8. Default Stream 的两种行为
+
+CUDA 里 default stream 有两种行为：
+
+**Legacy default stream（默认）**：**跟所有其他 stream 都同步**——default stream 上的任何操作会阻塞其他 stream 上还没开始的操作。
+
+**Per-thread default stream**：CUDA 7 引入的新选项，每个 CPU 线程有自己的 default stream，互不干扰。**在多线程 host 程序里非常有用**。
+
+**开启方式**：编译时加 `--default-stream per-thread`。
+
+**推荐**：**避免用 default stream**——所有操作都显式指定 stream。这样行为最清晰，最可预测。
+
+## 9. Callback：让 CPU 在 GPU 完成时被通知
+
+有时候你想让 GPU 完成一个操作后**回调 CPU 上的一个函数**：
+
+```cpp
+void CUDART_CB myCallback(void *data) {
+    printf("Kernel done!\n");
+}
+
+kernel<<<..., stream>>>();
+cudaLaunchHostFunc(stream, myCallback, nullptr);
+```
+
+**回调在专用线程里执行**——不要在里面调用 CUDA API（会 deadlock），只做轻量任务。
+
+## 10. 多 GPU 上的 Stream
+
+**每张 GPU 有自己的 stream 池**。多 GPU 时切换设备：
+
+```cpp
+cudaSetDevice(0);
+cudaStreamCreate(&s0);
+kernel_A<<<..., s0>>>();
+
+cudaSetDevice(1);
+cudaStreamCreate(&s1);
+kernel_B<<<..., s1>>>();  // 在 GPU 1 上跑，和 GPU 0 上的 kernel_A 并行
+```
+
+**多 GPU 上真正的并行由多 stream 提供**。深度学习框架（PyTorch、TF）内部就是这么做的。
+
+## 11. 一些实用的模式
+
+**Pipeline pattern**（流水线）：数据分块，每块流经"传入-计算-传出"三步。
+
+**Double buffer**（双缓冲）：两个 buffer 交替，一个在被 CPU 处理时另一个被 GPU 处理。
+
+**Fork-join**：主 stream 上开始，分出多个 sub-stream 并行做事，最后 join 回主 stream（用 event 同步）。
+
+**Producer-consumer**：一个 stream 产生数据，另一个 stream 消费——通过 event 保证顺序。
+
+## 12. Priority Streams
+
+不同 stream 可以有不同优先级：
+
+```cpp
+int prio_low, prio_high;
+cudaDeviceGetStreamPriorityRange(&prio_low, &prio_high);
+
+cudaStream_t stream_high;
+cudaStreamCreateWithPriority(&stream_high, cudaStreamNonBlocking, prio_high);
+```
+
+**优先级高的 stream 会插队**——被优先调度。适合"关键路径 vs 后台任务"分离的场景，比如推理服务里在线请求走高优先级流、离线预处理走低优先级流。
+
+## 13. Multi-Stream 的复杂性
+
+Stream 一多，问题也变多：
+
+**过多 stream 反而慢**：GPU 一次只能真正并行少数 kernel（受 SM 数量限制）。开 32 个 stream 通常没意义——硬件根本调度不过来。**一般 2-4 个 stream 就够用**。
+
+**Stream 之间的资源竞争**：kernel A 用了很多 SM，kernel B 想上但没资源——只能等。理想的多流是"每个 kernel 用 SM 少、多个 kernel 互补"。
+
+**测试并发**：**看 profiler**（Nsight Systems）验证 stream 是不是真的并行了。有时候你以为并行了，其实还是串行。
+
+**Debug 变难**：多 stream 下"到底哪里出了 bug"更难定位。stream 越多越乱，谨慎使用。
+
+## 14. 一些常见的坑
+
+**忘记 pinned memory**。**这是 stream 相关最常见的问题**。`cudaMemcpyAsync` 传的 host 端内存不是 pinned——退化成同步，异步全白搭。
+
+**忘记 sync**。`cudaMemcpyAsync` 后立即 `printf(h_out[0])`——读到未初始化数据。必须 `cudaStreamSynchronize`。
+
+**多个 stream 写同一块内存**。数据竞争，结果未定义。多流之间必须靠 event 或者用不同的 buffer。
+
+**Stream 数用得太多**。开 100 个 stream 期待 100 倍并行——不会的。硬件调度不了。
+
+**Async 但没 launch async kernel**。你以为 kernel 是异步的？**默认 kernel 就是异步**——但如果紧跟着 default stream 上的一个同步 memcpy，前面的 kernel 会被隐式 sync。
+
+**Callback 里调 CUDA API**。文档明确禁止——会 deadlock。**只在 callback 里做轻量任务**。
+
+**混用 default stream 和 named stream**。default stream 会同步其他 stream——想真正并行就**别用 default**。
+
+## 15. 一句话总结
+
+Stream 让 GPU 从"一次干一件事"变成"多任务并发"：
+
+- **原理**：不同 stream 之间没有隐式顺序，可以并行；
+- **前提**：pinned memory + `cudaMemcpyAsync` + 异步 kernel；
+- **典型收益**：传输和计算重叠，能到 2 倍加速；
+- **同步工具**：`cudaEvent` 精细控制；
+- **数量控制**：2-4 个 stream 通常够，别开太多；
+- **验证**：用 Nsight Systems 看时间线是否真的重叠。
+
+Stream 是把 CUDA 从"一个 kernel 快"提升到"整个 pipeline 快"的关键。写生产级的 GPU 应用（推理服务、训练框架），这一步是绕不过去的。
+
+下一章讲**性能分析工具**——你所有优化的效果，都要靠 profiler 验证。
+
+</WordCount>

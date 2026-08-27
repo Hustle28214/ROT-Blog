@@ -1,0 +1,290 @@
+import WordCount from '../../../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+HIP 语法虽然像 CUDA，但底层是 AMD 的硬件。**你写的 kernel 最终在 AMD GPU 上跑，你就得了解 AMD GPU 长什么样**。这一章讲清楚 AMD GPU 的核心执行单元——**Wavefront、Compute Unit（CU）、以及 CDNA/RDNA 架构的区别**。
+
+## 1. 从 SM 到 CU
+
+**NVIDIA 用"SM"（Streaming Multiprocessor）**，AMD 用**"CU"（Compute Unit）**。它们是同一类东西——**GPU 上一个个"计算集群"，里面有一批 SIMD 单元、寄存器、共享内存**。
+
+一个 GPU 里通常有几十上百个 CU：
+
+- **MI100 (CDNA1)**：120 CU；
+- **MI250X (CDNA2)**：220 CU（每个 GCD 110 CU × 2 GCD）；
+- **MI300X (CDNA3)**：304 CU；
+- **RX 7900 XTX (RDNA3)**：96 CU。
+
+**每个 CU 内部**：
+
+- **4 个 SIMD 单元**（宽度 16）；
+- **约 65K 个向量寄存器**；
+- **64KB LDS**（Local Data Share，相当于 shared memory）；
+- **共享 L1 cache**、纹理单元、指令 fetch。
+
+## 2. Wavefront：AMD 的调度单位
+
+**Wavefront 就是 AMD 版的 warp**——一组同步执行的线程。
+
+- CDNA 架构：**wavefront = 64**；
+- RDNA 架构：**wavefront = 32 或 64**（可选，wave32 模式或 wave64 模式）；
+- 一个 CU 上多个 wavefront 并发。
+
+**为什么是 64（而不是 32）**？历史选择。AMD 一直用 64 从 GCN 时代到 CDNA。RDNA 引入 wave32 是为了给消费卡（游戏）更细粒度调度。**数据中心 GPU（CDNA）依然是 wave64**。
+
+**wave64 vs wave32 的影响**：
+
+- **wave64 优势**：更好的算力密度（一次调度多干 2 倍活）、更少的调度开销；
+- **wave32 优势**：divergence 影响小（一个 warp 里只 32 线程，同类分支更容易一致）；
+- **对代码的影响**：warp-level 归约、shuffle 的写法要用 `warpSize` 而不是硬编码 32。
+
+## 3. CU 的 SIMD 结构
+
+一个 CU 内部有 **4 个 SIMD 单元**，每个 **宽度 16**。
+
+一个 wavefront（64 线程）在一个 SIMD 单元上**分 4 个 cycle 完成**——每个 cycle 处理 16 线程。也就是说：
+
+```
+Wavefront 64 threads
+   │
+   ├─ cycle 0: lanes 0-15
+   ├─ cycle 1: lanes 16-31
+   ├─ cycle 2: lanes 32-47
+   └─ cycle 3: lanes 48-63
+```
+
+**每 4 cycle 才完成一个 wavefront 的一条指令**。所以一个 CU 上一般同时有多个 wavefront 在轮流——不同 wavefront 在不同 SIMD 上跑，互相掩盖延迟。
+
+**NVIDIA 的对比**：NVIDIA A100 的 SM 有 4 个"warp scheduler"，每个每 cycle 发射一个 warp 的指令——一个 SM 每 cycle 发射 4 个 warp 的指令。AMD 的 CU 一个 cycle 分发的粒度不一样。
+
+**这些底层差异不影响你写 HIP 代码**——但影响你调优时的直觉。
+
+## 4. CDNA vs RDNA：两个方向
+
+AMD 的 GPU 分两个大家族：
+
+**CDNA（Compute DNA）**：**数据中心 / HPC / AI**。特点：
+
+- 没有图形单元（rasterizer、tessellator 都砍了）；
+- 大 HBM 显存（MI300X 192GB）；
+- 强 FP64（科学计算）；
+- Matrix Core（FP16/BF16/FP8 加速）；
+- Wave64 为主；
+- 型号：MI100、MI200、MI250、MI300。
+
+**RDNA（Radeon DNA）**：**消费级 / 游戏 / 一部分工作站**。特点：
+
+- 有完整图形单元；
+- GDDR6 显存；
+- Wave32 为主（更适合游戏 shader）；
+- 型号：RX 6000、RX 7000 系列。
+
+**深度学习和 HPC 主要关心 CDNA**。**RDNA 上也能跑 ROCm，但不是官方主战场，会遇到各种小 bug**。
+
+## 5. 一个 CU 上能跑多少 wavefront
+
+**Occupancy 计算**：
+
+- 一个 CU 有 4 个 SIMD；
+- 每个 SIMD 支持最多 10 个 wavefront（CDNA1/2）或 8 个（RDNA）；
+- 一个 CU 最多 40 wavefront（CDNA）或 32（RDNA）。
+
+**限制因素**：
+
+- **寄存器**：wavefront 用得多，能同时跑的少；
+- **LDS（shared memory）**：一个 block 用得多，一个 CU 上能塞的 block 少；
+- **Wavefront 数**：硬件上限。
+
+**类比 NVIDIA**：A100 的 SM 支持 64 warp，AMD CU 支持 40 wavefront——**但 wave64 相当于 2× warp32**——**等效算力密度差不多**。
+
+## 6. LDS：AMD 的 Shared Memory
+
+**LDS（Local Data Share）** 是 AMD CU 上的 shared memory。特点：
+
+- **一个 CU 64KB**（CDNA1/2）或 128KB（CDNA3）；
+- Bank 数量 **32 个**（每 bank 4 字节，和 NVIDIA 类似）；
+- Bank 冲突规则和 NVIDIA 类似——但**具体的地址映射有差异**。
+
+**用法在 HIP 里和 CUDA 完全一样**：
+
+```cpp
+__shared__ float sdata[256];
+```
+
+**但 tune 时要注意**：**bank pattern 不完全相同**。NVIDIA 上一个经典的"padding to 33"技巧，在 AMD 上不一定完全相同。**测量为准**。
+
+## 7. HBM 与内存带宽
+
+**CDNA 数据中心 GPU 用 HBM**（High Bandwidth Memory）：
+
+- MI250X：**3.2 TB/s**（HBM2e）；
+- MI300X：**5.3 TB/s**（HBM3）；
+- 对比 A100：**1.5-2 TB/s**；
+- 对比 H100：**3-3.35 TB/s**。
+
+**AMD 数据中心 GPU 的带宽普遍比同代 NVIDIA 高**——这是它在 LLM 推理（访存瓶颈）上的优势之一。
+
+**MI300X 独特设计**：一个 GPU 里集成 8 个 HBM 堆叠——**192GB 显存**——这是 H100 的 2 倍多。对大模型推理特别有价值——**一张卡就能装下 GPT-3-175B 甚至更大的模型**。
+
+## 8. Matrix Core：AMD 的 Tensor Core
+
+**Matrix Core** 是 CDNA 上的专用矩阵乘单元。功能上对应 NVIDIA Tensor Core，但**指令和接口不同**。
+
+**基本单元**：**MFMA（Matrix Fused Multiply-Add）** 指令。一次 MFMA 完成：
+
+$$
+D = A \cdot B + C
+$$
+
+其中 A、B、C、D 是小矩阵（比如 16×16×16、32×32×8）。
+
+**支持的精度（MI300）**：
+
+- FP64（HPC 必备）
+- FP32
+- FP16
+- BF16
+- INT8
+- FP8（E4M3 / E5M2）
+- INT4
+
+**峰值算力（MI300X）**：
+
+| 精度 | 峰值 |
+|------|-----|
+| FP64 (Matrix) | 163 TFLOPS |
+| FP32 (Matrix) | 163 TFLOPS |
+| BF16 / FP16 (Matrix) | 1307 TFLOPS |
+| FP8 (Matrix) | 2615 TFLOPS |
+
+**对比 H100（SXM）**：
+
+| 精度 | H100 |
+|------|-----|
+| FP64 (Tensor) | 67 TFLOPS |
+| BF16 / FP16 (Tensor) | 989 TFLOPS |
+| FP8 (Tensor) | 1979 TFLOPS |
+
+**MI300X 在 FP8/FP16 上算力比 H100 高约 30%**。加上 192GB 显存和 5.3 TB/s 带宽——LLM 推理场景下确实有优势。
+
+## 9. Infinity Fabric
+
+**Infinity Fabric** 是 AMD GPU 之间的高速互联，类比 NVIDIA 的 NVLink。
+
+- MI250X：单节点 8 GPU，通过 IF 全连接，每对 ~300 GB/s；
+- MI300X：单节点 8 GPU 全连接，每对更高；
+- 也用于 CPU-GPU 通信（在 MI300A APU 上，CPU 和 GPU 直接共享 HBM）。
+
+**MI300A** 是一个有趣的产品——**CPU 和 GPU 集成在同一个包里**，共享内存。这在 HPC 场景（比如 El Capitan 超算）有独特价值。
+
+## 10. AMD 独特的一些特性
+
+**Unified Memory**：AMD 有自己的 unified memory 实现（HSA + XGMI），CPU 和 GPU 能直接共享地址空间。在 MI300A 上这个特性达到极致。
+
+**PIM（Processing in Memory）**：一些前沿探索——把计算能力嵌入 HBM 附近。
+
+**Coherent Memory**：CPU-GPU 缓存一致性——CPU 和 GPU 读写同一块地址时，缓存自动同步。这个在 MI300A 上是硬件保证的，非常方便科学计算。
+
+## 11. 一个直观的架构对比
+
+CDNA3（MI300X）vs Hopper（H100 SXM）：
+
+| 项 | MI300X | H100 SXM |
+|----|--------|----------|
+| CU/SM 数 | 304 | 132 |
+| 显存 | 192 GB HBM3 | 80 GB HBM3 |
+| 显存带宽 | 5.3 TB/s | 3.35 TB/s |
+| FP16/BF16 峰值 | 1307 TFLOPS | 989 TFLOPS |
+| FP8 峰值 | 2615 TFLOPS | 1979 TFLOPS |
+| 功耗 | 750W | 700W |
+| 互联 | Infinity Fabric | NVLink 4 |
+
+**MI300X 在显存和 raw peak 上占优**，H100 在软件生态和工具链上占优。**深度学习负载上两家越来越接近**。
+
+## 12. 对写代码的影响
+
+理解了 AMD 硬件之后，回头看写 HIP 代码时要注意的几件事：
+
+**用 `warpSize` 表达 wavefront 大小**——不要硬编码 32 或 64。
+
+**Occupancy 计算不一样**：AMD 一个 CU 允许 40 wavefront（不是 64 warp）。用 `hipOccupancyMaxActiveBlocksPerMultiprocessor` 查询实际值。
+
+**Shared memory 大小要动态查**：`hipDeviceProp_t.sharedMemPerBlock`，不同架构不同。
+
+**Kernel block size 选 128、256、512**：这些都是 64 的倍数，能在 wave64 上被整除。
+
+**Matrix Core 不能直接用 WMMA API**：要么用 rocBLAS/hipBLAS，要么用 `__builtin_amdgcn_mfma_*` intrinsic，要么用 Composable Kernel 库。
+
+**Divergence 影响可能更大**：wave64 一个 wavefront 64 线程，如果一半分叉——串行执行——比 warp32 的一半更痛。
+
+## 13. 用 rocm-smi 看硬件信息
+
+一些常用命令：
+
+```bash
+# 看 GPU 状态（类似 nvidia-smi）
+rocm-smi
+
+# 看详细的 GPU 信息
+rocminfo
+
+# 看 topology（多 GPU 互联）
+rocm-smi --showtopo
+
+# 看某个 GPU 的时钟频率
+rocm-smi --showclocks
+
+# 看温度、功耗
+rocm-smi --showtemp --showpower
+```
+
+写代码前先 `rocminfo | grep gfx` 看看你手里是什么架构——决定编译 flag。
+
+## 14. Compute Unit 内部的更多细节
+
+想更深挖一层，一个 CU 内部长这样（CDNA3 大概示意）：
+
+```
+┌───────────────────────────────────────┐
+│                CU                     │
+│  ┌────────────────────────────┐       │
+│  │  Instruction fetch / cache │       │
+│  └────────────────────────────┘       │
+│  ┌──────┬──────┬──────┬──────┐         │
+│  │SIMD 0│SIMD 1│SIMD 2│SIMD 3│         │
+│  │ 16   │ 16   │ 16   │ 16   │         │
+│  │lanes │lanes │lanes │lanes │         │
+│  └──────┴──────┴──────┴──────┘         │
+│  ┌────────────────────────────┐        │
+│  │  Vector Registers (VGPR)   │        │
+│  │  Scalar Registers (SGPR)   │        │
+│  └────────────────────────────┘        │
+│  ┌────────────────────────────┐        │
+│  │        LDS (128KB)         │        │
+│  └────────────────────────────┘        │
+│  ┌────────────────────────────┐        │
+│  │        L1 Cache            │        │
+│  └────────────────────────────┘        │
+│  ┌────────────────────────────┐        │
+│  │      Matrix Core Units      │        │
+│  └────────────────────────────┘        │
+└───────────────────────────────────────┘
+```
+
+**Scalar Registers（SGPR）** 是 AMD 独有的——存放"整个 wavefront 共享"的标量值（比如 pointer、循环变量），减少 VGPR（向量寄存器）占用。**编译器自动使用**，不需要用户管。
+
+## 15. 一句话总结
+
+理解 AMD GPU 的硬件对写好 HIP 代码至关重要：
+
+- **CU 对应 SM**——都是"GPU 上的一个计算集群"；
+- **Wavefront 通常是 64**（CDNA）——影响 warp-level 代码的写法；
+- **CDNA 是数据中心方向**（MI 系列）——AI/HPC 主战场；
+- **RDNA 是消费级方向**（RX 系列）——支持有限；
+- **Matrix Core 对应 Tensor Core**——但接口是 MFMA；
+- **MI300X**：304 CU、192GB HBM3、5.3 TB/s、1307 TFLOPS BF16——是 AMD 目前对 H100 的答卷；
+- **性能优势**：显存、带宽、raw peak 上 AMD 越来越有竞争力。
+
+下一章讲 **HIP 内存模型**——虽然和 CUDA 大致对应，但一些细节和性能特性不同，值得单独讲。
+
+</WordCount>

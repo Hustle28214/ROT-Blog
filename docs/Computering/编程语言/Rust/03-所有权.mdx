@@ -1,0 +1,434 @@
+import WordCount from '../../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+这是 Rust 里最重要的一章。**理解了所有权（ownership），你就懂了 Rust 的精髓；没理解，你就永远在被编译器骂**。
+
+所有权是 Rust 的核心特性。**它替代了 GC、也替代了手动 malloc/free**——**编译期就确定每个值在哪一刻被释放**。学起来别扭，但一旦上手，你会觉得非常自然。
+
+## 1. 内存管理的三条路
+
+在讲所有权之前，先看看语言之间的路线选择：
+
+**路线 A：手动管理（C/C++）**：程序员自己 `malloc/free`、`new/delete`。**快，但容易忘记 free、free 两次、use-after-free**——大量 CVE 都来自这里。
+
+**路线 B：垃圾回收（Java/Go/Python）**：运行时定期扫描内存，回收不再用的对象。**省心，但有运行时开销、暂停时间、内存膨胀**。
+
+**路线 C：所有权（Rust）**：**编译器在编译期分析"每个值什么时候不再需要"，自动插入 drop**。**没有运行时开销，也不用担心忘 free**——但你要遵守一套规则。
+
+这套规则就是**所有权**。
+
+## 2. 所有权的三条规则
+
+Rust 官方总结：
+
+1. **每个值有一个"所有者"（owner）**；
+2. **同一时刻只能有一个所有者**；
+3. **所有者离开作用域时，值被 drop**（内存释放）。
+
+看起来简单，但**每一条都在改变你写代码的方式**。
+
+## 3. Move：移动语义
+
+来看一段 C++ 里"看似正常"的代码在 Rust 里发生了什么：
+
+```rust
+let s1 = String::from("hello");
+let s2 = s1;
+println!("{}", s1);   // ← 编译错误！
+```
+
+**报错**：`use of moved value: s1`。
+
+**为什么**？因为 Rust 觉得 `let s2 = s1` 是**"把所有权从 s1 转移到 s2"**——不是拷贝。**规则 2：一个值只能有一个所有者**——所以 s1 之后不能再用。
+
+**在 C++ 里**：`s1 = s2` 是深拷贝（默认调 copy constructor）。**Rust 默认是 move**。
+
+**这个差异是很多 C++ 程序员来 Rust 的最大障碍**。
+
+**为什么 Rust 选 move**：
+
+- **明确性能开销**——move 是零成本，拷贝可能很贵；
+- **防 double free**：如果两个变量都拥有同一个 String，作用域结束时会 drop 两次 → 内存崩溃；
+- **强制思考"这份数据谁负责"**——这是所有权的核心思想。
+
+## 4. Copy：什么时候不 move
+
+**简单值不 move，它们 copy**：
+
+```rust
+let x = 5;
+let y = x;
+println!("{}", x);   // OK，x 还能用
+```
+
+为什么？因为 `i32` 实现了 `Copy` trait——**赋值时自动按位复制**。
+
+**哪些类型是 Copy 的**：
+
+- 所有整数、浮点、bool、char；
+- 元组，如果所有字段都是 Copy 的；
+- 数组，如果元素是 Copy 的。
+
+**哪些不是 Copy**：
+
+- `String`、`Vec`、`Box`、`HashMap`——**任何拥有堆分配的类型**；
+- 自定义 struct 默认不是 Copy——**除非你手动 derive**。
+
+**规则**：**栈上的简单值是 Copy，堆上的数据不是**。堆数据 move 一次是零成本（复制指针），但两个变量都拥有会 double free——所以必须 move。
+
+## 5. Clone：显式深拷贝
+
+如果你确实要复制一个 String 呢？用 `.clone()`：
+
+```rust
+let s1 = String::from("hello");
+let s2 = s1.clone();
+println!("{}, {}", s1, s2);   // 两个都能用
+```
+
+**`.clone()` 是显式的深拷贝**——花开销你能看见。这是 Rust 的哲学：**贵的操作要显式写出来**。
+
+**注意**：新手最容易的错误是"编译器骂我就到处 clone 一下"——**这是对付编译器的短期方案，长期代码质量会很差**。**大部分场景应该用 borrow（下一章讲），而不是 clone**。
+
+## 6. 所有权的传递：函数调用
+
+**函数参数也遵守所有权**：
+
+```rust
+fn takes_ownership(s: String) {
+    println!("{}", s);
+}   // s 在这里被 drop
+
+fn main() {
+    let s = String::from("hello");
+    takes_ownership(s);
+    println!("{}", s);   // ← 编译错误！s 被移走了
+}
+```
+
+**关键点**：**把值传给函数，等于把所有权也交出去了**。函数结束时值被 drop。
+
+**返回值也可以传递所有权**：
+
+```rust
+fn gives_ownership() -> String {
+    String::from("hello")
+}
+
+fn takes_and_gives_back(s: String) -> String {
+    s   // 拿到、又送回去
+}
+
+let s1 = gives_ownership();
+let s2 = takes_and_gives_back(s1);
+```
+
+**这个模式很啰嗦**——每个函数都要"接收 + 归还"。**实际中我们几乎不这么写**——用**借用**代替（下一章讲）。
+
+## 7. 作用域与 Drop
+
+**变量离开作用域时被 drop**：
+
+```rust
+{
+    let s = String::from("hello");
+    // s 是有效的
+}   // 这里 s 离开作用域，String 的内存被自动释放
+```
+
+**内部机制**：编译器在编译期看到 `s` 的作用域到哪结束，就在那里插入一段"释放堆内存"的代码。**没有运行时 GC，只有静态插入的 free**。
+
+**`Drop` trait** 是这个机制的接口——你可以为自己的类型实现 `Drop`：
+
+```rust
+struct MyResource {
+    name: String,
+}
+
+impl Drop for MyResource {
+    fn drop(&mut self) {
+        println!("Dropping resource: {}", self.name);
+    }
+}
+
+fn main() {
+    let a = MyResource { name: String::from("A") };
+    {
+        let b = MyResource { name: String::from("B") };
+    }   // 这里 b 被 drop
+    // main 结束时 a 被 drop
+}
+
+// 输出：
+// Dropping resource: B
+// Dropping resource: A
+```
+
+**Drop 是"析构函数"**——比 C++ 的更清晰，因为触发时机由编译器精确控制。
+
+## 8. 一个例子：Vec 的所有权
+
+```rust
+let v = vec![1, 2, 3];
+let v2 = v;
+// println!("{:?}", v);   // 错，v 被 move
+
+for x in v2 {
+    println!("{}", x);
+}
+// println!("{:?}", v2);   // 错！for 循环 move 了 v2
+```
+
+**注意**：**`for x in v2`** 会**消费 v2**——把它 move 进 for 循环。之后不能再用。
+
+**要不消费**，用引用：
+
+```rust
+for x in &v2 {   // 借用
+    println!("{}", x);
+}
+println!("{:?}", v2);   // OK，v2 还在
+```
+
+**for 循环 + 引用**是最常见的组合。
+
+## 9. 部分 move（partial move）
+
+一个 struct 里的字段可以被单独 move 走：
+
+```rust
+struct Person {
+    name: String,
+    age: u32,
+}
+
+let p = Person { name: String::from("Alice"), age: 30 };
+let n = p.name;   // move 走 name
+// let _ = p;    // 错！p 已经不完整了
+// println!("{}", p.name);   // 错，name 被 move 走了
+println!("{}", p.age);   // OK，age 是 Copy，还在
+```
+
+**部分 move 之后，struct 整体不能再用**——但**没被 move 的字段（Copy 类型）还能访问**。
+
+这个行为让 pattern matching 里的解构变得灵活：
+
+```rust
+match p {
+    Person { name, age } => {
+        // name 被 move 出，age 被 copy
+    }
+}
+```
+
+## 10. 常见的错误模式
+
+**错误 1**：在循环里 move
+
+```rust
+let v = vec![String::from("a"), String::from("b")];
+for s in v {   // v 被 move 进循环
+    process(s);
+}
+println!("{:?}", v);   // 错！
+```
+
+**修复**：`for s in &v` 或者 `for s in v.iter()`。
+
+**错误 2**：多次调用需要 self 的方法
+
+```rust
+struct Builder { name: String }
+impl Builder {
+    fn set_name(self, name: String) -> Self {   // self 拿走了
+        Self { name, ..self }
+    }
+}
+
+let b = Builder { name: String::from("a") };
+let b2 = b.set_name(String::from("b"));
+// let b3 = b.set_name(...);   // 错！b 被 move
+```
+
+**这是 builder pattern 的特点**——每次调用 move 一次，链式往下走。**用完之后原变量就不能用了**。
+
+**错误 3**：把可变引用传给要 move 的函数
+
+```rust
+fn consume(s: String) { }
+
+let s = String::from("hello");
+consume(s);   // s 被 move
+consume(s);   // 错！s 已经不能用了
+```
+
+**修复**：`consume(s.clone())` 或者改函数签名接受 `&str`。
+
+**错误 4**：从 Vec 里"拿"某个元素
+
+```rust
+let v = vec![String::from("a")];
+let x = v[0];   // 错！不能从 Vec 里直接 move 一个不是 Copy 的元素
+```
+
+**修复**：
+
+- `let x = v[0].clone();`（clone）；
+- `let x = &v[0];`（借用）；
+- `let x = v.remove(0);`（真的移除并拿走）。
+
+## 11. 从函数返回而不是消费
+
+一个 Rust 里常见的模式：**不改参数，返回新值**：
+
+```rust
+fn append_exclamation(mut s: String) -> String {
+    s.push('!');
+    s
+}
+
+let s = String::from("hello");
+let s = append_exclamation(s);   // 用同名变量遮蔽，看起来像修改
+println!("{}", s);   // "hello!"
+```
+
+**这就是"值语义"编程**——参数进去、返回值出来，没有偷偷改。
+
+**但一般我们还是用可变引用**（下一章）：
+
+```rust
+fn append_exclamation(s: &mut String) {
+    s.push('!');
+}
+
+let mut s = String::from("hello");
+append_exclamation(&mut s);
+```
+
+看情况——**改动小、常用 &mut；改动大或者要返回不同类型、用值语义**。
+
+## 12. `Copy` 和 `Clone` 的关系
+
+**`Copy` 是隐式的 memcpy**——赋值时自动，你看不到：
+
+```rust
+let x = 5;
+let y = x;   // 隐式 copy，x 还在
+```
+
+**`Clone` 是显式的方法**——你要写 `.clone()`：
+
+```rust
+let s = String::from("a");
+let s2 = s.clone();   // 显式，可能很贵
+```
+
+**规则**：
+
+- 一个类型是 `Copy` 的，**必然也是 `Clone` 的**（可以隐式复制的更能显式复制）；
+- **不是 `Copy` 的可以是 `Clone` 的**（比如 String）；
+- **`Copy` 只能给"简单的、只在栈上"的类型**——String 之类的不能 Copy。
+
+**给自己的类型 derive**：
+
+```rust
+#[derive(Copy, Clone)]
+struct Point { x: f64, y: f64 }
+// 现在 Point 是 Copy 的
+
+#[derive(Clone)]
+struct Person { name: String, age: u32 }
+// Person 只是 Clone，不能 Copy（因为有 String 字段）
+```
+
+## 13. 所有权 vs 引用：什么时候用哪个
+
+**用所有权**（值语义）：
+
+- 函数需要**修改并返回**这个东西；
+- 函数需要**存下来**（比如放到自己的字段里）；
+- 函数需要**消费**这个东西（比如 `into_iter`）；
+- **不需要之后再用原来的变量**。
+
+**用引用**（借用，下一章）：
+
+- 函数只是**看一下**、不改；
+- 函数**改一下**、但之后原变量还要用；
+- **短生命周期的临时操作**。
+
+**一个直觉**：**看名字里有没有 `into_`、`_move`、`consume`**——那些是消费型。其他大多数用引用。
+
+## 14. 一个"啊哈"时刻的例子
+
+看下面这段代码，你能理解发生了什么吗：
+
+```rust
+fn take(v: Vec<i32>) -> Vec<i32> {
+    // v 现在是我的了
+    let mut w = v;
+    w.push(4);
+    w   // 我把它还给你
+}
+
+fn main() {
+    let v = vec![1, 2, 3];
+    let v = take(v);   // "把 v 交出去，拿到新的 v 回来"
+    println!("{:?}", v);   // [1, 2, 3, 4]
+}
+```
+
+**这个 take-and-return 模式**在 Rust 里很常见。所有权像"接力棒"一样在函数间传递。
+
+**如果只是想改 v**，用可变引用会更直观：
+
+```rust
+fn take(v: &mut Vec<i32>) {
+    v.push(4);
+}
+
+let mut v = vec![1, 2, 3];
+take(&mut v);
+println!("{:?}", v);
+```
+
+**看情况选**——这是 Rust 编程的核心决策。
+
+## 15. 编译器如何检查所有权
+
+**这一切都是编译期完成的**。编译器有一个内部叫做 **borrow checker** 的组件——它跟踪每个值的所有权：
+
+- 变量被 move 之后标记"不可用"；
+- 引用被创建时记录生命周期；
+- 违反规则时报错。
+
+**编译错误 = 潜在的 bug 被拦下来了**。第一次写 Rust 你会觉得编译器烦得要命——但每一次报错，都是它替你抓住了 C++ 里可能崩溃或泄漏的 bug。
+
+**Rust 的口号**："如果编译过了，多半就是对的"——这不是玩笑，是真的。
+
+## 16. 一些实用建议
+
+**不要一遇到 borrow error 就 clone**。这是新手最常见的坏习惯。**先问自己：真的需要拥有这个值吗？还是只是看一眼？** 后者用引用。
+
+**结构体设计时想清楚谁拥有什么**。像"这个 struct 拥有 name 还是引用 name"是个大决策——引用的话要引入生命周期（下一章）。**新手建议先从"struct 拥有一切"起步**——省心。
+
+**从"接手项目"读代码开始学**：看别人的 Rust 代码是怎么处理所有权的，看多了就有直觉。**tokio、serde、reqwest** 的代码值得读。
+
+**善用 `.into()` 和 `From` trait**：这些让"把一个类型转成另一个类型（并转移所有权）"的操作变得简洁。
+
+**接受这个学习曲线**：新手前两周可能一直被编译器骂。**这是正常的**。撑过去之后你会突然发现"Rust 好像也没那么难"。
+
+## 17. 一句话总结
+
+所有权是 Rust 的"心跳"：
+
+- **规则**：一个值一个 owner，owner 离开作用域时 drop；
+- **默认 move**：赋值、传参、返回都会转移所有权；
+- **例外是 Copy 类型**：整数、浮点等简单类型自动复制；
+- **想显式复制**：用 `.clone()`；
+- **想不复制也不转移**：用引用（下一章）；
+- **不要滥用 clone**——是短期解药、长期毒药。
+
+理解了所有权，你就理解了 Rust 为什么能做到"没有 GC 也没有内存崩溃"。**下一章讲借用**——所有权的重要补充，让"函数看一眼数据、不消费"成为可能。
+
+</WordCount>

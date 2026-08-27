@@ -1,0 +1,472 @@
+import WordCount from '../../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+到这里为止，我们讨论的所有权都很"经典"——**一个 owner、静态确定的生命周期**。这套模型简单、快、安全，但**不足以表达所有数据结构**：
+
+- 我想要一个东西"分配在堆上"（不是栈上）——怎么办？
+- 我想要多个变量"共享一个所有权"（就是引用计数）——怎么办？
+- 我想要"看起来是不可变，但内部能改一下"（interior mutability）——怎么办？
+
+**答案是：智能指针（smart pointer）**——一组特殊类型，通过实现某些 trait 来"扩展"所有权规则。这一章讲清楚常用的几个。
+
+## 1. 什么是智能指针
+
+**智能指针 = 指针 + 额外能力**。**在 C++ 里你熟悉 `unique_ptr`、`shared_ptr`、`weak_ptr` 这些**——Rust 里有对应的东西：
+
+| 用途 | Rust | C++ 类比 |
+|-----|------|---------|
+| 独占的堆分配 | `Box<T>` | `unique_ptr<T>` |
+| 引用计数共享（单线程）| `Rc<T>` | `shared_ptr<T>` |
+| 引用计数共享（多线程）| `Arc<T>` | `shared_ptr<T>` |
+| 内部可变（不可变引用下改数据）| `RefCell<T>` / `Cell<T>` | 无直接对应 |
+
+**它们都实现了 `Deref` trait**——让你用 `*` 或者自动解引用像用普通引用一样访问内部数据。
+
+## 2. Box\<T\>：把东西放到堆上
+
+**最简单的智能指针**——`Box<T>` **在堆上分配一个 T**，`Box` 本身在栈上（是一个指针）：
+
+```rust
+let b = Box::new(5);         // 5 分配在堆上
+println!("{}", b);            // 5，自动解引用
+```
+
+**为什么要用 Box**？
+
+**理由 1**：**大对象放堆上**——避免栈溢出。**Rust 的栈默认 8MB，深度递归或者大 struct 会爆栈**：
+
+```rust
+let big = Box::new([0u8; 10_000_000]);   // 10MB，栈上会爆
+```
+
+**理由 2**：**递归数据类型**——**大小编译期无法确定**：
+
+```rust
+// 错：List 大小无限
+// enum List {
+//     Cons(i32, List),
+//     Nil,
+// }
+
+// 对：Box 让它变成"一个指针"，大小固定
+enum List {
+    Cons(i32, Box<List>),
+    Nil,
+}
+```
+
+**Box 让编译器能确定 List 的大小**——每个变体的大小 = 4 字节 int + 一个指针大小。
+
+**理由 3**：**Trait object**——`Box<dyn Trait>`：
+
+```rust
+let animals: Vec<Box<dyn Animal>> = vec![
+    Box::new(Dog { ... }),
+    Box::new(Cat { ... }),
+];
+```
+
+**理由 4**：**从函数返回**——某些复杂结构在返回时用 Box 更方便。
+
+**Box 的所有权语义和普通值一样**——**owner 只有一个，drop 时 Box 会释放堆内存**。
+
+## 3. Rc\<T\>：单线程引用计数
+
+**问题**：**多个变量"共同拥有"一份数据**——怎么表达？
+
+一个例子：图数据结构里一个节点被多个别的节点引用。**你不能用普通所有权**（只有一个 owner），也不能全用引用（生命周期太复杂）。
+
+**Rc（Reference Counting）**：**每次 clone 增加引用计数、drop 时减少、计数归零时释放**：
+
+```rust
+use std::rc::Rc;
+
+let a = Rc::new(String::from("hello"));
+let b = Rc::clone(&a);        // 引用计数 +1
+let c = Rc::clone(&a);        // 引用计数 +1
+// 现在计数 = 3
+
+println!("count: {}", Rc::strong_count(&a));   // 3
+drop(a);   // 计数 -1
+drop(b);   // 计数 -1
+// c 还在，计数 = 1
+// c 离开作用域时计数 = 0，String 被释放
+```
+
+**关键点**：
+
+- **`Rc::clone(&a)` 不是深拷贝**——只是增加计数，几乎零成本；
+- **Rc 只能给不可变引用**——想改 Rc 里的值？**要配合 RefCell**（下一节）；
+- **Rc 只能单线程用**——跨线程用 `Arc`。
+
+**用法**：
+
+```rust
+// 图节点，多个 edge 共享 target
+struct Node {
+    value: i32,
+    neighbors: Vec<Rc<Node>>,
+}
+```
+
+## 4. Arc\<T\>：线程安全的引用计数
+
+**`Arc`（Atomically Reference Counted）** 是 Rc 的线程安全版——**用原子操作维护计数**：
+
+```rust
+use std::sync::Arc;
+use std::thread;
+
+let data = Arc::new(vec![1, 2, 3]);
+
+let mut handles = vec![];
+for _ in 0..3 {
+    let data = Arc::clone(&data);
+    let h = thread::spawn(move || {
+        println!("{:?}", data);
+    });
+    handles.push(h);
+}
+for h in handles { h.join().unwrap(); }
+```
+
+**Arc 是多线程共享数据的基础**。
+
+**Arc vs Rc**：
+
+- Arc 的原子操作比 Rc 慢一点点（几个 CPU 指令）；
+- **单线程用 Rc、多线程用 Arc**；
+- **写不确定是哪个场景？用 Arc**——反正开销很小。
+
+## 5. RefCell\<T\>：运行时借用检查
+
+**问题**：**你有一个不可变引用（比如 &T），但想临时改一下里面的东西**——比如："看起来是不可变的 API，但内部有个 cache 需要更新"——**Rust 编译期检查会拒绝**。
+
+**RefCell 提供"内部可变性（interior mutability）"**——**把借用检查从编译期挪到运行时**：
+
+```rust
+use std::cell::RefCell;
+
+let x = RefCell::new(5);
+
+// 通过不可变引用能读
+println!("{}", x.borrow());     // 5
+
+// 也能改
+*x.borrow_mut() += 1;
+println!("{}", x.borrow());     // 6
+```
+
+**运行时借用规则**：**同一时刻同样只能有多个 `borrow` 或一个 `borrow_mut`**——**违反了 panic**：
+
+```rust
+let x = RefCell::new(5);
+let r1 = x.borrow();
+let r2 = x.borrow_mut();   // panic！已经有一个 borrow 了
+```
+
+**代价**：**违反规则 panic 而不是编译错误**——**你把编译期检查换成了运行时检查**。
+
+**Rc + RefCell 的组合**：**多个 owner 共享、且能修改**：
+
+```rust
+use std::rc::Rc;
+use std::cell::RefCell;
+
+let shared = Rc::new(RefCell::new(vec![1, 2, 3]));
+
+let a = Rc::clone(&shared);
+let b = Rc::clone(&shared);
+
+a.borrow_mut().push(4);
+b.borrow_mut().push(5);
+
+println!("{:?}", shared.borrow());   // [1, 2, 3, 4, 5]
+```
+
+**这是构建"图"、"树"等复杂数据结构的常用模式**。
+
+## 6. Cell\<T\>：更轻量的内部可变
+
+**Cell** 和 RefCell 类似，但**只适合 Copy 类型**、且**用值语义**：
+
+```rust
+use std::cell::Cell;
+
+let x = Cell::new(5);
+x.set(10);              // 直接替换
+let v = x.get();        // 10
+```
+
+**没有 borrow/borrow_mut 的概念**——每次操作都是完整的值拷贝或替换。**因为是 Copy 类型，成本很小**。
+
+**用途**：**简单的计数、flag**——比 RefCell 更轻量。
+
+## 7. Mutex\<T\>：多线程共享 + 可变
+
+**多线程要修改共享数据**：Arc + Mutex 组合。
+
+**Mutex（Mutual Exclusion）**——**互斥锁**：
+
+```rust
+use std::sync::{Arc, Mutex};
+use std::thread;
+
+let counter = Arc::new(Mutex::new(0));
+
+let mut handles = vec![];
+for _ in 0..10 {
+    let counter = Arc::clone(&counter);
+    let h = thread::spawn(move || {
+        let mut num = counter.lock().unwrap();
+        *num += 1;
+    });
+    handles.push(h);
+}
+for h in handles { h.join().unwrap(); }
+
+println!("Result: {}", *counter.lock().unwrap());   // 10
+```
+
+**Mutex 的用法**：
+
+- `.lock()` 返回一个 `Result<MutexGuard, ...>`（其他线程 panic 时会 poisoned）；
+- `MutexGuard` 是"锁的 handle"——**离开作用域时自动解锁**（就是 RAII）；
+- 通过 `MutexGuard` 能像引用一样访问里面的数据。
+
+**RwLock**：**读写锁**——多个读者可以同时读，但写要独占。适合"读多写少"的场景。
+
+## 8. Weak：打破循环引用
+
+**Rc/Arc 的一个陷阱：循环引用会导致内存泄漏**。**引用计数永远不会归零**——数据永远不 drop：
+
+```rust
+struct Node {
+    value: i32,
+    next: Option<Rc<RefCell<Node>>>,
+}
+
+let a = Rc::new(RefCell::new(Node { value: 1, next: None }));
+let b = Rc::new(RefCell::new(Node { value: 2, next: Some(Rc::clone(&a)) }));
+a.borrow_mut().next = Some(Rc::clone(&b));
+
+// a 和 b 互相引用 - 引用计数各是 2
+// 即使 main 结束，也无法 drop
+```
+
+**解决**：**Weak 引用**——**不增加引用计数**：
+
+```rust
+use std::rc::{Rc, Weak};
+
+struct Node {
+    value: i32,
+    parent: RefCell<Weak<Node>>,   // 指向父节点，用 Weak
+    children: RefCell<Vec<Rc<Node>>>,  // 指向子节点，用 Rc
+}
+```
+
+**Weak 的用法**：
+
+- **`Rc::downgrade(&rc)`** 创建 Weak；
+- **`weak.upgrade()`** 尝试恢复为 Rc（可能失败，如果原数据已经 drop）；
+- 返回 `Option<Rc<T>>`——你要处理 None 的情况。
+
+**树结构里典型的用法**：**子节点用 Rc（父拥有子）、父节点用 Weak（子知道父但不拥有）**。
+
+## 9. Deref trait：让智能指针"像引用一样用"
+
+**为什么 `println!("{}", *b)` 能用**？因为 Box 实现了 `Deref`：
+
+```rust
+impl<T> Deref for Box<T> {
+    type Target = T;
+    fn deref(&self) -> &T {
+        &**self   // 假的实现，实际是编译器 intrinsic
+    }
+}
+```
+
+**Deref coercion**：**Rust 会自动把 `&Box<T>` 转成 `&T`**——让 Box 在调用方法时"透明"：
+
+```rust
+let b = Box::new(String::from("hello"));
+println!("{}", b.len());   // 直接调 String 的方法
+```
+
+**自定义 Deref**：**给自己的类型加"智能指针"行为**：
+
+```rust
+struct MyBox<T>(T);
+
+impl<T> Deref for MyBox<T> {
+    type Target = T;
+    fn deref(&self) -> &T { &self.0 }
+}
+
+let x = MyBox(String::from("hello"));
+println!("{}", x.len());   // 通过 Deref 自动调 String::len
+```
+
+**注意**：**过度自定义 Deref 会让代码难理解**——**只在真正是"包一层"的场景用**（比如 Box、Rc、String 自己）。
+
+## 10. Drop trait：自定义析构
+
+**Drop 让你在值被销毁时执行代码**——就是 RAII：
+
+```rust
+struct Resource {
+    name: String,
+}
+
+impl Drop for Resource {
+    fn drop(&mut self) {
+        println!("Dropping {}", self.name);
+    }
+}
+
+{
+    let r = Resource { name: String::from("A") };
+    // ...
+}   // 这里 r drop，打印 "Dropping A"
+```
+
+**大多数场景不用手写 Drop**——Rust 会递归 drop 所有字段。**但涉及"外部资源"时要**：
+
+- 关闭文件；
+- 释放锁；
+- 通知外部服务；
+- 释放 unsafe 分配的内存。
+
+**手动 drop**：`std::mem::drop(x)`——**编译器认为的"提前 drop"**。**不能直接调 `x.drop()`**——那是 trait 方法，用户不能显式调。
+
+## 11. 常见的组合
+
+**`Rc<RefCell<T>>`**：**单线程、多 owner、可变**——常用于图和树。
+
+**`Arc<Mutex<T>>`**：**多线程、多 owner、可变**——多线程共享状态的标配。
+
+**`Arc<RwLock<T>>`**：**多线程、多 owner、读多写少**——只有一处在写、多处在读时用。
+
+**`Box<dyn Trait>`**：**动态派发的对象**——异构集合、返回不同类型。
+
+**`Box<T>` + 自定义 Drop**：**RAII 管理外部资源**。
+
+**看到 `Arc<Mutex<...>>` 就知道是多线程共享**——已经是 Rust 里的"套路"。
+
+## 12. 一个真实例子：图数据结构
+
+**双向链表**：
+
+```rust
+use std::cell::RefCell;
+use std::rc::{Rc, Weak};
+
+struct Node {
+    value: i32,
+    next: RefCell<Option<Rc<Node>>>,
+    prev: RefCell<Option<Weak<Node>>>,   // 用 Weak 防循环
+}
+
+fn main() {
+    let a = Rc::new(Node {
+        value: 1,
+        next: RefCell::new(None),
+        prev: RefCell::new(None),
+    });
+    let b = Rc::new(Node {
+        value: 2,
+        next: RefCell::new(None),
+        prev: RefCell::new(Some(Rc::downgrade(&a))),
+    });
+    *a.next.borrow_mut() = Some(Rc::clone(&b));
+
+    println!("a.value = {}", a.value);
+    println!("a.next.value = {}", a.next.borrow().as_ref().unwrap().value);
+    if let Some(prev) = b.prev.borrow().as_ref().and_then(|w| w.upgrade()) {
+        println!("b.prev.value = {}", prev.value);
+    }
+}
+```
+
+**这就是"Rust 里的双向链表"**——比 C 里麻烦得多。**这也是为什么"用 Rust 实现链表"经常被拿来当难题**——**Rust 的所有权模型对"共享可变数据"是有摩擦的**。
+
+**实际生产中很少手写链表**——用标准库的 `LinkedList` 或者 `VecDeque`。
+
+## 13. 常见错误
+
+**Rc 传给别的线程**：
+
+```rust
+use std::rc::Rc;
+use std::thread;
+
+let rc = Rc::new(5);
+thread::spawn(move || println!("{}", rc));   // 错！Rc 不是 Send
+```
+
+**Rc 不能跨线程**——用 Arc。
+
+**RefCell 借用冲突**：
+
+```rust
+let x = RefCell::new(5);
+let a = x.borrow();
+let b = x.borrow_mut();   // panic：已有 borrow
+```
+
+**多个可变借用或一个可变+一个不可变**：panic 而不是编译错。**运行时才发现**。
+
+**循环引用**：`Rc<X>` 里包 `Rc<Y>`，Y 又包 X——**互相引用，永远不 drop**。用 Weak 打破。
+
+**Deref 过度**：给自己的类型实现 Deref 让 API 一堆隐式转换——**代码难以推理**。**只在包一层时实现**。
+
+**过度用 Rc/RefCell**：新手容易一 borrow checker 报错就上 `Rc<RefCell<...>>`。**这是逃避编译器**——**大部分场景应该重新设计所有权**，而不是包一层引用计数。
+
+## 14. 什么时候用什么
+
+一张决策表：
+
+| 需求 | 用什么 |
+|-----|-------|
+| 只是想把东西放堆上 | `Box<T>` |
+| 递归数据类型 | `Box<T>` |
+| 动态派发 | `Box<dyn Trait>` |
+| 单线程多 owner | `Rc<T>` |
+| 单线程多 owner + 可变 | `Rc<RefCell<T>>` |
+| 多线程多 owner（只读）| `Arc<T>` |
+| 多线程多 owner + 可变 | `Arc<Mutex<T>>` |
+| 多线程读多写少 | `Arc<RwLock<T>>` |
+| 循环引用避免 | `Weak<T>` |
+| RAII 外部资源 | 自定义 `impl Drop` |
+
+## 15. 一些实践建议
+
+**优先用最简单的**：能用普通所有权就不用 Rc，能用 Rc 就不用 Arc。**Arc + Mutex 比普通 struct 复杂几个量级**——**只在真需要多线程时用**。
+
+**`Rc<RefCell>` 是"逃避 borrow checker"的信号**：**大部分场景应该重新设计**——比如把可变数据放在明确的一个 owner 里、别的地方只借用。
+
+**Mutex 的锁粒度**：一个大 struct 用一个 Mutex 会成为瓶颈——**拆成多个更细的锁**（但要注意死锁）。
+
+**测试并发代码**：手写 Arc + Mutex 很容易死锁或者 race——**用 loom 之类的工具做并发测试**。
+
+**性能敏感的场景用 parking_lot**：**`parking_lot::Mutex` 比标准库快、体积小**——重度使用锁的项目考虑替换。
+
+## 16. 一句话总结
+
+智能指针是 Rust 里"扩展所有权模型"的工具：
+
+- **`Box<T>`**：独占堆分配，最基础；
+- **`Rc<T>`**：单线程引用计数共享；
+- **`Arc<T>`**：多线程引用计数共享；
+- **`RefCell<T>`**：单线程内部可变（运行时检查）；
+- **`Mutex<T>` / `RwLock<T>`**：多线程共享 + 可变；
+- **`Weak<T>`**：打破循环引用；
+- **`Deref` / `Drop`**：自定义解引用和析构。
+
+**大部分 Rust 代码用普通所有权就够**——**智能指针是应对复杂场景的工具，不是默认选择**。**看到 `Rc<RefCell<...>>` 满天飞的代码，通常是设计有问题**。
+
+下一章讲**并发编程**——用好智能指针 + Send/Sync trait，Rust 让你写出安全的并发代码。
+
+</WordCount>

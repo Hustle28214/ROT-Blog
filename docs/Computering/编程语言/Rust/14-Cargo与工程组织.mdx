@@ -1,0 +1,574 @@
+import WordCount from '../../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+前面十三章讲的都是 Rust 语言本身。**但真实项目里你 40% 的时间在处理"工程组织"**——项目结构、依赖管理、测试、发布。**Cargo 让这一切变得极其顺手**——**这是 Rust 生态里最被称赞的一点**。
+
+这一章讲清楚 Cargo 和 Rust 项目组织。
+
+## 1. Cargo 是什么
+
+**Cargo = Rust 官方的包管理 + 构建 + 测试 + 发布工具**。
+
+**对比其他语言**：
+
+- Python：`pip` + `setuptools` + `virtualenv` + `pytest` + `twine` + ... = **Cargo 一个**；
+- Java：`maven` 或 `gradle`——功能对齐但复杂多倍；
+- C++：**基本没有统一方案**（cmake、conan、bazel 各自为战）。
+
+**Cargo 是 Rust 最强的加分项之一**——**新手第一天就能"cargo new + cargo run"跑起来**，很多老语言至今做不到。
+
+## 2. 常用 Cargo 命令
+
+**项目管理**：
+
+```bash
+cargo new my_project              # 新项目（默认可执行）
+cargo new my_lib --lib            # 新库项目
+cargo init                         # 在当前目录 init 一个项目
+```
+
+**构建**：
+
+```bash
+cargo build                       # debug 构建（默认）
+cargo build --release              # release 构建（优化）
+cargo run                          # 编译并运行
+cargo run -- arg1 arg2             # 传参数给程序
+cargo check                        # 只检查语法/类型，不生成二进制（快 3-5 倍）
+cargo clean                        # 清理 target 目录
+```
+
+**测试**：
+
+```bash
+cargo test                         # 跑所有测试
+cargo test some_name               # 只跑名字含 some_name 的测试
+cargo test -- --nocapture          # 显示 println! 输出
+cargo test -- --test-threads=1     # 单线程跑（默认多线程）
+```
+
+**依赖**：
+
+```bash
+cargo add serde                    # 添加依赖
+cargo add serde --features derive  # 加带 feature
+cargo remove serde                 # 移除
+cargo update                       # 更新 Cargo.lock 到最新兼容版
+cargo tree                         # 显示依赖树
+```
+
+**其他常用**：
+
+```bash
+cargo fmt                          # 格式化代码
+cargo clippy                       # 更严格的静态检查
+cargo doc --open                   # 生成文档并在浏览器打开
+cargo bench                        # 跑 benchmark（nightly 或用 criterion）
+cargo publish                      # 发布到 crates.io
+```
+
+**别小看 `cargo check`**——**它比 build 快得多，专门用于"我这段代码语法对不对"**——**日常开发大量用**。
+
+## 3. Cargo.toml：项目的心脏
+
+```toml
+[package]
+name = "my_project"
+version = "0.1.0"
+edition = "2021"
+authors = ["Your Name <you@example.com>"]
+description = "A short description"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/you/my_project"
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+tokio = { version = "1", features = ["full"] }
+anyhow = "1"
+
+[dev-dependencies]
+# 只在测试和 example 里用
+tempfile = "3"
+
+[build-dependencies]
+# build.rs 里用
+bindgen = "0.69"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+```
+
+**几个关键 section**：
+
+**`[package]`**：**项目元信息**——name、version、edition。
+
+**`[dependencies]`**：**生产依赖**。
+
+**`[dev-dependencies]`**：**只在 `cargo test` 和 `cargo bench` 时用**——不进最终产物。
+
+**`[build-dependencies]`**：**给 `build.rs` 用**——**编译时的辅助工具**。
+
+**`[profile.release]`**：**release 构建的配置**——**开高级优化**。
+
+## 4. 版本号（SemVer）
+
+**Rust 用 SemVer（Semantic Versioning）**：`major.minor.patch`。
+
+**Cargo.toml 里的写法和含义**：
+
+- `serde = "1.0"` ≡ `"^1.0"`：**允许 1.0 以上、2.0 以下的版本**（`1.x.y`）；
+- `serde = "1.0.0"` ≡ `"^1.0.0"`：**同上**（第一个非零版本号锁死）；
+- `serde = "0.1.0"` ≡ `"^0.1.0"`：**允许 0.1.x**（0.x 里 minor 是 breaking）；
+- `serde = "=1.0.0"`：**精确锁定 1.0.0**；
+- `serde = ">=1.0, <2"`：**明确范围**；
+- `serde = { version = "1.0", features = ["derive"] }`：**带 feature**；
+- `serde = { path = "../serde" }`：**本地路径**；
+- `serde = { git = "https://..." }`：**Git 依赖**。
+
+**Cargo.lock**：**锁死每个依赖的具体版本**——**保证团队里所有人跑同样的代码**。**二进制项目应该 commit Cargo.lock**、**库项目一般不 commit**（让下游选版本）。
+
+## 5. Features：可选功能
+
+**很多库有"可选功能"**——**默认关闭，用户按需打开**：
+
+```toml
+[dependencies]
+tokio = { version = "1", features = ["rt", "macros"] }
+```
+
+**tokio 有几十个 features**——**你只开需要的、体积更小**。
+
+**自己的库定义 features**：
+
+```toml
+[features]
+default = ["json"]
+json = ["dep:serde_json"]
+xml = ["dep:quick-xml"]
+
+[dependencies]
+serde_json = { version = "1", optional = true }
+quick-xml = { version = "0.31", optional = true }
+```
+
+**在代码里用 `cfg`**：
+
+```rust
+#[cfg(feature = "json")]
+pub fn parse_json(s: &str) -> ... { ... }
+
+#[cfg(feature = "xml")]
+pub fn parse_xml(s: &str) -> ... { ... }
+```
+
+**用户只开需要的 feature，编译时只编译对应代码**。
+
+## 6. 模块系统
+
+**Rust 的模块结构**：
+
+**单文件模块**：
+
+```rust
+// src/main.rs
+mod utils;   // 从 src/utils.rs 或 src/utils/mod.rs 加载
+
+fn main() {
+    utils::hello();
+}
+
+// src/utils.rs
+pub fn hello() {
+    println!("hello");
+}
+```
+
+**目录模块**：
+
+```
+src/
+├── main.rs
+├── utils/
+│   ├── mod.rs      # 或者 utils.rs 在外面（Rust 2018+ 都行）
+│   ├── strings.rs
+│   └── numbers.rs
+```
+
+```rust
+// src/utils/mod.rs
+pub mod strings;
+pub mod numbers;
+
+// 或者用 src/utils.rs（现代风格）：
+// pub mod strings;
+// pub mod numbers;
+```
+
+**用**：
+
+```rust
+// src/main.rs
+mod utils;
+
+fn main() {
+    utils::strings::to_upper("hello");
+    utils::numbers::square(5);
+}
+```
+
+## 7. 可见性
+
+**默认所有东西私有**——**别的模块看不到**。**要暴露就加 `pub`**：
+
+```rust
+mod inner {
+    pub fn public_fn() {}
+    fn private_fn() {}     // 别人看不到
+
+    pub struct Point {
+        pub x: f64,        // 字段单独控制
+        y: f64,            // 私有
+    }
+}
+
+// 外部
+inner::public_fn();        // OK
+// inner::private_fn();   // 错，私有
+```
+
+**更细的可见性**：
+
+- `pub(crate)`：**当前 crate 内可见**；
+- `pub(super)`：**父模块可见**；
+- `pub(in path)`：**指定路径内可见**。
+
+**use 简化**：
+
+```rust
+use std::collections::HashMap;
+use std::io::{self, Read, Write};   // 多个一起
+use crate::utils::strings::to_upper as upper;   // 起别名
+```
+
+## 8. main.rs vs lib.rs
+
+**一个项目可以有两种入口**：
+
+**`src/main.rs`**：**可执行文件入口**——`cargo run` 会跑它。
+
+**`src/lib.rs`**：**库入口**——**如果想让别人用你的代码**（作为依赖）：
+
+```rust
+// src/lib.rs
+pub mod utils;
+pub mod networking;
+
+pub fn init() { ... }
+```
+
+**别人的项目里 `use my_lib::utils`** 就能用你的代码。
+
+**同时有两个**：**很多项目有 `lib.rs` 定义核心逻辑，`main.rs` 只是简单封装**——**这样代码既能作为库被别人用，也能作为可执行文件**：
+
+```rust
+// src/main.rs
+use my_project::run;
+
+fn main() {
+    run();
+}
+
+// src/lib.rs
+pub fn run() { ... }
+```
+
+## 9. bin、examples、tests、benches
+
+**Cargo 的目录约定**：
+
+```
+my_project/
+├── Cargo.toml
+├── src/
+│   ├── main.rs        # 默认 binary
+│   └── lib.rs         # library
+├── src/bin/           # 多个 binary
+│   ├── tool_a.rs
+│   └── tool_b.rs
+├── examples/          # 示例代码
+│   └── simple.rs
+├── tests/             # 集成测试
+│   └── integration_test.rs
+├── benches/           # benchmarks
+│   └── perf.rs
+└── build.rs           # 构建脚本
+```
+
+**跑不同的东西**：
+
+```bash
+cargo run                    # src/main.rs 或 唯一 bin
+cargo run --bin tool_a       # 特定 binary
+cargo run --example simple   # 跑 example
+cargo test                    # 所有测试（unit + integration）
+cargo bench                   # benchmarks（需要 nightly 或 criterion）
+```
+
+## 10. 单元测试和集成测试
+
+**Rust 的测试非常方便**——**测试代码直接和产品代码放一起**。
+
+**单元测试**：放在**同一个文件的 `mod tests`** 里：
+
+```rust
+pub fn add(a: i32, b: i32) -> i32 { a + b }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_add() {
+        assert_eq!(add(2, 3), 5);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_panic() {
+        panic!("boom");
+    }
+}
+```
+
+**关键点**：
+
+- **`#[cfg(test)]`**：**只在 `cargo test` 时编译**——不进 release 二进制；
+- **`#[test]`**：**标记这个 fn 是测试**；
+- **`assert_eq!`、`assert!`、`assert_ne!`**：断言宏；
+- **`#[should_panic]`**：期望这个测试 panic。
+
+**集成测试**：放在 `tests/` 目录——**测试你的库的公共 API**：
+
+```rust
+// tests/integration_test.rs
+use my_project::add;
+
+#[test]
+fn test_addition() {
+    assert_eq!(add(1, 2), 3);
+}
+```
+
+**单元测试和集成测试的差别**：
+
+- 单元测试：**可以测私有函数、和产品代码在一起**；
+- 集成测试：**只能测公共 API、独立文件**——**模拟用户视角**。
+
+**跑测试**：
+
+```bash
+cargo test                    # 所有
+cargo test test_add           # 名字匹配 test_add 的
+cargo test -- --nocapture     # 显示 println!
+cargo test -- --show-output   # 类似
+```
+
+## 11. 文档：cargo doc
+
+**Rust 有一流的文档系统**——**注释里用 `///`（doc comment）**：
+
+```rust
+/// Add two numbers.
+///
+/// # Examples
+///
+/// ```
+/// let x = my_project::add(2, 3);
+/// assert_eq!(x, 5);
+/// ```
+pub fn add(a: i32, b: i32) -> i32 {
+    a + b
+}
+```
+
+**生成文档**：
+
+```bash
+cargo doc --open
+```
+
+**特殊**：**Markdown 里的代码块会被当成测试跑**——**"doctest"**——**保证文档里的例子确实能工作**。
+
+**这是 Rust 生态一个绝妙的设计**——**你的例子永远不会过时**，因为编译器会检查。
+
+## 12. 工作区（Workspace）
+
+**大项目会有多个 crate**——**工作区**让你在一个仓库里管理多个 crate：
+
+```toml
+# 顶层 Cargo.toml
+[workspace]
+resolver = "2"
+members = [
+    "core",
+    "cli",
+    "server",
+]
+```
+
+**目录结构**：
+
+```
+my_workspace/
+├── Cargo.toml           # 工作区 manifest
+├── Cargo.lock           # 共享的 lock 文件
+├── core/
+│   └── Cargo.toml       # 独立的 crate
+├── cli/
+│   └── Cargo.toml
+└── server/
+    └── Cargo.toml
+```
+
+**优点**：
+
+- **共享 target 目录**——**编译产物复用**；
+- **一个 Cargo.lock 保证依赖版本一致**；
+- **可以 `cargo build --workspace` 一次编所有**。
+
+**内部 crate 之间依赖**：
+
+```toml
+# server/Cargo.toml
+[dependencies]
+core = { path = "../core" }
+```
+
+## 13. crates.io：Rust 的包仓库
+
+**发布到 crates.io**：
+
+```bash
+cargo login              # 一次性登录
+cargo publish            # 发布当前版本
+```
+
+**发布前检查**：
+
+- `Cargo.toml` 里填全信息（description、license、repository）；
+- 版本号正确（**发布后不能删也不能改**）；
+- **`cargo package` 看看会打包什么进去**——**别把敏感文件传上去**。
+
+**crates.io 的规则**：
+
+- **版本不能删**——**只能 yank（撤回，但已下载的还能用）**；
+- **name 先到先得**——**热门名字早早被占**；
+- **免费且无限使用**。
+
+## 14. build.rs：编译时脚本
+
+**有时候你需要在编译前做点事**——**生成代码、链接库、检查环境**——**用 build.rs**：
+
+```rust
+// build.rs
+fn main() {
+    println!("cargo:rustc-link-lib=my_c_lib");   // 链接系统库
+    println!("cargo:rerun-if-changed=build.rs"); // 只有 build.rs 改了才重跑
+
+    // 或者用 bindgen 生成 FFI 绑定：
+    let bindings = bindgen::Builder::default()
+        .header("wrapper.h")
+        .generate()
+        .expect("gen bindings");
+    bindings.write_to_file("src/bindings.rs").unwrap();
+}
+```
+
+**Cargo 编译前会先跑 build.rs**——**它输出的特殊 println 会被 Cargo 识别为指令**。
+
+## 15. Cargo 常用第三方工具
+
+**很多常用的功能是通过 cargo 子命令扩展的**——**装了之后 `cargo xxx` 直接用**：
+
+- **`cargo-edit`**：`cargo add`、`cargo rm`（Rust 1.62 之前）；
+- **`cargo-watch`**：**文件变化自动 recompile / test**——`cargo watch -x test`；
+- **`cargo-expand`**：**看宏展开后的代码**；
+- **`cargo-outdated`**：**检查过期依赖**；
+- **`cargo-audit`**：**检查依赖的已知漏洞**；
+- **`cargo-bloat`**：**分析二进制大小占用**；
+- **`cargo-flamegraph`**：**性能分析生成火焰图**；
+- **`cargo-nextest`**：**更快的 test runner**——**并发跑测试，输出更友好**。
+
+**安装**：`cargo install cargo-watch`。
+
+## 16. Release 优化
+
+**默认 release 编译已经不错**，但可以进一步调：
+
+```toml
+[profile.release]
+opt-level = 3               # 优化等级（默认 3）
+lto = "fat"                 # Link Time Optimization：全局优化
+codegen-units = 1           # 单元数（越少优化越好，编译越慢）
+panic = "abort"             # panic 直接崩溃（省栈展开代码）
+strip = true                # 去掉调试符号（减小体积）
+```
+
+**代价**：
+
+- **编译时间大幅上升**——`lto = "fat" + codegen-units = 1` 可能慢 3-5 倍；
+- **性能可能提升 5-15%**——具体看程序；
+- **二进制变小 20-50%**（strip + panic=abort）。
+
+**建议**：**日常开发用默认 release**，**发布前用 fat LTO + strip 打个精优版本**。
+
+## 17. 一些常见问题
+
+**Cargo.lock 提交不提交**：
+
+- **可执行项目**：**提交**——**保证团队一致**；
+- **库**：**通常不提交**——**让下游选自己的版本**。
+
+**依赖太多，编译太慢**：
+
+- 用 `cargo tree` 看依赖树；
+- 关掉不用的 features；
+- 一些库有"重"和"轻"版本（比如 `serde` 用 default features 还是不用）；
+- 用 sccache 缓存。
+
+**target 目录巨大**：**几个 GB 正常**——**target 里放了所有依赖的编译产物**。**可以定期 `cargo clean`**。
+
+**多平台构建**：**`cargo build --target x86_64-unknown-linux-musl`** 交叉编译到目标平台。**需要装对应的 toolchain（`rustup target add ...`）**。
+
+## 18. 一句话总结
+
+Cargo 是 Rust 生态里"最爽的部分"：
+
+- **一个工具**：**建项目、编译、测试、依赖、发布——全包**；
+- **Cargo.toml**：**心脏**——依赖、feature、profile；
+- **Cargo.lock**：**版本锁定**，binary 提交、lib 不提交；
+- **模块系统**：**默认私有，`pub` 暴露；`mod` 加载子模块**；
+- **测试内建**：**`#[test]` 和 `cargo test`，一分钟上手**；
+- **文档一流**：**`///` 注释 + doctest**；
+- **工作区**：**多 crate 项目**；
+- **生态**：**crates.io 有几十万个库**——**你想干啥基本都有现成的**。
+
+---
+
+到这里，Rust 专题的 14 章讲完了。整体覆盖了：
+
+- **基础**：语法、自定义类型（01-02）；
+- **核心**：所有权、借用、生命周期（03-05）；
+- **抽象**：泛型/trait、错误处理、闭包/迭代器（06-08）；
+- **进阶**：智能指针、并发、异步（09-11）；
+- **底层**：unsafe/FFI、宏（12-13）；
+- **工程**：Cargo（14）。
+
+**你走完这 14 章**，就已经能写正儿八经的 Rust 代码了——**从命令行工具到 web 服务、从数据处理到系统编程**。剩下的深入话题（unsafe 深度技巧、专业库、宏元编程）都是"某个具体方向深挖"的事。
+
+Rust 是一门"越用越顺手"的语言——**前两周被编译器骂，两个月后你会开始觉得别的语言不安全**。这套所有权 + 类型系统给你的信心，是真金白银的。**祝你编 Rust 顺利**。
+
+</WordCount>

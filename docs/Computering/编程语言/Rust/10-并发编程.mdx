@@ -1,0 +1,496 @@
+import WordCount from '../../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+**Rust 有个响亮的口号——"Fearless Concurrency"（无所畏惧的并发）**。这不是营销词——它的意思是**并发中最容易犯的错（数据竞争、迭代器失效、死锁）大部分在编译期就被拦下来**。
+
+这一章讲清楚 Rust 的并发编程——线程、消息传递、共享状态、Send/Sync。
+
+## 1. 线程：thread::spawn
+
+**基本用法**：
+
+```rust
+use std::thread;
+
+let handle = thread::spawn(|| {
+    for i in 1..10 {
+        println!("hello from spawned thread {}", i);
+    }
+});
+
+for i in 1..5 {
+    println!("hello from main thread {}", i);
+}
+
+handle.join().unwrap();   // 等 spawned thread 结束
+```
+
+**几个特点**：
+
+- **`thread::spawn` 接受一个闭包**——闭包会在新线程里跑；
+- **返回 `JoinHandle`**——用 `.join()` 等它结束；
+- **主线程结束时，所有其他线程也结束**（除非它们已经 join 过）。
+
+## 2. `move` 闭包：跨线程传数据
+
+**闭包在别的线程里跑，捕获的变量必须"跟着走"**：
+
+```rust
+let v = vec![1, 2, 3];
+
+let handle = thread::spawn(|| {
+    println!("{:?}", v);   // 错！编译器不确定 v 能活多久
+});
+```
+
+**修复**：加 `move`：
+
+```rust
+let v = vec![1, 2, 3];
+
+let handle = thread::spawn(move || {
+    println!("{:?}", v);   // v 被 move 到新线程
+});
+
+// println!("{:?}", v);   // 错，v 已经被 move
+```
+
+**规则**：**跨线程传数据几乎必须用 `move` 闭包**——**编译期保证数据只在一个线程里**。
+
+## 3. 消息传递：Channel
+
+**消息传递是并发编程里最经典的模型**——**"不要通过共享内存来通信，而是通过通信来共享内存"**（Go 语言的箴言，Rust 也支持）：
+
+```rust
+use std::sync::mpsc;   // multi-producer, single-consumer
+use std::thread;
+
+let (tx, rx) = mpsc::channel();
+
+thread::spawn(move || {
+    tx.send(String::from("hello")).unwrap();
+});
+
+let received = rx.recv().unwrap();
+println!("got: {}", received);
+```
+
+**注意**：
+
+- **`mpsc`**：**多生产者、单消费者**——多个 tx 可以 clone，rx 只有一个；
+- **`tx.send(v)`**：**转移所有权**——发送方失去 v；
+- **`rx.recv()`**：**阻塞**直到有消息或者所有 tx 都 drop；
+- **`rx.try_recv()`**：**非阻塞**——没消息就立刻返回 Err。
+
+**多个发送者**：
+
+```rust
+let (tx, rx) = mpsc::channel();
+
+for i in 0..5 {
+    let tx = tx.clone();
+    thread::spawn(move || {
+        tx.send(i).unwrap();
+    });
+}
+drop(tx);   // 关闭原 tx（否则 rx 一直等）
+
+for received in rx {   // 迭代直到所有 tx 关闭
+    println!("got: {}", received);
+}
+```
+
+**遍历接收器**：**`for received in rx`** 自动接收所有消息，直到所有 tx 关闭。
+
+## 4. 共享状态：Arc\<Mutex\<T\>\>
+
+上一章讲过。回顾一下最常见的模式：
+
+```rust
+use std::sync::{Arc, Mutex};
+use std::thread;
+
+let counter = Arc::new(Mutex::new(0));
+let mut handles = vec![];
+
+for _ in 0..10 {
+    let counter = Arc::clone(&counter);
+    let h = thread::spawn(move || {
+        let mut num = counter.lock().unwrap();
+        *num += 1;
+        // Mutex 在离开作用域时自动解锁
+    });
+    handles.push(h);
+}
+
+for h in handles { h.join().unwrap(); }
+println!("Result: {}", *counter.lock().unwrap());   // 10
+```
+
+**关键点**：
+
+- **`Arc` 让多个线程能共同拥有 Mutex**（Rc 不行，跨不了线程）；
+- **`Mutex::lock()` 返回一个 `MutexGuard`**——它是"锁的持有证明"；
+- **MutexGuard 离开作用域时自动解锁**——不会忘 unlock；
+- **如果一个线程持有锁时 panic**，锁会"中毒"——**其他线程再 lock 会失败**（这是防止看到"半损坏状态"）。
+
+## 5. Send 和 Sync：编译期的并发安全
+
+**Rust 编译期就能拦下大部分并发 bug**——**靠 Send 和 Sync 两个 marker trait**：
+
+**`Send`**：**类型可以在线程间"转移所有权"**——大部分类型都是 Send。
+
+**`Sync`**：**类型可以在多个线程间"共享引用"**——**`T` 是 Sync ⟺ `&T` 是 Send**。
+
+**这两个 trait 是 auto trait**——编译器根据字段自动推导。你不用手写。
+
+**哪些不是 Send**：
+
+- **`Rc<T>`**：引用计数是非原子的——两个线程同时 clone 会 race。**跨线程要用 Arc**。
+- **`RefCell<T>`**：借用检查是运行时的、非原子——**跨线程要用 Mutex/RwLock**。
+
+**哪些不是 Sync**：
+
+- **`Cell<T>` / `RefCell<T>`**：内部可变但不加锁。
+- **裸指针 `*mut T`**：不受任何检查。
+
+**编译器怎么用这些**：**`thread::spawn` 的参数要求 `Send + 'static`**——**编译期就检查你传的东西能不能跨线程**：
+
+```rust
+let rc = Rc::new(5);
+thread::spawn(move || {
+    println!("{}", rc);   // 错！Rc 不是 Send
+});
+```
+
+**这就是 Rust "fearless concurrency" 的核心**——**编译期就防止 data race**。
+
+## 6. Deadlock：编译器管不了
+
+**Send/Sync 防的是 data race**——**但死锁 Rust 编译期无法防**。你还是要自己小心：
+
+```rust
+let a = Arc::new(Mutex::new(0));
+let b = Arc::new(Mutex::new(0));
+
+// 线程 1：先锁 a，再锁 b
+let a1 = Arc::clone(&a);
+let b1 = Arc::clone(&b);
+let t1 = thread::spawn(move || {
+    let _l1 = a1.lock().unwrap();
+    thread::sleep(std::time::Duration::from_millis(10));
+    let _l2 = b1.lock().unwrap();
+});
+
+// 线程 2：先锁 b，再锁 a — 死锁！
+let a2 = Arc::clone(&a);
+let b2 = Arc::clone(&b);
+let t2 = thread::spawn(move || {
+    let _l1 = b2.lock().unwrap();
+    thread::sleep(std::time::Duration::from_millis(10));
+    let _l2 = a2.lock().unwrap();
+});
+```
+
+**避免死锁的经典规则**：
+
+- **所有线程按相同顺序获取锁**；
+- **锁的粒度尽量小**——lock 后立刻做完事就释放；
+- **别在持锁时做长时间操作**（尤其别 sleep、别 IO）；
+- **别在持锁时调用其他会 lock 的函数**——容易嵌套死锁。
+
+**避免嵌套锁**：能用一个 lock 就用一个——**减少复杂度**。
+
+## 7. RwLock：读写锁
+
+**Mutex 是"互斥"——任何时候只有一个持有者**。但很多场景**读多写少**——多个读者应该能同时读：
+
+```rust
+use std::sync::{Arc, RwLock};
+
+let data = Arc::new(RwLock::new(vec![1, 2, 3]));
+
+// 读：可以多个并发
+let data_r = Arc::clone(&data);
+thread::spawn(move || {
+    let reader = data_r.read().unwrap();
+    println!("{:?}", *reader);
+});
+
+// 写：独占
+let data_w = Arc::clone(&data);
+thread::spawn(move || {
+    let mut writer = data_w.write().unwrap();
+    writer.push(4);
+});
+```
+
+**规则**：
+
+- **多个 `read()` 可以同时持有**；
+- **只有一个 `write()` 独占**；
+- **有 `write()` 时任何 `read()` 也不行**。
+
+**适用场景**：读远多于写。**读写差不多时用普通 Mutex**——RwLock 有额外开销。
+
+## 8. atomics：无锁并发原语
+
+**对于简单的整数、指针操作**，不需要 Mutex——**用原子操作**：
+
+```rust
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
+use std::thread;
+
+let counter = Arc::new(AtomicUsize::new(0));
+let mut handles = vec![];
+
+for _ in 0..10 {
+    let counter = Arc::clone(&counter);
+    let h = thread::spawn(move || {
+        counter.fetch_add(1, Ordering::SeqCst);
+    });
+    handles.push(h);
+}
+
+for h in handles { h.join().unwrap(); }
+println!("Result: {}", counter.load(Ordering::SeqCst));
+```
+
+**Rust 提供的原子类型**：
+
+- `AtomicBool`、`AtomicUsize`、`AtomicIsize`、`AtomicPtr<T>`；
+- 各种整数类型：`AtomicU8` / `U16` / `U32` / `U64` / `I8` / `I16` / `I32` / `I64`。
+
+**常用操作**：
+
+- `.load(order)`：读；
+- `.store(val, order)`：写；
+- `.fetch_add(n, order)`：原子加，返回旧值；
+- `.compare_exchange(old, new, ...)`：CAS。
+
+**Ordering（内存排序）**：
+
+- `Relaxed`：**最弱**——只保证原子性，不保证顺序；
+- `Acquire` / `Release`：**中等**——用于同步；
+- `SeqCst`：**最强**——顺序一致；
+- **不确定选哪个用 SeqCst**——性能可能差一点点，但正确性最容易保证。
+
+**原子操作是构建 lock-free 数据结构的基础**——比 Mutex 快，但正确性极难保证。**通用建议：能用 Mutex 就用 Mutex，性能瓶颈时再考虑 atomics**。
+
+## 9. 线程池：不要手动 spawn 一万个线程
+
+**每个线程有几十 KB 的栈**——**创建 10000 个线程会消耗几百 MB 内存**。而且线程创建/销毁开销大——**短任务不该开新线程**。
+
+**用线程池**：
+
+**rayon**：**数据并行的经典库**：
+
+```rust
+use rayon::prelude::*;
+
+let v: Vec<i32> = (0..1_000_000).collect();
+let sum: i64 = v.par_iter().map(|&x| x as i64).sum();
+```
+
+**`par_iter`** 让迭代器并行——**rayon 自动管理线程池，你不用操心**。
+
+**crossbeam**：更底层的并发原语（channels、scoped threads、原子操作等）。
+
+**tokio**：**异步 runtime**——大部分场景不需要显式管理线程池。下一章讲。
+
+**规则**：**日常写并发几乎不用 `thread::spawn`**——**用 rayon 或 tokio**。手写线程只在做底层库或者非常特殊的场景。
+
+## 10. Scoped Threads：借用局部变量的线程
+
+**普通 `thread::spawn` 要求 `'static`**——不能借用局部变量：
+
+```rust
+let v = vec![1, 2, 3];
+thread::spawn(|| {
+    println!("{:?}", v);   // 错，v 不 'static
+});
+```
+
+**用 `move` 也行，但要转移所有权**——**如果多线程都想访问 v 呢**？
+
+**`std::thread::scope`（Rust 1.63+）**：**scoped threads**——线程在 scope 结束时必定 join，可以借用局部变量：
+
+```rust
+let v = vec![1, 2, 3];
+
+std::thread::scope(|s| {
+    s.spawn(|| {
+        println!("thread 1: {:?}", v);   // 可以借用
+    });
+    s.spawn(|| {
+        println!("thread 2: {:?}", v);
+    });
+});   // scope 结束前所有线程必须 join
+```
+
+**这个特性 crossbeam 早就有**，标准库最近才加入。**局部借用 + 多线程**的场景 scoped threads 是最佳选择。
+
+## 11. 一个典型例子：工作队列
+
+**多个 worker 从队列取任务并行处理**：
+
+```rust
+use std::sync::mpsc;
+use std::thread;
+
+fn main() {
+    let (tx, rx) = mpsc::channel::<i32>();
+    let rx = std::sync::Arc::new(std::sync::Mutex::new(rx));
+
+    // 4 个 worker
+    let mut workers = vec![];
+    for id in 0..4 {
+        let rx = std::sync::Arc::clone(&rx);
+        let w = thread::spawn(move || {
+            loop {
+                let job = rx.lock().unwrap().recv();
+                match job {
+                    Ok(n) => println!("worker {} processing {}", id, n),
+                    Err(_) => break,
+                }
+            }
+        });
+        workers.push(w);
+    }
+
+    // 派发任务
+    for i in 0..20 {
+        tx.send(i).unwrap();
+    }
+    drop(tx);   // 关闭 channel，所有 worker 会退出
+
+    for w in workers { w.join().unwrap(); }
+}
+```
+
+**注意 rx 用 `Arc<Mutex<...>>`**——**mpsc 的 rx 不是 Send + Sync，多线程访问要包一层**。**tokio 有更好的多消费者 channel**（下一章讲）。
+
+## 12. Barrier 和 Condvar
+
+**Barrier**：**让 N 个线程"同步"——都到齐后一起前进**：
+
+```rust
+use std::sync::{Arc, Barrier};
+use std::thread;
+
+let barrier = Arc::new(Barrier::new(4));
+
+let mut handles = vec![];
+for i in 0..4 {
+    let b = Arc::clone(&barrier);
+    handles.push(thread::spawn(move || {
+        println!("phase 1: thread {}", i);
+        b.wait();
+        println!("phase 2: thread {}", i);
+    }));
+}
+for h in handles { h.join().unwrap(); }
+```
+
+**Condvar（条件变量）**：**让线程等待某个条件成立**——**通常和 Mutex 一起用**：
+
+```rust
+use std::sync::{Arc, Mutex, Condvar};
+
+let pair = Arc::new((Mutex::new(false), Condvar::new()));
+
+let p1 = Arc::clone(&pair);
+thread::spawn(move || {
+    let (lock, cvar) = &*p1;
+    let mut ready = lock.lock().unwrap();
+    while !*ready {
+        ready = cvar.wait(ready).unwrap();   // 等直到通知
+    }
+    println!("ready!");
+});
+
+let (lock, cvar) = &*pair;
+*lock.lock().unwrap() = true;
+cvar.notify_one();
+```
+
+**这些是底层原语**——**日常写代码通常用 channel 就够**。
+
+## 13. Send/Sync 是 auto trait 的例外
+
+**你能给自己类型手动实现 Send 或 Sync**：
+
+```rust
+struct MyType(*mut u8);
+
+unsafe impl Send for MyType {}
+unsafe impl Sync for MyType {}
+```
+
+**注意 `unsafe`**——**你是在向编译器承诺 "我知道这样安全"**。**大部分场景不该手动实现**——**依赖编译器自动推导**。
+
+**手动实现的场景**：
+
+- 你有裸指针字段，但知道它跨线程安全（比如底层 FFI）；
+- 你的类型内部有原子操作保证并发正确。
+
+## 14. 常见错误
+
+**忘 join**：主线程结束了，spawned 线程可能没跑完。**always join or use scoped threads**。
+
+**在 Mutex 里持锁太久**：
+
+```rust
+let mut guard = mutex.lock().unwrap();
+some_long_operation();     // 持锁很久
+```
+
+**修复**：**尽早释放锁**：
+
+```rust
+let value = {
+    let guard = mutex.lock().unwrap();
+    guard.clone()   // 拿到值就释放锁
+};   // guard drop
+some_long_operation_with(value);   // 不持锁
+```
+
+**死锁**：多个锁按不同顺序获取——**建立"锁的全局顺序"**。
+
+**Race condition 但过了编译**：Rust 编译器防 data race，但**逻辑上的 race condition**（比如 check-then-act）不管。要自己小心。
+
+**`unwrap()` 泛滥**：`.lock().unwrap()` 到处飞——**MutexGuard poisoning 时会 panic**。多线程程序 crash 一半是这样。改成 `.expect("...")` 或者处理 poisoning。
+
+**过度使用共享状态**：**大部分并发代码应该用消息传递**——**共享状态是最后手段**。
+
+## 15. 一些实践建议
+
+**优先消息传递、其次共享状态**：channel 比 Mutex 更容易推理、更少 bug。
+
+**日常用 rayon 或 tokio**：手写 `thread::spawn` 只在特殊场景。
+
+**并发单元测试**：**用 `loom` 之类工具做穷举测试**——普通测试跑十次可能没 race，但生产会崩。
+
+**看 Nomicon 的并发章节**：**"Rustonomicon"** 是 unsafe / 并发的深度指南——**要深入必读**。
+
+**别在 hot path 频繁加锁**：锁的开销小，但持锁时的竞争大。**尽量把共享数据的访问集中在少数点**。
+
+## 16. 一句话总结
+
+Rust 的并发核心：
+
+- **`thread::spawn`** 是最原始的线程 API，配合 `move` 闭包；
+- **消息传递**：`mpsc::channel` 生产消费，是首选；
+- **共享状态**：`Arc<Mutex<T>>` / `Arc<RwLock<T>>`；
+- **Send / Sync**：编译期检查跨线程安全，防 data race；
+- **原子操作**：性能敏感场景的无锁选项；
+- **线程池**：**rayon 数据并行、tokio 异步**——日常两选一，别手写；
+- **死锁编译器不管**——按固定顺序加锁、锁粒度小、别在锁里 sleep。
+
+**Fearless Concurrency 的含义**：**编译器帮你拦下 90% 的并发 bug**——**data race 直接编译错误**。剩下 10% 的死锁、逻辑 race 还是要靠工程实践。
+
+下一章讲**异步编程**——`async/await`、Future、tokio——**当代 Rust 处理 IO 密集型任务的标配**。
+
+</WordCount>

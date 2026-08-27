@@ -297,7 +297,7 @@ __global__ void kernel(const float * __restrict__ A, float * __restrict__ C) { .
 for (int i = 0; i < 8; i++) { ... }
 ```
 
-编译器展开循环，减少循环开销。**只适合小循环**（<16 次），太大会 register 爆炸。
+编译器展开循环，减少循环开销。**只适合小循环**（不超过 16 次），太大会 register 爆炸。
 
 ## 12. 常见问题与调优 checklist
 

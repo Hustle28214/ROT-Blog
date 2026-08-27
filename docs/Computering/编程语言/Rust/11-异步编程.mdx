@@ -1,0 +1,488 @@
+import WordCount from '../../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+**上一章讲的线程**是"每个任务一个 OS 线程"——**几十个线程可以，几万个不行**。**Web 服务器要同时处理几万个连接怎么办**？
+
+**异步（async）** 就是解决这个的——**几百个 OS 线程搞定几万个并发任务**。这是当代 Rust 处理 IO 密集型任务的标配。
+
+这一章讲清楚 async/await、Future、tokio。
+
+## 1. 为什么要异步
+
+**同步阻塞的问题**：
+
+```rust
+fn handle(conn: TcpStream) {
+    let mut buf = [0; 1024];
+    conn.read(&mut buf);   // 阻塞——等 IO 完成
+    process(&buf);
+    conn.write(&response); // 阻塞
+}
+```
+
+**这个线程在 read/write 时啥也没干**——只是**等 syscall 返回**。如果一个 read 要 100ms（网络 IO 常见），这个线程 100ms 内完全闲置。
+
+**每个连接一个线程**（"per-connection thread"模型）——OS 线程栈几十 KB，一万个连接就是几百 MB 内存。**上下文切换开销也大**。
+
+**异步的思路**：
+
+- **只在真的能进展时才用 CPU**——**等 IO 时切换到别的任务**；
+- **多个"任务"共享一个 OS 线程**——上下文切换在用户态，比 OS 快得多；
+- **任务在用户态可以有几千字节栈**——**几万个任务几百 MB 也够**。
+
+## 2. Future：Rust 里的异步
+
+**Rust 里所有异步的东西都是 Future**：
+
+```rust
+trait Future {
+    type Output;
+    fn poll(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Self::Output>;
+}
+
+enum Poll<T> {
+    Ready(T),
+    Pending,
+}
+```
+
+**一个 Future 表示"一个还没完成的计算"**——你调用 `poll` 问它："完了吗？"——它要么说"完了，结果给你"，要么说"没完，稍后再来问"。
+
+**你不用手写 Future**——**Rust 有 `async` 关键字帮你自动生成**：
+
+```rust
+async fn get_data() -> String {
+    // ...
+    String::from("hello")
+}
+```
+
+这个函数返回的类型是**"某个实现了 `Future<Output = String>` 的匿名类型"**——**编译器自动生成状态机**。
+
+## 3. `async` 和 `.await`
+
+**`async fn`**：函数体变成一个 Future——**函数不会立即执行**，返回一个 Future 对象：
+
+```rust
+async fn hello() {
+    println!("hello");
+}
+
+fn main() {
+    let f = hello();
+    // 此时 println! 还没执行！f 只是一个 Future。
+    // 需要 runtime 来 poll 它。
+}
+```
+
+**`.await`**：**在 async 函数里**"等 Future 完成"：
+
+```rust
+async fn get() -> u32 {
+    let a = fetch_a().await;   // 等 fetch_a 完成
+    let b = fetch_b().await;   // 等 fetch_b 完成
+    a + b
+}
+```
+
+**注意**：**`.await` 只能在 `async fn` 或 `async {}` 块里用**。
+
+**关键点**：**`fetch_a().await` 期间当前任务会 yield 出去**——**这个线程可以去干别的任务**。等 fetch_a 完成时才回来继续。
+
+## 4. 为什么需要 runtime
+
+**Future 是懒的**——**它自己不会跑，需要有人调用 `.poll()`**。**这个"有人"就是 async runtime**。
+
+**Rust 标准库不带 runtime**——**要用第三方**：
+
+- **tokio**：**最主流**，功能全，生态最大；
+- **async-std**：类似标准库风格；
+- **smol**：轻量。
+
+**99% 场景用 tokio**。
+
+**用 tokio 跑 async 代码**：
+
+```rust
+#[tokio::main]
+async fn main() {
+    println!("hello, async!");
+    let s = get_data().await;
+    println!("{}", s);
+}
+
+async fn get_data() -> String {
+    String::from("hello")
+}
+```
+
+**`#[tokio::main]` 宏**：**把 main 变成同步入口，内部启动 tokio runtime 跑 async main**。
+
+**要用 tokio 得加依赖**：
+
+```toml
+[dependencies]
+tokio = { version = "1", features = ["full"] }
+```
+
+## 5. 并发：join
+
+**`.await` 是顺序的**——两个都要等：
+
+```rust
+let a = fetch_a().await;   // 100ms
+let b = fetch_b().await;   // 100ms
+// 总 200ms
+```
+
+**想并发**——用 `tokio::join!`：
+
+```rust
+let (a, b) = tokio::join!(fetch_a(), fetch_b());
+// 100ms（两者并发）
+```
+
+**`join!` 让多个 Future 同时进展**——**都完成才返回**。
+
+**多个未确定数量的 Future**——**用 `FuturesUnordered`** 或者 tokio 的 `join_all`：
+
+```rust
+use futures::future::join_all;
+
+let handles: Vec<_> = urls.iter().map(|u| fetch(u)).collect();
+let results = join_all(handles).await;
+```
+
+## 6. Spawn：让 Future 后台跑
+
+**`tokio::spawn`**：**把 Future 交给 runtime，让它在别的地方跑**——**返回一个 JoinHandle**：
+
+```rust
+let handle = tokio::spawn(async {
+    println!("running in background");
+    42
+});
+
+// 干点别的事
+println!("main task");
+
+let result = handle.await.unwrap();   // 等 spawn 出去的完成
+println!("got {}", result);
+```
+
+**注意**：**`tokio::spawn` 里的 Future 要求 `Send + 'static`**——和 `thread::spawn` 类似。
+
+**tokio 的调度器**：**多线程 runtime 默认用多个 worker thread**（等于 CPU 核数）——**任务在这些线程间迁移**。
+
+## 7. tokio 的常用 API
+
+**IO**：`tokio::net::TcpStream`、`tokio::fs::File`——**都是 async 版本**：
+
+```rust
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::net::TcpStream;
+
+async fn fetch(addr: &str) -> Result<String, Box<dyn std::error::Error>> {
+    let mut stream = TcpStream::connect(addr).await?;
+    stream.write_all(b"GET / HTTP/1.0\r\n\r\n").await?;
+    let mut buf = String::new();
+    stream.read_to_string(&mut buf).await?;
+    Ok(buf)
+}
+```
+
+**注意**：**要用 `AsyncReadExt` / `AsyncWriteExt` 才能用 `.read`、`.write`——它们提供 async 方法**。
+
+**Timer**：
+
+```rust
+use tokio::time::{sleep, Duration};
+
+async fn wait_and_print() {
+    sleep(Duration::from_secs(2)).await;
+    println!("done");
+}
+```
+
+**Channel**：**mpsc、oneshot、broadcast**：
+
+```rust
+use tokio::sync::mpsc;
+
+let (tx, mut rx) = mpsc::channel(100);
+
+tokio::spawn(async move {
+    tx.send("hello").await.unwrap();
+});
+
+let msg = rx.recv().await;
+println!("{:?}", msg);
+```
+
+**Mutex**：tokio 有 async 版本的 Mutex——**不阻塞线程**：
+
+```rust
+use tokio::sync::Mutex;
+
+let m = Mutex::new(0);
+let mut guard = m.lock().await;   // 注意 .await
+*guard += 1;
+```
+
+**注意**：**如果只是短暂持锁，用 `std::sync::Mutex` 更快**——**只有可能持锁很久的场景才用 async Mutex**。
+
+## 8. select!：多路等待
+
+**`tokio::select!`** 让你**同时等多个 Future，谁先完成用谁**：
+
+```rust
+use tokio::time::{sleep, Duration};
+
+tokio::select! {
+    result = fetch_data() => {
+        println!("got data: {:?}", result);
+    }
+    _ = sleep(Duration::from_secs(5)) => {
+        println!("timeout!");
+    }
+}
+```
+
+**这就是"超时"的经典写法**——**要么数据来了、要么 5 秒到了，先来者执行**。
+
+**注意**：`select!` 的**每个分支应该是 cancel-safe 的**——因为一个分支完成后，别的分支会被 drop。**不 cancel-safe 的 Future 可能在中间被 drop 导致状态错乱**。
+
+## 9. 异步中的所有权
+
+**异步 Future 里的所有权规则和普通 Rust 一样，但有些特殊**：
+
+**跨 `.await` 的引用**：
+
+```rust
+async fn f() {
+    let s = String::from("hello");
+    let r = &s;
+    some_async_call().await;   // 挂起、恢复
+    println!("{}", r);          // r 依然有效
+}
+```
+
+**为什么这样有效**：**编译器把整个 async 函数变成一个状态机**——**s 和 r 都保存在状态机里**。
+
+**但——如果 Future 被 spawn 到别的线程呢**？**引用就不能跨线程了**——**编译器会拒绝**。
+
+**规则**：**Future 里的引用要么是 `'static` 的，要么在整个 Future 里都合法**。
+
+## 10. Send 和 async
+
+**tokio 的 spawn 要求 Send**——**Future 里跨 `.await` 持有的东西必须是 Send**：
+
+```rust
+async fn bad() {
+    let rc = std::rc::Rc::new(5);   // Rc 不是 Send
+    some_call().await;               // 跨 .await 时 rc 还活着
+    println!("{}", rc);
+}
+
+tokio::spawn(bad());   // 编译错误！
+```
+
+**修复**：**用 Arc 代替**，或者**让 rc 在 `.await` 之前 drop**：
+
+```rust
+async fn good() {
+    let arc = std::sync::Arc::new(5);
+    some_call().await;
+    println!("{}", arc);
+}
+```
+
+**新手最容易踩的坑**：**MutexGuard 跨 await**——**导致锁一直被持有**，其他任务卡住：
+
+```rust
+async fn bad() {
+    let guard = mutex.lock().unwrap();   // std::sync::Mutex
+    some_async_call().await;              // 锁一直被持着，其他线程干不了活
+}
+```
+
+**修复**：**要么在 await 之前释放锁**（一般是把关键区拆到独立块里让 guard 提前 drop），**要么用 tokio::sync::Mutex**（可以 `.await`）。
+
+## 11. `async` 和 trait
+
+**Rust 一直到 1.75 才支持 `async fn in trait`**——**之前需要用 async_trait crate**：
+
+```rust
+use async_trait::async_trait;
+
+#[async_trait]
+trait Store {
+    async fn get(&self, key: &str) -> Option<String>;
+    async fn set(&self, key: String, value: String);
+}
+```
+
+**1.75+ 可以直接**：
+
+```rust
+trait Store {
+    async fn get(&self, key: &str) -> Option<String>;
+}
+```
+
+但依然有一些限制（比如没法直接和 `dyn Trait` 一起用）。**过渡期两种写法都能看到**。
+
+## 12. Runtime 的选择
+
+**tokio 是主流**——**功能最全、社区最活跃、性能好**。
+
+**基本用法**：
+
+```toml
+tokio = { version = "1", features = ["full"] }
+```
+
+**features**：
+
+- **`rt`**：runtime 核心；
+- **`rt-multi-thread`**：多线程 runtime；
+- **`macros`**：`#[tokio::main]`、`select!` 等宏；
+- **`net`**：TCP/UDP；
+- **`fs`**：文件 IO；
+- **`io-util`**：AsyncReadExt/AsyncWriteExt；
+- **`sync`**：Mutex/RwLock/mpsc/oneshot；
+- **`time`**：sleep/timeout/interval；
+- **`full`**：**全部打开**——原型开发省事，生产可以按需精简。
+
+**tokio runtime 类型**：
+
+- **单线程 (`current_thread`)**：所有任务在一个线程——**适合 CLI 工具、单 CPU 环境**；
+- **多线程 (`multi_thread`)** 默认：**worker 线程数 = CPU 核数**——**适合服务器**。
+
+## 13. 一个例子：并发 HTTP fetch
+
+用 **reqwest**（async HTTP client）：
+
+```toml
+tokio = { version = "1", features = ["full"] }
+reqwest = "0.11"
+futures = "0.3"
+```
+
+```rust
+use futures::future::join_all;
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let urls = vec![
+        "https://example.com",
+        "https://rust-lang.org",
+        "https://github.com",
+    ];
+
+    let handles: Vec<_> = urls
+        .iter()
+        .map(|url| async move {
+            let body = reqwest::get(*url).await?.text().await?;
+            Ok::<_, reqwest::Error>((url, body.len()))
+        })
+        .collect();
+
+    let results = join_all(handles).await;
+
+    for r in results {
+        match r {
+            Ok((url, size)) => println!("{}: {} bytes", url, size),
+            Err(e) => println!("Error: {}", e),
+        }
+    }
+    Ok(())
+}
+```
+
+**这段代码 3 个 URL 会并发请求——总时间约等于最慢的那个，而不是三者之和**。
+
+## 14. 一些常见问题
+
+**Q：async 比多线程快吗？**
+
+A：**看场景**。**IO 密集**（大量小任务等 IO）：async 快得多——**几万个连接一个线程都能撑住**。**CPU 密集**：async 没意义甚至更慢——**该用 rayon 等数据并行**。
+
+**Q：能混用同步和 async 代码吗？**
+
+A：**同步调用 async**：需要一个 runtime——**`tokio::runtime::Runtime::new()?.block_on(future)`**。**async 调用同步阻塞**：**是个大坑**——**会 block 整个 runtime worker**。**要用 `tokio::task::spawn_blocking`** 把阻塞代码送到专用线程池。
+
+**Q：为什么我的 async 函数不能 spawn？**
+
+A：**大概率是里面持有了 non-Send 类型**（Rc、RefCell、std::sync::MutexGuard 等）跨 await。**改用 Arc、Mutex 的 async 版**。
+
+**Q：为什么我的程序卡住了？**
+
+A：**多半是"async 里做了阻塞操作"**（读大文件、CPU 长计算、std Mutex 跨 await）——**把 runtime worker 阻塞了**。**要么改成 async 版、要么用 spawn_blocking**。
+
+## 15. 一些坑
+
+**async fn 什么都不做**：
+
+```rust
+async fn f() { println!("hi"); }
+f();   // 什么都不打印！
+```
+
+Future 是懒的——**不 `.await` 就不跑**。
+
+**忘 await**：
+
+```rust
+let result = fetch();   // result 是 Future 不是 Response
+// 应该：
+let result = fetch().await;
+```
+
+**编译器会警告**但可能被忽略。
+
+**用 std::sync::Mutex 跨 await**：**block runtime**。用 `tokio::sync::Mutex` 或者释放锁再 await。
+
+**用 std::thread::sleep**：**阻塞 runtime**。**用 tokio::time::sleep**。
+
+**`?` 在 async fn 里**：**完全没问题**——`?` 和 async 是正交的。
+
+**Spawn 的任务里 panic**：**JoinHandle.await 会返回 JoinError**——处理它。
+
+**多个 runtime 同时存在**：**tokio 一个进程一般只该有一个 runtime**——嵌套或多个 runtime 会 panic。
+
+**过度并发**：**spawn 太多任务，即使是 async 也会拖慢**——task 数量应该有个上限（用 semaphore 限流）。
+
+## 16. 生态
+
+**tokio 生态**：
+
+- **`reqwest`**：HTTP client；
+- **`hyper`**：低层 HTTP；
+- **`axum`**：Web 框架（tokio 官方）；
+- **`sqlx`**：async SQL 客户端；
+- **`redis-rs`**（with tokio feature）；
+- **`tonic`**：gRPC；
+- **`tracing`**：结构化日志和追踪，为 async 设计。
+
+**tokio 是当前 Rust "backend 服务"的绝对标配**——**几乎每个网络应用都用它**。
+
+## 17. 一句话总结
+
+Rust 的异步编程：
+
+- **Future**：一个"未完成的计算"，通过 `poll` 推进；
+- **`async fn`**：写起来像同步，编译器把它变成状态机；
+- **`.await`**：等一个 Future 完成，期间当前任务 yield；
+- **需要 runtime**：**tokio 是主流选择**；
+- **`spawn`、`join!`、`select!`**：三大并发原语；
+- **Send / Sync**：跨线程 spawn 需要 Send；
+- **别在 async 里做阻塞**：用 async 版本或 `spawn_blocking`；
+- **别持 std Mutex 跨 await**：用 tokio::sync::Mutex 或者提前释放。
+
+学到这里你已经能写出真正的 async Rust 网络应用了——**这是 Rust 在 web 后端和分布式系统里的主战场**。
+
+下一章讲**unsafe 和 FFI**——Rust 里"关掉安全网"的能力，让你能和 C 库交互、写 low-level 数据结构。
+
+</WordCount>

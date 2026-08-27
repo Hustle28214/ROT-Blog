@@ -1,0 +1,446 @@
+import WordCount from '../../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+**你从第一章开始就在用宏**——`println!`、`vec!`、`#[derive(Debug)]`。**看到那个 `!` 或者 `#[...]` 就是宏**。
+
+**Rust 里有大量东西是宏而不是函数**——**因为宏能做函数做不到的事**：**接受任意数量参数、生成代码、在编译期展开**。这一章讲清楚 Rust 的宏。
+
+## 1. 为什么要有宏
+
+**先看看什么样的东西函数做不到**：
+
+**多参数**：`println!("{} + {} = {}", a, b, c)`——**参数数量不定**，函数只能接受固定数量。
+
+**编译期字符串检查**：`println!("{:?}", x)` 里 `{:?}` 和 `x` 的类型要匹配——**函数做不到，宏能**。
+
+**生成 struct 或 enum 定义**：`#[derive(Debug)]` 帮你生成 `impl Debug for MyType`——**函数不能生成代码**。
+
+**创建 DSL**：SQL 查询、正则、路由——很多 Rust 库用宏做 DSL。
+
+**总结**：**宏是"编译期的代码生成"**。**它比函数强大得多，但复杂得多**。
+
+## 2. 两种宏
+
+Rust 里有两种宏：
+
+**声明式宏（declarative macros）**：**用 `macro_rules!` 定义**——**类似"高级模式匹配 + 模板替换"**。
+
+**过程宏（procedural macros）**：**Rust 代码写的宏——把输入 token 变换成输出 token**——**功能更强**。分三种：
+- 自定义 derive（`#[derive(MyTrait)]`）；
+- 属性宏（`#[my_attr]`）；
+- 函数宏（`my_macro!(...)`）。
+
+**新手先学声明式**——**过程宏是"进阶"内容**。
+
+## 3. 一个简单的声明式宏
+
+**`vec!` 是标准库里的宏**：
+
+```rust
+let v = vec![1, 2, 3];
+```
+
+**它的定义简化版**：
+
+```rust
+macro_rules! vec {
+    ( $( $x:expr ),* ) => {
+        {
+            let mut temp = Vec::new();
+            $(
+                temp.push($x);
+            )*
+            temp
+        }
+    };
+}
+```
+
+**看起来复杂**，一点点拆开：
+
+- **`macro_rules! vec`**：定义一个叫 `vec` 的宏；
+- **`( $( $x:expr ),* )`**：**模式**——匹配"用逗号分隔的表达式列表"；
+- **`=>`**：模式匹配到就替换成 `=>` 右边的代码；
+- **`$( temp.push($x); )*`**：**对每个匹配的 $x 重复展开**。
+
+**调用 `vec![1, 2, 3]`** 展开成：
+
+```rust
+{
+    let mut temp = Vec::new();
+    temp.push(1);
+    temp.push(2);
+    temp.push(3);
+    temp
+}
+```
+
+## 4. 模式语法
+
+**声明式宏的模式非常灵活**：
+
+**片段说明符**：告诉宏解析器"接下来匹配什么"：
+
+- `$x:expr`：**表达式**（`1 + 2`、`foo()`）；
+- `$x:ident`：**标识符**（`foo`、`bar`）；
+- `$x:ty`：**类型**（`i32`、`Vec<T>`）；
+- `$x:pat`：**模式**（`Some(x)`、`_`）；
+- `$x:literal`：**字面量**（`42`、`"hello"`）；
+- `$x:stmt`：**语句**；
+- `$x:block`：**代码块**；
+- `$x:path`：**路径**（`std::collections::HashMap`）；
+- `$x:tt`：**token tree**（**最宽松，几乎啥都行**）；
+- `$x:item`：**顶层项**（fn、struct、mod 等）。
+
+**重复**：
+
+- `$( ... ),*`：**零次或多次，逗号分隔**；
+- `$( ... ),+`：**一次或多次，逗号分隔**；
+- `$( ... );*`：**零次或多次，分号分隔**；
+- `$( ... )*`：**零次或多次，无分隔符**。
+
+## 5. 多个规则
+
+**一个宏可以有多个分支——像 match 一样**：
+
+```rust
+macro_rules! my_min {
+    ($x:expr) => {
+        $x   // 单个值直接返回
+    };
+    ($x:expr, $y:expr) => {
+        if $x < $y { $x } else { $y }
+    };
+    ($x:expr, $($rest:expr),+) => {
+        my_min!($x, my_min!($($rest),+))   // 递归
+    };
+}
+
+let m = my_min!(3, 1, 4, 1, 5, 9);   // 1
+```
+
+**这展示了宏的一个强大特性**——**递归展开**。
+
+## 6. 卫生性（Hygiene）
+
+**Rust 的宏是"卫生的"**——**宏里定义的变量不会和调用点的变量冲突**：
+
+```rust
+macro_rules! using_a {
+    () => {
+        let a = 42;
+        println!("in macro: {}", a);
+    };
+}
+
+fn main() {
+    let a = 1;
+    using_a!();
+    println!("in main: {}", a);   // 还是 1，宏里的 a 不影响外面
+}
+```
+
+**这是 C 宏最大的问题（`#define` 会污染命名空间）Rust 直接解决**。
+
+**副作用**：**宏里用的标识符必须以某种方式"从外面拿进来"**——**要么是标准库、要么是通过参数传进来**。
+
+## 7. 一个实用的例子
+
+**写一个 `hashmap!` 宏**——**像 vec! 一样方便地建 HashMap**：
+
+```rust
+macro_rules! hashmap {
+    ( $( $key:expr => $value:expr ),* $(,)? ) => {
+        {
+            let mut m = std::collections::HashMap::new();
+            $(
+                m.insert($key, $value);
+            )*
+            m
+        }
+    };
+}
+
+let m = hashmap! {
+    "one" => 1,
+    "two" => 2,
+    "three" => 3,
+};
+```
+
+**几个细节**：
+
+- **`$(,)?`**：**允许最后一个逗号**——**方便格式化**；
+- **`=>` 是任意 token**——匹配"key => value"这种形式；
+- **模式里的 `=>` 和分支的 `=>` 是两回事**——前者是宏的模式一部分，后者是分支分隔符。
+
+## 8. 常用的标准库宏
+
+**打印**：
+
+- `println!` / `eprintln!`：格式化打印到 stdout / stderr；
+- `print!` / `eprint!`：不加换行；
+- `format!`：**返回一个 String**，不打印；
+- `write!` / `writeln!`：写到某个 Writer（比如 String、File）。
+
+**集合**：
+
+- `vec![...]`：建 Vec；
+- **HashMap / BTreeMap 没有宏**——**用第三方 crate（`maplit`）** 或者自己写。
+
+**assert**：
+
+- `assert!(cond)`：条件不为真就 panic；
+- `assert_eq!(a, b)`、`assert_ne!(a, b)`：**打印 a 和 b 的值**，比 `assert!(a == b)` 好用。
+
+**其他**：
+
+- `panic!(msg)`：主动 panic；
+- `unimplemented!()` / `todo!()`：占位符，运行到就 panic（区别只是消息）；
+- `unreachable!()`：断言"这里不该执行到"——运行到就 panic；
+- `dbg!(x)`：**打印 x 的表达式和值，然后返回 x**——**调试神器**：
+
+```rust
+let n = dbg!(2 + 3);   // 打印 "[src/main.rs:1] 2 + 3 = 5"，n = 5
+```
+
+- `include_str!("path")`：**编译期把文件内容 include 成字符串**——**用于嵌入配置、模板**；
+- `include_bytes!("path")`：类似，嵌入 &[u8]。
+
+## 9. 过程宏：更强大的元编程
+
+**过程宏是 Rust 代码生成 Rust 代码**——**输入是 TokenStream，输出也是 TokenStream**。
+
+**过程宏必须在单独的 crate 里**，crate 类型 `proc-macro`：
+
+```toml
+[lib]
+proc-macro = true
+```
+
+**三种过程宏**：
+
+**1. 自定义 derive**：
+
+```rust
+#[derive(MyTrait)]
+struct MyStruct { ... }
+```
+
+**你写一个过程宏 `MyTrait`**——**它接收 `MyStruct` 的 tokens、生成 `impl MyTrait for MyStruct { ... }` 的 tokens**。
+
+**`serde::Serialize` 就是这么工作的**：
+
+```rust
+#[derive(Serialize, Deserialize)]
+struct Config { name: String, value: i32 }
+```
+
+**编译期 serde 生成对应的 impl**——你运行时几乎零开销。
+
+**2. 属性宏**：
+
+```rust
+#[route(GET, "/")]
+fn index() { ... }
+```
+
+**输入是"路径 GET, / 加 `fn index() { ... }`"，输出可以是任意 tokens**——**web 框架用得多**（如 axum、actix、rocket）。
+
+**3. 函数宏**：
+
+```rust
+sql!(SELECT * FROM users WHERE id = 1);
+```
+
+**这些不是 macro_rules 能做的**——**函数宏用过程宏能解析任意 DSL**。
+
+## 10. 写一个简单的过程宏
+
+**过程宏比较麻烦**——**要单独 crate、要用 `syn` 和 `quote` 库**。
+
+**Cargo.toml**：
+
+```toml
+[lib]
+proc-macro = true
+
+[dependencies]
+syn = "2"
+quote = "1"
+proc-macro2 = "1"
+```
+
+**src/lib.rs**：
+
+```rust
+use proc_macro::TokenStream;
+use quote::quote;
+use syn::{parse_macro_input, DeriveInput};
+
+#[proc_macro_derive(HelloName)]
+pub fn derive_hello_name(input: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(input as DeriveInput);
+    let name = &input.ident;
+
+    let expanded = quote! {
+        impl #name {
+            fn hello() {
+                println!("Hello from {}", stringify!(#name));
+            }
+        }
+    };
+
+    TokenStream::from(expanded)
+}
+```
+
+**使用**：
+
+```rust
+use my_macros::HelloName;
+
+#[derive(HelloName)]
+struct Foo;
+
+fn main() {
+    Foo::hello();   // "Hello from Foo"
+}
+```
+
+**关键库**：
+
+- **`syn`**：**parse Rust 代码为 AST**——处理 tokens；
+- **`quote`**：**用 template 语法生成 tokens**——`quote! { ... }` 里可以插值 `#var`；
+- **`proc-macro2`**：桥接 proc_macro 和 syn/quote，用起来更方便。
+
+## 11. 宏的常用场景
+
+**声明式宏**：
+
+- **构造集合**：`vec!`、`hashmap!`；
+- **格式化输出**：`println!`、`format!`；
+- **重复代码消除**：`log!(level, "message")`、`fields!(a, b, c)`；
+- **测试辅助**：`assert_eq!` 一族。
+
+**过程宏**：
+
+- **derive**：**serde、diesel、thiserror 大量用**；
+- **框架路由**：`#[get("/")]`、`#[route(...)]`；
+- **异步转换**：**tokio 的 `#[tokio::main]`**——**把 async main 变成同步 main + runtime**；
+- **DSL**：**sqlx query!、rocket forms、tauri 命令绑定**。
+
+## 12. 宏的调试
+
+**宏难 debug——因为它在编译期展开**。工具：
+
+**看展开后的代码**：`cargo expand`（需要 `cargo-expand` 工具）：
+
+```bash
+cargo install cargo-expand
+cargo expand
+```
+
+**这是理解宏行为的最强工具**——**看它到底生成了什么代码**。
+
+**编译错误里的 `-> here from macro invocation`**：**这些错误很难看**——**因为报错在展开后的代码里**。要慢慢找。
+
+**测试宏**：**过程宏可以写测试**——用 `trybuild` 之类的库测试"编译时期望的错误消息"。
+
+## 13. 常见错误
+
+**宏名字后面忘 `!`**：`println("hello")` 是错的，`println!("hello")` 才对。
+
+**片段说明符用错**：`$x:expr` 匹配表达式，但 `$x:ident` 只匹配标识符。**用 `tt` 时最宽松，但也最容易出错**。
+
+**在宏里用未导入的类型**：**宏是卫生的**——它假设"从调用点看你能访问哪些类型"。**你的宏依赖 `std::collections::HashMap`，用户要么有 `use` 语句、要么在宏里用全路径**：
+
+```rust
+macro_rules! hashmap {
+    ...
+    let mut m = std::collections::HashMap::new();   // 全路径最保险
+    ...
+}
+```
+
+**过度用宏**：**能用函数解决就用函数**——**宏难读、难维护、错误信息糟糕**。**只在函数真的做不到时才用宏**。
+
+**过程宏编译慢**：**每个过程宏 crate 编译时都要构建**——**大量过程宏会拖慢整个项目**。**注意分寸**。
+
+## 14. 一些实用建议
+
+**新手**：**先熟悉声明式宏**——大部分场景够用了。**过程宏是进阶话题**——**写多了业务代码你会自然想到用它**。
+
+**参考标准库和主流库**：**看 `vec!`、`serde_derive`、`thiserror`、`tokio::main`** 是怎么实现的——**是最好的学习材料**。
+
+**别写"通用宏库"**：**大部分项目里 3-5 个自定义宏就够**。**别学人家 crate 一次写几百个宏**——**你会后悔的**。
+
+**编写宏时先手写目标代码**：**先写"我期望这个宏展开成什么样"**——然后用宏把它模板化。**别一上来就写宏**。
+
+**测试宏的展开**：**用 `cargo expand` 反复看展开结果**——**保证宏行为如你所愿**。
+
+## 15. 一个真实例子：thiserror
+
+看看 `thiserror` crate 让错误类型定义变得多简洁：
+
+**没有 thiserror**：
+
+```rust
+#[derive(Debug)]
+enum MyError {
+    IoError(std::io::Error),
+    ParseError(String),
+}
+
+impl std::fmt::Display for MyError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            MyError::IoError(e) => write!(f, "IO error: {}", e),
+            MyError::ParseError(s) => write!(f, "Parse error: {}", s),
+        }
+    }
+}
+
+impl std::error::Error for MyError {}
+
+impl From<std::io::Error> for MyError {
+    fn from(e: std::io::Error) -> Self {
+        MyError::IoError(e)
+    }
+}
+```
+
+**用 thiserror**：
+
+```rust
+use thiserror::Error;
+
+#[derive(Error, Debug)]
+enum MyError {
+    #[error("IO error: {0}")]
+    IoError(#[from] std::io::Error),
+
+    #[error("Parse error: {0}")]
+    ParseError(String),
+}
+```
+
+**一个 derive 搞定 Display、Debug、Error、From**——**这就是过程宏的力量**。
+
+## 16. 一句话总结
+
+Rust 宏是"编译期元编程"：
+
+- **两种**：**声明式（`macro_rules!`）+ 过程宏（proc-macro）**；
+- **声明式宏**：模式匹配 + 模板替换，看 `vec!`、`println!`；
+- **过程宏**：Rust 代码生成 Rust 代码，看 `#[derive]`、`#[tokio::main]`；
+- **卫生性**：**宏里的标识符不会污染调用点**；
+- **调试神器**：**`cargo expand`** 看展开结果；
+- **原则**：**能用函数就用函数、宏是最后手段**——但需要时非常强大。
+
+**大部分 Rust 用户不会自己写复杂宏——但会大量用现成宏**。学会读懂 `#[derive(...)]` 背后干了什么、什么时候能用宏消灭重复，就够了。
+
+下一章讲**Cargo 和工程组织**——一个 Rust 项目从小到大怎么维护。
+
+</WordCount>

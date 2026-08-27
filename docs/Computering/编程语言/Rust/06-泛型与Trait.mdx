@@ -1,0 +1,494 @@
+import WordCount from '../../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+Rust 的类型系统真正让人感到"精妙"的地方，是**泛型（Generics）** 和 **Trait**。它们让代码既通用又高效——**一份代码在编译期为每个类型生成专用版本**，运行时零开销。
+
+这一章讲清楚这两个东西。
+
+## 1. 泛型：函数级别
+
+**朴素的问题**：你有两个函数，一个求 i32 的最大值、一个求 f64 的最大值——**逻辑完全一样**，只是类型不同：
+
+```rust
+fn largest_i32(list: &[i32]) -> i32 {
+    let mut largest = list[0];
+    for &x in list {
+        if x > largest { largest = x; }
+    }
+    largest
+}
+
+fn largest_f64(list: &[f64]) -> f64 {
+    let mut largest = list[0];
+    for &x in list {
+        if x > largest { largest = x; }
+    }
+    largest
+}
+```
+
+**重复代码**。用泛型合并：
+
+```rust
+fn largest<T: PartialOrd + Copy>(list: &[T]) -> T {
+    let mut largest = list[0];
+    for &x in list {
+        if x > largest { largest = x; }
+    }
+    largest
+}
+```
+
+**几个要点**：
+
+- **`<T>`** 声明类型参数；
+- **`T: PartialOrd + Copy`** 是 **trait bound**——限定 T 必须实现哪些 trait；
+- 函数体里 T 是"某个类型"，编译期确定。
+
+**编译期单态化**：编译器看到 `largest(&vec_of_i32)` 时，会生成一个 `largest_i32` 的专用版本；看到 `largest(&vec_of_f64)` 时又生成一个 `largest_f64`。**这叫单态化（monomorphization）**——**运行时零开销**。
+
+**代价**：编译时间和二进制大小——泛型用得多，产物变大。
+
+## 2. 泛型：结构体和枚举
+
+**上一章已经见过**：
+
+```rust
+struct Point<T> {
+    x: T,
+    y: T,
+}
+
+impl<T> Point<T> {
+    fn x(&self) -> &T {
+        &self.x
+    }
+}
+
+let p1 = Point { x: 5, y: 10 };            // Point<i32>
+let p2 = Point { x: 1.0, y: 4.0 };         // Point<f64>
+```
+
+**多个类型参数**：
+
+```rust
+struct Pair<T, U> {
+    first: T,
+    second: U,
+}
+
+let p = Pair { first: 1, second: "hello" };   // Pair<i32, &str>
+```
+
+## 3. Trait：接口
+
+**Trait 就是"一组方法签名"**——类似 Java 的 interface、C++ 的 concept。
+
+```rust
+trait Animal {
+    fn name(&self) -> &str;
+    fn sound(&self) -> String;
+
+    // 也可以有默认实现
+    fn introduce(&self) -> String {
+        format!("I am {}, I say {}", self.name(), self.sound())
+    }
+}
+```
+
+**实现 trait**：
+
+```rust
+struct Dog { name: String }
+struct Cat { name: String }
+
+impl Animal for Dog {
+    fn name(&self) -> &str { &self.name }
+    fn sound(&self) -> String { String::from("Woof!") }
+}
+
+impl Animal for Cat {
+    fn name(&self) -> &str { &self.name }
+    fn sound(&self) -> String { String::from("Meow!") }
+    // 覆盖默认实现
+    fn introduce(&self) -> String { format!("Cat {} purrs", self.name) }
+}
+
+let d = Dog { name: String::from("Rex") };
+let c = Cat { name: String::from("Whiskers") };
+println!("{}", d.introduce());
+println!("{}", c.introduce());
+```
+
+**几个特点**：
+
+- **`impl Trait for Type`**——把 trait 的能力加到 Type 上；
+- 默认方法可以调用其他 trait 方法（`self.name()`）；
+- 可以覆盖默认实现。
+
+## 4. Trait Bound：约束泛型
+
+Trait bound 让你说"这个泛型 T 必须实现某某 trait"：
+
+```rust
+fn print_all<T: Display>(list: &[T]) {
+    for x in list {
+        println!("{}", x);
+    }
+}
+```
+
+**多个 trait bound**：用 `+`：
+
+```rust
+fn print_and_hash<T: Display + Hash>(x: &T) { ... }
+```
+
+**where 从句**：约束多了写在函数签名里太乱，用 `where`：
+
+```rust
+fn complex<T, U>(x: T, y: U) -> i32
+where
+    T: Display + Clone,
+    U: Clone + Debug,
+{
+    // ...
+}
+```
+
+**where 从句是标准的、可读性更好**——尤其复杂签名。
+
+## 5. `impl Trait`：更简洁的写法
+
+**参数上**：
+
+```rust
+// 写法 1：泛型
+fn take<T: Display>(x: T) { ... }
+
+// 写法 2：impl Trait（等价）
+fn take(x: impl Display) { ... }
+```
+
+**返回值上**：**"我返回某个实现了 Trait 的类型，但不告诉你具体是什么"**：
+
+```rust
+fn make_adder(x: i32) -> impl Fn(i32) -> i32 {
+    move |y| x + y
+}
+
+let add5 = make_adder(5);
+println!("{}", add5(10));   // 15
+```
+
+**`impl Trait` 返回值特别适合闭包**——闭包的具体类型你没法写出来，`impl Fn(...) -> ...` 是唯一选择。
+
+**局限**：函数只能返回一个具体类型。如果分支返回不同类型（比如 `if ... { Dog } else { Cat }`），要用 `Box<dyn Trait>`（下一节讲）。
+
+## 6. Trait Object：dyn Trait
+
+**静态派发**（泛型）：**编译期知道具体类型**——每种类型生成专用代码。
+
+**动态派发**（trait object）：**运行时才知道类型**——通过虚表调用。
+
+**Trait object 的语法**：`Box<dyn Trait>` 或者 `&dyn Trait`：
+
+```rust
+fn make_animal(is_dog: bool) -> Box<dyn Animal> {
+    if is_dog {
+        Box::new(Dog { name: String::from("Rex") })
+    } else {
+        Box::new(Cat { name: String::from("Whiskers") })
+    }
+}
+
+let a = make_animal(true);
+println!("{}", a.introduce());
+```
+
+**vs 泛型**：
+
+- **泛型 `T: Animal`**：编译期知道 T 是啥；一个函数用了两次不同 T，会有两份代码。
+- **`dyn Animal`**：运行时才知道，通过虚表调用。**一份代码、慢一点点、大小可变**。
+
+**什么时候用 `dyn`**：
+
+- **一个容器要装不同类型**：`Vec<Box<dyn Animal>>`——容器里既有 Dog 又有 Cat；
+- **异构集合**——参见 GUI 组件树、AST 树；
+- **不关心编译期类型**——运行时才决定。
+
+**什么时候用泛型**：
+
+- **性能敏感**：静态派发无虚表调用；
+- **类型是编译期确定的**——大部分场景。
+
+## 7. 常用的标准库 trait
+
+**`Debug` 和 `Display`**：
+
+```rust
+use std::fmt;
+
+struct Point { x: f64, y: f64 }
+
+impl fmt::Debug for Point {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Point {{ x: {}, y: {} }}", self.x, self.y)
+    }
+}
+
+impl fmt::Display for Point {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "({}, {})", self.x, self.y)
+    }
+}
+```
+
+**Debug 一般 derive**（`#[derive(Debug)]`）。**Display 一定要手写**（因为"给最终用户看的字符串"没有标准形式）。
+
+**`Clone` 和 `Copy`**：
+
+```rust
+#[derive(Clone, Copy)]
+struct Point { x: f64, y: f64 }
+```
+
+**Copy 是隐式复制，Clone 是显式 .clone()**。Copy 必须实现 Clone。
+
+**`PartialEq` 和 `Eq`**：
+
+- `PartialEq`：**支持 == 比较**——但不要求"每个值和自己相等"（比如 NaN != NaN）；
+- `Eq`：**"完全等价"**——要求自反、对称、传递。`f32/f64` 是 `PartialEq` 但不是 `Eq`；`i32/String` 都是 `Eq`。
+
+**`PartialOrd` 和 `Ord`**：类似——**Ord 要求全序**。用于排序等。
+
+**`Hash`**：能当 HashMap 的 key。
+
+**`Default`**：`Default::default()` 造零值。
+
+一般 derive 一次搞定：
+
+```rust
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
+struct Config { ... }
+```
+
+**注意**：derive 要求**所有字段都实现对应 trait**——否则报错。
+
+## 8. `From` 和 `Into`：类型转换
+
+**`From<T>`**："我可以从 T 造出自己"：
+
+```rust
+struct Celsius(f64);
+struct Fahrenheit(f64);
+
+impl From<Fahrenheit> for Celsius {
+    fn from(f: Fahrenheit) -> Self {
+        Celsius((f.0 - 32.0) * 5.0 / 9.0)
+    }
+}
+
+let c = Celsius::from(Fahrenheit(100.0));
+```
+
+**`Into<T>`**：自动实现——**只要 U 实现了 `From<T>`，T 就自动实现 `Into<U>`**：
+
+```rust
+let c: Celsius = Fahrenheit(100.0).into();
+```
+
+**规则**：**优先实现 `From`**，别实现 `Into`——`Into` 会自动来。
+
+**`From` / `Into` 是 Rust 里最常用的转换机制**——**看到 `.into()` 就是在做类型转换**。
+
+## 9. `Iterator`：一个 trait 撬动一整套函数式编程
+
+**`Iterator` 是标准库里最重要的 trait 之一**——它是所有迭代器的接口：
+
+```rust
+trait Iterator {
+    type Item;
+    fn next(&mut self) -> Option<Self::Item>;
+    // ...  几十个默认方法，比如 map, filter, collect
+}
+```
+
+**任何实现了 `Iterator` 的类型都能用 map、filter、collect 等**：
+
+```rust
+let v = vec![1, 2, 3, 4, 5];
+let sum: i32 = v.iter().filter(|&&x| x > 2).map(|&x| x * 2).sum();
+println!("{}", sum);   // 18
+```
+
+**自己实现 Iterator**：
+
+```rust
+struct Counter { count: u32 }
+
+impl Iterator for Counter {
+    type Item = u32;
+    fn next(&mut self) -> Option<u32> {
+        if self.count < 5 {
+            self.count += 1;
+            Some(self.count)
+        } else {
+            None
+        }
+    }
+}
+
+let sum: u32 = Counter { count: 0 }.sum();   // 15
+```
+
+**只实现 next 就自动获得几十个方法**——**这就是 trait 的力量**。第 8 章会详细讲迭代器。
+
+## 10. 关联类型（Associated Types）
+
+**Trait 里的 `type Item`** 就是关联类型：
+
+```rust
+trait Iterator {
+    type Item;   // 关联类型
+    fn next(&mut self) -> Option<Self::Item>;
+}
+```
+
+**vs 泛型 trait**：
+
+```rust
+// 泛型 trait
+trait Container<T> {
+    fn get(&self, i: usize) -> T;
+}
+
+// 关联类型 trait
+trait Container {
+    type Item;
+    fn get(&self, i: usize) -> Self::Item;
+}
+```
+
+**区别**：
+
+- **泛型**：一个类型可以对**多个 T** 实现同一个 trait（`impl Container<i32> for X` 和 `impl Container<String> for X` 都行）；
+- **关联类型**：一个类型只能实现一次——**类型系统里 Container 和 Item 是一一对应的**。
+
+**用哪个**：**关联类型更常见**——大部分场景里 "Container 里装什么" 只有一个答案。
+
+## 11. 一个综合例子：泛型的力量
+
+写一个通用的"kv 存储"：
+
+```rust
+use std::collections::HashMap;
+use std::hash::Hash;
+
+struct KVStore<K, V> {
+    data: HashMap<K, V>,
+}
+
+impl<K: Eq + Hash, V: Clone> KVStore<K, V> {
+    fn new() -> Self {
+        Self { data: HashMap::new() }
+    }
+
+    fn set(&mut self, key: K, value: V) {
+        self.data.insert(key, value);
+    }
+
+    fn get(&self, key: &K) -> Option<V> {
+        self.data.get(key).cloned()
+    }
+}
+
+let mut kv: KVStore<String, i32> = KVStore::new();
+kv.set("age".to_string(), 30);
+println!("{:?}", kv.get(&"age".to_string()));   // Some(30)
+
+let mut kv2: KVStore<i32, String> = KVStore::new();
+kv2.set(1, "one".to_string());
+```
+
+**一份代码支持任意 K、V 组合**——**编译期为每种组合生成专用代码**。
+
+## 12. 常见 trait 设计模式
+
+**"标记 trait"**：没有方法，只是"标记"某个类型有某种性质：
+
+```rust
+trait Marker {}
+
+impl Marker for Dog {}
+impl Marker for Cat {}
+
+fn only_marker<T: Marker>(x: T) { ... }
+```
+
+标准库里的 `Send`、`Sync`、`Copy` 都是标记 trait。
+
+**"能力 trait"**：一个 trait 表示一种能力，多个 trait 可以组合。**大部分 API 是这样设计**——`Iterator`、`Serialize`、`Debug` 都是。
+
+**Newtype pattern + trait 实现**：用 tuple struct 包一层，然后实现 trait——**给外部类型加行为**：
+
+```rust
+struct Wrapper(Vec<String>);
+
+impl fmt::Display for Wrapper {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "[{}]", self.0.join(", "))
+    }
+}
+```
+
+**为什么要这么做**：因为 Rust 的 **orphan rule**——**你不能给"外部类型 + 外部 trait"实现方法**（`impl Display for Vec<String>` 会报错）。用 newtype 绕过。
+
+## 13. 常见的坑
+
+**Orphan rule**：`impl 外部Trait for 外部类型` 不允许——**必须要么 trait 是本地的，要么类型是本地的**。理由：防止两个库对同一个"外部 trait + 外部类型"给出不一致的实现。
+
+**derive 需要所有字段支持**：`#[derive(Copy)]` 会失败如果某个字段不是 Copy 的。要么改类型、要么手写 impl。
+
+**Trait 里带默认实现要小心冲突**：**两个 trait 都有同名方法时，需要显式指定用哪个**：
+
+```rust
+Trait1::method(&x);
+Trait2::method(&x);
+```
+
+**动态派发和静态派发的取舍**：**别一律用 dyn**——静态派发更快、编译期检查更严格。**只在真需要"异构集合"或"运行时决定类型"时用 dyn**。
+
+**Blanket impl**：**给所有满足某条件的类型实现 trait**——**慎重**，可能和别的 impl 冲突：
+
+```rust
+impl<T: Display> ToString for T { ... }   // 给所有 Display 的类型实现 ToString
+```
+
+## 14. 一些实践建议
+
+**别过度泛型化**：**先写具体类型的版本，等你真的需要 2 种以上类型时再泛型化**。过早泛型化 = 过度工程。
+
+**Trait bound 精确**：只加你真正需要的 trait——`T: Debug` 好过 `T: Debug + Clone + Display + ...`。
+
+**用标准库的 trait**：`From/Into/Display/Debug` 都是社区共识。**别自己发明 `MyConvert<T>` 之类**。
+
+**看别人的 trait 设计**：`serde::Serialize`、`std::io::Read/Write`、`tokio::AsyncRead` 都是范本。
+
+**理解静态派发 vs 动态派发**：性能敏感的库用静态；GUI、插件系统用动态。
+
+## 15. 一句话总结
+
+泛型和 trait 是 Rust 类型系统的核心工具：
+
+- **泛型**：让代码对多种类型都能用，编译期单态化，运行时零开销；
+- **Trait**：定义"能力"——`Iterator`、`Display`、`From` 等标准 trait 撑起了整个生态；
+- **Trait bound**：`T: SomeTrait` 约束泛型；
+- **impl Trait**：更简洁的泛型语法，也适合返回闭包；
+- **Trait object (`dyn Trait`)**：动态派发，用于异构集合；
+- **关联类型**：一个类型对应一个 trait 实现——比泛型 trait 更常用。
+
+学到这里你已经掌握了 Rust 大部分类型系统。**下一章讲错误处理**——`Result` 和 `?` 是 Rust 最好用的功能之一。
+
+</WordCount>

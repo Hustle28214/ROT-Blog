@@ -1,0 +1,517 @@
+import WordCount from '../../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+**Rust 的默认承诺是"内存安全"**——**编译器帮你拦下所有 use-after-free、null deref、data race**。
+
+但有时候你**必须**做编译器不允许的事——**和 C 库交互、写底层数据结构、和硬件打交道**。**这时用 `unsafe`**——**"我知道我在干嘛，让我来"**。
+
+这一章讲清楚 `unsafe` 是什么、什么时候用、以及 Rust 里最常见的 unsafe 场景——**FFI（Foreign Function Interface）**。
+
+## 1. unsafe 是什么
+
+**首先要说清楚**：**`unsafe` 不是"关闭所有 Rust 规则"**。**它只是允许你做以下 5 件事**：
+
+1. **解引用裸指针**（raw pointer）；
+2. **调用 unsafe 函数**（包括 FFI 函数）；
+3. **访问或修改 static mut 变量**；
+4. **实现 unsafe trait**；
+5. **访问 union 的字段**。
+
+**除此以外的所有规则依然适用**——所有权、借用检查、类型系统都还在。**`unsafe` 只是让你在需要时打开这几个特定"逃生舱口"**。
+
+**基本形式**：
+
+```rust
+unsafe {
+    // 这里能做上面五件事
+    let x = *raw_ptr;
+    dangerous_function();
+}
+```
+
+## 2. 裸指针
+
+**裸指针**：**`*const T`（不可变）和 `*mut T`（可变）**。类似 C 里的指针。
+
+**创建裸指针不需要 unsafe**：
+
+```rust
+let mut x = 5;
+let r1 = &x as *const i32;
+let r2 = &mut x as *mut i32;
+```
+
+**解引用需要 unsafe**：
+
+```rust
+unsafe {
+    println!("{}", *r1);
+    *r2 = 10;
+}
+```
+
+**为什么裸指针需要 unsafe**：
+
+- 可能是 null；
+- 可能悬垂（指向已释放内存）；
+- 可能对齐错误；
+- 可以创建"多个可变引用"——完全不受借用检查约束。
+
+**裸指针 vs 引用**：
+
+- 引用（`&T` / `&mut T`）：**永远保证有效、有生命周期、遵守借用规则**；
+- 裸指针（`*const T` / `*mut T`）：**编译器不管，你自己保证正确**。
+
+## 3. unsafe 函数
+
+**声明 unsafe 函数**：
+
+```rust
+unsafe fn dangerous() {
+    // 内部可以做 unsafe 操作
+    let ptr = 0x12345 as *const i32;
+    println!("{}", *ptr);
+}
+```
+
+**调用要在 unsafe 块里**：
+
+```rust
+unsafe {
+    dangerous();
+}
+```
+
+**含义**：**函数声明为 unsafe 是在说"调用我需要遵守某些约定，你确保它们满足"**。**调用方用 unsafe 块表达"我已经确保了"**。
+
+**大多数 unsafe 函数会在文档里写清楚"safety requirements"**——**调用前认真读**。
+
+## 4. 安全抽象：unsafe 内部 + safe 接口
+
+**一个非常重要的模式**：**内部用 unsafe 实现，外部提供 safe API**。
+
+**`Vec::split_at_mut`** 就是经典例子——它把一个 `&mut [T]` 切成两个不重叠的 `&mut [T]`：
+
+```rust
+fn split_at_mut(v: &mut [i32], mid: usize) -> (&mut [i32], &mut [i32]) {
+    let len = v.len();
+    let ptr = v.as_mut_ptr();
+
+    assert!(mid <= len);
+
+    unsafe {
+        (
+            std::slice::from_raw_parts_mut(ptr, mid),
+            std::slice::from_raw_parts_mut(ptr.add(mid), len - mid),
+        )
+    }
+}
+```
+
+**注意**：
+
+- **返回两个 `&mut [i32]`**——**普通借用规则下不可能**（同一 slice 不能有两个 mut 引用）；
+- **但语义上是安全的**——**两块 slice 不重叠**，运行时是安全的；
+- **内部用 unsafe 打破规则，外部用 safe 签名封装**——**用户不知道内部有 unsafe，他们只看到"安全的分割 API"**。
+
+**这就是 unsafe 的正确用法**——**局限在小范围里、外面包 safe API**。**整个 Rust 标准库大量用了这种模式**——**HashMap、Vec、String 内部都有 unsafe**。
+
+## 5. FFI：调用 C 函数
+
+**FFI（Foreign Function Interface）** 是 Rust 调用 C 代码的机制——**因为 C ABI 是事实标准**，几乎所有系统 API 都是 C 接口。
+
+**声明外部函数**：
+
+```rust
+extern "C" {
+    fn abs(input: i32) -> i32;
+}
+
+fn main() {
+    unsafe {
+        println!("Absolute value of -3: {}", abs(-3));
+    }
+}
+```
+
+**注意**：
+
+- **`extern "C"`** 说"这是一个 C ABI 函数"（大部分平台就是 C 调用约定）；
+- **调用 extern 函数必须在 unsafe 里**——**Rust 编译器不能验证 C 函数的安全性**。
+
+**链接 C 库**——用 `#[link(name = "...")]`：
+
+```rust
+#[link(name = "m")]
+extern "C" {
+    fn sqrt(x: f64) -> f64;
+}
+```
+
+**或者在 build.rs 里配置**（更常见的做法）。
+
+## 6. 让 C 调 Rust：#[no_mangle]
+
+**反向 FFI**——**导出 Rust 函数给 C 用**：
+
+```rust
+#[no_mangle]
+pub extern "C" fn rust_function(x: i32) -> i32 {
+    x * 2
+}
+```
+
+**关键点**：
+
+- **`#[no_mangle]`**：**防止编译器改函数名**（Rust 默认会 mangle 名字来避免冲突）；
+- **`pub extern "C"`**：**用 C ABI 导出**。
+
+**然后从 C 里**：
+
+```c
+extern int rust_function(int x);
+
+int main() {
+    printf("%d\n", rust_function(5));
+    return 0;
+}
+```
+
+## 7. 通用类型 vs FFI 类型
+
+**FFI 时，Rust 类型和 C 类型必须匹配**——**否则 UB（Undefined Behavior）**。
+
+一些常见对应：
+
+| C 类型 | Rust 类型 |
+|-------|----------|
+| `int` | `i32` (一般) 或 `libc::c_int` |
+| `long` | 平台相关，用 `libc::c_long` |
+| `char*` | `*const c_char` |
+| `void*` | `*mut c_void` |
+| `size_t` | `usize` 或 `libc::size_t` |
+| `float` / `double` | `f32` / `f64` |
+| `struct { ... }` | `#[repr(C)] struct { ... }` |
+
+**建议**：**用 `libc` crate 里的类型**——**跨平台正确**：
+
+```rust
+use libc::{c_int, c_char, size_t};
+
+extern "C" {
+    fn strlen(s: *const c_char) -> size_t;
+}
+```
+
+## 8. 传字符串给 C
+
+**Rust 的 `String` 不是 null-terminated——不能直接传给 C**。**要用 `CString`**：
+
+```rust
+use std::ffi::CString;
+
+extern "C" {
+    fn puts(s: *const std::os::raw::c_char) -> i32;
+}
+
+fn main() {
+    let s = CString::new("Hello from Rust").unwrap();
+    unsafe {
+        puts(s.as_ptr());
+    }
+    // s 的生命周期结束时释放 C 字符串
+}
+```
+
+**关键点**：
+
+- **`CString::new(...)`**：把 Rust 字符串转成 C 字符串（null-terminated）；
+- **`.as_ptr()`**：得到 `*const c_char`——**这个指针只在 CString 存活时有效**；
+- **不能把 as_ptr 拿出去存**——用完就丢，别让它 dangling。
+
+**从 C 拿字符串到 Rust**——**用 `CStr`**：
+
+```rust
+use std::ffi::CStr;
+
+extern "C" {
+    fn get_name() -> *const c_char;
+}
+
+let ptr = unsafe { get_name() };
+let cstr = unsafe { CStr::from_ptr(ptr) };
+let s = cstr.to_str().unwrap();   // 转成 &str
+```
+
+## 9. #[repr(C)]：布局兼容
+
+**Rust struct 默认布局不保证和 C 一样**——**字段顺序、padding 都可能不同**。**要和 C 交互必须 `#[repr(C)]`**：
+
+```rust
+#[repr(C)]
+struct Point {
+    x: f64,
+    y: f64,
+}
+
+extern "C" {
+    fn compute_distance(p1: *const Point, p2: *const Point) -> f64;
+}
+```
+
+**其他 repr**：
+
+- **`#[repr(C)]`**：C ABI 兼容布局；
+- **`#[repr(transparent)]`**：**单字段 struct 和字段本身完全等价**——ABI 上没有开销；
+- **`#[repr(u8)]` on enum**：明确指定 enum 的 discriminant 类型；
+- **`#[repr(packed)]`**：**去掉所有 padding**（要小心，可能对齐错误）。
+
+## 10. 常见的 unsafe 场景
+
+**场景 1：性能优化——去掉边界检查**
+
+```rust
+// Safe 版本，每次访问检查边界
+fn sum(v: &[i32]) -> i32 {
+    v.iter().sum()
+}
+
+// Unsafe 版本，跳过边界检查
+fn sum_unsafe(v: &[i32]) -> i32 {
+    let mut total = 0;
+    for i in 0..v.len() {
+        unsafe {
+            total += *v.get_unchecked(i);
+        }
+    }
+    total
+}
+```
+
+**大多数场景 safe 版本经编译器优化已经很快了**——**不要过早用 unsafe 追性能**。
+
+**场景 2：自定义数据结构**
+
+**链表、图、self-referential struct** 在 Rust 里用 safe 代码很难写——**常常用 unsafe**：
+
+```rust
+struct LinkedList<T> {
+    head: *mut Node<T>,
+    tail: *mut Node<T>,
+    len: usize,
+}
+```
+
+**但要小心**——unsafe 数据结构极易出 bug。**用现有的库（`std::collections::LinkedList`、`slotmap`）几乎总是更好**。
+
+**场景 3：全局可变状态**
+
+```rust
+static mut COUNTER: u32 = 0;
+
+fn increment() {
+    unsafe {
+        COUNTER += 1;
+    }
+}
+```
+
+**多线程时不安全**——**用 `AtomicUsize` 或者 `Mutex`**：
+
+```rust
+use std::sync::atomic::{AtomicUsize, Ordering};
+
+static COUNTER: AtomicUsize = AtomicUsize::new(0);
+
+fn increment() {
+    COUNTER.fetch_add(1, Ordering::SeqCst);
+}
+```
+
+**场景 4：union**
+
+**Union 里所有字段共享内存**——**读取时你要确保用了正确的字段**：
+
+```rust
+#[repr(C)]
+union MyUnion {
+    i: i32,
+    f: f32,
+}
+
+let u = MyUnion { i: 0x40490fdb };   // 大概是 π 的 IEEE 754 表示
+let f = unsafe { u.f };
+println!("{}", f);   // 大约 3.14
+```
+
+**用途**：**和 C API 交互（比如 sockaddr）、优化内存布局**。**日常代码几乎不用**。
+
+## 11. bindgen 和 cbindgen
+
+**手写 FFI 声明很累**——**几百个函数、几十个 struct 时抄不完**。**有自动化工具**：
+
+**`bindgen`**：**从 C 头文件生成 Rust 绑定**：
+
+```bash
+bindgen mylib.h -o mylib.rs
+```
+
+生成一堆 `extern "C"` 和 `#[repr(C)] struct` 定义。**大部分 Rust 里的 `-sys` crate 都是这么生成的**——`libc-sys`、`openssl-sys` 等。
+
+**`cbindgen`**：反向——**从 Rust 生成 C 头文件**。**发布库给 C 用户时用**。
+
+## 12. 常见的坑
+
+**Undefined Behavior（UB）**：
+
+- 解引用 null / dangling 指针；
+- 两个 `&mut` 指向同一位置；
+- 破坏对齐；
+- 读取未初始化内存；
+- 数据竞争；
+- 溢出（在 debug 会 panic，release 会 wrap，但转换类型时可能 UB）；
+- 违反 unsafe 函数的 safety 约定。
+
+**UB 一旦发生**——**整个程序行为都可能崩坏**（不只是"这一行错了"）。**这是 unsafe 最危险的地方**。
+
+**string ownership 混乱**：
+
+- Rust 的 `String` 拥有数据；
+- `&str` 是借用；
+- `CString` 拥有 null-terminated；
+- `CStr` 是借用 null-terminated；
+- 混用可能 dangling。
+
+**规则**：`CString` 是"生命周期的锚"——**从它拿 as_ptr 后不要放它 drop**。
+
+**跨 FFI 边界的 panic**：**Rust 的 panic 不能穿越 FFI 边界**（会 UB）。**给 C 用的函数里用 `catch_unwind` 捕获 panic**：
+
+```rust
+use std::panic::catch_unwind;
+
+#[no_mangle]
+pub extern "C" fn my_fn() -> i32 {
+    match catch_unwind(|| {
+        // 可能 panic 的代码
+        1 / 0
+    }) {
+        Ok(v) => v,
+        Err(_) => -1,   // panic 转成错误码
+    }
+}
+```
+
+**内存所有权跨 FFI**：**谁分配、谁释放**——**大坑**。
+
+- 如果 Rust 分配了 String 给 C，**要提供一个 free 函数让 C 调用**——不能让 C 用 malloc/free；
+- 反之，C 分配的东西 Rust 要用 C 的 free 释放。
+
+## 13. 一些实用建议
+
+**尽量少 unsafe**：**每一行 unsafe 都是潜在的 bug**。**能用 safe 就用 safe**。
+
+**unsafe 集中在一个地方**：**别把 unsafe 撒得到处都是**——**内部 unsafe、外部 safe 接口**。
+
+**每个 unsafe 都有一段 comment**：**解释"为什么这里安全"**——**为你自己、为 code review、为未来的维护者**：
+
+```rust
+// SAFETY: ptr is valid because we just allocated it above,
+// and we haven't returned to the caller yet.
+unsafe {
+    *ptr = 42;
+}
+```
+
+**Rust 有 SAFETY comment 惯例**——**用这个 comment 前缀**。
+
+**用 miri 检查 UB**：**Miri** 是 Rust 的一个 interpreter，能捕捉大量 UB：
+
+```bash
+cargo +nightly miri test
+```
+
+**慢**（比正常慢几百倍），但**能发现 Valgrind 都发现不了的问题**。
+
+**多用现成的库**：**link C 库时**：**libc、winapi、bindgen 生成的绑定**。**自己写 unsafe 的场景应该很少**。
+
+## 14. 一个完整例子：包装 C 库
+
+假设你想用 SQLite 的 C API：
+
+**Cargo.toml**：
+
+```toml
+[dependencies]
+libc = "0.2"
+
+[build-dependencies]
+bindgen = "0.69"
+```
+
+**build.rs**：告诉 cargo 链接 sqlite3：
+
+```rust
+fn main() {
+    println!("cargo:rustc-link-lib=sqlite3");
+    let bindings = bindgen::Builder::default()
+        .header("wrapper.h")
+        .generate()
+        .expect("Unable to generate bindings");
+    bindings.write_to_file("src/bindings.rs").expect("Couldn't write bindings!");
+}
+```
+
+**wrapper.h**：
+
+```c
+#include <sqlite3.h>
+```
+
+**src/lib.rs**：
+
+```rust
+mod bindings;   // 自动生成的绑定
+
+use std::ffi::CString;
+
+pub struct Db { handle: *mut bindings::sqlite3 }
+
+impl Db {
+    pub fn open(path: &str) -> Result<Self, String> {
+        let c_path = CString::new(path).unwrap();
+        let mut handle: *mut bindings::sqlite3 = std::ptr::null_mut();
+        let rc = unsafe { bindings::sqlite3_open(c_path.as_ptr(), &mut handle) };
+        if rc == 0 {
+            Ok(Db { handle })
+        } else {
+            Err(format!("Failed to open db, code {}", rc))
+        }
+    }
+}
+
+impl Drop for Db {
+    fn drop(&mut self) {
+        unsafe { bindings::sqlite3_close(self.handle); }
+    }
+}
+```
+
+**这就是"Rust 包装 C 库"的经典模式**——**内部 unsafe，外部 safe，RAII 管理资源**。
+
+## 15. 一句话总结
+
+Unsafe 是 Rust 里"关掉部分安全网"的能力：
+
+- **允许的 5 件事**：解引用裸指针、调 unsafe fn、访问 static mut、实现 unsafe trait、访问 union；
+- **规则依然多数适用**：所有权、借用、类型都还在；
+- **典型场景**：FFI、self-referential data、极致性能、底层 IO；
+- **FFI**：**`extern "C"` + `#[repr(C)]` + libc + CString/CStr**；
+- **原则**：**小范围 unsafe + 外部 safe API + 每处 SAFETY 注释**；
+- **工具**：**bindgen 自动生成绑定、miri 检查 UB**。
+
+**大部分 Rust 用户几乎不写 unsafe**——**只在需要"和其他系统交互"时才需要**。**普通业务代码不用 unsafe 你就不会遇到内存问题**——**这就是 Rust 的核心保证**。
+
+下一章讲 Rust 里另一个高级特性——**宏系统**。它是 Rust 的"元编程"能力——**很多"看似语言特性"的东西（`println!`、`vec!`、`#[derive(Debug)]`）其实都是宏**。
+
+</WordCount>

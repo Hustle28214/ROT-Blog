@@ -2,5 +2,473 @@ import WordCount from '../../../../src/components/WordCount/WordCount';
 
 <WordCount>
 
+学 Rust 之前先说一件事：**它和你之前学过的语言不太一样**。
+
+C/C++ 让你手动管内存——好处是快、坏处是各种崩溃。Java/Go/Python 有 GC——好处是省心、坏处是运行时开销、暂停。
+
+**Rust 走了第三条路**：**编译期就把内存管理规则查清楚**——没有 GC、没有手动 free、但也不会崩。代价是**你要学一套新的编程模型（所有权），编译器会不停跟你吵架**。
+
+这一章先跳过所有权（第 3 章讲），把基本语法过一遍——变量、函数、控制流、基础类型。这些和别的语言差别不大，容易上手。
+
+## 1. Hello World
+
+```rust
+fn main() {
+    println!("Hello, world!");
+}
+```
+
+**几个观察**：
+
+- **`fn`** 关键字定义函数（不是 `def`、不是 `function`）；
+- **`main`** 是程序入口；
+- **`println!`** 后面有个 `!`——**它不是普通函数，是宏**（后面章节讲）；
+- 语句以 **`;`** 结尾。
+
+**运行**：
+
+```bash
+# 用 cargo（推荐）
+cargo new hello
+cd hello
+cargo run
+
+# 或者用 rustc 直接编译
+rustc hello.rs
+./hello
+```
+
+**Rust 是编译型语言**——每次跑要先编译。debug build 快（几秒），release build 慢（几十秒到几分钟）。
+
+## 2. 变量
+
+```rust
+let x = 5;
+let y: i32 = 10;   // 显式标注类型
+```
+
+**默认不可变**。这是 Rust 一个非常重要的默认——**变量声明后不能改**：
+
+```rust
+let x = 5;
+x = 6;    // 编译错误！
+```
+
+要可变要显式加 `mut`：
+
+```rust
+let mut x = 5;
+x = 6;    // 现在可以了
+```
+
+**为什么默认不可变**？这是 Rust 的哲学——**大多数变量其实不需要变**，标记 `mut` 让改动的地方一目了然。写多了你会发现这条帮助非常大——**看到 `mut` 就知道这里有状态变化，要小心**。
+
+**变量遮蔽（shadowing）**：可以用 `let` 重新声明同名变量，甚至类型不同：
+
+```rust
+let x = 5;
+let x = "hello";   // 完全合法，x 现在是字符串
+```
+
+这和 `mut` 是两回事——遮蔽是**创建了新变量**，类型可以变。
+
+**常量**用 `const`：
+
+```rust
+const MAX_SIZE: u32 = 100_000;
+```
+
+常量必须显式标类型，编译期确定，可以在任何作用域用。
+
+## 3. 基本类型
+
+**整数**：`i8`、`i16`、`i32`、`i64`、`i128`、`isize`（signed），`u8`-`u128`、`usize`（unsigned）。
+
+- 默认 `i32`；
+- `isize` / `usize` 是"指针大小"——64 位机器上是 64 位；
+- 数字字面量可以带下划线增加可读性：`1_000_000`；
+- 可以带后缀：`123i64`、`3.14f32`。
+
+**浮点**：`f32`、`f64`。默认 `f64`。
+
+**布尔**：`bool`——`true` / `false`。
+
+**字符**：`char`——**4 字节的 Unicode 标量**（不是 C 里的 1 字节 char）：
+
+```rust
+let c = 'A';
+let emoji = '😀';   // 完全合法
+```
+
+**元组**：
+
+```rust
+let t = (1, "hello", 3.14);
+let (a, b, c) = t;        // 解构
+let first = t.0;          // 通过索引访问
+```
+
+**数组**：**固定长度**（长度是类型的一部分）：
+
+```rust
+let arr = [1, 2, 3, 4, 5];        // 类型是 [i32; 5]
+let zeros = [0; 100];              // 100 个 0
+let x = arr[0];
+```
+
+**动态长度**用 `Vec`（后面讲）。
+
+## 4. 函数
+
+```rust
+fn add(x: i32, y: i32) -> i32 {
+    x + y   // 注意：没有分号！这是返回值
+}
+```
+
+**几个特点**：
+
+- **参数必须标类型**；
+- 返回类型用 **`->`**；
+- **最后一个表达式没有分号就是返回值**——加了分号就变成语句，返回 `()`；
+- 可以显式 `return`——但**风格上都用"末尾表达式"**。
+
+**块表达式**：Rust 里几乎什么都是表达式：
+
+```rust
+let y = {
+    let x = 3;
+    x + 1   // 这个块的值是 4，赋给 y
+};
+```
+
+`if` 也是表达式：
+
+```rust
+let x = if condition { 5 } else { 6 };
+```
+
+这个特性让 Rust 代码经常没有 return 语句——**函数体最后一行的值就是返回值**。
+
+## 5. 控制流
+
+**`if`**：
+
+```rust
+let n = 5;
+
+if n > 0 {
+    println!("positive");
+} else if n < 0 {
+    println!("negative");
+} else {
+    println!("zero");
+}
+```
+
+**没有 C 风格的 `if (n > 0) {}`**——**条件不用括号**，但 `{}` 必须要。
+
+**注意**：条件**必须是 `bool`**，不能是整数。`if n {}` 是错的。
+
+**`loop`**：无限循环，配合 `break` 和 `continue`：
+
+```rust
+let result = loop {
+    // 干点事
+    if done {
+        break 42;   // 从 loop 返回值！
+    }
+};
+```
+
+**`loop` 可以带返回值**——这是很多其他语言没有的特性。
+
+**`while`**：
+
+```rust
+while n > 0 {
+    n -= 1;
+}
+```
+
+**`for`**：Rust 的 `for` 只能遍历迭代器：
+
+```rust
+for i in 0..10 {           // 0..10 是 range，[0, 10)
+    println!("{}", i);
+}
+
+for i in 0..=10 {          // [0, 10]，包含 10
+    println!("{}", i);
+}
+
+for x in vec![1, 2, 3] {
+    println!("{}", x);
+}
+```
+
+**没有 C 风格的 `for(i=0; i<n; i++)`**——用 `for i in 0..n` 代替。**更少的错误、更清晰的意图**。
+
+**`match`**：一个非常强大的模式匹配：
+
+```rust
+let x = 5;
+
+match x {
+    1 => println!("one"),
+    2 | 3 => println!("two or three"),
+    4..=9 => println!("four to nine"),
+    _ => println!("other"),
+}
+```
+
+**`match` 必须穷尽所有可能**——如果你忘了 `_`（通配符），编译器会报错。**这个特性是 Rust 里最"救命"的东西之一**——加了一个新的枚举分支？编译器立刻告诉你所有 `match` 都要更新。
+
+## 6. 字符串：两种类型
+
+Rust 里字符串有**两个类型**，是新手最容易犯的坑：
+
+**`String`**：**堆上分配、可变、可增长的字符串**：
+
+```rust
+let mut s = String::from("hello");
+s.push_str(", world");
+```
+
+**`&str`**：**字符串切片**——**引用一段字符串数据**，本身不拥有：
+
+```rust
+let s: &str = "hello";      // 字符串字面量的类型是 &'static str
+let slice = &some_string[0..5];   // 从 String 里切出一段
+```
+
+**关系**：
+
+- `String` 拥有堆上的字符串数据；
+- `&str` 只是一段"借来看看"的引用；
+- 函数参数**几乎永远用 `&str`**——更通用；
+- 只有需要修改或者拥有时才用 `String`。
+
+**经典写法**：
+
+```rust
+fn greet(name: &str) {   // 参数是 &str
+    println!("Hello, {}", name);
+}
+
+let s = String::from("world");
+greet(&s);       // String 可以自动转 &str
+greet("world");  // 字面量也是 &str
+```
+
+**这两个类型的区别是很多新手的入门槛**——**记住"参数用 &str、要改就 String"就基本够用**。
+
+## 7. Vec：可变数组
+
+对应 Java 的 `ArrayList`、Python 的 `list`、C++ 的 `vector`：
+
+```rust
+let mut v: Vec<i32> = Vec::new();
+v.push(1);
+v.push(2);
+v.push(3);
+
+// 用宏更简单
+let v = vec![1, 2, 3];
+
+// 访问
+let first = v[0];              // 直接索引（越界会 panic）
+let maybe_first = v.get(0);    // 返回 Option<&i32>（安全）
+
+// 遍历
+for x in &v {
+    println!("{}", x);
+}
+```
+
+**Vec 是最常用的容器**——存一堆同类型的东西。
+
+## 8. 结构体和方法：小尝试
+
+正式讲结构体在第 2 章，这里先看一眼：
+
+```rust
+struct Point {
+    x: f64,
+    y: f64,
+}
+
+impl Point {
+    fn new(x: f64, y: f64) -> Self {
+        Self { x, y }
+    }
+
+    fn distance(&self, other: &Point) -> f64 {
+        let dx = self.x - other.x;
+        let dy = self.y - other.y;
+        (dx * dx + dy * dy).sqrt()
+    }
+}
+
+let p1 = Point::new(1.0, 2.0);
+let p2 = Point::new(3.0, 4.0);
+let d = p1.distance(&p2);
+```
+
+**关键点**：
+
+- 数据（`struct`）和方法（`impl`）**分开定义**——不像 C++/Java 一个类包所有；
+- 方法的第一个参数是 `&self` / `&mut self` / `self`——**决定方法怎么访问对象**；
+- `Self`（大写）是"当前类型"的别名——写起来省字。
+
+## 9. 打印和格式化
+
+**打印**：
+
+```rust
+println!("Hello");
+println!("x = {}", x);
+println!("x = {}, y = {}", x, y);
+println!("x = {x}, y = {y}");   // 直接用变量名（Rust 2021+）
+```
+
+**格式说明符**：
+
+- `{}`：Display trait（用户可读）；
+- `{:?}`：Debug trait（调试用）；
+- `{:#?}`：Debug 的"pretty print"（带换行缩进）；
+- `{:.2}`：小数点后 2 位；
+- `{:>10}`：右对齐宽度 10。
+
+**为什么有两个** `{}` **和** `{:?}`：
+
+- **`{}` 是给最终用户看的**——像 `"3.14"`；
+- **`{:?}` 是给开发者看的**——像 `"Point { x: 3.14, y: 2.71 }"`。
+
+**你自定义的类型默认不能被 println**——需要 derive 或者手动实现 `Display` / `Debug`：
+
+```rust
+#[derive(Debug)]
+struct Point { x: f64, y: f64 }
+
+let p = Point { x: 1.0, y: 2.0 };
+println!("{:?}", p);   // 现在可以了
+```
+
+## 10. 一些常见的坑（新手会踩）
+
+**整数溢出**：debug build 里溢出会 panic，release build 里会 wrap。**这是很多 C 程序员意料之外的行为**。
+
+**类型不能隐式转换**：
+
+```rust
+let x: i32 = 5;
+let y: i64 = x;   // 编译错误！
+let y: i64 = x as i64;   // 显式转换
+```
+
+Rust 极其严格——**没有隐式的数值转换**。这防止了一大类 bug。
+
+**除法保留类型**：
+
+```rust
+let x = 5 / 2;    // = 2（整数除法）
+let x = 5.0 / 2.0;   // = 2.5
+```
+
+**布尔不能当条件之外的东西用**：
+
+```rust
+let x: i32 = true;   // 错，不能把 bool 当 i32
+let x = if true { 1 } else { 0 };   // 要用 if
+```
+
+**返回值别加分号**：
+
+```rust
+fn add(x: i32, y: i32) -> i32 {
+    x + y;   // 错！分号让这变成语句，返回 ()
+}
+
+fn add(x: i32, y: i32) -> i32 {
+    x + y    // 对
+}
+```
+
+**这是新手最容易懵的地方**——**看到编译错误 "expected i32, found ()"，多半是这个**。
+
+## 11. Cargo：Rust 的构建工具
+
+**Cargo 是 Rust 生态的核心**——它做包管理、构建、测试、发布：
+
+```bash
+cargo new my_project              # 新项目
+cargo new my_lib --lib            # 新库
+cargo build                       # 编译 debug
+cargo build --release             # 编译 release（优化）
+cargo run                         # 编译并运行
+cargo test                        # 跑测试
+cargo add serde                   # 添加依赖
+cargo clippy                      # 静态检查（比 rustc 更严格）
+cargo fmt                         # 格式化代码
+```
+
+**项目结构**：
+
+```
+my_project/
+├── Cargo.toml          # 依赖 + 元信息
+├── Cargo.lock          # 锁定依赖版本
+├── src/
+│   ├── main.rs         # 可执行文件入口
+│   └── lib.rs          # 库入口
+└── target/             # 编译产物（.gitignore 掉）
+```
+
+**Cargo.toml** 示例：
+
+```toml
+[package]
+name = "my_project"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+tokio = { version = "1", features = ["full"] }
+```
+
+**Cargo 是 Rust 生态最大的加分项**——比 C++/Java 的构建工具好用得多。
+
+## 12. 一些工程建议
+
+**编译报错不要害怕**——Rust 的编译器是**你最好的老师**。它的错误信息在业界最详细：
+
+- 指出具体位置；
+- 解释为什么错；
+- 给出可能的修复；
+- 甚至有 `--explain E0001` 详细解释某个错误码。
+
+**多用 `cargo clippy`**：它会给出比 rustc 更严格的建议，很多"能编译但风格不好"的地方都能被抓到。
+
+**`cargo fmt` 自动格式化**：让所有 Rust 代码风格统一，别为了缩进浪费时间。
+
+**别急着写 unsafe**：新手很容易被 borrow checker 折磨，然后想"我用 unsafe 绕开"——**99% 的场景不需要 unsafe**，你只是没找到正确的模式。**先学好 safe Rust**。
+
+**读别人的代码**：Rust 的错误信息虽好，但一些常见 pattern 需要你从别人代码里学。**tokio、serde、reqwest** 这些主流库的代码风格值得看。
+
+## 13. 一句话总结
+
+Rust 基础语法要点：
+
+- **变量默认不可变**，需要 `mut`；
+- **函数返回值是最后一个表达式**（不加分号）；
+- **`if`、`match`、`loop`** 都是表达式；
+- **两种字符串**：`String`（拥有）和 `&str`（借用）；
+- **`match` 必须穷尽**——这是好事；
+- **类型严格**：没有隐式转换；
+- **Cargo** 是你最好的工具。
+
+这一章只是热身，Rust 真正的核心在下一章开始的**类型系统、所有权、生命周期**。这些是让 Rust "既快又安全"的秘密——**也是学习曲线最陡的地方**。
 
 </WordCount>

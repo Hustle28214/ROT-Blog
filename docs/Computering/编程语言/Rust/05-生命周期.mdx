@@ -1,0 +1,410 @@
+import WordCount from '../../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+前一章说过一件事：**引用必须始终指向有效的数据**。Rust 编译器要保证这条规则——它得知道"这个引用能存活多久"以及"被引用的值能存活多久"，然后检查前者是否短于后者。
+
+**这个"能存活多久"就是生命周期（lifetime）**。大多数时候编译器自动推断，你根本感觉不到；但**遇到函数返回引用、struct 里放引用**这类场景，你要显式标注。这一章讲清楚。
+
+## 1. 一个不加生命周期就报错的例子
+
+**返回两个 &str 里较长的那个**：
+
+```rust
+fn longest(x: &str, y: &str) -> &str {
+    if x.len() > y.len() { x } else { y }
+}
+```
+
+**编译不过**，报错：
+
+```
+error[E0106]: missing lifetime specifier
+help: this function's return type contains a borrowed value, but the signature does not say whether it is borrowed from `x` or `y`
+```
+
+**编译器的问题**：**返回的引用是借自 x 还是借自 y？** 因为它决定"返回值能活多久"——**如果借自 x，就要等 x 结束；如果借自 y，就要等 y 结束**。编译器不知道，你要告诉它。
+
+**修复**：加生命周期标注：
+
+```rust
+fn longest<'a>(x: &'a str, y: &'a str) -> &'a str {
+    if x.len() > y.len() { x } else { y }
+}
+```
+
+**含义**："x、y、返回值 **共享同一个生命周期 `'a`**——返回值的生命周期不长于 x 和 y 中较短的那个"。
+
+## 2. 生命周期标注语法
+
+**基本形式**：
+
+- **`'a`、`'b`、`'lifetime_name`**：都是生命周期参数名（一般用短的 `'a`）；
+- 撇号 `'` 是必须的；
+- 在**引用类型前面**：`&'a str`、`&'a mut T`；
+- 声明在**尖括号里**：`fn foo<'a>(...)`、`struct Book<'a> { ... }`。
+
+**关键点**：**生命周期标注不改变引用的实际存活时间**——它只是"告诉编译器它们之间的关系"。就像类型标注不改变值的实际类型一样。
+
+## 3. 生命周期消除规则（Lifetime Elision）
+
+**大部分时候你不用写生命周期**——因为编译器有一套推断规则：
+
+**规则 1**：**每个引用参数分配一个生命周期**——`fn f(x: &A, y: &B)` 相当于 `fn f<'a, 'b>(x: &'a A, y: &'b B)`。
+
+**规则 2**：**只有一个输入生命周期时，它自动传给所有输出**：
+
+```rust
+fn first(s: &str) -> &str { ... }
+// 相当于
+fn first<'a>(s: &'a str) -> &'a str { ... }
+```
+
+**规则 3**：**有 `&self` 或 `&mut self` 时，输出用 self 的生命周期**：
+
+```rust
+impl MyType {
+    fn get(&self, key: &str) -> &Value { ... }
+    // 相当于
+    fn get<'a, 'b>(&'a self, key: &'b str) -> &'a Value { ... }
+}
+```
+
+**这三条规则覆盖了 90% 的场景**——你根本感觉不到生命周期存在。**只有跨多个引用、且规则不适用时**，你才要手写。
+
+## 4. 结构体里的引用
+
+如果 struct 里有引用字段，**必须标生命周期**：
+
+```rust
+struct Book<'a> {
+    title: &'a str,
+    author: &'a str,
+}
+
+let title = String::from("Rust");
+let author = String::from("Foo");
+let book = Book { title: &title, author: &author };
+```
+
+**含义**：`Book` 里的引用生命周期是 `'a`——**这个 Book 实例不能活过 `'a`**（即不能活过 title 和 author）。
+
+**方法上**：
+
+```rust
+impl<'a> Book<'a> {
+    fn title(&self) -> &str {
+        self.title
+    }
+}
+```
+
+**注意**：`impl<'a>` 里的 `'a` 必须写——因为 struct 定义带了它。
+
+## 5. `'static` 生命周期
+
+**`'static` 是最长的生命周期**——**整个程序运行期间**：
+
+```rust
+let s: &'static str = "hello";   // 字符串字面量都是 'static
+```
+
+**因为字符串字面量存在二进制文件里，永远不会被释放**——所以引用它的 `&str` 是 `'static`。
+
+**注意**：`'static` **不**意味着"变量一直存在"——只是说"引用可以一直存在"。有些类型可能是 `T: 'static`（拥有的数据无引用或引用都是 static）——这是很多 async 场景要求的。
+
+**滥用 `'static`**：新手常见错误——遇到生命周期错误就一路加 `'static`。**这几乎肯定不对**。**要正确设计生命周期关系**，不要用 `'static` 逃避。
+
+## 6. 多个不同生命周期
+
+有时候不同参数的生命周期要区分开：
+
+```rust
+fn longest_prefix<'a, 'b>(x: &'a str, y: &'b str) -> &'a str {
+    // 返回值和 x 相关，和 y 无关
+    if x.starts_with(y) { x } else { &x[..0] }
+}
+```
+
+**含义**：`'a` 和 `'b` 可能不同——返回值的生命周期是 `'a`（跟着 x），和 y 无关。
+
+**生命周期约束**：一个生命周期比另一个长（"outlives"）：
+
+```rust
+fn foo<'a, 'b: 'a>(x: &'a str, y: &'b str) { ... }
+// 'b: 'a 意思是 'b 至少和 'a 一样长
+```
+
+**这些情况实际很少见**——大部分场景一个 `'a` 就够。多生命周期通常出现在库设计里。
+
+## 7. impl 块的生命周期
+
+**结构体上有生命周期，impl 也要写**：
+
+```rust
+struct Book<'a> {
+    title: &'a str,
+}
+
+impl<'a> Book<'a> {
+    fn new(title: &'a str) -> Self {
+        Book { title }
+    }
+}
+```
+
+**独立生命周期的方法**：
+
+```rust
+impl<'a> Book<'a> {
+    fn compare<'b>(&self, other: &'b str) -> bool {
+        self.title == other
+    }
+}
+```
+
+`'b` 和 `'a` 各自独立——都不影响返回值（bool 不含引用）。
+
+## 8. 结构体内引用之间的关系
+
+一个 struct 里有多个引用时，生命周期关系可以复杂：
+
+```rust
+struct Parser<'input> {
+    source: &'input str,
+    tokens: Vec<&'input str>,   // 这些 token 是 source 里切出来的
+}
+```
+
+**含义**：`tokens` 里的引用和 `source` 用同一个生命周期 `'input`——**它们都指向输入字符串的一部分**。
+
+**这是"零拷贝解析器"的经典模式**——避免把每个 token 都 copy 出来，直接引用原文的片段。
+
+## 9. 生命周期 vs 所有权：什么时候用哪个
+
+有一个 struct，字段类型有两种选择：
+
+**方案 A**：拥有
+
+```rust
+struct User {
+    name: String,     // 我拥有自己的 name
+    email: String,
+}
+```
+
+**方案 B**：引用
+
+```rust
+struct User<'a> {
+    name: &'a str,
+    email: &'a str,
+}
+```
+
+**方案 A 的取舍**：
+
+- 优点：**简单、不用生命周期**、User 可以到处传；
+- 缺点：**每个 User 都要 clone 字符串**——可能贵。
+
+**方案 B 的取舍**：
+
+- 优点：**零拷贝**、共享字符串数据；
+- 缺点：**生命周期传染**——用了 User 的地方都要考虑 `'a`，可能非常麻烦。
+
+**新手建议**：**默认用方案 A（拥有）**。等你**真的**需要零拷贝性能，再考虑方案 B。
+
+## 10. 生命周期在函数签名里的意义
+
+**回到最开始的例子**：
+
+```rust
+fn longest<'a>(x: &'a str, y: &'a str) -> &'a str { ... }
+```
+
+**这个签名说了什么**？
+
+**"给我两个 `&str`，我返回一个 `&str`。返回的引用的生命周期不长于两个输入中较短的那个。"**
+
+调用时：
+
+```rust
+let s1 = String::from("long string");
+let result;
+{
+    let s2 = String::from("short");
+    result = longest(&s1, &s2);
+    println!("{}", result);   // OK，都在作用域里
+}
+// println!("{}", result);   // 错！s2 已经 drop，result 可能指向它
+```
+
+**这就是生命周期检查的价值**——**在 println! 那一行拦下"可能的悬垂引用"**。
+
+## 11. 常见错误
+
+**错误 1**：结构体带引用忘了 `<'a>`
+
+```rust
+struct Book {
+    title: &str,   // 错！
+}
+```
+
+**修复**：`struct Book<'a> { title: &'a str }`。
+
+**错误 2**：返回引用但没标生命周期
+
+```rust
+fn first_word(s: String) -> &str {   // 错，s 是拥有的，返回引用后 s 被 drop
+    &s[..1]
+}
+```
+
+**修复**：**返回值也拥有**，或者**参数改成引用**：
+
+```rust
+fn first_word(s: &str) -> &str {   // 现在 elision 规则能处理
+    &s[..1]
+}
+```
+
+**错误 3**：滥用 `'static`
+
+```rust
+fn get_config() -> &'static str {
+    let s = String::from("hello");
+    &s   // 错，s 不是 'static
+}
+```
+
+**修复**：返回值不能是从局部变量借的：
+
+```rust
+fn get_config() -> &'static str {
+    "hello"   // 字面量是 'static
+}
+
+// 或者返回拥有的：
+fn get_config() -> String {
+    String::from("hello")
+}
+```
+
+**错误 4**：迭代器里的引用
+
+```rust
+fn find(v: &Vec<i32>) -> &i32 {
+    v.iter().find(|&&x| x > 0).unwrap()
+    // 编译器会自动推断，通常没问题
+}
+```
+
+**这个能过**——因为 elision 规则把 `&self` 的生命周期传给输出。
+
+**错误 5**：mut 引用和 lifetime 组合
+
+```rust
+fn update<'a>(s: &'a mut String, val: &'a str) {
+    s.push_str(val);
+}
+
+let mut s = String::from("hello");
+update(&mut s, &s);   // 错！同时 &mut s 和 &s
+```
+
+**修复**：分开生命周期让编译器接受，或者复制数据。
+
+## 12. 一个真实的例子：LRU cache
+
+假设你要实现一个 LRU cache，key 是字符串：
+
+**方案 A（简单）**：拥有 key
+
+```rust
+struct LRU {
+    map: HashMap<String, i32>,
+}
+
+impl LRU {
+    fn get(&self, key: &str) -> Option<i32> {
+        self.map.get(key).copied()
+    }
+    fn insert(&mut self, key: String, val: i32) {
+        self.map.insert(key, val);
+    }
+}
+```
+
+**方案 B（复杂）**：引用 key
+
+```rust
+struct LRU<'a> {
+    map: HashMap<&'a str, i32>,
+}
+```
+
+**这时你会碰到麻烦**——map 里的 `&str` 是从哪来的？
+
+- 如果是外部传入的，`LRU<'a>` 里 `'a` 会绑定到外部数据；
+- **LRU 就不能拥有自己的 key**——只能"引用外面的"；
+- 调用者必须保证 key 数据活得比 LRU 长。
+
+**一般不这么设计**——**拥有的 String 用起来简单得多**。生命周期在 API 边界会变得非常麻烦。
+
+## 13. Higher-Ranked Trait Bounds（HRTB）
+
+高级话题：**一个引用可以对任意生命周期都成立**：
+
+```rust
+fn call_with_any_str<F>(f: F)
+where
+    F: for<'a> Fn(&'a str) -> &'a str,
+{
+    let s = String::from("hello");
+    let r = f(&s);
+    println!("{}", r);
+}
+```
+
+**`for<'a>`** 表示"对任何生命周期 `'a` 都成立"。**这在闭包/trait 边界里偶尔会用到**——普通代码里很少。
+
+## 14. 生命周期的常见简化
+
+**新手建议**：写代码时按这个优先级：
+
+1. **优先用值语义**——`String` 而不是 `&str`（新手前期）；
+2. **多用 elision**——大部分函数不用手写生命周期；
+3. **必须手写时保持简单**——一个 `'a` 通常够；
+4. **需要多个生命周期时先想想能不能重构**——**复杂的生命周期签名通常是 API 设计问题**；
+5. **避免 `'static`**——除非真的有全局静态数据。
+
+## 15. 一些实用心得
+
+**编译错误 "missing lifetime specifier"**：一般说明返回引用要标生命周期。跟着编译器建议改。
+
+**编译错误 "does not live long enough"**：说明某个引用引用了短命的东西。要么让被引用的东西活久一点，要么改用值。
+
+**编译错误 "borrowed value does not live long enough"**：类似上面。
+
+**加了生命周期还是不过**：**多半是设计有问题**——重新想 API 里数据流的方向。
+
+**不要过度追求"零拷贝"**：`.clone()` 一个 String 是几百纳秒——**大部分应用完全不敏感**。追求极致性能之前先让代码能编译过。
+
+**读别人的代码看生命周期**：`tokio`、`serde` 的 API 里各种生命周期是最好的教材。
+
+## 16. 一句话总结
+
+生命周期是引用之上的一层机制：
+
+- **大多数场景编译器自动推断**（elision）——你感觉不到；
+- **函数返回引用需要标注**——告诉编译器返回值和哪个输入相关；
+- **结构体带引用字段必须标注**——`struct Book<'a>`；
+- **`'static` 是最长的生命周期**——但不要滥用；
+- **新手优先用拥有的类型**——避免生命周期传染。
+
+生命周期是 Rust 学习曲线的第三个陡坡（前两个是所有权和借用）。**过了这一关，你就能自由地设计 Rust 的类型和 API 了**。
+
+下一章讲**泛型和 trait**——Rust 类型系统的另一个大块头，也是让代码"通用又高效"的秘诀。
+
+</WordCount>

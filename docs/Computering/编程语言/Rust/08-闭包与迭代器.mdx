@@ -1,0 +1,487 @@
+import WordCount from '../../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+**闭包（Closure）** 和 **迭代器（Iterator）** 是 Rust 里最优雅的两个特性——它们让你能写出"看起来像 Python/Haskell 那么函数式"的代码，**但底层零成本**。这一章讲清楚它们。
+
+## 1. 闭包：能捕获环境的匿名函数
+
+**闭包语法**：
+
+```rust
+let add_one = |x| x + 1;
+println!("{}", add_one(5));   // 6
+
+let multiply = |x, y| x * y;
+println!("{}", multiply(3, 4));   // 12
+```
+
+**和函数的区别**：**闭包能捕获周围作用域的变量**：
+
+```rust
+let n = 10;
+let add_n = |x| x + n;   // 捕获了 n
+println!("{}", add_n(5));   // 15
+```
+
+**闭包类型可以显式标注**（但一般省略）：
+
+```rust
+let add_one = |x: i32| -> i32 { x + 1 };
+```
+
+**闭包最常用的场景**：**给高阶函数传行为**：
+
+```rust
+let v = vec![1, 2, 3, 4, 5];
+let sum: i32 = v.iter().sum();
+let even_sum: i32 = v.iter().filter(|&&x| x % 2 == 0).sum();
+let squared: Vec<i32> = v.iter().map(|&x| x * x).collect();
+```
+
+## 2. 闭包的三种捕获方式
+
+**闭包捕获环境变量有三种方式**——**对应引用、可变引用、拿走所有权**：
+
+**方式 1：不可变借用（`Fn`）**——**默认**：
+
+```rust
+let s = String::from("hello");
+let print_s = || println!("{}", s);   // 借用 s
+print_s();
+print_s();   // 能多次调用
+```
+
+**方式 2：可变借用（`FnMut`）**——**闭包修改捕获的变量**：
+
+```rust
+let mut count = 0;
+let mut incr = || count += 1;
+incr();
+incr();
+println!("{}", count);   // 2
+```
+
+**注意**：**`let mut incr`**——闭包本身要 `mut`，因为调用它会改变内部状态（借用了外面的可变引用）。
+
+**方式 3：拿走所有权（`FnOnce`）**——**闭包 move 走了捕获的东西**：
+
+```rust
+let s = String::from("hello");
+let take_s = move || {
+    println!("{}", s);
+    // s 被 move 到闭包里了
+};
+take_s();
+// println!("{}", s);   // 错，s 已经 move
+```
+
+**关键字 `move`**：**强制闭包"拿走所有权"而不是借用**——**这在多线程和异步里非常常用**（因为闭包要在另一个线程/task 里独立运行）。
+
+## 3. Fn、FnMut、FnOnce：三个 trait
+
+**这三个是闭包实现的 trait**——描述"这个闭包能被怎么调用"：
+
+- **`Fn`**：**多次调用**、只读借用捕获——最灵活的调用能力；
+- **`FnMut`**：**多次调用**、但每次可能改变内部状态；
+- **`FnOnce`**：**只能调用一次**——因为可能消费了捕获的东西。
+
+**继承关系**：
+
+- 每个 `Fn` 也是 `FnMut` 和 `FnOnce`；
+- 每个 `FnMut` 也是 `FnOnce`；
+- **`Fn ⊂ FnMut ⊂ FnOnce`**。
+
+**在函数签名里**：
+
+```rust
+fn call_fn<F: Fn(i32) -> i32>(f: F, x: i32) -> i32 { f(x) }
+fn call_fnmut<F: FnMut(i32) -> i32>(mut f: F, x: i32) -> i32 { f(x) }
+fn call_fnonce<F: FnOnce(i32) -> i32>(f: F, x: i32) -> i32 { f(x) }
+```
+
+**选哪个 trait bound**：**能用 Fn 就用 Fn**（最宽松）；**需要修改就用 FnMut**；**只调一次就用 FnOnce**。
+
+## 4. 闭包作为返回值
+
+**上一章讲过 `impl Trait`**——**闭包作为返回值最合适**：
+
+```rust
+fn make_adder(x: i32) -> impl Fn(i32) -> i32 {
+    move |y| x + y
+}
+
+let add5 = make_adder(5);
+println!("{}", add5(10));   // 15
+```
+
+**注意 `move`**——**函数返回后，x 会离开作用域**——**闭包必须拿走 x 的所有权**，否则返回的闭包引用了已释放的 x。
+
+**如果要返回不同类型的闭包**（比如 `if` 里返回不同的实现），用 `Box<dyn Fn(...) -> ...>`：
+
+```rust
+fn make_fn(mode: bool) -> Box<dyn Fn(i32) -> i32> {
+    if mode {
+        Box::new(|x| x + 1)
+    } else {
+        Box::new(|x| x * 2)
+    }
+}
+```
+
+## 5. 迭代器：Rust 的函数式核心
+
+**Iterator trait**：
+
+```rust
+trait Iterator {
+    type Item;
+    fn next(&mut self) -> Option<Self::Item>;
+}
+```
+
+**极简接口**——一个 `next` 方法。**但基于它，标准库提供了几十个默认方法**——`map`、`filter`、`collect`、`fold`、`take`、`skip`、`zip`……
+
+**用法**：
+
+```rust
+let v = vec![1, 2, 3, 4, 5];
+
+// 各种 iter
+v.iter();          // 每个元素是 &T
+v.iter_mut();      // 每个元素是 &mut T
+v.into_iter();     // 每个元素是 T（消费 v）
+```
+
+**for 循环底层就是调用 iter + next**：
+
+```rust
+for x in &v {
+    println!("{}", x);
+}
+
+// 等价于：
+let mut iter = v.iter();
+while let Some(x) = iter.next() {
+    println!("{}", x);
+}
+```
+
+## 6. 迭代器的两种方法：adaptor vs consumer
+
+**adaptor**：**返回一个新的迭代器**——链式操作：
+
+- `map`、`filter`、`take`、`skip`、`chain`、`zip`、`enumerate`、`rev`、……
+
+**consumer**：**消费迭代器，返回一个值**：
+
+- `collect`、`sum`、`product`、`count`、`fold`、`any`、`all`、`find`、`max`、`min`、……
+
+**adaptor 是懒的**——不会立刻执行：
+
+```rust
+let v = vec![1, 2, 3];
+let mapped = v.iter().map(|x| x * 2);   // 什么都没算！
+// map 是懒的，只有当有 consumer（比如 collect）时才执行
+let result: Vec<_> = mapped.collect();
+println!("{:?}", result);   // [2, 4, 6]
+```
+
+## 7. 常用的适配器
+
+```rust
+let v = vec![1, 2, 3, 4, 5, 6];
+
+// map：变换每个元素
+v.iter().map(|x| x * 2);   // 2, 4, 6, 8, 10, 12
+
+// filter：保留满足条件的
+v.iter().filter(|&&x| x > 3);   // 4, 5, 6
+
+// take：只取前 N 个
+v.iter().take(3);   // 1, 2, 3
+
+// skip：跳过前 N 个
+v.iter().skip(2);   // 3, 4, 5, 6
+
+// enumerate：带索引
+v.iter().enumerate();   // (0, 1), (1, 2), (2, 3), ...
+
+// zip：两个迭代器打包
+let names = vec!["Alice", "Bob"];
+let ages = vec![30, 25];
+names.iter().zip(ages.iter());   // ("Alice", 30), ("Bob", 25)
+
+// chain：连接两个迭代器
+let a = vec![1, 2];
+let b = vec![3, 4];
+a.iter().chain(b.iter());   // 1, 2, 3, 4
+
+// rev：反转
+v.iter().rev();   // 6, 5, 4, 3, 2, 1
+
+// flat_map：变换后展平（map + flatten）
+vec![vec![1, 2], vec![3, 4]].iter().flat_map(|v| v.iter());   // 1, 2, 3, 4
+
+// take_while / skip_while：条件截断
+v.iter().take_while(|&&x| x < 4);   // 1, 2, 3
+```
+
+## 8. 常用的消费器
+
+```rust
+let v = vec![1, 2, 3, 4, 5];
+
+// collect：收集成集合
+let s: Vec<i32> = v.iter().map(|x| x * 2).collect();
+
+// sum, product
+let sum: i32 = v.iter().sum();          // 15
+let product: i32 = v.iter().product();  // 120
+
+// count
+let n = v.iter().filter(|&&x| x > 2).count();   // 3
+
+// max, min
+let max = v.iter().max();   // Some(&5)
+let min = v.iter().min();   // Some(&1)
+
+// find：找第一个匹配的
+let first_even = v.iter().find(|&&x| x % 2 == 0);   // Some(&2)
+
+// any, all
+let has_even = v.iter().any(|&x| x % 2 == 0);   // true
+let all_positive = v.iter().all(|&x| x > 0);     // true
+
+// fold：像 reduce
+let sum = v.iter().fold(0, |acc, x| acc + x);   // 15
+let sum_str = v.iter().fold(String::new(), |acc, x| acc + &x.to_string());
+
+// for_each：对每个元素执行操作（有副作用）
+v.iter().for_each(|x| println!("{}", x));
+
+// reduce：像 fold 但初始值是第一个元素
+let sum = v.iter().copied().reduce(|acc, x| acc + x);
+```
+
+## 9. collect 的类型推断
+
+**`collect` 需要指定目标类型**——因为它能收集成多种集合：
+
+```rust
+let v = vec![1, 2, 3];
+
+let vec: Vec<i32> = v.iter().map(|x| x * 2).collect();
+let set: HashSet<i32> = v.iter().copied().collect();
+let string: String = vec!['a', 'b', 'c'].into_iter().collect();
+
+// 也可以用 turbofish
+let vec = v.iter().map(|x| x * 2).collect::<Vec<i32>>();
+```
+
+**特殊：`collect::<Result<Vec<_>, _>>()`**——**处理错误的集合**：
+
+```rust
+let strings = vec!["1", "2", "not_a_number", "4"];
+let numbers: Result<Vec<i32>, _> = strings.iter().map(|s| s.parse::<i32>()).collect();
+// 遇到第一个错就返回 Err
+// 全部成功才是 Ok(Vec<...>)
+```
+
+**这是 Rust 里"map + 错误传播"的经典组合**。
+
+## 10. 迭代器的性能
+
+**迭代器是零成本抽象**——**编译器把链式调用 inline 成一个循环**：
+
+```rust
+let result: i32 = v.iter().filter(|&&x| x > 2).map(|&x| x * 2).sum();
+```
+
+**编译后大致等价于**：
+
+```rust
+let mut result = 0;
+for x in &v {
+    if *x > 2 {
+        result += x * 2;
+    }
+}
+```
+
+**没有任何中间的 `Vec` 分配**——完全是编译期展开的。**这就是"零成本抽象"的力量**。
+
+**vs Python**：Python 里 `filter().map().sum()` 每一步都实际执行（虽然有 iterator 也懒）——**Rust 编译期就 fuse 掉了**。
+
+## 11. 自己写 Iterator
+
+**只需实现 `next`**——其他方法自动获得：
+
+```rust
+struct Fibonacci {
+    curr: u64,
+    next: u64,
+}
+
+impl Iterator for Fibonacci {
+    type Item = u64;
+
+    fn next(&mut self) -> Option<u64> {
+        let new_next = self.curr + self.next;
+        self.curr = self.next;
+        self.next = new_next;
+        Some(self.curr)
+    }
+}
+
+let fib = Fibonacci { curr: 0, next: 1 };
+let first_10: Vec<u64> = fib.take(10).collect();
+println!("{:?}", first_10);   // [1, 1, 2, 3, 5, 8, 13, 21, 34, 55]
+```
+
+**这就是斐波那契数列**——**用 iterator + take**，代码非常干净。
+
+## 12. IntoIterator trait
+
+**任何实现 `IntoIterator` 的类型都能用在 `for` 循环里**：
+
+```rust
+trait IntoIterator {
+    type Item;
+    type IntoIter: Iterator<Item = Self::Item>;
+    fn into_iter(self) -> Self::IntoIter;
+}
+
+// for x in vec { ... }
+// 等价于
+// for x in vec.into_iter() { ... }
+```
+
+**Vec、HashMap、Range、String 都实现了 IntoIterator**——所以它们都能直接 for。
+
+**给自己类型加迭代支持**：**实现 `IntoIterator`**。
+
+## 13. 常见错误
+
+**闭包类型标注太严格**：
+
+```rust
+fn take_closure(f: fn(i32) -> i32) { ... }
+let n = 10;
+take_closure(|x| x + n);   // 错，|x| x + n 捕获了 n，不是纯函数指针
+```
+
+**修复**：用 `impl Fn` 或 `Box<dyn Fn>`：
+
+```rust
+fn take_closure(f: impl Fn(i32) -> i32) { ... }
+```
+
+**多次调用消费型闭包**：
+
+```rust
+let s = String::from("hello");
+let take = move || s;   // move 走了 s
+take();
+take();   // 错！FnOnce 只能调一次
+```
+
+**修复**：改成 `Fn`——不消费 s，只借用：
+
+```rust
+let take = move || &s;   // 借用不消费
+```
+
+**迭代器耗尽后继续用**：
+
+```rust
+let iter = v.iter().map(|x| x * 2);
+let sum1: i32 = iter.sum();   // 消费了 iter
+let sum2: i32 = iter.sum();   // 错！iter 已经消费
+```
+
+**修复**：**别复用迭代器**——重新构造或者 `.clone()`。
+
+**Vec vs Iter 混淆**：
+
+```rust
+let v = vec![1, 2, 3];
+let doubled = v.iter().map(|x| x * 2);   // doubled 是 iter，不是 Vec
+for x in doubled { ... }   // OK
+println!("{:?}", doubled);   // 错，doubled 已经被 for 消费
+```
+
+**修复**：需要 Vec 就 `.collect()`。
+
+**闭包 lifetime 让人懵**：闭包捕获引用时会引入生命周期。**新手常见的"我这闭包不能返回"的错误多半是生命周期问题**——**用 `move` 强制拿所有权，避免生命周期麻烦**。
+
+## 14. 一个完整的例子
+
+**统计一段文本里每个单词出现的次数，输出频次最高的 5 个**：
+
+```rust
+use std::collections::HashMap;
+
+fn top_words(text: &str, n: usize) -> Vec<(String, usize)> {
+    let mut counts: HashMap<String, usize> = HashMap::new();
+
+    // 统计
+    text.split_whitespace()
+        .for_each(|w| *counts.entry(w.to_lowercase()).or_insert(0) += 1);
+
+    // 排序取 top N
+    let mut result: Vec<_> = counts.into_iter().collect();
+    result.sort_by(|a, b| b.1.cmp(&a.1));
+    result.into_iter().take(n).collect()
+}
+
+fn main() {
+    let text = "the quick brown fox jumps over the lazy dog the fox";
+    for (word, count) in top_words(text, 3) {
+        println!("{}: {}", word, count);
+    }
+}
+```
+
+**用了**：`split_whitespace()`（生成 iter）、`for_each`、`entry().or_insert()`（HashMap 惯用法）、`into_iter().collect()`（转 Vec）、`sort_by`、`take`。
+
+**函数式风格的 Rust，代码非常紧凑**。
+
+## 15. 一些实用建议
+
+**优先用迭代器方法而不是手写循环**：更短、更清晰、编译器优化更好。
+
+**别过度链式**：一行链 10 个 map/filter 会让代码难读。**中间用 let 拆一下**：
+
+```rust
+let filtered: Vec<_> = v.iter().filter(...).collect();
+let mapped: Vec<_> = filtered.iter().map(...).collect();
+```
+
+**注意 `iter()` vs `into_iter()`**：
+
+- `iter()`：**借用**，每个元素是 `&T`；
+- `into_iter()`：**消费**，每个元素是 `T`（Vec 被消费）；
+- `iter_mut()`：**可变借用**，每个元素是 `&mut T`。
+
+**collect 需要类型标注**：`.collect::<Vec<_>>()` 或 `let v: Vec<_> = ....collect();`。
+
+**闭包默认借用，`move` 强制拿走**：多线程和异步场景经常需要 `move`。
+
+## 16. 一句话总结
+
+闭包和迭代器让 Rust 代码优雅又高效：
+
+- **闭包**：能捕获环境的匿名函数，三种捕获（Fn/FnMut/FnOnce）；
+- **`move` 关键字**：强制闭包拿走所有权，常用在多线程/异步；
+- **迭代器**：`next` 一个方法撑起 map/filter/collect 一整套操作；
+- **懒执行**：适配器不算，消费器才算——组合可以任意长；
+- **零成本**：编译器 inline 成手写循环级别的代码；
+- **`collect`**：收集成 Vec、HashSet、HashMap、Result 等；
+- **自己实现 Iterator**：只写 next，其他方法全免费。
+
+学完这一章，你就能写出"看起来像 Python 那么简洁、跑起来像 C 那么快"的 Rust 代码——**这也是 Rust 最迷人的地方之一**。
+
+下一章讲**智能指针**——`Box`、`Rc`、`RefCell` 等，让所有权模型能表达更复杂的数据结构。
+
+</WordCount>

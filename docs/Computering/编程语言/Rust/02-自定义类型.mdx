@@ -2,7 +2,530 @@ import WordCount from '../../../../src/components/WordCount/WordCount';
 
 <WordCount>
 
-## 2.1 
+上一章讲了 Rust 的基础语法——变量、函数、控制流。这些都是"标量数据 + 简单函数"级别的。**实际写代码时，你几乎立刻会想到自己定义类型**——比如"我要一个 `Point` 表示点"、"我要一个 `Result` 表示成功或失败"。
 
+Rust 里自定义类型主要靠三种东西：**结构体 struct、枚举 enum、类型别名 type**。这一章讲这三个，重点是**枚举——Rust 里最好的抽象工具之一**。
+
+## 1. 结构体（struct）
+
+**基本形式**：
+
+```rust
+struct Point {
+    x: f64,
+    y: f64,
+}
+
+let p = Point { x: 1.0, y: 2.0 };
+println!("{}, {}", p.x, p.y);
+```
+
+**几个细节**：
+
+- **字段必须都初始化**——不能 `Point { x: 1.0 }`，会报错；
+- **字段访问**：`.x`、`.y`；
+- **`mut` 在变量上**：`let mut p = ...` 后可以改字段。
+
+**字段初始化简写**：变量名和字段名一样时可以省略：
+
+```rust
+fn new(x: f64, y: f64) -> Point {
+    Point { x, y }   // 等价于 Point { x: x, y: y }
+}
+```
+
+**结构体更新语法**：从另一个结构体复制大部分字段：
+
+```rust
+let p1 = Point { x: 1.0, y: 2.0 };
+let p2 = Point { x: 10.0, ..p1 };   // y 从 p1 复制
+```
+
+## 2. 元组结构体
+
+**只有类型没有字段名**：
+
+```rust
+struct Color(u8, u8, u8);
+struct Meters(f64);
+
+let red = Color(255, 0, 0);
+let dist = Meters(10.5);
+
+let r = red.0;   // 用索引访问
+```
+
+**用途**：
+
+- **单字段的 wrapper**：`Meters(f64)` 让"米"和"英尺"在类型层面区分——**类型安全**；
+- **短小的一次性类型**：像 RGB 这种字段名多此一举的。
+
+**别滥用**——大多数场景普通 struct 更清晰。
+
+## 3. 单元结构体（Unit Struct）
+
+**没有任何字段**：
+
+```rust
+struct AlwaysEqual;
+
+let a = AlwaysEqual;
+```
+
+**看起来没用**？其实有用——**Marker types**：你要一个只承担类型功能的东西（比如 trait 的实现载体），Unit Struct 是零开销的选择。
+
+## 4. 方法：给类型加行为
+
+**`impl` 块**：
+
+```rust
+struct Rectangle {
+    width: f64,
+    height: f64,
+}
+
+impl Rectangle {
+    // 关联函数（类似静态方法，不用 self）
+    fn new(w: f64, h: f64) -> Self {
+        Self { width: w, height: h }
+    }
+
+    fn square(size: f64) -> Self {
+        Self { width: size, height: size }
+    }
+
+    // 方法（第一个参数是 self）
+    fn area(&self) -> f64 {
+        self.width * self.height
+    }
+
+    fn scale(&mut self, factor: f64) {
+        self.width *= factor;
+        self.height *= factor;
+    }
+
+    fn consume(self) -> f64 {
+        // 这个方法拿走了 self 的所有权
+        self.width + self.height
+    }
+}
+
+let mut r = Rectangle::new(3.0, 4.0);
+let a = r.area();          // &self
+r.scale(2.0);              // &mut self
+let sum = r.consume();     // self（r 被移走了，不能再用）
+```
+
+**三种 self**：
+
+- **`&self`**：只读借用——**大部分只读方法用它**；
+- **`&mut self`**：可变借用——需要修改字段；
+- **`self`**：**拿走所有权**——通常用在"消费自己产生一个新东西"的场景（比如 builder pattern）。
+
+**关联函数 vs 方法**：
+
+- 用 `::` 调用关联函数：`Rectangle::new(1.0, 2.0)`；
+- 用 `.` 调用方法：`r.area()`。
+
+**多个 impl 块**：一个类型可以有多个 impl 块（同文件或分散在多个文件），编译器合并：
+
+```rust
+impl Rectangle {
+    fn area(&self) -> f64 { ... }
+}
+
+impl Rectangle {
+    fn perimeter(&self) -> f64 { ... }
+}
+```
+
+## 5. 枚举（enum）：Rust 的秘密武器
+
+**这是 Rust 最重要的类型工具之一**。它比 C 的 enum 或 Java 的 enum 强大得多——**每个变体可以带自己的数据**。
+
+**最简单的形式**：
+
+```rust
+enum Direction {
+    North,
+    South,
+    East,
+    West,
+}
+
+let d = Direction::North;
+```
+
+看起来和 C 一样。但 Rust 的 enum 允许**每个变体带数据**：
+
+```rust
+enum Shape {
+    Circle(f64),                    // 半径
+    Rectangle(f64, f64),            // 宽、高
+    Triangle { a: f64, b: f64, c: f64 },   // 三边（命名字段）
+}
+
+let c = Shape::Circle(5.0);
+let r = Shape::Rectangle(3.0, 4.0);
+let t = Shape::Triangle { a: 3.0, b: 4.0, c: 5.0 };
+```
+
+**每个变体的"内部数据"不一样**——但它们都是 `Shape` 类型。这个能力叫做**"和类型（sum type）"或"tagged union"**——是函数式语言的核心概念，C/Java 没有。
+
+## 6. `match` 处理枚举
+
+**`match` 是使用 enum 的核心工具**：
+
+```rust
+fn area(shape: &Shape) -> f64 {
+    match shape {
+        Shape::Circle(r) => 3.14 * r * r,
+        Shape::Rectangle(w, h) => w * h,
+        Shape::Triangle { a, b, c } => {
+            let s = (a + b + c) / 2.0;
+            (s * (s - a) * (s - b) * (s - c)).sqrt()
+        }
+    }
+}
+```
+
+**关键点**：
+
+- **必须穷尽所有变体**（或者用 `_`）；
+- **每个 arm 里可以直接取出变体的数据**（`r`、`w`、`h`）；
+- **加了新变体，所有 `match` 都会编译错误**——**这是好事**，保证你不会漏掉处理。
+
+## 7. Option：处理"可能没有值"
+
+**Option 是 Rust 标准库里的一个 enum**，替代了很多语言里的 null：
+
+```rust
+enum Option<T> {
+    None,
+    Some(T),
+}
+```
+
+用来表达"这个值可能存在也可能不存在"。**Rust 没有 null**——**所有可能不存在的值都必须用 `Option`**：
+
+```rust
+fn find_user(id: u32) -> Option<String> {
+    if id == 1 {
+        Some(String::from("Alice"))
+    } else {
+        None
+    }
+}
+
+let user = find_user(1);
+match user {
+    Some(name) => println!("Found: {}", name),
+    None => println!("Not found"),
+}
+```
+
+**这是 Rust 一个绝妙的设计**——**编译期强制你处理"可能为空"的情况**。C/Java 里 `NullPointerException` 是常见 bug，Rust 里根本不可能——**编译器会拒绝**你把 `Option<T>` 当 `T` 用。
+
+**`Option` 的常用方法**：
+
+```rust
+let x: Option<i32> = Some(5);
+
+x.unwrap();                     // 拿出值，None 时 panic
+x.unwrap_or(0);                 // None 时用默认值
+x.expect("shouldn't be None");  // 带自定义 panic 消息
+x.map(|v| v * 2);               // 转换 Some 里的值
+x.is_some();
+x.is_none();
+```
+
+## 8. Result：处理"可能出错"
+
+**Result 是另一个标准库 enum**，专门处理错误：
+
+```rust
+enum Result<T, E> {
+    Ok(T),
+    Err(E),
+}
+```
+
+**用途**：所有可能失败的操作都返回 `Result`：
+
+```rust
+fn parse_number(s: &str) -> Result<i32, String> {
+    match s.parse::<i32>() {
+        Ok(n) => Ok(n),
+        Err(_) => Err(format!("'{}' is not a number", s)),
+    }
+}
+
+match parse_number("42") {
+    Ok(n) => println!("Got: {}", n),
+    Err(e) => println!("Error: {}", e),
+}
+```
+
+**Rust 里没有 exception**——**错误都通过返回值传递**。这让"哪些函数可能失败"一目了然。第 7 章会详细讲错误处理，这里先记住这个模式。
+
+## 9. Pattern Matching：不只是 match
+
+**模式匹配可以出现在很多地方**：
+
+**`let` 里**：
+
+```rust
+let (a, b) = (1, 2);              // 元组解构
+let Point { x, y } = my_point;    // 结构体解构
+
+let Some(x) = maybe_val;   // 危险：如果是 None 会 panic
+                            // 建议用 if let 或 let else
+```
+
+**`if let`**——只关心一种模式：
+
+```rust
+if let Some(x) = maybe_val {
+    println!("Got {}", x);
+}
+```
+
+**`while let`**：
+
+```rust
+while let Some(item) = iter.next() {
+    process(item);
+}
+```
+
+**`let ... else`**（Rust 1.65+）——**匹配失败就早退**：
+
+```rust
+let Some(x) = maybe_val else {
+    return;    // 或者 panic!、continue、break
+};
+// 之后 x 已经是 T 类型，可以直接用
+```
+
+**`let else` 是 Rust 里最好用的一个 pattern**——**减少嵌套，让主逻辑扁平**。
+
+## 10. 更复杂的模式
+
+**模式匹配可以做很多事**：
+
+```rust
+match value {
+    // 字面量
+    1 => "one",
+
+    // 多个值 |
+    2 | 3 | 5 | 7 => "prime",
+
+    // 范围
+    10..=100 => "10 to 100",
+
+    // 变量绑定
+    n if n < 0 => "negative",
+
+    // 解构 + 条件（guard）
+    Point { x, y } if x == y => "diagonal",
+
+    // 解构 + 忽略
+    Point { x, .. } => "any y",
+
+    // 通配符
+    _ => "other",
+}
+```
+
+**`@` 绑定**：既想匹配又想拿到值：
+
+```rust
+match age {
+    n @ 0..=17 => println!("{} is a minor", n),
+    n @ 18..=64 => println!("{} is an adult", n),
+    _ => println!("senior"),
+}
+```
+
+## 11. 类型别名（type alias）
+
+给已有类型起个新名字，**不创建新类型**：
+
+```rust
+type Kilometers = i32;
+
+let x: i32 = 5;
+let y: Kilometers = 10;
+let z = x + y;   // 完全 OK，Kilometers 就是 i32
+```
+
+**用途**：
+
+- **简化长类型**：`type Result<T> = std::result::Result<T, MyError>;`
+- **提高可读性**：`type UserId = u64;` 让代码里 `UserId` 的意图明确。
+
+**注意**：type alias **不做类型检查**——`Kilometers` 和 `i32` 混用是允许的。要真正的类型隔离，用**新类型模式**：
+
+```rust
+struct Kilometers(i32);   // 元组结构体
+struct Miles(i32);
+
+fn move_km(x: Kilometers) { ... }
+// move_km(Miles(10)) 会编译错误 — 真正的类型隔离
+```
+
+## 12. 泛型：让类型参数化
+
+结构体和枚举可以带类型参数：
+
+```rust
+struct Pair<T> {
+    first: T,
+    second: T,
+}
+
+impl<T> Pair<T> {
+    fn new(a: T, b: T) -> Self {
+        Self { first: a, second: b }
+    }
+}
+
+let p1 = Pair::new(1, 2);           // Pair<i32>
+let p2 = Pair::new("a", "b");       // Pair<&str>
+```
+
+**多个类型参数**：
+
+```rust
+struct Container<T, U> {
+    key: T,
+    value: U,
+}
+```
+
+**枚举也可以**：`Option<T>` 和 `Result<T, E>` 就是。
+
+泛型的更多细节（trait bound、where 从句、生命周期）在第 5、6 章讲。
+
+## 13. 派生宏（derive）：一键实现常见 trait
+
+**每次自己写 `Debug`、`Clone` 之类的实现太累了**——**Rust 提供 derive**：
+
+```rust
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+struct Point {
+    x: i32,
+    y: i32,
+}
+
+let p = Point { x: 1, y: 2 };
+println!("{:?}", p);          // Debug
+let p2 = p.clone();           // Clone
+assert_eq!(p, p2);            // PartialEq
+```
+
+**常用的 derive**：
+
+- **`Debug`**：能被 `{:?}` 打印；
+- **`Clone`**：`.clone()` 复制；
+- **`Copy`**：值可以隐式复制（简单类型）；
+- **`PartialEq`, `Eq`**：`==` 比较；
+- **`PartialOrd`, `Ord`**：排序；
+- **`Hash`**：能当 HashMap 的 key；
+- **`Default`**：`.default()` 造一个零值实例。
+
+**一个类型如果都是"可 derive 的字段"，加上这套 derive 就基本够用**。
+
+## 14. 一个综合例子
+
+拿枚举实现一个"链表"（**注意**：这里为了简化没处理内存回收，实际用 Box）：
+
+```rust
+#[derive(Debug)]
+enum List {
+    Cons(i32, Box<List>),
+    Nil,
+}
+
+impl List {
+    fn new() -> Self {
+        List::Nil
+    }
+
+    fn prepend(self, val: i32) -> Self {
+        List::Cons(val, Box::new(self))
+    }
+
+    fn len(&self) -> usize {
+        match self {
+            List::Cons(_, tail) => 1 + tail.len(),
+            List::Nil => 0,
+        }
+    }
+}
+
+let list = List::new().prepend(1).prepend(2).prepend(3);
+println!("length: {}", list.len());
+println!("list: {:?}", list);
+```
+
+**看到了吗**——**Rust 的 enum + 递归就能表达一个完整的链表**。这是函数式语言里的 ADT（Algebraic Data Type），比 C 里 `struct Node { int val; struct Node *next; }` 表达力强得多。
+
+## 15. 一些常见坑
+
+**忘了 `#[derive(Debug)]` 就 println**：报错 `Point` doesn't implement `Debug`。加上 derive。
+
+**struct 里字段全 pub 才能外部初始化**：
+
+```rust
+mod foo {
+    pub struct Point {
+        pub x: i32,        // pub
+        y: i32,            // 不 pub
+    }
+}
+
+// 外部代码
+foo::Point { x: 1, y: 2 }   // 错！y 不是 pub
+```
+
+一般 struct 的字段**保持私有**，通过 `new()` 构造 + getter 访问——**封装原则**。
+
+**match 时忘了引用**：
+
+```rust
+let opt = Some(5);
+match opt {
+    Some(x) => ...,   // 这里 x 是 i32
+}
+
+// 但对复杂类型：
+let opt = Some(String::from("hello"));
+match opt {
+    Some(s) => ...,   // s 拿走了 String 的所有权
+}
+
+// 想借用不拿：
+match &opt {
+    Some(s) => ...,   // s 是 &String
+    None => ...,
+}
+```
+
+**枚举变体名字撞了**：`enum A { Foo }` 和 `enum B { Foo }` 里 `Foo` 不冲突——要用 `A::Foo` 和 `B::Foo` 区分。
+
+## 16. 一句话总结
+
+Rust 自定义类型：
+
+- **结构体（struct）**：数据聚合，配 `impl` 加方法；
+- **枚举（enum）**：**Rust 的杀手锏**——每个变体带自己的数据，配 `match` 使用；
+- **Option / Result**：标准库里两个最重要的 enum，替代了 null 和 exception；
+- **模式匹配**：`match` / `if let` / `while let` / `let else`，无处不在；
+- **type alias**：起别名，不是新类型（要新类型用 tuple struct）；
+- **derive**：一键实现 Debug、Clone、PartialEq 等常用 trait。
+
+这一章你已经能表达大部分数据结构了。**下一章开始进入 Rust 的核心——所有权（ownership）**。这也是 Rust 学习曲线最陡的地方，但学会了就理解了 Rust 的独特之处。
 
 </WordCount>

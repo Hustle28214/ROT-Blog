@@ -1,0 +1,445 @@
+import WordCount from '../../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+**Rust 里没有 exception**。
+
+这句话是很多人来 Rust 的第一个"文化冲击"——Java、Python、C++ 里熟悉的 `try/catch` 全没了。**取而代之的是 `Result` 和 `?` 操作符**——一套非常干净的错误处理机制。
+
+这一章讲清楚 Rust 的错误处理。
+
+## 1. Rust 为什么不用 exception
+
+**Exception 的问题**：
+
+- **隐藏控制流**：函数签名看不出它可能抛异常——`f(x)` 里 f 到底会不会抛？只有跳到实现里找；
+- **性能有代价**：unwinding stack 是慢的；
+- **难以静态检查**：编译器不知道"catch 哪些异常足够"。
+
+**Rust 的答案**：**错误通过返回值传递**——**函数签名里明确写"我可能失败"**。
+
+具体形式是 **`Result<T, E>`**：
+
+```rust
+enum Result<T, E> {
+    Ok(T),      // 成功，装着 T
+    Err(E),     // 失败，装着 E
+}
+```
+
+**函数返回 `Result<T, E>`** 就说"我可能返回 T 或者 E"。**调用方必须处理 E 才能拿到 T**。
+
+## 2. 两种错误：可恢复 vs 不可恢复
+
+**可恢复错误**——用 `Result`：
+
+- 文件找不到；
+- 网络超时；
+- 用户输入格式错。
+
+调用方**应该处理**——比如重试、给用户报错、fallback。
+
+**不可恢复错误**——用 `panic!`：
+
+- Vec 越界访问；
+- 数组切片索引错；
+- unwrap 一个 None；
+- 除以零（一些场景）。
+
+调用方**不能处理**——**程序状态已经错了**，只能崩溃或者退回上层。
+
+**大部分情况用 Result**——panic 是"最后手段"。
+
+## 3. Result 的基本用法
+
+**函数返回 Result**：
+
+```rust
+use std::fs::File;
+use std::io::Read;
+
+fn read_file(path: &str) -> Result<String, std::io::Error> {
+    let mut file = File::open(path)?;   // ? 见下节
+    let mut contents = String::new();
+    file.read_to_string(&mut contents)?;
+    Ok(contents)
+}
+```
+
+**调用**：
+
+```rust
+match read_file("hello.txt") {
+    Ok(content) => println!("{}", content),
+    Err(e) => println!("Error: {}", e),
+}
+```
+
+**必须处理 Err**——**编译器会警告**如果你忽略 Result。
+
+## 4. `?` 操作符：错误传播的糖
+
+**上面代码里 `File::open(path)?` 里的 `?`** 是 Rust 里最好用的语法糖之一。
+
+**`?` 做什么**：
+
+- 如果 `Result` 是 `Ok(v)`：**取出 v 继续**；
+- 如果 `Result` 是 `Err(e)`：**直接从当前函数 return `Err(e)`**。
+
+**没有 `?` 时**：
+
+```rust
+fn read_file(path: &str) -> Result<String, std::io::Error> {
+    let mut file = match File::open(path) {
+        Ok(f) => f,
+        Err(e) => return Err(e),
+    };
+    let mut contents = String::new();
+    match file.read_to_string(&mut contents) {
+        Ok(_) => {},
+        Err(e) => return Err(e),
+    }
+    Ok(contents)
+}
+```
+
+**啰嗦得要死**。**有了 `?`**：
+
+```rust
+fn read_file(path: &str) -> Result<String, std::io::Error> {
+    let mut file = File::open(path)?;
+    let mut contents = String::new();
+    file.read_to_string(&mut contents)?;
+    Ok(contents)
+}
+```
+
+**`?` 是 Rust 错误处理的核心**——**用起来像 exception，但静态类型检查**。
+
+**注意**：`?` 只能用在**返回 `Result` 或 `Option`** 的函数里。
+
+## 5. `Option` 也有类似的用法
+
+**`Option<T>` 是 `enum { Some(T), None }`**——**表示"可能没有值"**。
+
+用法类似 Result：
+
+```rust
+fn first_char(s: &str) -> Option<char> {
+    s.chars().next()
+}
+
+fn to_upper_first(s: &str) -> Option<char> {
+    let c = first_char(s)?;   // 如果 None 就直接返回 None
+    Some(c.to_ascii_uppercase())
+}
+```
+
+**Option 的 `?`** 和 Result 的 `?` 类似：
+
+- `Some(v)` → 取出 v 继续；
+- `None` → 直接 return None。
+
+**Result 和 Option 不能混用 `?`**——除非做转换（用 `.ok_or(...)` 之类）：
+
+```rust
+fn f(s: &str) -> Result<i32, String> {
+    let c = s.chars().next().ok_or("empty".to_string())?;   // Option → Result
+    // c 是 char
+    Ok(c as i32)
+}
+```
+
+## 6. Result 的常用方法
+
+```rust
+let r: Result<i32, String> = Ok(5);
+
+r.is_ok();                       // true
+r.is_err();                      // false
+r.unwrap();                      // 5（Err 时 panic）
+r.unwrap_or(0);                  // Err 时用 0
+r.unwrap_or_else(|e| { ... });   // Err 时用闭包生成默认值
+r.expect("Something went wrong"); // 带自定义 panic 消息
+
+r.ok();                          // 转 Option<i32>：Ok(5) → Some(5)
+r.err();                         // Ok(5) → None
+
+r.map(|v| v * 2);                // 变换 Ok 里的值
+r.map_err(|e| format!("Fail: {}", e));   // 变换 Err
+r.and_then(|v| some_fn(v));      // 链式（v 是 Ok 里的值）
+```
+
+**Option 也有对应的方法**（`unwrap`、`unwrap_or`、`map`、`and_then` 等）。
+
+## 7. panic！：不可恢复的错误
+
+**`panic!` 宏立即崩溃程序**（默认展开栈、打印错误、退出）：
+
+```rust
+panic!("Something went terribly wrong");
+panic!("Value is {}, expected {}", got, expected);
+```
+
+**什么时候用**：
+
+- **不变量被打破**：`assert!(x > 0)` 失败；
+- **调用方 API 用错**：`from_utf8` 遇到非法字节；
+- **测试里断言**（`assert_eq!` 底层就是 panic）；
+- **明显的编程错误**：`Vec::new().pop().unwrap()`——你确信队列非空但事实证明是空的。
+
+**panic 的处理**：
+
+- **默认展开（unwind）**：调用每个变量的 drop，然后线程退出；
+- **可以设置为 abort**：直接崩溃，不 unwind——**二进制更小、崩溃更快**。
+
+**在多线程程序里**：一个线程 panic 不会影响别的线程——**主线程 panic 会导致整个程序退出**。
+
+## 8. `unwrap()` vs `expect()` vs `?`
+
+**三种从 Result/Option 取值的方式**：
+
+```rust
+let r: Result<i32, String> = ...;
+
+let v1 = r.unwrap();                      // Err → panic
+let v2 = r.expect("must be ok");         // Err → panic with message
+let v3 = r?;                              // Err → return Err(e) from current fn
+```
+
+**什么时候用哪个**：
+
+- **`?`**：**默认选择**——把错误传给调用方；
+- **`expect(msg)`**：**你确信这里不会 Err**，msg 描述"如果错了说明代码 bug"；
+- **`unwrap`**：**快速原型、测试**——生产代码尽量别用（信息量太少）。
+
+**新手最常犯的错**：**到处 unwrap()**。这样程序会随机 panic，且没有上下文——调试地狱。**要么 `?` 传出去，要么 `expect("有意义的话")`**。
+
+## 9. 自定义错误类型
+
+上面用了 `std::io::Error`，但一般项目会有**自己的 Error 类型**：
+
+```rust
+#[derive(Debug)]
+enum MyError {
+    IoError(std::io::Error),
+    ParseError(String),
+    NotFound,
+}
+
+impl std::fmt::Display for MyError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            MyError::IoError(e) => write!(f, "IO error: {}", e),
+            MyError::ParseError(s) => write!(f, "Parse error: {}", s),
+            MyError::NotFound => write!(f, "Not found"),
+        }
+    }
+}
+
+impl std::error::Error for MyError {}   // 空 impl，用于 trait bound
+```
+
+**关键 trait**：**`std::error::Error`**——这是错误类型的"标准接口"。实现它之后你的错误能被通用 error 处理机制识别。
+
+## 10. From trait：让 `?` 自动转换错误类型
+
+上面的 `MyError` 有个 `IoError` 变体——但 `?` 直接把 `io::Error` 转成 `MyError` 吗？**不会——除非你实现 `From`**：
+
+```rust
+impl From<std::io::Error> for MyError {
+    fn from(e: std::io::Error) -> Self {
+        MyError::IoError(e)
+    }
+}
+```
+
+**现在 `?` 会自动做转换**：
+
+```rust
+fn read_and_parse(path: &str) -> Result<i32, MyError> {
+    let content = std::fs::read_to_string(path)?;    // io::Error 自动转 MyError
+    content.trim().parse::<i32>()
+        .map_err(|_| MyError::ParseError(content))
+}
+```
+
+**`?` 底层原理**：`x?` 大致等价于：
+
+```rust
+match x {
+    Ok(v) => v,
+    Err(e) => return Err(e.into()),   // 关键：.into()
+}
+```
+
+**`.into()`** 用了 `From` trait 做转换——**只要你实现了 `From<E1> for E2`，`?` 就能自动把 E1 转成 E2**。
+
+## 11. 主流错误处理库
+
+手写 `impl std::error::Error` 和 `impl From` 挺累。**社区有两个非常好用的库**：
+
+**`thiserror`**——用宏简化"自定义错误类型"：
+
+```rust
+use thiserror::Error;
+
+#[derive(Error, Debug)]
+enum MyError {
+    #[error("IO error: {0}")]
+    IoError(#[from] std::io::Error),
+
+    #[error("Parse error: {0}")]
+    ParseError(String),
+
+    #[error("Not found")]
+    NotFound,
+}
+```
+
+**一个宏搞定 Display、Debug、Error、From 全部**。**这是当前 Rust 库里"错误类型"的主流写法**。
+
+**`anyhow`**——**用于应用层的通用错误**：
+
+```rust
+use anyhow::{Context, Result};
+
+fn read_config(path: &str) -> Result<Config> {
+    let content = std::fs::read_to_string(path)
+        .context(format!("Failed to read {}", path))?;
+    let cfg: Config = serde_json::from_str(&content)
+        .context("Failed to parse config")?;
+    Ok(cfg)
+}
+```
+
+**特点**：
+
+- **`anyhow::Result<T>`** 是 `Result<T, anyhow::Error>` 的别名；
+- **`anyhow::Error` 能装任何实现了 `Error` 的类型**——不用定义具体错误枚举；
+- **`.context(...)`** 加上错误的上下文——**错误链会保留下来**。
+
+**用法哲学**：
+
+- **库里用 `thiserror`**——精确的错误类型，调用方能 match 处理；
+- **应用里用 `anyhow`**——简单粗暴，任何错误都能吞下。
+
+## 12. 一个完整例子
+
+用 `thiserror` + `anyhow` 组合：
+
+```rust
+// 库：cli_tool/src/config.rs
+use thiserror::Error;
+
+#[derive(Error, Debug)]
+pub enum ConfigError {
+    #[error("File not found: {0}")]
+    NotFound(String),
+
+    #[error("Invalid JSON: {0}")]
+    Invalid(#[from] serde_json::Error),
+
+    #[error("IO error: {0}")]
+    Io(#[from] std::io::Error),
+}
+
+pub fn load_config(path: &str) -> Result<Config, ConfigError> {
+    let content = std::fs::read_to_string(path)?;
+    let cfg = serde_json::from_str(&content)?;
+    Ok(cfg)
+}
+```
+
+```rust
+// 应用：cli_tool/src/main.rs
+use anyhow::{Context, Result};
+
+fn main() -> Result<()> {
+    let cfg = load_config("config.json")
+        .context("Failed to load config")?;
+
+    run_with_config(&cfg)
+        .context("Runtime error")?;
+
+    Ok(())
+}
+```
+
+**输出**：如果 `config.json` 不存在，你会看到：
+
+```
+Error: Failed to load config
+
+Caused by:
+    0: File not found: config.json
+```
+
+**错误链保留了，用户能看到完整原因**。
+
+## 13. `Result<(), E>` 主函数
+
+**`main` 也可以返回 Result**：
+
+```rust
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let s = std::fs::read_to_string("hello.txt")?;
+    println!("{}", s);
+    Ok(())
+}
+```
+
+**`Box<dyn Error>` 是"任何错误都行"**——最简单粗暴，适合小程序。**大项目里用 anyhow**：
+
+```rust
+fn main() -> anyhow::Result<()> {
+    ...
+}
+```
+
+## 14. 一些设计原则
+
+**尽量早地传播错误**：`?` 是你的朋友。别 `match` 到处包（除非有具体逻辑要区分）。
+
+**具体错误 vs 通用错误**：**库里用具体的错误 enum**（thiserror），**应用里用 anyhow 的通用错误**。
+
+**上下文比错误信息重要**：单纯说"File not found"没用——**告诉用户是哪个文件、什么操作、期望是什么**（anyhow 的 context 就是干这个）。
+
+**别把 Result 和 Option 混用得乱七八糟**：
+
+- 值可能不存在（正常情况）→ `Option`
+- 操作可能失败（错误情况）→ `Result`
+- 有具体理由说明"为什么不存在"的场景 → `Result`
+
+**panic 是最后手段**：**库代码尽量别 panic**（除非文档说明）——用户可能不希望库轻易 crash 他们的程序。
+
+## 15. 常见错误
+
+**`?` 用在返回不是 Result 的函数里**：报错。改函数签名，或者用 match。
+
+**Error 类型不匹配**：`?` 里的 error 类型和函数返回的不一致。**加 `From` 实现让它们能转换**。
+
+**忘记处理 Result 结果**：编译器警告 `unused Result`。用 `let _ = ...;` 显式忽略（但通常这是 bug）。
+
+**过度 unwrap**：新手常见 pattern——`.unwrap()` 满天飞。**生产代码里改成 `?` 或 `expect`**。
+
+**panic 里丢失信息**：`unwrap()` 只打印一句 "called `Result::unwrap()` on an `Err` value"——**没什么用**。**用 `.expect("meaningful description")`**。
+
+**错误信息没上下文**：直接把库的错误往外扔——用户看到 `no such file or directory` 一脸懵。**用 anyhow 的 context 或者手动包一层"你操作 X 时失败"**。
+
+## 16. 一句话总结
+
+Rust 错误处理的核心：
+
+- **没有 exception**：错误通过 `Result<T, E>` 返回；
+- **`?` 操作符**：错误传播的语法糖，把"如果 Err 就返回"变成 3 个字符；
+- **`Result` 有一堆好用方法**：`map`、`and_then`、`unwrap_or` 等；
+- **panic 是不可恢复错误**：越界、bug、明显违反不变量时用；
+- **自定义错误类型**：库用 `thiserror`，应用用 `anyhow`；
+- **`From` trait**：让 `?` 自动做错误类型转换。
+
+**Rust 的错误处理是"显式但不啰嗦"**——**每个函数都明确写出可能失败，但 `?` 让传播错误变得极其简洁**。写了几个月 Rust 之后你会觉得这套系统比 try/catch 优雅得多。
+
+下一章讲**闭包和迭代器**——Rust 里最优雅的两个特性，让代码看起来像函数式风格但底层零开销。
+
+</WordCount>

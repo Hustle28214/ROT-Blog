@@ -1,0 +1,466 @@
+import WordCount from '../../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+上一章讲了所有权——每个值有一个 owner，赋值和传参都会 move。**但如果每次读一下都要 move，代码就没法写了**。
+
+**引用（reference）** 就是为了解决这个——**"我借你看一下，但不拿走"**。引用是 Rust 里除所有权之外最重要的概念。这一章讲清楚它。
+
+## 1. 引用的基本形式
+
+**`&` 创建引用**：
+
+```rust
+let s = String::from("hello");
+let r = &s;             // r 是 &String
+
+println!("{}", s);      // s 还能用
+println!("{}", r);      // r 也能用
+```
+
+**关键点**：`&s` 创建一个"指向 s 的引用"——**不 move、不 copy、几乎零成本**。
+
+**"引用"和"借用"是同一件事的两面**——**引用是数据结构，借用是行为**。"我持有一个引用" = "我借了这份数据"。
+
+**函数参数用引用**：
+
+```rust
+fn print_len(s: &String) {
+    println!("{}", s.len());
+}
+
+let s = String::from("hello");
+print_len(&s);
+println!("{}", s);   // s 还能用
+```
+
+**这才是 Rust 里正常的函数写法**——参数用引用，调用方不失去所有权。
+
+## 2. 两种引用：& 和 &mut
+
+**共享引用 `&T`**：**只读**——不能通过它修改数据：
+
+```rust
+let s = String::from("hello");
+let r = &s;
+// r.push('!');   // 错！&String 是只读
+```
+
+**可变引用 `&mut T`**：**读写都行**：
+
+```rust
+let mut s = String::from("hello");
+let r = &mut s;
+r.push('!');
+println!("{}", r);   // "hello!"
+```
+
+**注意**：变量本身必须先是 `mut`——`&mut s` 要求 `s` 是 `mut`。
+
+**函数参数**：
+
+```rust
+fn read_only(s: &String) { ... }
+fn modify(s: &mut String) {
+    s.push_str(" world");
+}
+
+let mut s = String::from("hello");
+read_only(&s);
+modify(&mut s);
+```
+
+**注意调用时也要写 `&mut`**——比别的语言啰嗦，但意图非常明确：**这个调用会改我的变量**。
+
+## 3. 借用检查器的两条铁律
+
+**这是 Rust 最核心的两条规则**，理解了它们你就理解了 borrow checker：
+
+**规则 1**：**同一时刻，一个值的引用要么有多个 `&`，要么只有一个 `&mut`——不能兼有**。
+
+具体展开：
+
+- **多个不可变引用 OK**：`let r1 = &s; let r2 = &s;` — 都能读。
+- **一个可变引用 OK**：`let r = &mut s;` — 独占地改。
+- **不能同时**：`let r1 = &s; let r2 = &mut s;` — **编译错误**。
+
+**规则 2**：**引用必须始终指向有效的数据**——不能有悬垂引用（dangling reference）。
+
+具体展开：
+
+- 引用的生命周期**不能长于被引用的值**；
+- 编译期就检查——**没有 "use after free"**。
+
+这两条规则听起来抽象，我们看具体例子。
+
+## 4. 违反规则 1 的例子
+
+**多个可变引用同时存在**：
+
+```rust
+let mut s = String::from("hello");
+let r1 = &mut s;
+let r2 = &mut s;   // 错！只能有一个 &mut
+println!("{} {}", r1, r2);
+```
+
+**为什么禁止**？因为**同时两个可变引用会导致数据竞争**。如果 r1 和 r2 各改一半，最终结果无法预测。**Rust 编译期就拦下**。
+
+**可变和不可变混用**：
+
+```rust
+let mut s = String::from("hello");
+let r1 = &s;
+let r2 = &mut s;   // 错！有 & 就不能有 &mut
+println!("{} {}", r1, r2);
+```
+
+**为什么禁止**？因为 r1 期望"读到的数据不变"，但 r2 可能会改——r1 拿到的东西可能是"读到一半的中间状态"。**这就是并发编程里最难对付的 data race**——Rust 直接编译期禁止。
+
+## 5. Non-Lexical Lifetimes（NLL）：更宽松的检查
+
+上面的例子看着很严格。但**Rust 2018 之后的 borrow checker 更聪明**——它不看变量作用域，只看"引用最后一次使用的地方"：
+
+```rust
+let mut s = String::from("hello");
+let r1 = &s;
+let r2 = &s;
+println!("{} {}", r1, r2);
+// r1、r2 到这里已经"用完了"
+
+let r3 = &mut s;   // OK！之前的引用已经不用了
+r3.push('!');
+```
+
+**这叫 NLL（Non-Lexical Lifetimes）**——引用的生命周期是"从创建到最后一次使用"，不是"到变量作用域末尾"。
+
+**这个改进极大提升了 Rust 的可用性**。很多老 Rust 教程里的"啰嗦例子"现在都能通过。
+
+## 6. 悬垂引用（Dangling Reference）
+
+看这段代码：
+
+```rust
+fn dangle() -> &String {   // 返回一个 String 的引用
+    let s = String::from("hello");
+    &s
+}   // s 在这里被 drop，返回的引用指向已释放内存
+```
+
+**在 C++ 里，这会编译过、运行时崩溃**。**在 Rust 里编译就报错**：
+
+```
+error[E0106]: missing lifetime specifier
+help: this function's return type contains a borrowed value, but there is no value for it to be borrowed from
+```
+
+Rust 编译器发现"引用指向一个即将被释放的值"——直接拦下。**没有 dangling reference**。
+
+**正确的写法**：返回值本身：
+
+```rust
+fn no_dangle() -> String {
+    String::from("hello")
+}
+```
+
+## 7. 引用和方法
+
+**方法的第一个参数是 `&self` / `&mut self` / `self`**——就是这里的引用：
+
+```rust
+impl String {
+    fn len(&self) -> usize { ... }         // 借用 self（读）
+    fn push(&mut self, c: char) { ... }    // 可变借用（写）
+    fn into_bytes(self) -> Vec<u8> { ... } // 拿走 self（消费）
+}
+
+let mut s = String::from("hello");
+s.len();          // OK，读
+s.push('!');      // OK，写
+let bytes = s.into_bytes();
+// s.len();       // 错！s 被 into_bytes 消费了
+```
+
+**大部分方法用 `&self` 或 `&mut self`**——只有明确要消费自己的方法（`into_*` 之类）才用 `self`。
+
+## 8. 引用的隐式转换：自动解引用
+
+**你不需要总是显式写 `*r` 解引用**：
+
+```rust
+let s = String::from("hello");
+let r = &s;
+println!("{}", r.len());   // 直接调 .len()，不用 *r
+```
+
+Rust 在方法调用时会**自动 &、&mut、*** 各种转换——**只要类型能对上就行**。这叫 **auto-deref**。
+
+**唯一需要显式 `*` 的场景**：读引用指向的值本身：
+
+```rust
+let x = 5;
+let r = &x;
+let y = *r + 1;   // 需要 *
+```
+
+**在 struct 字段访问、方法调用时都不用**——Rust 自动处理。
+
+## 9. Slice：一种特殊的引用
+
+**Slice 是"引用一段连续的数据"**——常用的有 `&str` 和 `&[T]`：
+
+```rust
+let s = String::from("hello world");
+let word = &s[0..5];      // "hello"，&str 类型
+let word = &s[..5];        // 从头到 5
+let word = &s[6..];        // 从 6 到尾
+
+let v = vec![1, 2, 3, 4, 5];
+let slice = &v[1..3];     // &[i32]，包含 [2, 3]
+```
+
+**Slice 由两部分组成**：**一个指针 + 长度**。它不拥有数据，只是"看着一部分"。
+
+**`&str` 是最常见的 slice**：
+
+```rust
+fn first_word(s: &str) -> &str {
+    // 找第一个空格，返回它前面的部分
+    for (i, c) in s.char_indices() {
+        if c == ' ' {
+            return &s[..i];
+        }
+    }
+    s
+}
+
+let s = String::from("hello world");
+let w = first_word(&s);   // &str
+```
+
+**为什么 `&str` 这么受欢迎**——它是"通用的字符串接口"——`String` 和字符串字面量都能自动转成 `&str`。
+
+## 10. 引用和所有权的组合：解决"我想改但不消费"
+
+回到上一章那个啰嗦的例子：
+
+```rust
+// 上一章：所有权来回传
+fn append_exclamation(mut s: String) -> String {
+    s.push('!');
+    s
+}
+
+let s = String::from("hello");
+let s = append_exclamation(s);
+```
+
+**用可变引用重写**：
+
+```rust
+fn append_exclamation(s: &mut String) {
+    s.push('!');
+}
+
+let mut s = String::from("hello");
+append_exclamation(&mut s);
+println!("{}", s);   // s 还在，被改了
+```
+
+**清晰得多**——函数明确说"我要改你的 s"，调用方明确说"我允许你改（&mut s）"。**这是 Rust 里"改数据"的默认模式**。
+
+## 11. 常见错误模式
+
+**错误 1**：在同一个 scope 里创建可变和不可变引用
+
+```rust
+let mut v = vec![1, 2, 3];
+let r1 = &v;
+v.push(4);   // 错！push 需要 &mut v，但 r1 是 &v，冲突
+println!("{:?}", r1);
+```
+
+**修复**：
+
+```rust
+let mut v = vec![1, 2, 3];
+{
+    let r1 = &v;
+    println!("{:?}", r1);
+}   // r1 用完了
+v.push(4);   // OK
+```
+
+或者用 NLL 的隐式作用域：
+
+```rust
+let mut v = vec![1, 2, 3];
+let r1 = &v;
+println!("{:?}", r1);   // r1 用完了
+v.push(4);   // OK
+```
+
+**错误 2**：迭代时修改
+
+```rust
+let mut v = vec![1, 2, 3];
+for x in &v {
+    v.push(*x);   // 错！v 已经被 &v 借用
+}
+```
+
+**修复**：先克隆或者用索引：
+
+```rust
+let mut v = vec![1, 2, 3];
+let n = v.len();
+for i in 0..n {
+    v.push(v[i]);
+}
+```
+
+**这个错误是 Rust 拦下的"迭代器失效"bug**——在 C++ 里对着一个正在被迭代的 vector 做 push，可能会崩（vector 扩容后老指针失效）。Rust 编译期禁止。
+
+**错误 3**：函数返回内部引用
+
+```rust
+fn last_char(s: String) -> &char {
+    s.chars().last().as_ref().unwrap()   // 错，函数结束后 s 就 drop 了
+}
+```
+
+**修复**：要么返回值不是引用，要么用生命周期标注（下一章讲）：
+
+```rust
+fn last_char(s: &str) -> Option<char> {
+    s.chars().last()
+}
+```
+
+**错误 4**：结构体里放引用
+
+```rust
+struct Book {
+    title: &str,   // 错，需要生命周期标注
+}
+```
+
+**修复**：加生命周期（下一章）：
+
+```rust
+struct Book<'a> {
+    title: &'a str,
+}
+```
+
+**新手一般建议**：**结构体里存 `String` 而不是 `&str`**——避免生命周期。等你熟练了再考虑用引用。
+
+## 12. Ref pattern：解构时不拿走所有权
+
+在模式匹配里，如果你想解构但不 move：
+
+```rust
+let s = Some(String::from("hello"));
+
+// 这样会 move
+match s {
+    Some(v) => println!("{}", v),   // v 是 String，s 被 move
+    None => {}
+}
+// s 不能再用
+
+// 这样不 move
+match &s {
+    Some(v) => println!("{}", v),   // v 是 &String
+    None => {}
+}
+// s 还能用
+```
+
+**在 match 前加 `&`** 或者在 pattern 里用 `ref`：
+
+```rust
+match s {
+    Some(ref v) => println!("{}", v),
+    None => {}
+}
+```
+
+现代 Rust 里更常写 `&s` 那种形式，`ref` 用得少了。
+
+## 13. 一个例子：安全地"看看又改改"
+
+```rust
+struct Config {
+    name: String,
+    value: i32,
+}
+
+impl Config {
+    fn name(&self) -> &str {          // 只读借用
+        &self.name
+    }
+
+    fn set_value(&mut self, v: i32) {  // 可变借用
+        self.value = v;
+    }
+}
+
+let mut cfg = Config { name: String::from("cfg1"), value: 42 };
+
+println!("name: {}", cfg.name());   // 借用只读
+cfg.set_value(100);                  // 可变借用
+println!("name: {}", cfg.name());   // 再借用只读
+```
+
+**这就是最经典的 Rust API 设计**——getter 用 `&self` 返回 `&str`、setter 用 `&mut self`——**读的时候多个读者可以同时读、写的时候独占**。
+
+## 14. 为什么这么严格
+
+看到这里你可能想："Rust 这套规则也太烦了吧？"
+
+**这套规则的价值在于——它把并发编程里最难的问题变成了"编译错误"**。
+
+在 C++ 里：
+
+- 多线程里两个 thread 同时改一个变量 → **data race**，最难 debug 的 bug；
+- 一个 thread 迭代 vec 时另一个 push → **迭代器失效**，随机崩；
+- 函数返回栈上变量的引用 → **段错误**，可能几个月才复现一次。
+
+**Rust 用同一套规则把这些都干掉了**：
+
+- 只有一个 `&mut` → **没有并发写入冲突**；
+- iter 时 `&`，push 需要 `&mut` → **冲突，编译期报错**；
+- 引用生命周期 → **不能返回悬垂引用**。
+
+**"新手觉得烦，老手觉得爽"**——因为这些规则一旦内化，你的代码天生就没有这些 bug。
+
+## 15. 一些实践建议
+
+**函数签名优先用引用**：`fn f(s: &str)` 好过 `fn f(s: String)`。**除非你真的要消费或者存下来**。
+
+**返回值优先用值**：`fn f() -> String` 好过 `fn f() -> &str`（返回引用要生命周期）。
+
+**结构体新手先用 `String` / `Vec`**，别用 `&str` / `&[T]`——避免生命周期。
+
+**同一个作用域别混用 & 和 &mut**：分块用 `{ ... }` 或者 NLL 让它们错开。
+
+**看编译错误里的 "help:"**：Rust 的错误信息经常给出直接可行的修复建议——**照着改常常就对了**。
+
+## 16. 一句话总结
+
+引用是 Rust 里"看数据不拿走"的基本工具：
+
+- **`&T` 只读、`&mut T` 可变**；
+- **规则 1**：同一时刻要么多个 `&`、要么一个 `&mut`；
+- **规则 2**：引用不能长于被引用的值；
+- **NLL**：引用生命周期到"最后使用"结束，不是到变量作用域结束；
+- **Slice**：一种特殊的引用，看一段连续数据；
+- **函数参数默认用引用**——大多数场景比拿所有权好。
+
+理解了所有权 + 借用，你就掌握了 Rust 的"内存安全魔法"。**这两章是 Rust 学习曲线最陡的部分**——过了这两章你就已经能写不少 Rust 代码了。
+
+下一章讲**生命周期**——引用之上的一层机制，让你能把引用放进 struct、返回值、复杂函数签名里。
+
+</WordCount>

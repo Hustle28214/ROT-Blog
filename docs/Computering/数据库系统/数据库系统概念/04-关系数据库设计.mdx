@@ -4,39 +4,358 @@ import Mermaid from '@theme/Mermaid';
 <WordCount>
 
 ## 7.1 好的关系设计的特点
+
+从 E-R 图机械转换得到的关系模式并不总是"好"的。评价一个关系模式集合是否优秀，通常看它是否**信息无损**、**依赖保持**、**冗余低、异常少**。
+
+考虑一个反例：把 `instructor` 与 `department` 合并成一张表
+
+```
+inst_dept(ID, name, salary, dept_name, building, budget)
+```
+
+- **冗余**：同一个系的每位教师都要重复存 `building` 和 `budget`；
+- **更新异常**：修改 Physics 系预算时必须一次改多行；
+- **插入异常**：新建 Biology 系但暂无教师时，无法插入该系；
+- **删除异常**：删除某系最后一名教师，可能连带丢失该系的属性。
+
+规范化理论旨在通过**分解（decomposition）** 消除这些异常。
+
 ### 7.1.1 分解
+
+**分解**是把关系模式 $R$ 拆成若干模式 $R_1, R_2, \dots, R_n$，使得 $R_1 \cup R_2 \cup \dots \cup R_n = R$（属性并集）。上例可分解为：
+
+```
+instructor(ID, name, dept_name, salary)
+department(dept_name, building, budget)
+```
+
+分解必须满足两条重要性质：**无损连接性（lossless-join）** 与**依赖保持性（dependency preservation）**。
+
 ### 7.1.2 无损分解
+
+分解 $\{R_1, R_2\}$ 是**无损的**当且仅当对任何合法实例 $r$：
+
+$$r = \pi_{R_1}(r) \bowtie \pi_{R_2}(r)$$
+
+定理（无损分解判定）：若 $R_1 \cap R_2 \to R_1$ 或 $R_1 \cap R_2 \to R_2$ 中至少有一个成立，则 $\{R_1, R_2\}$ 是无损分解。直观地说，两块的**公共属性**必须是至少一边的**超码**。
+
+反例：若把 `inst_dept` 分解为 `(ID, name, dept_name)` 与 `(name, salary, dept_name, building, budget)`，公共属性 `(name, dept_name)` 不是任何一边的超码，连接后会出现"假元组"。
+
 ### 7.1.3 规范化理论
+
+**规范化（normalization）** 是把关系模式改造为满足特定"范式"要求的过程。目标是尽量避免冗余和异常，同时保持信息完整、可查询。理论基石是**函数依赖（functional dependency, FD）** 与**多值依赖（multi-valued dependency, MVD）**。
+
+---
+
 ## 7.2 使用函数依赖进行分解
+
+**函数依赖** $\alpha \to \beta$：对关系模式 $R$，若在任何合法实例中，只要两元组在 $\alpha$ 上取值相同，则在 $\beta$ 上取值也相同。称"$\alpha$ 函数决定 $\beta$"。
+
+例：`ID → name, dept_name, salary`；`dept_name → building, budget`；`course_id → title, credits`。
+
 ### 7.2.1 符号惯例
+
+- 用大写字母 $R, S$ 表示关系模式；小写斜体 $r, s$ 表示实例；
+- 用 $A, B, C, \dots$ 表示单个属性，$\alpha, \beta, \gamma$ 表示属性集合；
+- $\alpha\beta$ 简写属性集合的并 $\alpha \cup \beta$；
+- 用 $F$ 表示函数依赖集合，$F^+$ 表示其**闭包**（可从 $F$ 推出的所有 FD）。
+
 ### 7.2.2 码和函数依赖
+
+函数依赖给出了码的严格定义：属性集 $K$ 是关系模式 $R$ 的**超码**当且仅当 $K \to R$ 在 $F^+$ 中；$K$ 是**候选码**当且仅当 $K \to R$ 而任意真子集都不能决定 $R$。
+
+若 $\alpha \to \beta$ 且 $\beta \subseteq \alpha$，称为**平凡（trivial）** 依赖；如 $AB \to A$ 恒成立。
+
 ### 7.2.3 无损分解和函数依赖
+
+由 7.1.2 的判据可知：若 $F$ 蕴涵 $R_1 \cap R_2 \to R_1$ 或 $R_1 \cap R_2 \to R_2$，则 $\{R_1, R_2\}$ 无损。判定的关键是能计算属性集合的**闭包** $\alpha^+$，见 7.4.2。
+
+---
+
 ## 7.3 范式
+
 ### 7.3.1 Boyce-Codd范式
+
+关系模式 $R$ 关于函数依赖集 $F$ 属于 **Boyce-Codd 范式（BCNF）**，当且仅当对 $F^+$ 中每一个形如 $\alpha \to \beta$ 的非平凡 FD，$\alpha$ 都是 $R$ 的**超码**。
+
+直观：BCNF 要求"决定因素必为超码"。若某个 FD 的左端不是超码，就存在冗余的种子。
+
+例：`inst_dept(ID, name, dept_name, salary, building, budget)` 有 `dept_name → building, budget`，但 `dept_name` 不是超码，因此不满足 BCNF。分解后得到的两张表分别满足 BCNF。
+
 ### 7.3.2 第三范式
+
+**第三范式（3NF）** 是 BCNF 的适度放宽：对每个非平凡 FD $\alpha \to \beta$，至少满足下列之一：
+
+1. $\alpha$ 是超码；
+2. $\beta - \alpha$ 中每个属性都包含于 $R$ 的某个**候选码**中（即"$\beta$ 的属性是主属性"）。
+
+引入 3NF 的原因：BCNF 有时无法与"依赖保持性"两全，而 3NF 总是可以达到依赖保持。
+
 ### 7.3.3 BCNF和3NF的比较
+
+| 性质         | BCNF | 3NF        |
+| ------------ | ---- | ---------- |
+| 无冗余       | 强   | 允许少量冗余（主属性可跨表出现） |
+| 无损分解     | 总能达到 | 总能达到   |
+| 依赖保持分解 | 未必能达到 | 总能达到   |
+| 判定复杂度   | 低   | 略高       |
+
+设计建议：优先追求 BCNF；若为了保持某个跨候选码的关键依赖而不得不放弃，则退到 3NF。
+
 ### 7.3.4 更高级的范式
+
+- **4NF**：消除**多值依赖**造成的冗余（见 7.6）；
+- **PJNF (5NF)**：消除**连接依赖**造成的冗余；
+- **DKNF**：完全由域和码约束表达的最理想范式，但通常无法机械达到。
+
+---
+
 ## 7.4 函数依赖理论
+
 ### 7.4.1 函数依赖集的闭包
+
+从 $F$ 推出所有能被逻辑蕴涵的 FD，得到**闭包 $F^+$**。三条基本推理规则（**Armstrong 公理**）：
+
+- **自反律（reflexivity）**：若 $\beta \subseteq \alpha$，则 $\alpha \to \beta$；
+- **增广律（augmentation）**：若 $\alpha \to \beta$，则 $\alpha\gamma \to \beta\gamma$；
+- **传递律（transitivity）**：若 $\alpha \to \beta$ 且 $\beta \to \gamma$，则 $\alpha \to \gamma$。
+
+由三条公理可导出：合并律、分解律、伪传递律。**Armstrong 公理是可靠且完备的**——它推出的每个 FD 都在 $F^+$ 中，且 $F^+$ 中每个 FD 都可由公理推出。
+
 ### 7.4.2 属性集的闭包
+
+**属性集闭包 $\alpha^+$** 表示所有由 $\alpha$ 能函数决定的属性组成的集合。计算算法：
+
+```text
+Algorithm ATTR-CLOSURE(α, F):
+  result := α
+  repeat
+    for each FD  β → γ in F do
+      if β ⊆ result then
+        result := result ∪ γ
+  until  result 不再变化
+  return result
+```
+
+判定：$\alpha \to \beta$ 在 $F^+$ 中当且仅当 $\beta \subseteq \alpha^+$；$\alpha$ 是超码当且仅当 $\alpha^+ = R$。
+
+**示例**：$R(A,B,C,G,H,I)$，$F=\{A\to B,\ A\to C,\ CG\to H,\ CG\to I,\ B\to H\}$。计算 $(AG)^+$：
+
+- 初始 $\{A,G\}$；
+- 用 $A\to B$、$A\to C$：$\{A,B,C,G\}$；
+- 用 $CG\to H, CG\to I$：$\{A,B,C,G,H,I\}$；
+- 收敛，得 $(AG)^+ = R$，故 $AG$ 是超码；进一步验证 $A^+, G^+$ 都小于 $R$，可得 $AG$ 是候选码。
+
 ### 7.4.3 正则覆盖
+
+一个 FD 集合往往含有冗余：或整条依赖多余，或某条依赖左端的某个属性多余。**正则覆盖（canonical cover）** $F_c$ 是 $F$ 的一个等价子集，满足：
+
+1. 每个 FD 右端仅有一个属性（可选，便于形式化）；
+2. 没有 FD 是冗余的（去掉后 $F$ 的闭包变小）；
+3. 没有 FD 左端含有**多余属性（extraneous attribute）**。
+
+**计算算法**：
+
+```text
+Algorithm CANONICAL-COVER(F):
+  Fc := F
+  repeat
+    使用合并律把左端相同的 FD 合并
+    在 Fc 中挑一个 FD  α → β
+      // 检查 α 中是否有多余属性
+      for each A ∈ α do
+        if β ⊆ ((α - {A}))+_Fc  then
+          从 α 中去掉 A
+      // 检查 β 中是否有多余属性
+      for each B ∈ β do
+        if B ∈ ((α)+_(Fc - {α→β} ∪ {α → β - {B}}))  then
+          从 β 中去掉 B
+  until  Fc 不再变化
+  return Fc
+```
+
+**示例**：$R(A,B,C)$，$F=\{A\to BC,\ B\to C,\ A\to B,\ AB\to C\}$。
+
+- 合并 $A \to BC$ 与 $A \to B$：$A\to BC$；
+- $AB \to C$：检查左端 $B$，$(A)^+ = \{A,B,C\}$ 已含 $C$，故 $B$ 多余，$AB\to C$ 化为 $A\to C$；
+- $A\to C$ 与 $A\to BC$ 合并等价重复，可以去掉；
+- 剩余 $F_c=\{A\to B,\ B\to C\}$。
+
 ### 7.4.4 保持依赖
+
+分解 $\{R_1,\dots,R_n\}$ 是**依赖保持的**当且仅当 $\bigcup_{i=1}^n F_i$ 的闭包等于 $F^+$，其中 $F_i$ 是 $F$ 在 $R_i$ 上的**投影**：$F_i = \{\alpha\to\beta \in F^+ \mid \alpha\beta \subseteq R_i\}$。
+
+依赖保持保证了完整性约束可以**局部检查**——每个 FD 在其所属的表内即可验证，无需连接。
+
+---
+
 ## 7.5 使用函数依赖的分解算法
+
 ### 7.5.1 BCNF分解
+
+```text
+Algorithm BCNF-DECOMPOSE(R, F):
+  result := { R }
+  while  result 中存在 Ri 且 Ri 不满足 BCNF do
+    在 Ri 上找一个违反 BCNF 的 FD  α → β  (α 不是 Ri 的超码, β ∩ α = ∅)
+    result := (result - {Ri}) ∪ { (α ∪ β), (Ri - (β - α)) }
+  return result
+```
+
+**关键性质**：每一步都是无损分解（因为 $\alpha$ 是分解得到的两块的公共属性，且它决定其中一块）；但不保证依赖保持。
+
+**示例**：$R(A,B,C)$，$F=\{A\to B,\ B\to C\}$。候选码为 $A$。
+
+- $B\to C$ 违反 BCNF（$B$ 不是超码）；分解为 $R_1(B,C)$ 与 $R_2(A,B)$；
+- $R_1$、$R_2$ 均满足 BCNF；
+- 依赖 $A\to B$ 保留在 $R_2$；$B\to C$ 保留在 $R_1$——本例中依赖保持得以保全。
+
+**反例（BCNF 不能保依赖）**：$R(J, K, L)$，$F=\{JK\to L,\ L\to K\}$。候选码是 $JK$ 与 $JL$，主属性为 $J,K,L$。$L\to K$ 违反 BCNF，分解为 $R_1(L,K),\ R_2(J,L)$，但依赖 $JK\to L$ 跨表，需要连接才能校验。
+
 ### 7.5.2 3NF分解
+
+依赖保持的 3NF 分解算法（基于正则覆盖 $F_c$）：
+
+```text
+Algorithm 3NF-DECOMPOSE(R, F):
+  Fc := canonical cover of F
+  i := 0
+  for each  α → β  in Fc  do
+    i := i + 1
+    Ri := α ∪ β
+  if  没有任何 Ri 包含 R 的一个候选码 then
+    i := i + 1
+    Ri := R 的任一候选码
+  // 消除被其他 Rj 完全包含的 Ri
+  return  { R1, ..., Rn }
+```
+
+产生的分解**必是无损的**且**依赖保持**。
+
+**示例**：$R(\text{ID}, \text{dept\_name}, \text{building}, \text{budget})$，$F=\{\text{ID}\to\text{dept\_name},\ \text{dept\_name}\to\text{building},\text{budget}\}$。
+
+- $F_c=\{\text{ID}\to\text{dept\_name},\ \text{dept\_name}\to\text{building},\text{budget}\}$；
+- 生成 $R_1(\text{ID}, \text{dept\_name})$、$R_2(\text{dept\_name},\text{building},\text{budget})$；
+- 候选码 $\{\text{ID}\}$ 已在 $R_1$ 中，无需追加。
+- 得到的关系与我们熟悉的 `instructor`、`department` 的一部分是一致的。
+
 ### 7.5.3 3NF算法的正确性
+
+- **无损性**：因为 $R_i$ 之一包含候选码，能与其他 $R_j$ 通过公共属性无损连接；
+- **依赖保持**：$F_c$ 中的每条 FD 至少完整地落在某一 $R_i$ 中；
+- **3NF 性**：每个 $R_i$ 都由一条 FD 的左右两端构成，或由候选码构成——可证明满足 3NF 定义。
+
+---
+
 ## 7.6 使用多值依赖的分解
+
 ### 7.6.1 多值依赖
+
+**多值依赖（MVD）** $\alpha \twoheadrightarrow \beta$ 定义：对关系 $r$ 上任意两个元组 $t_1, t_2$，若 $t_1[\alpha]=t_2[\alpha]$，则存在元组 $t_3, t_4 \in r$ 满足
+
+$$t_3[\alpha]=t_4[\alpha]=t_1[\alpha],\ t_3[\beta]=t_1[\beta],\ t_3[R-\alpha-\beta]=t_2[R-\alpha-\beta],\ t_4[\beta]=t_2[\beta],\ t_4[R-\alpha-\beta]=t_1[R-\alpha-\beta]$$
+
+直观：给定 $\alpha$，$\beta$ 的取值与 $R-\alpha-\beta$ 的取值**相互独立**。
+
+**示例**：一位教师可能教多门课，同时可能有多个电话号码，课程与电话号码相互无关：
+
+| ID  | course_id | phone       |
+| --- | --------- | ----------- |
+| 001 | CS-101    | 111-1111    |
+| 001 | CS-101    | 222-2222    |
+| 001 | CS-347    | 111-1111    |
+| 001 | CS-347    | 222-2222    |
+
+存在 MVD：`ID →→ course_id`、`ID →→ phone`；显然表中有大量冗余。
+
 ### 7.6.2 第四范式
+
+关系模式 $R$ 关于依赖集 $D$ 属于 **第四范式（4NF）** 当且仅当对 $D^+$ 中每个非平凡 MVD $\alpha \twoheadrightarrow \beta$，$\alpha$ 是 $R$ 的**超码**。
+
+$4NF \Rightarrow BCNF$：4NF 是 BCNF 的严格加强。
+
 ### 7.6.3 4NF分解
+
+```text
+Algorithm 4NF-DECOMPOSE(R, D):
+  result := { R }
+  while  result 中存在 Ri 且 Ri 不满足 4NF do
+    在 Ri 上找一个违反 4NF 的 MVD  α →→ β
+    result := (result - {Ri}) ∪ { α ∪ β, Ri - β }
+  return result
+```
+
+上例分解为 `(ID, course_id)` 与 `(ID, phone)`，冗余消失。
+
+---
+
 ## 7.7 更多的范式
+
+- **投影-连接范式（PJNF, 5NF）**：处理**连接依赖（join dependency）**——某些关系不能分解为两块但可分解为三块；工程实践中很少刻意追求；
+- **域-码范式（DKNF）**：所有约束都可由域和码约束推出，是概念上的"完美形态"；
+- **6NF**：处理时态数据的极端规范化，将每个非码属性单独成表。
+
+理论上范式的层次是 $\text{DKNF} \Rightarrow 6NF \Rightarrow 5NF \Rightarrow 4NF \Rightarrow BCNF \Rightarrow 3NF \Rightarrow 2NF \Rightarrow 1NF$。工程中一般以 BCNF/3NF 为主，4NF 视需要而定。
+
+---
+
 ## 7.8 原子域和第一范式
+
+**第一范式（1NF）**：关系中每个属性的域都是**原子的**——不能包含集合、列表、嵌套结构。
+
+许多现代 SQL 方言允许数组、JSON、复杂类型，形式上违反了 1NF，但若使用得当（例如仅用于确定性的、不需要在 SQL 谓词中拆分的数据），仍可接受。若需要跨"子元素"进行查询，则应拆表以恢复 1NF。
+
+---
+
 ## 7.9 数据库设计过程
+
 ### 7.9.1 E-R模型和规范化
+
+正确构造的 E-R 图翻译得到的模式通常已经接近 BCNF/3NF。规范化理论有两种使用姿势：
+
+1. **验证已有设计**：把 E-R 翻译的模式拿到规范化框架内验证；
+2. **修复不良设计**：对由业务/遗留系统得到的"大宽表"进行分解。
+
 ### 7.9.2 属性和联系的命名
+
+- 命名要一致：同一概念在不同表中应使用同一属性名（如 `dept_name`）；
+- 避免同名异义与异名同义；
+- 联系集的命名应能反映其角色（如 `takes` 优于 `has`）。
+
 ### 7.9.3 为了性能去规范化
+
+**去规范化（denormalization）** 指为了减少运行时连接而故意保留冗余属性。它以牺牲写一致性为代价换取读性能，是**有意识的取舍**，需要通过触发器或应用逻辑维护冗余的一致性。经典场景：报表表、数据仓库、缓存视图。
+
 ### 7.9.4 其他设计问题
+
+- **时态数据**：需要显式地记录数据的有效期；
+- **审计**：需要保留历史版本；
+- **软删除**：用标志位而非物理删除，方便回滚；
+- **软引用**：跨模块的引用是否强制外码，需要根据一致性/自治性折衷。
+
+---
+
 ## 7.10 时态数据建模
+
+**时态数据（temporal data）** 明确记录信息的时间维度：
+
+- **有效时间（valid time）**：事实在真实世界中成立的时间区间；
+- **事务时间（transaction time）**：该事实被数据库记录的时间区间；
+- **双时态（bitemporal）**：同时使用两者。
+
+朴素做法是把每张表加两列 `start_time, end_time`，主码扩展为 `(原主码, start_time)`。SQL:2011 引入 `PERIOD FOR ... (start, end)` 语法，直接支持时态谓词与历史查询。
+
+时态数据破坏了传统函数依赖（相同 ID 的多行确实存在），需要引入**时态函数依赖**加以约束。
+
+---
+
 ## 7.11 总结
+
+- 好的关系模式应满足**无损分解**与**依赖保持**，并尽量避免冗余带来的插入/删除/更新异常；
+- 函数依赖是关系设计的核心理论工具；属性集闭包和 Armstrong 公理提供了机械判定的手段；
+- **BCNF** 消除所有基于 FD 的冗余，但可能牺牲依赖保持；**3NF** 略弱但总能保依赖；
+- 分解算法：BCNF 分解迭代拆解违规 FD；3NF 分解基于正则覆盖；4NF 分解处理多值依赖；
+- 更高范式（PJNF、DKNF）与去规范化在工程中根据性能与一致性需求酌情使用；
+- E-R 建模 + 规范化理论共同构成了关系数据库设计的完整方法学。
 
 </WordCount>

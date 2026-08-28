@@ -4,34 +4,395 @@ import Mermaid from '@theme/Mermaid';
 <WordCount>
 
 ## 16.1 概述
+
+**查询优化（Query Optimization）** 是数据库系统在诸多等价的执行计划中挑选一个代价最低者的过程。同一条 SQL 语句，写法虽然相同，但优化器可能生成的候选计划数目呈指数级增长，因此优化器必须依靠：
+
+1. **一组等价规则**：用于把关系代数表达式变换成语义等价的另一种表达式；
+2. **统计信息**：估计中间结果的规模；
+3. **代价模型**：把物理执行计划的时间、I/O 折算为可比较的数字；
+4. **搜索策略**：动态规划、贪心或遗传算法，用来在庞大的计划空间中找出较优者。
+
+优化的粒度可以分为两层：
+
+- **逻辑优化**：只在关系代数层面变换表达式，不涉及具体算法；
+- **物理优化**：为每个算子选择实现算法（顺序扫描 vs 索引扫描、块嵌套 vs 散列连接等），并根据统计信息估计代价。
+
+<Mermaid value={`flowchart TB
+  A[语法树] --> B[关系代数表达式]
+  B --> C[逻辑等价变换]
+  C --> D[候选表达式集合]
+  D --> E[为每个算子选算法]
+  E --> F[基于代价的搜索]
+  G[(统计信息)] --> F
+  F --> H[最优执行计划]`} />
+
+---
+
 ## 16.2 关系表达式的转换
+
+两个关系代数表达式若在所有实例上都产生相同的结果集合（多重集合），则称它们**等价**，记作 $E_1 \equiv E_2$。优化器利用一批等价规则重写表达式，从而扩大候选计划集合。
+
 ### 16.2.1 等价规则
+
+以下规则中，$E, E_1, E_2$ 表示关系代数表达式，$\theta, \theta_1, \theta_2$ 表示谓词，$L$ 表示投影属性列表。
+
+1. **合取选择级联**
+
+   $$\sigma_{\theta_1 \land \theta_2}(E) \equiv \sigma_{\theta_1}(\sigma_{\theta_2}(E))$$
+
+2. **选择交换**
+
+   $$\sigma_{\theta_1}(\sigma_{\theta_2}(E)) \equiv \sigma_{\theta_2}(\sigma_{\theta_1}(E))$$
+
+3. **投影只保留最外层**
+
+   $$\Pi_{L_1}(\Pi_{L_2}(\dots(\Pi_{L_n}(E)) \dots)) \equiv \Pi_{L_1}(E)$$
+
+4. **选择与笛卡尔积组合成连接**
+
+   $$\sigma_{\theta}(E_1 \times E_2) \equiv E_1 \bowtie_{\theta} E_2$$
+
+5. **$\theta$ 连接的交换律**
+
+   $$E_1 \bowtie_{\theta} E_2 \equiv E_2 \bowtie_{\theta} E_1$$
+
+6. **自然连接结合律**
+
+   $$(E_1 \bowtie E_2) \bowtie E_3 \equiv E_1 \bowtie (E_2 \bowtie E_3)$$
+
+7. **$\theta$ 连接结合律**（需要保证 $\theta_2$ 只涉及 $E_2, E_3$ 的属性）
+
+   $$(E_1 \bowtie_{\theta_1} E_2) \bowtie_{\theta_2 \land \theta_3} E_3 \equiv E_1 \bowtie_{\theta_1 \land \theta_3} (E_2 \bowtie_{\theta_2} E_3)$$
+
+8. **选择下推到连接一侧**（若 $\theta_0$ 只涉及 $E_1$ 的属性）
+
+   $$\sigma_{\theta_0}(E_1 \bowtie_{\theta} E_2) \equiv (\sigma_{\theta_0}(E_1)) \bowtie_{\theta} E_2$$
+
+9. **投影下推**（若 $L_1 \subseteq \text{attr}(E_1)$，$L_2 \subseteq \text{attr}(E_2)$，且 $\theta$ 只用到 $L_1 \cup L_2$）
+
+   $$\Pi_{L_1 \cup L_2}(E_1 \bowtie_{\theta} E_2) \equiv \Pi_{L_1}(E_1) \bowtie_{\theta} \Pi_{L_2}(E_2)$$
+
+10. **集合运算的交换律/结合律**：$\cup, \cap$ 均满足交换律与结合律。
+
+11. **选择在集合运算上的分配律**
+
+    $$\sigma_{\theta}(E_1 \cup E_2) \equiv \sigma_{\theta}(E_1) \cup \sigma_{\theta}(E_2)$$
+
+    对 $\cap$ 与 $-$ 也成立。
+
 ### 16.2.2 转换示例
+
+以查询"找出所有 2020 年之后教授 CS-101 的教师姓名"为例：
+
+```sql
+SELECT name
+FROM instructor, teaches, course
+WHERE instructor.ID = teaches.ID
+  AND teaches.course_id = course.course_id
+  AND course.course_id = 'CS-101'
+  AND teaches.year > 2020;
+```
+
+朴素翻译为：
+
+$$
+\Pi_{name}\big(\sigma_{\text{course\_id}='CS\text{-}101' \land \text{year} > 2020}(\text{instructor} \bowtie \text{teaches} \bowtie \text{course})\big)
+$$
+
+应用规则 8（选择下推）：
+
+$$
+\Pi_{name}\big(\text{instructor} \bowtie \sigma_{\text{year}>2020}(\text{teaches}) \bowtie \sigma_{\text{course\_id}='CS\text{-}101'}(\text{course})\big)
+$$
+
+再应用规则 9（投影下推）：
+
+$$
+\Pi_{name}\big(\text{instructor} \bowtie \Pi_{ID, \text{course\_id}}(\sigma_{\text{year}>2020}(\text{teaches})) \bowtie \Pi_{\text{course\_id}}(\sigma_{\text{course\_id}='CS\text{-}101'}(\text{course}))\big)
+$$
+
+选择的下推让中间结果显著缩小，从而降低连接代价。
+
 ### 16.2.3 连接次序
+
+$n$ 个关系的连接有多种执行顺序，代价可能相差数个数量级。设 3 张表 $r_1(1000), r_2(1000), r_3(1)$ 连接：
+
+- $(r_1 \bowtie r_2) \bowtie r_3$：先形成 $10^6$ 大小的中间结果；
+- $(r_1 \bowtie r_3) \bowtie r_2$：先把 $r_1$ 缩到 $10^3$ 甚至更小。
+
+自然连接是**结合的**且**交换的**，所以 $n$ 个关系可以有：
+
+$$
+\text{fully-parenthesized orders} = \frac{(2(n-1))!}{(n-1)!}
+$$
+
+个不同的完全括号化次序。当 $n$ 较大时数量爆炸，需要动态规划或启发式搜索。
+
 ### 16.2.4 等价表达式的枚举
+
+一种朴素做法是反复对当前表达式集合应用等价规则，直到没有新表达式出现。虽然思路正确，但会重复枚举、内存占用巨大。实际系统（如 Volcano/Cascades 优化器）采用**记忆化搜索**：把子表达式规范化后存入哈希表（memo），避免重复扩展。
+
+---
+
 ## 16.3 表达式结果的统计信息估计
+
 ### 16.3.1 目录信息
+
+系统目录（catalog）中通常存储：
+
+- $n_r$：关系 $r$ 的元组数；
+- $b_r$：$r$ 占用的块数；
+- $l_r$：元组的平均长度；
+- $f_r$：每块的元组数；
+- $V(A, r)$：$r$ 的属性 $A$ 上的不同取值个数；
+- **直方图（histogram）**：$A$ 的取值分布，常见形式有**等宽直方图**与**等深直方图**。
+
 ### 16.3.2 选择规模估计
+
+- **等值选择** $\sigma_{A=v}(r)$：假设取值均匀分布，估计为
+
+  $$\lceil n_r / V(A, r) \rceil$$
+
+  若 $A$ 为主键，则为 1；若使用直方图，则查找 $v$ 所在的桶。
+
+- **比较选择** $\sigma_{A \le v}(r)$：若已知 $A$ 的最小值 $\min(A)$、最大值 $\max(A)$，则估计为
+
+  $$n_r \cdot \frac{v - \min(A)}{\max(A) - \min(A)}$$
+
+  若无最值信息，默认使用 $n_r / 2$。
+
+- **合取** $\sigma_{\theta_1 \land \dots \land \theta_n}(r)$：设每个 $\theta_i$ 的**选择率**为 $s_i = \frac{\text{est}(\sigma_{\theta_i})}{n_r}$，假设条件独立，则
+
+  $$\text{est} = n_r \cdot \prod_{i=1}^{n} s_i$$
+
+- **析取** $\sigma_{\theta_1 \lor \dots \lor \theta_n}(r)$：容斥原理下
+
+  $$\text{est} = n_r \cdot \Big(1 - \prod_{i=1}^{n}(1 - s_i)\Big)$$
+
+- **取反** $\sigma_{\neg \theta}(r) = n_r - \text{est}(\sigma_{\theta})$。
+
 ### 16.3.3 连接规模估计
+
+- 若 $r$ 与 $s$ 无共享属性，则 $|r \bowtie s| = n_r \cdot n_s$（即笛卡尔积）。
+- 若 $r$ 与 $s$ 共有属性 $A$，且 $A$ 是 $s$ 的键，则每个 $t_r$ 至多与一个 $t_s$ 匹配，$|r \bowtie s| \le n_r$。
+- 一般情况下：
+
+  $$|r \bowtie s| \approx \frac{n_r \cdot n_s}{\max(V(A, r), V(A, s))}$$
+
+  这个公式来源于"每个 $r$ 的元组能匹配 $n_s / V(A, s)$ 个 $s$ 元组"的假设。
+
 ### 16.3.4 其他运算的规模估计
+
+- **投影** $\Pi_L(r)$：若不去重，则等于 $n_r$；若去重，可视为分组后的组数估计。
+- **聚集** $_G\mathcal{F}(r)$：等于分组键 $G$ 的不同取值个数。
+- **集合运算**：
+  - $|r \cup s| \le n_r + n_s$；
+  - $|r \cap s| \le \min(n_r, n_s)$；
+  - $|r - s| \ge n_r - n_s$。
+- **外连接** $r \mathbin{⟕} s$：估计为 $\max(|r \bowtie s|, n_r)$。
+
 ### 16.3.5 不同取值个数的估计
+
+某些算子的输出中，$V(A, \text{result})$ 需要重新估计：
+
+- $\sigma_{\theta}(r)$ 的输出：若 $\theta$ 与 $A$ 无关，估计仍为 $V(A, r)$；否则常保守估计为 $\min(V(A, r), \text{est}(\sigma_{\theta}))$。
+- $r \bowtie s$ 的输出，$A \in r$：若 $A$ 不出现在连接条件里，通常保守取 $V(A, r)$。
+- $\Pi_L(r)$：$V(L, r)$，用抽样或 HyperLogLog 估计。
+
+---
+
 ## 16.4 执行计划的选择
+
+在获得可选表达式集合与统计信息后，需要从中挑出估计代价最低的物理计划。
+
 ### 16.4.1 基于代价的连接次序选择
+
+对 $n$ 个关系的连接，System R 采用**动态规划（dynamic programming）**：
+
+- 状态：$S \subseteq \{r_1, \dots, r_n\}$；
+- $\text{bestPlan}(S)$ = 计算 $S$ 中所有关系连接的最优计划；
+- 递推：
+
+  $$
+  \text{cost}(S) = \min_{S' \subsetneq S, S' \ne \emptyset} \big[\text{cost}(S') + \text{cost}(S - S') + \text{join}(S', S - S')\big]
+  $$
+
+- 计算 $2^n$ 个子集，每个子集枚举其非空真子集，时间复杂度：
+
+  $$O(3^n)$$
+
+  空间复杂度 $O(2^n)$。若限制为**左深连接树（left-deep join tree）**（即每次只把一个新表加入到已有连接结果），复杂度降为：
+
+  $$O(n \cdot 2^n)$$
+
+  这也是 System R 优化器的核心思路：只考虑左深树、只保留每个子集的最优计划（有时加上"有用序（interesting order）"扩展保留次优）。
+
 ### 16.4.2 采用等价规则的基于代价的优化
+
+Volcano/Cascades 优化器不局限于连接次序，而是把所有等价规则作为变换算子应用到一个**记忆表（memo）** 中。它的关键思想：
+
+- **组（group）**：一组等价的逻辑表达式；
+- **物理属性（physical property）**：如输出顺序、分区方式；
+- **规则驱动搜索**：分为"生成组""枚举物理算子""传播代价"三步；
+- **剪枝**：若当前代价已超过已知最优，则停止扩展。
+
 ### 16.4.3 优化中的启发式方法
+
+当关系数量很大（如超过 10~12 张表）时，动态规划的时间与空间都不可接受，可以使用启发式：
+
+- **总是先做选择、投影下推**；
+- **贪心连接次序**：每一步选择与当前部分结果连接后中间结果最小的关系；
+- **遗传算法/模拟退火**：PostgreSQL 的 `geqo` 就在关系数很多时切换到遗传算法；
+- **只考虑左深树**：Oracle 早期版本的做法。
+
 ### 16.4.4 嵌套子查询的优化
+
+对形如：
+
+```sql
+SELECT name
+FROM instructor
+WHERE salary > (SELECT AVG(salary) FROM instructor);
+```
+
+的嵌套子查询，直接执行相当于**关联嵌套（correlated evaluation）**——对外层每一行都执行一次子查询，代价高。优化器通过 **去关联（decorrelation）** 把它改写成等价的连接、聚集或半连接：
+
+```sql
+SELECT i.name
+FROM instructor i, (SELECT AVG(salary) AS a FROM instructor) t
+WHERE i.salary > t.a;
+```
+
+对 `EXISTS` / `IN` / `NOT EXISTS` 的关联子查询，可分别转为**半连接（semi-join）** $r \ltimes s$、**反半连接（anti-join）** $r \triangleright s$。
+
+---
+
 ## 16.5 物化视图
+
+**物化视图（materialized view）** 把视图的结果预先计算并存到物理表中，查询时直接读取，从而把复杂的连接、聚集摊销到更新时。
+
 ### 16.5.1 视图维护
+
+维护物化视图有两种基本方式：
+
+- **完全重算（recomputation）**：基表更新后，重新计算视图；简单但代价高；
+- **增量维护（incremental maintenance）**：只根据基表增量 $\Delta r$ 计算视图的增量 $\Delta v$，代价与 $\Delta r$ 成正比。
+
 ### 16.5.2 增量的视图维护
+
+设视图 $v = r \bowtie s$：
+
+- 若 $r$ 增加了 $i_r$，删除了 $d_r$，则
+
+  $$\Delta v = i_r \bowtie s - d_r \bowtie s$$
+
+- 若 $r, s$ 同时更新：
+
+  $$v_{new} = (r - d_r + i_r) \bowtie (s - d_s + i_s)$$
+
+  展开后保留一次项并忽略二次项即得增量表达式。
+
+对聚集视图 `SUM/COUNT/AVG` 可增量维护；`MIN/MAX` 在遇到基表删除极值时需要重扫，效率较差。
+
 ### 16.5.3 查询优化和物化视图
+
+如果一个物化视图 $v$ 覆盖了查询 $q$ 的一部分子表达式，则优化器可以**用 $v$ 替换 $q$ 的对应部分**，从而节省重复计算——这称为**视图重写（view rewriting）** 或**答案化视图（answering queries using views）**。判定与重写的核心问题是：给定 $q, v$，能否找到重写 $q'$ 使得 $q' = q$。这是 NP 难问题，实际系统使用受限匹配。
+
 ### 16.5.4 物化视图和索引选择
+
+物化视图与索引都是"以空间换时间"的辅助结构。选择哪些视图和索引是**物理数据库设计（physical design）** 的核心问题，往往通过**工作负载建议器（workload advisor）** 完成：给一批代表性查询，估计对每一候选视图/索引的收益与维护代价，用整数规划求解。
+
+---
+
 ## 16.6 查询优化中的高级主题
+
 ### 16.6.1 top-K优化
+
+`ORDER BY x LIMIT K` 类型的查询无需完全排序。若在 $x$ 上有 B+ 树索引，可只沿索引顺序取前 $K$ 条；否则可用**堆式 top-K 算法**（大小为 $K$ 的最小堆）扫描一次数据，代价 $O(n \log K)$ 而非 $O(n \log n)$。
+
 ### 16.6.2 连接最小化
+
+若查询里出现了本可以去掉的连接（因为外键约束保证匹配），优化器可以**消去冗余连接**。例如：
+
+```sql
+SELECT s.name
+FROM student s JOIN department d ON s.dept_id = d.id;
+```
+
+当且仅当 `s.dept_id` 是引用 `d.id` 的外键、且 `s.dept_id` 非空时，可直接改为：
+
+```sql
+SELECT s.name FROM student s;
+```
+
 ### 16.6.3 更新的优化
+
+`UPDATE`、`DELETE`、`INSERT` 的谓词可复用相同的选择/连接优化框架。要注意**Halloween 问题**：如果更新会改变正在被扫描的索引键（如 `UPDATE emp SET salary = salary * 1.1 WHERE salary < 5000`），扫描器可能反复更新同一行；解决办法是先物化被更新元组的 ID 集合，再执行更新。
+
 ### 16.6.4 多查询优化和共享式扫描
+
+若并发的多个查询共用同一张大表，可以**共享扫描（scan sharing）**：同一次扫描的元组同时供多个查询处理。**多查询优化（multi-query optimization）** 更进一步，把多条查询的公共子表达式识别并共享执行。
+
 ### 16.6.5 参数化查询优化
+
+`PreparedStatement` 会被参数化，如 `WHERE age > ?`。同一个模板在不同参数下最优计划可能不同。常用策略：
+
+- **一次编译，多次使用**：仅在第一次执行时优化，参数敏感时可能选到较差计划；
+- **参数敏感执行计划（PSP）**：SQL Server、Oracle 支持对特定参数值缓存不同计划；
+- **计划集（plan cache）**：对不同参数区间准备多份计划，运行时按参数选择。
+
 ### 16.6.6 自适应查询处理
+
+**自适应查询处理（adaptive query processing）** 在运行时根据实际观察修正计划：
+
+- **重新优化（re-optimization）**：在阻塞算子处采样中间结果，若与估计差距过大则重新优化后半部分；
+- **动态选择算子**：eddies、learning optimizer 允许每个元组选择不同路径；
+- **反馈学习**：把每次执行的实际基数写回目录，用于改进直方图与估计。
+
+---
+
 ## 16.7 总结
+
+- 查询优化是 SQL 引擎的核心，它决定了同一条 SQL 在不同数据上的性能可能相差多个数量级。
+- 逻辑优化依赖等价规则，其中选择下推、投影下推与连接结合律最为关键。
+- 连接次序选择在 $n$ 张表时的搜索空间指数级增长，System R 用左深树 + 动态规划把复杂度控制在 $O(n \cdot 2^n)$。
+- 代价估计依赖基数估计与直方图；错误的基数估计是绝大多数"坏计划"的根源。
+- 物化视图以更新代价换查询代价，需配合视图重写与增量维护。
+- 现代优化器已经从单纯基于代价演进为兼顾自适应、参数敏感与多查询共享。
+
+**关键公式速查**：
+
+| 场景 | 估计公式 |
+| --- | --- |
+| 等值选择 $\sigma_{A=v}(r)$ | $\lceil n_r / V(A, r) \rceil$ |
+| 范围选择 $\sigma_{A \le v}(r)$ | $n_r \cdot \frac{v - \min}{\max - \min}$ |
+| 合取选择 | $n_r \cdot \prod s_i$（独立性假设） |
+| 析取选择 | $n_r \cdot (1 - \prod (1-s_i))$ |
+| 连接大小 | $\dfrac{n_r \cdot n_s}{\max(V(A,r), V(A,s))}$ |
+| DP 连接次序（任意树） | $O(3^n)$ 时间 |
+| DP 连接次序（左深树） | $O(n \cdot 2^n)$ 时间 |
+
+**优化器工作流**（以 System R 风格为例）：
+
+<Mermaid value={`flowchart LR
+  A[SQL] --> B[语义分析]
+  B --> C[规范化关系代数]
+  C --> D[等价变换：谓词/投影下推]
+  D --> E[枚举连接次序（DP）]
+  E --> F[为每子集选最优物理计划]
+  F --> G[考虑 interesting order]
+  G --> H[输出最优 plan]
+  I[(直方图/统计)] --> E
+  I --> F`} />
+
+**优化陷阱与实践建议**：
+
+1. **过时统计信息**：`ANALYZE` 未及时刷新导致优化器基数估计偏差数量级。生产环境需要 auto-analyze。
+2. **相关列 (correlated column)**：合取选择的独立性假设失效，可通过多列直方图、扩展统计（PostgreSQL `CREATE STATISTICS`）缓解。
+3. **`OR` 谓词**：优化器往往回退到全表扫描；改写为 `UNION ALL` 可让每支各自使用索引。
+4. **函数索引**：`WHERE UPPER(name)='X'` 通常无法命中普通索引；应建立表达式索引。
+5. **提示 (hint) 使用**：Oracle、MySQL 允许在 SQL 中加提示强制某种计划；仅在优化器明显错判时使用，长期依赖会导致适应性下降。
+
+理解等价规则、代价模型和搜索策略三大要素，就能理解为什么同一条 SQL 在不同数据规模、不同索引下计划迥异，从而在实际调优中做出精准判断。
 
 </WordCount>

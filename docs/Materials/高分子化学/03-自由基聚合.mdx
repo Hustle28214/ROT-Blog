@@ -1,0 +1,234 @@
+import WordCount from '../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+# 自由基聚合
+
+自由基聚合是**产量最大**的连锁聚合类型。四大通用塑料里，PE、PVC、PS 都是自由基做的（PP 是配位）；橡胶里的 SBR、NBR、CR 也是。工业量产得如此彻底，是因为自由基对水、CO₂、常见杂质都比较宽容，反应条件粗放，容易放大。
+
+## 1. 单体的取向性：哪些单体能自由基聚合
+
+带 $\text{C}=\text{C}$ 双键的单体，取代基的电子效应决定它偏向哪种活性种：
+
+- **强吸电子基**（—CN，—COOR）：能配位、能自由基、能阴离子。丙烯腈、丙烯酸酯是典型。
+- **强给电子基**（—OR，—NR₂）：只能阳离子和配位。乙烯基醚不能自由基聚合。
+- **中性、弱共轭**（—Ph，—CH=CH₂）：三种活性种都能引发。苯乙烯、丁二烯。
+- **卤素、酯基**（—Cl，—OAc）：主要自由基。氯乙烯、醋酸乙烯酯。
+
+**自由基对取代基敏感度最低**——因为自由基本身没有明确电荷，对取代基的电子诱导只表现为共振稳定化程度，不像离子那样对极性要求苛刻。这是自由基聚合工业适用性广的化学基础。
+
+## 2. 基元反应
+
+自由基聚合分**四个基元反应**：链引发、链增长、链转移、链终止。
+
+<svg viewBox="0 0 700 320" role="img" aria-label="自由基聚合四个基元反应示意图" style={{maxWidth:'700px',width:'100%',color:'var(--ifm-font-color-base)'}}>
+  <defs><marker id="ch3a-arrow" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8 Z" fill="currentColor"/></marker></defs>
+  <g fontSize="15" fill="currentColor">
+    <text x="30" y="52" fontWeight="bold" fill="var(--ifm-color-primary)">① 链引发</text>
+    <text x="150" y="52">I</text><text x="270" y="52">2 R·</text><text x="380" y="52">R· + M</text><text x="580" y="52">M₁·</text>
+    <text x="30" y="115" fontWeight="bold" fill="var(--ifm-color-primary)">② 链增长</text>
+    <text x="150" y="115">Mₙ· + M</text><text x="380" y="115">Mₙ₊₁·</text>
+    <text x="30" y="180" fontWeight="bold" fill="var(--ifm-color-warning)">③ 链转移</text>
+    <text x="150" y="180">Mₙ· + XA</text><text x="380" y="180">MₙX + A·</text>
+    <text x="30" y="245" fontWeight="bold" fill="var(--ifm-color-danger)">④ 链终止（偶合）</text>
+    <text x="200" y="245">Mₙ· + Mₘ·</text><text x="450" y="245">Mₙ₊ₘ</text>
+    <text x="30" y="285" fontWeight="bold" fill="var(--ifm-color-danger)">    （歧化）</text>
+    <text x="200" y="285">Mₙ· + Mₘ·</text><text x="450" y="285">Mₙ + Mₘ(=)</text>
+  </g>
+  <g stroke="currentColor" strokeWidth="1.5" fill="none" markerEnd="url(#ch3a-arrow)">
+    <path d="M180 47 H255"/><text x="200" y="40" fontSize="12" fill="currentColor">k_d</text>
+    <path d="M320 47 H370"/>
+    <path d="M470 47 H565"/><text x="500" y="40" fontSize="12" fill="currentColor">k_i</text>
+    <path d="M240 110 H370"/><text x="285" y="103" fontSize="12" fill="currentColor">k_p</text>
+    <path d="M270 175 H370"/><text x="300" y="168" fontSize="12" fill="currentColor">k_tr</text>
+    <path d="M320 240 H440"/><text x="355" y="233" fontSize="12" fill="currentColor">k_tc</text>
+    <path d="M320 280 H440"/><text x="355" y="273" fontSize="12" fill="currentColor">k_td</text>
+  </g>
+</svg>
+
+### 2.1 链引发
+
+引发剂 I 均裂产生初级自由基 R·，进一步与单体 M 加成得单体自由基 M₁·：
+
+$$
+\text{I} \xrightarrow{k_d} 2\text{R}\cdot, \qquad \text{R}\cdot + \text{M} \xrightarrow{k_i} \text{M}_1\cdot
+$$
+
+**引发效率 $f$**：初级自由基中真正引发单体聚合的比例。理想情况 $f=1$，实际因**笼蔽效应（cage effect）**（一对刚生成的自由基还未扩散开就重新结合）$f$ 通常在 0.3–0.8。溶液粘度越高、单体浓度越低，$f$ 越低。
+
+**引发剂分解速率** $R_d = 2 f k_d [\text{I}]$。
+
+常用引发剂：
+
+- **偶氮类**（AIBN, ABVN）：$k_d$ 温度敏感，10 h 半衰期温度 60 °C。分解产物 $\text{N}_2 + 2 \text{R}\cdot$，不参与副反应。
+- **过氧化物**（BPO, LPO, DTBP）：也是热分解，另有氧化能力，可作为氧化-还原体系用于低温引发。
+- **氧化-还原体系**（$\text{H}_2\text{O}_2 + \text{Fe}^{2+}$，过硫酸铵 + 硫代硫酸盐）：低温（0–50 °C）产生自由基，用于乳液聚合和冷法丁苯橡胶。
+- **光引发**：紫外光照射引发剂或直接激发单体（$\text{TiO}_2$、$\text{ZnO}$ 表面吸收），无温度要求。
+
+### 2.2 链增长
+
+$$
+\text{M}_n\cdot + \text{M} \xrightarrow{k_p} \text{M}_{n+1}\cdot
+$$
+
+$k_p$ 通常在 $10^2$ – $10^4$ L·mol⁻¹·s⁻¹，与温度、单体结构有关。链增长的**活化能** $E_p$ 通常 20–30 kJ/mol，比引发（$E_d \sim 125$ kJ/mol）低得多——这意味着**温度对分子量的影响主要来自引发**。
+
+链增长有**头-尾/头-头/尾-尾**几种加成方向。实际几乎全是头-尾：因为头-尾加成后自由基落在带取代基的碳上，共振稳定；空间位阻也支持这种取向。
+
+### 2.3 链转移
+
+自由基被别的分子（溶剂 S、单体 M、引发剂 I、聚合物 P、专门的**链转移剂** T）夺走氢或卤原子，自身死亡，同时产生新自由基继续引发：
+
+$$
+\text{M}_n\cdot + \text{XA} \xrightarrow{k_{tr}} \text{M}_n\text{X} + \text{A}\cdot
+$$
+
+**结果是分子量下降，但速率不变**（前提是 A·的引发能力与原来的 M·相当）。定义**链转移常数** $C_X = k_{tr,X} / k_p$：
+
+- $C_M \sim 10^{-4}$（对普通单体），本身贡献不大。
+- $C_S$：溶剂对 $C_S$ 影响很大。$\text{CCl}_4$ 的 $C_S \sim 10^{-2}$，是强链转移剂；苯、丙酮 $\sim 10^{-5}$，可忽略。
+- $C_I$：引发剂本身可以链转移，工业上尽量选低 $C_I$ 的引发剂。
+- $C_T$：**专门的调节剂**，如正十二硫醇（丁苯橡胶合成中常用），$C_T \sim 20$——只加几个 mol‰ 就能显著把分子量降到目标值。
+
+**Mayo 方程**（不考虑聚合物链转移，只考虑正常终止和几种链转移）：
+
+$$
+\frac{1}{\overline{X}_n} = \frac{1}{\overline{X}_{n,0}} + C_M + C_S\frac{[\text{S}]}{[\text{M}]} + C_I\frac{[\text{I}]}{[\text{M}]}
+$$
+
+$\overline{X}_{n,0}$ 是无链转移的理论聚合度。用这个式子可以从不同 $[\text{S}]/[\text{M}]$ 的实验测出各种 $C$，是自由基动力学最经典的实验方法。
+
+### 2.4 链终止
+
+两个活性链相遇，两种去路：
+
+**偶合终止（combination）**：两个链头对头结合，得到一个高分子，聚合度是两条链之和。
+
+**歧化终止（disproportionation）**：一条链的 $\beta$-氢转移到另一条上，得到一个饱和末端 + 一个双键末端，聚合度不变。
+
+$$
+k_t = k_{tc} + k_{td}
+$$
+
+比例 $k_{tc}/k_{td}$ 由单体决定：St 偏向偶合（约 80%），MMA 偏向歧化（约 80%，因为 $\alpha$-甲基提供了容易脱去的氢）。这个比例影响**分子量分布**：偶合终止得到 PDI $\sim$ 1.5，歧化得到 PDI $\sim$ 2.0。
+
+## 3. 稳态假设与聚合速率
+
+**稳态假设**：活性中心的生成速率等于消耗速率，$[\text{M}\cdot]$ 保持常数。
+
+$$
+R_i = R_t \quad\Longrightarrow\quad 2 f k_d [\text{I}] = 2 k_t [\text{M}\cdot]^2
+$$
+
+$$
+[\text{M}\cdot] = \left(\frac{f k_d [\text{I}]}{k_t}\right)^{1/2}
+$$
+
+聚合速率：
+
+$$
+R_p = k_p [\text{M}\cdot][\text{M}] = k_p\left(\frac{f k_d}{k_t}\right)^{1/2}[\text{I}]^{1/2}[\text{M}]
+$$
+
+$$
+\boxed{R_p \propto [\text{I}]^{1/2}[\text{M}]^1}
+$$
+
+**这个"半级依赖引发剂浓度、一级依赖单体浓度"是自由基聚合的指纹**。实验偏离这个关系（比如指数变成 0.7 或 0.4），一定是稳态假设失效——链转移到聚合物、扩散控制、笼效应显著等。
+
+## 4. 动力学链长与聚合度
+
+**动力学链长 $\nu$**：一个活性中心一生中经手的单体数。
+
+$$
+\nu = \frac{R_p}{R_i} = \frac{k_p[\text{M}]}{2(f k_d k_t [\text{I}])^{1/2}}
+$$
+
+$\nu \propto [\text{I}]^{-1/2}[\text{M}]$。这是最重要的一个 scaling：**引发剂加得越多，反应越快但分子量越低**。
+
+数均聚合度 $\overline{X}_n$ 与 $\nu$ 的关系取决于终止方式（不考虑链转移）：
+
+- 全部偶合：$\overline{X}_n = 2\nu$
+- 全部歧化：$\overline{X}_n = \nu$
+- 部分偶合：$\overline{X}_n = 2\nu/(1+X)$，$X$ 是歧化分数
+
+代入 Mayo 方程（考虑链转移）：
+
+$$
+\frac{1}{\overline{X}_n} = \frac{(1+X) k_t R_p}{k_p^2 [\text{M}]^2} + C_M + C_S\frac{[\text{S}]}{[\text{M}]} + \cdots
+$$
+
+## 5. 温度效应
+
+**总活化能** $E = E_p + \frac{1}{2}(E_d - E_t)$。数据：
+
+- $E_p \sim 20\text{--}30$ kJ/mol
+- $E_d \sim 125$ kJ/mol
+- $E_t \sim 8\text{--}20$ kJ/mol
+
+代入 $E \sim 20 + 63 - 8 \approx 75$ kJ/mol。温度每升 10 °C，$R_p$ 大约翻倍。
+
+对聚合度：$E_{\overline{X}_n} = E_p - \frac{1}{2}(E_d + E_t) \approx 25 - 72 \approx -50$ kJ/mol，**负值**——**温度越高，分子量越低**。原因是升温对引发剂分解更敏感，产生的自由基多、每条链的动力学链长就短。
+
+工业上会针对目标分子量选择引发剂-温度组合，例如 60 °C 用 AIBN、80 °C 用 BPO、120 °C 用 DTBP，各有分子量窗口。
+
+## 6. 自动加速（Trommsdorff 效应）
+
+转化率超过 15–20% 后，粘度升高，$k_t$ 因扩散控制而**明显下降**（活性中心找不到另一条链去终止），但 $k_p$（增长）尚未受影响。结果：
+
+$$
+R_p = k_p[\text{M}\cdot][\text{M}], \quad [\text{M}\cdot] \uparrow \quad \Rightarrow \quad R_p\uparrow
+$$
+
+**同时** $\overline{X}_n = k_p[\text{M}]/(2k_t[\text{M}\cdot])$ **也上升**——自动加速导致的速率与分子量同时上升，是自由基聚合独有的现象。危险在于放热失控：本体聚合甲基丙烯酸甲酯，若温度不控制好，转化率 40% 附近可能爆聚。所以工业上要么用溶剂/悬浮/乳液把粘度限制住，要么在高转化率段主动降温。
+
+<svg viewBox="0 0 700 340" role="img" aria-label="自动加速效应：转化率-时间曲线的 S 形拐点" style={{maxWidth:'700px',width:'100%',color:'var(--ifm-font-color-base)'}}>
+  <defs><marker id="ch3b-arrow" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8 Z" fill="currentColor"/></marker></defs>
+  <g stroke="currentColor" strokeWidth="2" fill="none" markerEnd="url(#ch3b-arrow)"><path d="M70 290 H665"/><path d="M70 290 V30"/></g>
+  <g stroke="currentColor" strokeWidth="1" opacity="0.5"><path d="M70 60 H620" strokeDasharray="4 4"/></g>
+  <path d="M70 288 C160 275 240 250 300 220 C340 200 355 195 370 190 C420 176 480 130 540 80 C570 62 600 60 640 60" fill="none" stroke="var(--ifm-color-warning)" strokeWidth="3"/>
+  <path d="M70 288 C200 240 340 175 500 105 C560 78 610 65 640 60" fill="none" stroke="var(--ifm-color-primary)" strokeWidth="2" strokeDasharray="6 4"/>
+  <circle cx="300" cy="220" r="5" fill="var(--ifm-color-danger)"/>
+  <circle cx="500" cy="115" r="5" fill="var(--ifm-color-danger)"/>
+  <g fill="currentColor" fontSize="14">
+    <text x="670" y="295">t</text>
+    <text x="18" y="34">转化率</text>
+    <text x="42" y="65">100%</text><text x="55" y="295">0</text>
+    <text x="310" y="215" fill="var(--ifm-color-danger)">拐点 A（自动加速起）</text>
+    <text x="510" y="110" fill="var(--ifm-color-danger)">B（玻璃化终止）</text>
+    <text x="130" y="200" fill="var(--ifm-color-warning)">S 形自动加速曲线</text>
+    <text x="200" y="130" fill="var(--ifm-color-primary)">理想稳态（无凝胶效应）</text>
+  </g>
+</svg>
+
+## 7. 阻聚与缓聚
+
+**阻聚剂 Z**：与自由基反应生成不能引发新链的稳定物种。氧、对苯二酚（工业运输 St、MMA 单体必加）、DPPH（学术上量化用）都是。
+
+阻聚使聚合有诱导期：所有阻聚剂消耗完之前，$R_p = 0$。诱导期长短由 $[\text{Z}]$ 决定。
+
+**缓聚剂**：像稳定的 nitroxide（TEMPO）——它跟自由基是可逆结合，让链暂时"睡着"再醒来。这是可控聚合（NMP）的核心（第 3 章末尾会详细展开）。
+
+区分两者的判据：反应曲线上有**平台后陡增**是阻聚（诱导期结束）；**斜率减小但曲线连续**是缓聚。
+
+## 8. 可控/活性自由基聚合（CRP）
+
+Szwarc 的阴离子活性聚合可以给 PDI $\to 1$，但对水氧极端敏感、单体范围窄。1990 年代以来发展了**可控自由基聚合**，让自由基聚合也能拿到窄分布、嵌段共聚物。原理都是**动态平衡**：把大部分活性链"睡"在休眠态，只有极少量瞬时活性，从而避免终止、又允许可控增长。
+
+- **NMP（Nitroxide-Mediated Polymerization）**：TEMPO 或 SG1 与链自由基形成 C-O 键休眠，热活化释放。对苯乙烯类效果最好。
+- **ATRP（Atom Transfer Radical Polymerization）**：Cu(I)/Cu(II) 与 R-Br 之间可逆卤原子转移。适用范围最广，对丙烯酸酯、苯乙烯、丙烯腈都行。缺点是残余铜要脱除。
+- **RAFT（Reversible Addition-Fragmentation chain Transfer）**：二硫代酯（xanthate、trithiocarbonate）在两个链之间做"链传递中转站"。对水氧最宽容，是目前工业化最快的 CRP。
+
+三者共同点：$\overline{X}_n$ 随转化率线性上升，PDI $\to$ 1.05–1.3，能做嵌段共聚。但**速率比传统自由基慢 1–2 个数量级**——因为大部分时间都在休眠。工业化必须权衡产量与结构精确度。
+
+## 9. 与前一章的对比
+
+自由基聚合的**动力学与分子量演化都不同于逐步聚合**：
+
+- **分子量恒定**：从反应开始到结束，任何时刻已生成的高分子平均分子量都差不多。只有转化率影响**分子数**，不影响单链长度（不考虑自动加速时）。
+- **单体浓度指数下降**：$\ln([\text{M}]_0/[\text{M}]) = k_p[\text{M}\cdot]t$，$[\text{M}\cdot]$ 稳态下常数。
+- **只需 40–60% 转化率就能获得高分子**——不像缩聚那样非要跑到 99%。
+
+这一章讲的是**纯自由基均聚**，下一章讨论**两种单体一起做自由基聚合**——共聚组成、竞聚率、序列结构。
+
+</WordCount>

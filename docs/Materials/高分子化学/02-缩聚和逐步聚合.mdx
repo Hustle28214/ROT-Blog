@@ -1,0 +1,221 @@
+import WordCount from '../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+# 缩聚和逐步聚合
+
+逐步聚合是**官能团之间的反应**，跟小分子有机化学的酯化、酰胺化、加成没有本质区别。区别只在于：单体带两个或更多官能团，反应产物还带官能团，可以继续反应。**分子量是这样"步进"长起来的**——第 1 步二聚体，第 2 步四聚体或三聚体，第 3 步…… 直到官能团几乎耗尽。
+
+## 1. 单体的官能度决定拓扑
+
+**官能度（functionality）** $f$：每个单体带的可反应官能团数。
+
+- $f=1$（比如乙酸）：只能封端，得不到高分子。
+- $f=2$（比如己二酸 + 己二胺，或 $\omega$-氨基己酸）：只能得到**线型高分子**。
+- $f \geq 3$（比如甘油 + 邻苯二甲酸酐）：能得到**支化或交联的网状高分子**。
+
+工业上区分"缩聚（polycondensation）"和"逐步加成（step addition）"：前者伴随小分子（水、醇、$\text{HCl}$）脱出，后者不脱出（聚氨酯的 —NCO + —OH 就是典型的逐步加成）。**机理和动力学是一样的**，教材放一起讲。
+
+## 2. Carothers 方程
+
+线型缩聚（等物质的量 A-A + B-B，或 A-B 单体）中最重要的关系式。设**官能团反应程度** $p$ 为已反应官能团分数，则数均聚合度：
+
+$$
+\overline{X}_n = \frac{1}{1-p}
+$$
+
+推导思路很简单：初始有 $N_0$ 个官能团（或者说 $N_0/2$ 个单体），反应到 $p$ 时剩下 $N_0(1-p)/2$ 个分子（每形成一个键消耗两个官能团），聚合度就是初始单体数除以剩余分子数 $= 1/(1-p)$。
+
+这个式子的现实意义很扎心：
+
+- $p = 0.90$：$\overline{X}_n = 10$，只是低聚物；
+- $p = 0.99$：$\overline{X}_n = 100$，勉强能叫高分子；
+- $p = 0.999$：$\overline{X}_n = 1000$。
+
+**要合成高分子，必须把转化率推到 99% 以上**。这就是为什么缩聚反应通常要长时间加热、真空脱除小分子副产物、精确控制两种官能团的化学计量比——任何一点偏差都会让 $p$ 卡在 0.98 以下，永远得不到有用的分子量。
+
+<svg viewBox="0 0 700 360" role="img" aria-label="Carothers 方程 X̄n 随转化率 p 变化的曲线" style={{maxWidth:'700px',width:'100%',color:'var(--ifm-font-color-base)'}}>
+  <defs><marker id="ch2a-arrow" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8 Z" fill="currentColor"/></marker></defs>
+  <g stroke="currentColor" strokeWidth="2" fill="none" markerEnd="url(#ch2a-arrow)"><path d="M70 305 H665"/><path d="M70 305 V30"/></g>
+  <g stroke="currentColor" strokeWidth="1" opacity="0.5"><path d="M70 260 H620" strokeDasharray="4 4"/><path d="M70 215 H620" strokeDasharray="4 4"/><path d="M70 170 H620" strokeDasharray="4 4"/><path d="M70 125 H620" strokeDasharray="4 4"/><path d="M70 80 H620" strokeDasharray="4 4"/><path d="M180 305 V295"/><path d="M290 305 V295"/><path d="M400 305 V295"/><path d="M510 305 V295"/><path d="M620 305 V295"/></g>
+  <path d="M70 300 L180 297 L290 291 L400 279 L510 250 L565 210 L595 150 L610 90 L618 50" fill="none" stroke="var(--ifm-color-primary)" strokeWidth="3"/>
+  <g stroke="currentColor" strokeWidth="1" opacity="0.6"><path d="M580 305 V190" strokeDasharray="3 3"/><path d="M602 305 V120" strokeDasharray="3 3"/></g>
+  <g fill="currentColor" fontSize="14">
+    <text x="670" y="310">p</text>
+    <text x="20" y="34">X̄ₙ</text>
+    <text x="45" y="310">0</text><text x="175" y="325">0.2</text><text x="285" y="325">0.4</text><text x="395" y="325">0.6</text><text x="505" y="325">0.8</text><text x="605" y="325">0.99</text>
+    <text x="45" y="265">2</text><text x="45" y="220">10</text><text x="45" y="175">20</text><text x="45" y="130">50</text><text x="45" y="85">100</text>
+    <text x="480" y="140" fill="var(--ifm-color-warning)">末端陡升区</text>
+    <text x="440" y="110">X̄ₙ = 1/(1−p)</text>
+  </g>
+</svg>
+
+## 3. 官能团不等当量的情形
+
+实际配料很难精确等当量。设 A-A 的官能团数 $N_A$，B-B 的官能团数 $N_B$，且 $N_A \leq N_B$，定义**摩尔比**：
+
+$$
+r = \frac{N_A}{N_B} \leq 1
+$$
+
+以少的一方 A 为参照（$p_A$ 为 A 的转化率），则：
+
+$$
+\overline{X}_n = \frac{1+r}{1+r-2rp_A}
+$$
+
+极限情况：$p_A \to 1$（A 完全反应），
+
+$$
+\overline{X}_n^{\max} = \frac{1+r}{1-r}
+$$
+
+举个例：$r = 0.99$，$\overline{X}_n^{\max} = 199$；$r = 0.98$，$\overline{X}_n^{\max} = 99$。所以工业上缩聚配料的**摩尔比误差要控制在千分之几**，这比称量本身还严苛。
+
+**加封端剂**（单官能团小分子，比如乙酸控制己二胺过量）也可以用同一个公式描述，只要把 $r$ 换成等效的官能团比。这是控制分子量的实用手段——不是不控制就好，太长反而无法加工。
+
+## 4. 分子量分布：Flory 分布
+
+线型缩聚在等当量、随机反应假设下，$x$-聚体的**数量分数** $n_x$ 和**重量分数** $w_x$ 是：
+
+$$
+n_x = p^{x-1}(1-p), \qquad w_x = x p^{x-1}(1-p)^2
+$$
+
+这就是 **Flory 最可几分布（most probable distribution）**。推导：一个 $x$-聚体需要连续经过 $x-1$ 个反应键和 $1$ 个末端未反应，概率就是 $p^{x-1}(1-p)$。
+
+由此得到：
+
+$$
+\overline{X}_n = \frac{1}{1-p}, \qquad \overline{X}_w = \frac{1+p}{1-p}
+$$
+
+多分散指数：
+
+$$
+\text{PDI} = \frac{\overline{X}_w}{\overline{X}_n} = 1 + p \to 2 \quad (p \to 1)
+$$
+
+**所有随机线型缩聚在高转化率下的 PDI 都趋近 2**——这是一个不依赖化学细节的普适结果。想拿到窄分布，只能改机理（活性聚合），不能改条件。
+
+<svg viewBox="0 0 700 340" role="img" aria-label="Flory 最可几分布：不同转化率下 x-聚体的数量分数" style={{maxWidth:'700px',width:'100%',color:'var(--ifm-font-color-base)'}}>
+  <defs><marker id="ch2b-arrow" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8 Z" fill="currentColor"/></marker></defs>
+  <g stroke="currentColor" strokeWidth="2" fill="none" markerEnd="url(#ch2b-arrow)"><path d="M70 290 H665"/><path d="M70 290 V30"/></g>
+  <path d="M70 60 C90 90 110 130 140 170 C180 220 240 260 320 275 C440 290 550 292 640 292" fill="none" stroke="var(--ifm-color-primary)" strokeWidth="2.5"/>
+  <path d="M70 130 C110 145 160 175 220 205 C300 240 400 262 500 275 C560 282 610 288 640 289" fill="none" stroke="var(--ifm-color-warning)" strokeWidth="2.5"/>
+  <path d="M70 220 C130 225 200 240 300 258 C400 272 500 282 640 288" fill="none" stroke="var(--ifm-color-success)" strokeWidth="2.5"/>
+  <g fill="currentColor" fontSize="14">
+    <text x="670" y="295">x (聚合度)</text>
+    <text x="24" y="34">nₓ</text>
+    <text x="470" y="80" fill="var(--ifm-color-primary)">p = 0.5</text>
+    <text x="470" y="115" fill="var(--ifm-color-warning)">p = 0.9</text>
+    <text x="470" y="150" fill="var(--ifm-color-success)">p = 0.99</text>
+    <text x="90" y="315">1</text><text x="220" y="315">5</text><text x="360" y="315">10</text><text x="500" y="315">15</text><text x="620" y="315">20</text>
+    <text x="220" y="55">nₓ = p^(x−1)(1−p)</text>
+  </g>
+</svg>
+
+$p$ 越大，分布向长链方向拉，但小分子（$x=1,2$）始终数量最多——这是 Flory 分布违反直觉的一面。
+
+## 5. 逐步聚合动力学
+
+自催化和外加催化情形不同。以 A-A + B-B 的酯化为例（A 是 —COOH，B 是 —OH），反应：
+
+$$
+-\text{COOH} + -\text{OH} \xrightarrow{k} -\text{COO}- + \text{H}_2\text{O}
+$$
+
+**外加酸催化**（比如 $\text{H}_2\text{SO}_4$，浓度定为常数），速率二级：
+
+$$
+-\frac{d[\text{COOH}]}{dt} = k'[\text{COOH}][\text{OH}]
+$$
+
+等当量情况 $[\text{COOH}]=[\text{OH}]=C$，积分：
+
+$$
+\frac{1}{1-p} - 1 = C_0 k' t \quad\Longrightarrow\quad \overline{X}_n - 1 \propto t
+$$
+
+**$\overline{X}_n$ 随时间线性增长**。
+
+**羧酸自催化**（无外加酸时，—COOH 本身催化酯化），速率变成三级：
+
+$$
+-\frac{d[\text{COOH}]}{dt} = k[\text{COOH}]^2[\text{OH}]
+$$
+
+积分得：
+
+$$
+\frac{1}{(1-p)^2} - 1 = 2 C_0^2 k t \quad\Longrightarrow\quad \overline{X}_n^2 - 1 \propto t
+$$
+
+**$\overline{X}_n$ 随 $\sqrt{t}$ 增长，越到后面越慢**。这就是为什么工业尼龙缩聚都要加外加酸催化——不催化的话高分子量段的反应时间要几十倍地长。
+
+## 6. 平衡与脱除
+
+多数缩聚是**可逆平衡**反应，比如聚酯化：
+
+$$
+-\text{COOH} + -\text{OH} \rightleftharpoons -\text{COO}- + \text{H}_2\text{O}, \quad K = \frac{[\text{ester}][\text{H}_2\text{O}]}{[\text{COOH}][\text{OH}]}
+$$
+
+$K$ 通常只有几到几十（远不像加成聚合那样"一去不回"）。要把 $p$ 推到 0.99 以上，必须**脱除水**（或其它小分子），Le Chatelier 原理下强制平衡右移。
+
+工业做法：
+
+- **前期常压**加热脱去大部分水（$p \sim 0.9$）；
+- **后期真空**、薄膜蒸发、聚合釜带机械搅拌把最后几个百分点的水拉走；
+- 熔融缩聚温度必须高于产物熔点，否则粘度爆增无法搅拌。
+
+以 PET 为例：熔点 265 °C，聚合温度 280–290 °C，真空度需要低于 100 Pa 才能把 $\overline{M}_n$ 推到 20000 以上。
+
+## 7. 支化与凝胶：Flory-Stockmayer 理论
+
+$f \geq 3$ 的多官能单体参与时，某个转化率下体系突然从**溶液（可流动）变成凝胶（不可流动）**——出现无穷网络。这个临界转化率 $p_c$ 就是**凝胶点**。
+
+Flory 用**支化系数 $\alpha$**（从一个官能团出发，通过链走到下一个支化点的概率）推导：凝胶点对应
+
+$$
+\alpha_c = \frac{1}{f-1}
+$$
+
+对 $\text{A}_3 + \text{B}_2$（$f=3$ 的 A 单体与二官能 B 反应）体系，若两组分官能团等当量、A 数为少：
+
+$$
+p_c = \frac{1}{\sqrt{f-1}} = \frac{1}{\sqrt{2}} \approx 0.707
+$$
+
+所以刚过 70% 转化率就凝胶化。工业上做**醇酸树脂**（甘油 + 邻苯二甲酸酐）就是要精确停在凝胶点之前，否则搅不动。
+
+Carothers 从另一个角度给出**平均官能度 $\bar{f}$** 的判据：
+
+$$
+p_c = \frac{2}{\bar{f}}, \quad \bar{f} = \frac{\sum N_i f_i}{\sum N_i}
+$$
+
+这个公式比 Flory 简单但偏于保守（预测的 $p_c$ 偏高）。工程上两个都算，取较小值做安全裕度。
+
+## 8. 缩聚工业实例
+
+**尼龙 66**（聚己二酰己二胺）：己二酸 + 己二胺，先成"尼龙盐"以精确配比（这一步实际上是把化学计量比的问题变成结晶纯化的问题），再熔融缩聚。$\overline{M}_n$ 通常 15000–25000。
+
+**PET**（聚对苯二甲酸乙二醇酯）：早期用 DMT + EG 走酯交换路线（脱甲醇），现在直接用 PTA + EG 熔融缩聚（脱水），后期常固相缩聚进一步提高分子量到瓶级树脂的 30000 以上。
+
+**聚碳酸酯（PC）**：双酚 A + 光气（脱 HCl）的界面缩聚。或者双酚 A + 碳酸二苯酯的熔融酯交换（脱苯酚）。前者分子量高、色泽好，光气毒性大；后者绿色但对催化剂敏感。
+
+**酚醛树脂**：苯酚 + 甲醛，酸催化得线型 novolak（$f_{\text{苯酚}}$ 实际是 3，但受空间位阻控制在低于凝胶点的支化），碱催化得可固化的 resol。第一款商业化的合成树脂（Baekeland，1907），也是第一款热固性塑料。
+
+## 9. 与连锁聚合的再对比
+
+学完这一章可以更精确地陈述两者的差异：
+
+- **反应对象**：逐步是官能团 vs 官能团；连锁是活性中心 vs 单体。
+- **分子量演化**：逐步依赖 $p$，只有 $p \to 1$ 才有高分子；连锁依赖动力学链长，反应一开始就产生高分子。
+- **单体消耗曲线**：逐步的官能团浓度平缓下降；连锁的单体浓度快速下降，但已生成的高分子不再反应。
+- **对杂质容忍度**：逐步只怕单官能杂质（封端），对痕量氧、水不敏感；连锁怕自由基淬灭剂、水（阴离子）、微量碱（阳离子），对纯度要求高一个数量级。
+
+下一章开始进入连锁聚合的第一个分支：**自由基聚合**。
+
+</WordCount>

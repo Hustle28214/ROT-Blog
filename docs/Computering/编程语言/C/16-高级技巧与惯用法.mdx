@@ -1,0 +1,482 @@
+import WordCount from '../../../../src/components/WordCount/WordCount';
+import Mermaid from '@theme/Mermaid';
+
+<WordCount>
+
+C 是一门"低层"的语言，但掌握了它的**惯用法**与**技巧**后，你能用它写出既高效又优雅的通用代码——甚至实现面向对象、泛型、多态。这一章汇集内核代码、著名库中反复出现的经典模式。
+
+## 一、`container_of` — 侵入式数据结构的核心
+
+**问题**：给你结构体中某个成员的指针，反推整个结构体的指针。
+
+```c
+struct Node {
+    int val;
+    struct list_head list;   // 内嵌链表节点
+};
+
+struct list_head *lp = ...;
+struct Node *n = container_of(lp, struct Node, list);
+```
+
+**实现**：
+
+```c
+#define container_of(ptr, type, member) \
+    ((type *)((char *)(ptr) - offsetof(type, member)))
+```
+
+**原理**：`offsetof(type, member)` 给出成员相对结构体开头的偏移；把成员指针减去这个偏移就得到宿主结构体指针。
+
+Linux 内核的双向链表、红黑树、hashtable 全部基于这个宏。它让**同一个数据结构可以嵌入到任何 struct**——无需模板/泛型。
+
+**类型安全版**（GCC 扩展）：
+
+```c
+#define container_of(ptr, type, member) ({ \
+    const typeof(((type *)0)->member) *__mptr = (ptr); \
+    (type *)((char *)__mptr - offsetof(type, member)); \
+})
+```
+
+## 二、侵入式链表
+
+Linux `<linux/list.h>` 的核心：
+
+```c
+struct list_head {
+    struct list_head *next, *prev;
+};
+
+#define LIST_HEAD_INIT(name) { &(name), &(name) }
+#define LIST_HEAD(name) struct list_head name = LIST_HEAD_INIT(name)
+
+static inline void list_add(struct list_head *new, struct list_head *head) {
+    new->next = head->next;
+    new->prev = head;
+    head->next->prev = new;
+    head->next = new;
+}
+
+#define list_entry(ptr, type, member) container_of(ptr, type, member)
+
+#define list_for_each_entry(pos, head, member) \
+    for (pos = list_entry((head)->next, typeof(*pos), member); \
+         &pos->member != (head); \
+         pos = list_entry(pos->member.next, typeof(*pos), member))
+```
+
+使用：
+
+```c
+struct Task {
+    int id;
+    struct list_head list;
+};
+LIST_HEAD(task_list);
+
+struct Task *t = malloc(sizeof *t);
+t->id = 42;
+list_add(&t->list, &task_list);
+
+struct Task *pos;
+list_for_each_entry(pos, &task_list, list) {
+    printf("task %d\n", pos->id);
+}
+```
+
+**优势**：链表节点内嵌，无需额外分配；同一对象可属于多条链表。
+
+## 三、X-Macro
+
+一份数据，多种展开。
+
+```c
+#define COMMANDS \
+    X(START, "start", cmd_start) \
+    X(STOP,  "stop",  cmd_stop) \
+    X(RESET, "reset", cmd_reset)
+
+// 生成枚举
+typedef enum {
+#define X(id, name, fn) CMD_##id,
+    COMMANDS
+#undef X
+    CMD_COUNT
+} CmdId;
+
+// 生成分派表
+typedef void (*CmdFn)(void);
+static const struct { const char *name; CmdFn fn; } cmd_table[] = {
+#define X(id, name, fn) [CMD_##id] = { name, fn },
+    COMMANDS
+#undef X
+};
+
+// 使用
+void dispatch(const char *name) {
+    for (size_t i = 0; i < CMD_COUNT; i++) {
+        if (strcmp(cmd_table[i].name, name) == 0) {
+            cmd_table[i].fn();
+            return;
+        }
+    }
+}
+```
+
+**优势**：新增命令只改一处；枚举、字符串、函数指针自动同步。
+
+## 四、面向对象在 C 中的实现
+
+### 4.1 简单封装
+
+```c
+typedef struct {
+    int x, y;
+} Point;
+
+Point *Point_new(int x, int y) {
+    Point *p = malloc(sizeof *p);
+    p->x = x; p->y = y;
+    return p;
+}
+
+void Point_free(Point *p) { free(p); }
+```
+
+### 4.2 多态与虚函数表
+
+```c
+typedef struct Shape Shape;
+
+typedef struct {
+    double (*area)(const Shape *self);
+    void   (*draw)(const Shape *self);
+    void   (*destroy)(Shape *self);
+} ShapeVTable;
+
+struct Shape {
+    const ShapeVTable *vt;
+};
+
+// Circle 继承 Shape
+typedef struct {
+    Shape base;      // 首成员：可安全转成 Shape*
+    double radius;
+} Circle;
+
+static double circle_area(const Shape *self) {
+    const Circle *c = (const Circle *)self;
+    return 3.14159 * c->radius * c->radius;
+}
+
+static void circle_draw(const Shape *self) {
+    const Circle *c = (const Circle *)self;
+    printf("Circle(r=%f)\n", c->radius);
+}
+
+static void circle_destroy(Shape *self) { free(self); }
+
+static const ShapeVTable circle_vt = {
+    .area = circle_area,
+    .draw = circle_draw,
+    .destroy = circle_destroy,
+};
+
+Shape *Circle_new(double r) {
+    Circle *c = malloc(sizeof *c);
+    c->base.vt = &circle_vt;
+    c->radius = r;
+    return &c->base;
+}
+
+// 用法：
+Shape *s = Circle_new(2.0);
+s->vt->draw(s);         // 多态调用
+printf("%f\n", s->vt->area(s));
+s->vt->destroy(s);
+```
+
+GTK+/GObject、CPython C API、FFmpeg、libcurl 广泛采用这种模式。
+
+## 五、`_Generic` — 类型泛型选择（C11）
+
+C 版"函数重载"：
+
+```c
+#include <math.h>
+
+#define abs_generic(x) _Generic((x), \
+    int:         abs, \
+    long:        labs, \
+    long long:   llabs, \
+    float:       fabsf, \
+    double:      fabs, \
+    long double: fabsl, \
+    default:     abs \
+)(x)
+
+int    a = abs_generic(-3);
+double b = abs_generic(-3.14);
+```
+
+编译期根据 `x` 的类型选分支。所有分支都必须**类型合法**（即使不选中）。
+
+**注意**：类型是**表达式的类型**——`char` 参数会经过整型提升为 `int`。
+
+## 六、`offsetof` — 成员偏移
+
+```c
+#include <stddef.h>
+struct S { int a; double b; char c; };
+
+offsetof(struct S, b);   // 8（取决于对齐）
+```
+
+编译期常量，可用于：
+- `container_of`
+- 序列化/反序列化
+- 检查布局是否符合预期
+
+## 七、编译期断言
+
+C11：
+```c
+_Static_assert(sizeof(int) == 4, "This code assumes 32-bit int");
+_Static_assert(offsetof(struct S, b) == 8, "layout mismatch");
+```
+
+C11 之前的技巧：
+```c
+#define STATIC_ASSERT(cond, msg) typedef char msg[(cond) ? 1 : -1]
+STATIC_ASSERT(sizeof(int) == 4, int_must_be_32bit);
+```
+
+## 八、`typeof` — 类型推导
+
+GCC 扩展，C23 标准化：
+
+```c
+int arr[10];
+typeof(arr[0]) x = 42;   // int
+
+#define SWAP(a, b) do { \
+    typeof(a) _t = a; a = b; b = _t; \
+} while (0)
+```
+
+配合宏能写出更安全的通用代码——不用假设类型。
+
+## 九、宏防御性技巧
+
+### 9.1 `do-while(0)` 包裹语句
+
+```c
+#define LOG(x) do { if (verbose) printf("%s\n", x); } while (0)
+
+if (cond) LOG(msg); else other();   // ✓ 正确解析
+```
+
+### 9.2 参数括号
+
+```c
+#define SQ(x) ((x) * (x))   // 保护低优先级操作数
+```
+
+### 9.3 单次求值（GCC 扩展）
+
+```c
+#define MAX(a, b) ({ \
+    typeof(a) _a = (a); \
+    typeof(b) _b = (b); \
+    _a > _b ? _a : _b; \
+})
+```
+
+### 9.4 静态断言宏
+
+```c
+#define BUILD_BUG_ON(cond) _Static_assert(!(cond), #cond)
+```
+
+## 十、`__attribute__` 常用武器（GCC/Clang）
+
+```c
+__attribute__((packed))              // 结构体不 padding
+__attribute__((aligned(N)))          // 强制对齐
+__attribute__((noreturn))            // 不返回
+__attribute__((pure))                // 无副作用
+__attribute__((const))               // 更强：完全依赖参数
+__attribute__((unused))              // 未使用不告警
+__attribute__((deprecated))          // 使用时告警
+__attribute__((format(printf,1,2)))  // printf 风格检查
+__attribute__((always_inline))
+__attribute__((cold))                // 冷路径
+__attribute__((hot))                 // 热路径
+__attribute__((used))                // 即使未引用也保留（LTO/dead-strip）
+__attribute__((weak))                // 弱符号
+__attribute__((constructor))         // main 前调用
+__attribute__((destructor))          // 退出时调用
+```
+
+C23 标准化了 `[[attribute]]` 语法。
+
+## 十一、通用容器：不用模板做泛型
+
+**方案 A：`void *`**
+```c
+typedef struct {
+    void  *data;
+    size_t elem_size;
+    size_t len, cap;
+} Vec;
+
+void vec_push(Vec *v, const void *elem) {
+    if (v->len == v->cap) grow(v);
+    memcpy((char *)v->data + v->len * v->elem_size, elem, v->elem_size);
+    v->len++;
+}
+```
+
+**方案 B：宏模板**
+```c
+#define VEC_DECLARE(name, type) \
+    typedef struct { type *data; size_t len, cap; } name; \
+    static inline void name##_push(name *v, type x) { \
+        if (v->len == v->cap) { \
+            v->cap = v->cap ? v->cap * 2 : 4; \
+            v->data = realloc(v->data, v->cap * sizeof(type)); \
+        } \
+        v->data[v->len++] = x; \
+    }
+
+VEC_DECLARE(IntVec, int)
+IntVec v = {0};
+IntVec_push(&v, 42);
+```
+
+STC、klib、stb 都采用这种方式。
+
+## 十二、编译期计算
+
+C99 允许更多编译期表达式，C23 引入 `constexpr`：
+
+```c
+// C11
+enum { CACHE_LINE = 64 };
+_Alignas(CACHE_LINE) char buf[1024];
+
+// C23
+constexpr size_t CACHE_LINE = 64;
+```
+
+**编译期字符串长度**：
+```c
+#define STRLEN_LIT(s) (sizeof(s) - 1)   // 只对字面量有效
+```
+
+## 十三、错误处理惯用法
+
+### 13.1 返回码 + errno
+
+```c
+int result = do_something();
+if (result < 0) { perror("do_something"); return -1; }
+```
+
+### 13.2 goto 集中清理（内核风格）
+
+见 [[04-控制流]] 中的 `goto err_xxx` 模式。
+
+### 13.3 结果类型（`sum type`）
+
+```c
+typedef enum { R_OK, R_ERR_NOMEM, R_ERR_INVAL, R_ERR_IO } ResultCode;
+typedef struct {
+    ResultCode code;
+    union {
+        int    ok_val;
+        char  *err_msg;
+    };
+} Result;
+```
+
+### 13.4 setjmp/longjmp 异常
+
+见 [[04-控制流]]。适合罕见场景。
+
+## 十四、`likely` / `unlikely` 分支提示
+
+```c
+#define likely(x)   __builtin_expect(!!(x), 1)
+#define unlikely(x) __builtin_expect(!!(x), 0)
+
+if (unlikely(err)) { handle(); return; }
+```
+
+告知编译器分支概率，帮助生成更好的代码布局（热路径落 fall-through）。
+
+## 十五、`__COUNTER__` — 编译期唯一 ID（GCC 扩展）
+
+每次展开值 +1：
+
+```c
+#define UNIQUE_ID(prefix) prefix##__COUNTER__
+
+int UNIQUE_ID(var_) = 1;   // var_0
+int UNIQUE_ID(var_) = 2;   // var_1
+```
+
+用于生成唯一的局部变量名、静态构造器等。
+
+## 十六、Bit tricks 常用清单
+
+```c
+x & (x - 1)          // 消最低位 1
+x & -x               // 取最低位 1
+(x + 7) & ~7         // 向上对齐到 8
+(x + n - 1) / n * n  // 向上对齐到 n（n 不必是 2 幂）
+(x + n - 1) & -n     // 向上对齐（n 是 2 幂）
+```
+
+## 十七、"strict" C 与"extended" C
+
+- 严格标准：`gcc -std=c11 -pedantic`
+- 允许扩展：`-std=gnu11`（默认）——启用 `typeof`、语句表达式、`__attribute__` 等
+
+工程可根据可移植性需求选择。
+
+## 十八、常见小库借鉴
+
+- **stb**：单头文件库（stb_image.h、stb_truetype.h）
+- **klib**：泛型容器（`khash`、`kvec`）
+- **libbsd**：BSD 扩展函数（`strlcpy` 等）
+- **cJSON**：JSON 库，代码风格清晰
+- **SDS**（Redis）：动态字符串
+- **utlist / uthash**：宏实现的链表/hash
+
+阅读它们的源码是学 C 惯用法的最佳材料。
+
+## 十九、宏 vs 内联 vs `_Generic`
+
+| 需求 | 推荐 |
+| --- | --- |
+| 类型无关工具（min/max） | `static inline` + `typeof` 或 `_Generic` |
+| 需要编译期常量 | 宏 或 `constexpr`（C23） |
+| 生成代码（枚举 + 表） | X-Macro |
+| 通用容器 | 宏模板 |
+| 类似"重载" | `_Generic` |
+
+## 二十、总结
+
+C 的表达力源自**指针 + 宏 + 结构体** 三件套。真正掌握 C 的分水岭不在语法，而在能否恰当使用这些惯用法：
+
+- `container_of` 让你以侵入方式做泛型数据结构。
+- X-Macro 让你的数据源一份、视角多样。
+- 结构体首成员 + 函数指针表模拟继承与多态。
+- `_Generic` 让 API 类型无关。
+- 宏 + `typeof` 写通用工具。
+
+多读优秀的 C 项目（Linux 内核、Redis、SQLite、Lua），比刷 100 道题更能提升 C 水平。
+
+</WordCount>

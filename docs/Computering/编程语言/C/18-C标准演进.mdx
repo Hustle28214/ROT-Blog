@@ -1,0 +1,319 @@
+import WordCount from '../../../../src/components/WordCount/WordCount';
+import Mermaid from '@theme/Mermaid';
+
+<WordCount>
+
+C 自 1972 年问世，已历经近半个世纪。它的标准演进保守而稳健——每次修订只引入被广泛验证的特性。本章横向对比 C89 → C99 → C11 → C17 → C23 的关键差异。
+
+## 一、标准编号速查
+
+| 通俗名 | 正式编号 | 发布年 | 别名 |
+| --- | --- | --- | --- |
+| K&R C | — | 1978 | 第一本 C 圣经 |
+| ANSI C / C89 | ANSI X3.159-1989 | 1989 | 首个标准 |
+| C90 | ISO/IEC 9899:1990 | 1990 | 与 C89 内容等价 |
+| C95 | Amendment 1 | 1995 | 宽字符 |
+| C99 | ISO/IEC 9899:1999 | 1999 | 大更新 |
+| C11 | ISO/IEC 9899:2011 | 2011 | 多线程 |
+| C17 / C18 | ISO/IEC 9899:2018 | 2018 | 缺陷修复 |
+| C23 | ISO/IEC 9899:2024 | 2024 | 大更新 |
+
+## 二、检测宏
+
+```c
+#if defined(__STDC_VERSION__)
+  #if __STDC_VERSION__ >= 202311L
+    // C23
+  #elif __STDC_VERSION__ >= 201710L
+    // C17
+  #elif __STDC_VERSION__ >= 201112L
+    // C11
+  #elif __STDC_VERSION__ >= 199901L
+    // C99
+  #endif
+#endif
+```
+
+C89/C90 没有定义 `__STDC_VERSION__`。
+
+## 三、K&R C → C89 (1989)
+
+从传统 C 到首个标准的规范化。**关键改动**：
+
+- **函数原型**（`int f(int a, int b);`）— 编译期类型检查。
+- 类型 **`void`** 与 `void *`。
+- 类型限定符 `const`、`volatile`。
+- 结构体可传值、可返回。
+- 枚举 `enum`。
+- 标准库大扩展（`<stdio.h>`、`<string.h>`、`<stdlib.h>`、`<math.h>`……）。
+- 预处理器标准化（`#pragma`、`#error`、`##`）。
+- 三字符序列（trigraphs）——应对早期键盘。
+
+**K&R 函数定义仍被支持**（旧代码兼容），但**C23 起废除**。
+
+## 四、C99 (1999)
+
+C 的第一次重大更新。**语言特性**：
+
+| 特性 | 说明 |
+| --- | --- |
+| `//` 单行注释 | 从 C++ 引入 |
+| `long long int` | 至少 64 位整数 |
+| `_Bool` / `<stdbool.h>` | 布尔类型 |
+| `<stdint.h>` | `int32_t` 等定长 |
+| `<inttypes.h>` | `PRId64` 等格式宏 |
+| VLA（Variable Length Array） | `int a[n]`，n 运行时 |
+| 复合字面量 | `(Point){1,2}` |
+| 指定初始化 | `{.x=1, .y=2}`、`[0]=1` |
+| 混合声明与语句 | 变量可在任意位置声明 |
+| `for` 里声明 | `for(int i=0; ...)` |
+| `inline` | 内联函数 |
+| `restrict` | 指针非别名 |
+| `_Complex` / `<complex.h>` | 复数 |
+| `_Pragma` | 预处理器 pragma |
+| `__func__` | 当前函数名 |
+| 灵活数组成员 | `char data[];` 末尾 |
+| 十六进制浮点字面量 | `0x1.8p+1` = 3.0 |
+| 可变宏 | `#define LOG(...) ...` |
+| 单精度数学函数 | `sinf`、`cosf`、`sqrtf` |
+| `snprintf` | 安全格式化 |
+| `stdint.h` `SIZE_MAX` | 明确边界 |
+| `%zu`、`%td` | 新格式说明符 |
+
+C99 的 VLA 与复合字面量至今仍是"最 C 味"的特性——功能强、争议大。
+
+## 五、C11 (2011)
+
+响应多核与安全的重大更新。
+
+| 特性 | 说明 |
+| --- | --- |
+| `<threads.h>` | 标准线程 |
+| `<stdatomic.h>` | 原子操作 |
+| **内存模型** | 数据竞争、内存序 |
+| `_Alignof(T)` | 对齐查询 |
+| `_Alignas(N)` | 强制对齐 |
+| `aligned_alloc` | 对齐分配 |
+| `_Static_assert` | 编译期断言 |
+| `_Generic` | 类型泛型选择 |
+| 匿名 struct / union | 嵌套时省略名字 |
+| `_Noreturn` | 不返回函数 |
+| `char16_t` / `char32_t` | Unicode |
+| `u8"..."` `u"..."` `U"..."` | UTF-8/16/32 字面量 |
+| `<uchar.h>` | Unicode 支持 |
+| `_Thread_local` | 线程局部存储 |
+| `gets` 移除 | 危险函数除名 |
+| 边界检查库（可选） | `<stdlib.h>` 的 `_s` 后缀函数 |
+| 静态断言表达式 | 类型/大小校验 |
+
+VLA 从**必须支持**变成 **可选特性**（若 `__STDC_NO_VLA__` == 1 则不支持）——MSVC 从未实现 VLA。
+
+## 六、C17 / C18 (2018)
+
+**无新语言特性**。纯粹是 C11 的缺陷修复版（Defect Report 集合）。
+
+主要澄清：
+- 内存模型措辞更精确
+- 修复若干未定义/未指定行为
+- 修正标准库描述错误
+
+从工程视角，C17 与 C11 完全兼容。
+
+## 七、C23 (2024)
+
+C 的现代化跃迁。许多特性借鉴 C++ / 现代语言。
+
+### 7.1 关键字与类型
+
+| 新特性 | 说明 |
+| --- | --- |
+| `nullptr` / `nullptr_t` | 类型安全空指针 |
+| `true` / `false` / `bool` | 直接内建，无需 `<stdbool.h>` |
+| `typeof` / `typeof_unqual` | 标准化类型推导（此前 GCC 扩展） |
+| `constexpr` | 编译期常量对象 |
+| `auto` | 类型推导（从 C++ 借） |
+| `_BitInt(N)` | 任意精度整数（如 `_BitInt(128)`） |
+
+### 7.2 字面量与字面
+
+| 新特性 | 说明 |
+| --- | --- |
+| 二进制字面量 | `0b1010` |
+| 数字分隔符 | `1'000'000` |
+| UTF-8 字符字面量 | `u8'A'` 类型 `unsigned char` |
+| `#embed` | 直接嵌入二进制文件 |
+| `#warning` 标准化 | 此前 GCC 扩展 |
+
+### 7.3 语法
+
+| 新特性 | 说明 |
+| --- | --- |
+| `[[attribute]]` | C++ 风格属性 |
+| `[[nodiscard]]` `[[fallthrough]]` `[[maybe_unused]]` `[[deprecated]]` `[[noreturn]]` | 标准属性 |
+| 无参数 `f()` == `f(void)` | 终于严格化 |
+| `enum : type` | 显式底层类型 `enum E : uint8_t { }` |
+| Empty init `= {}` | 全零初始化 |
+| Labels 可以放在块尾 | 不再需要空语句 |
+
+### 7.4 库
+
+| 新特性 | 说明 |
+| --- | --- |
+| `<stdckdint.h>` | 溢出检查算术（`ckd_add` 等） |
+| `<stdbit.h>` | 位操作库（`stdc_bit_ceil` 等） |
+| `strdup` / `strndup` 标准化 | 此前 POSIX |
+| `memccpy` 标准化 | |
+| `memset_explicit` | 不会被优化掉的清零（安全） |
+| `timespec_getres` | |
+| `printf %b` `%B` | 二进制格式 |
+| `<stdatomic.h>` 强制存在 | C11 时是可选 |
+
+### 7.5 移除
+
+- **K&R 风格函数定义**：`int f(a, b) int a; int b; { ... }` 不再合法。
+- **Trigraphs**：`??=` 等三字符序列彻底移除。
+
+## 八、可选特性
+
+C99+ 引入了"条件强制"的概念——某些特性允许实现声明"不支持"：
+
+| 宏（若为 1 则不支持） | 特性 |
+| --- | --- |
+| `__STDC_NO_VLA__` | 变长数组 |
+| `__STDC_NO_ATOMICS__` | 原子操作（C11-C17；C23 起强制） |
+| `__STDC_NO_THREADS__` | `<threads.h>` |
+| `__STDC_NO_COMPLEX__` | 复数 |
+
+## 九、编译器支持现状
+
+| 编译器 | C99 | C11 | C17 | C23 |
+| --- | --- | --- | --- | --- |
+| GCC | 完全 | 完全（4.9+） | 完全 | 部分（14+ 大多数） |
+| Clang | 完全 | 完全（3.6+） | 完全 | 部分（16+ 大多数） |
+| MSVC | 部分（VS 2013+，无 VLA） | 部分（VS 2019+） | 部分 | 极少（进行中） |
+
+**注意**：MSVC 直到近几年才认真跟进 C 标准；历史上把 C 视为 C++ 的子集。想用现代 C 特性写 Windows 程序，用 Clang（`clang-cl`）更省心。
+
+## 十、`-std=` 命令行选项
+
+```bash
+gcc -std=c89       # 严格 C89
+gcc -std=c99
+gcc -std=c11
+gcc -std=c17
+gcc -std=c23       # 最新（GCC 14+）
+gcc -std=gnu11     # C11 + GNU 扩展（默认）
+```
+
+`-pedantic` 附加严格标准合规。
+
+## 十一、演进对比：一个例子
+
+```c
+// K&R (1978)
+sum(a, b)
+int a, b;
+{
+    return a + b;
+}
+main()
+{
+    printf("%d\n", sum(1, 2));
+}
+```
+
+```c
+// C89
+#include <stdio.h>
+int sum(int a, int b) {
+    return a + b;
+}
+int main(void) {
+    printf("%d\n", sum(1, 2));
+    return 0;
+}
+```
+
+```c
+// C99
+#include <stdio.h>
+#include <stdbool.h>
+static inline int sum(int a, int b) { return a + b; }
+int main(void) {
+    int arr[] = {1, 2, 3};
+    for (size_t i = 0; i < sizeof arr / sizeof arr[0]; i++)
+        printf("%d ", arr[i]);
+    printf("\n%d\n", sum(1, 2));
+}
+```
+
+```c
+// C11
+#include <stdio.h>
+#include <threads.h>
+#include <stdatomic.h>
+
+_Static_assert(sizeof(int) >= 4, "need 32-bit int");
+_Thread_local int per_thread;
+atomic_int counter;
+
+_Noreturn void die(const char *msg) { fprintf(stderr, "%s\n", msg); exit(1); }
+```
+
+```c
+// C23
+#include <stdio.h>
+constexpr int N = 42;
+[[nodiscard]] int compute(int x) { return x * 2; }
+int main() {
+    auto n = 0b1010;       // 二进制字面量
+    int arr[] = {1'000'000};  // 数字分隔符
+    if (nullptr == nullptr) puts("hi");
+}
+```
+
+## 十二、迁移建议
+
+- **新项目**：C11（工业标准）或 C17（无实质差异）；能用 C23 更佳。
+- **旧代码库**：兼容 C99（GCC/Clang/MSVC 都稳定支持）。
+- **嵌入式**：看编译器——某些 IAR/Keil 仍卡在 C99。
+- **跨平台库**：宁可牺牲新特性也求兼容——见 SQLite（严格 ANSI C89 兼容 + 少量 C99）。
+
+## 十三、被移除或废弃的特性
+
+- **`gets`**（C11 移除）：无法防止缓冲区溢出。
+- **K&R 函数定义**（C23 移除）。
+- **Trigraphs**（C23 移除）。
+- **`_Noreturn`** → 被 `[[noreturn]]` 替代（C23）。
+- **`register` 关键字**：仍存在但基本没用。
+
+## 十四、C 与 C++ 的分歧
+
+历史上 C 与 C++ 长期"约定俗成"地兼容。但每次修订都在拉大距离：
+
+- **C11 `_Generic`**：C 特有，无对应 C++ 特性（C++ 用重载/模板）。
+- **C99 VLA、复合字面量、指定初始化**：C++ 没有（部分被 C++20 借鉴）。
+- **C++11 `nullptr`、`constexpr`、`auto`、attributes**：反向影响了 C23。
+- 未来两者会继续吸收彼此，但不会合并。
+
+## 十五、标准委员会与提案流程
+
+- **WG14**：ISO C 委员会，负责标准演进。
+- 提案叫 **N-numbered documents**（如 N2731 是 C23 nullptr 提案）。
+- 定期召开会议投票；获采纳后进入下一轮标准。
+- 参考 [open-std.org/JTC1/SC22/WG14](https://open-std.org/JTC1/SC22/WG14/) 追踪最新动向。
+
+## 十六、总结表：什么时候用什么
+
+| 你想 | 用哪个标准 |
+| --- | --- |
+| 极致可移植（老 Unix、极简嵌入式） | C89 |
+| 主流跨平台（含 Windows） | C99 或 C11 |
+| Linux/Android/macOS 项目 | C11/C17 |
+| 现代新项目 | C23（如工具链支持） |
+| Windows 原生 | 用 MSVC 时受限于其支持；用 clang-cl 摆脱束缚 |
+| 内核 / 驱动 | 项目指定（Linux 目前基于 C11 gnu 扩展） |
+
+C 语言的演进不像其他语言那样激进，但每次都精雕细琢。理解每次修订的动机与实际影响，是从 C 使用者到 C 专家的必经之路。
+
+</WordCount>

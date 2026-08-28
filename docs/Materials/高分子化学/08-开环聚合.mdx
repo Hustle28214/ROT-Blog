@@ -1,0 +1,138 @@
+import WordCount from '../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+# 开环聚合
+
+前面几章的单体都带 $\text{C}=\text{C}$ 双键。**开环聚合（Ring-Opening Polymerization, ROP）** 的单体是**环状分子**，聚合时环打开、连成链。反应机理可以是自由基、阳离子、阴离子、配位——**开环聚合是"按单体形状分"而不是"按活性种分"**，与前面几章的分类维度垂直。
+
+代表产品：**尼龙 6**（己内酰胺开环）、**聚甲醛**（甲醛环三聚体开环）、**环氧树脂**、**聚硅氧烷**、**聚乳酸（PLA）**、**聚己内酯（PCL）**。工业地位不如 PE/PP，但覆盖工程塑料、可降解塑料、有机硅材料这几大特种领域。
+
+## 1. 环张力：为什么环能开
+
+$$
+\Delta G_{\text{polym}} = \Delta H - T\Delta S
+$$
+
+**开环放热由环张力（ring strain）提供**：环越小张力越大（3-环环氧、氮杂环丙烷 $\sim -100$ kJ/mol），开环驱动力足够。**熵变通常不利于聚合**（$\Delta S < 0$，链比环有序）。
+
+环大小的普适规律：
+
+<svg viewBox="0 0 720 340" role="img" aria-label="环张力能量随环大小的变化" style={{maxWidth:'720px',width:'100%',color:'var(--ifm-font-color-base)'}}>
+  <defs><marker id="ch8-arrow" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8 Z" fill="currentColor"/></marker></defs>
+  <g stroke="currentColor" strokeWidth="2" fill="none" markerEnd="url(#ch8-arrow)"><path d="M70 290 H680"/><path d="M70 290 V30"/></g>
+  <g stroke="currentColor" strokeWidth="1" opacity="0.4"><path d="M70 80 H640" strokeDasharray="4 4"/><path d="M70 160 H640" strokeDasharray="4 4"/><path d="M70 220 H640" strokeDasharray="4 4"/></g>
+  <g stroke="currentColor" strokeWidth="1" opacity="0.5"><path d="M130 290 V300"/><path d="M200 290 V300"/><path d="M270 290 V300"/><path d="M340 290 V300"/><path d="M410 290 V300"/><path d="M480 290 V300"/><path d="M550 290 V300"/><path d="M620 290 V300"/></g>
+  <path d="M130 70 L200 130 L270 275 L340 285 L410 260 L480 200 L550 175 L620 220" fill="none" stroke="var(--ifm-color-primary)" strokeWidth="3"/>
+  <g fill="var(--ifm-color-primary)"><circle cx="130" cy="70" r="6"/><circle cx="200" cy="130" r="6"/><circle cx="270" cy="275" r="6"/><circle cx="340" cy="285" r="6"/><circle cx="410" cy="260" r="6"/><circle cx="480" cy="200" r="6"/><circle cx="550" cy="175" r="6"/><circle cx="620" cy="220" r="6"/></g>
+  <g fill="currentColor" fontSize="13" textAnchor="middle"><text x="130" y="315">3</text><text x="200" y="315">4</text><text x="270" y="315">5</text><text x="340" y="315">6</text><text x="410" y="315">7</text><text x="480" y="315">8</text><text x="550" y="315">9</text><text x="620" y="315">10+</text></g>
+  <g fill="currentColor" fontSize="14"><text x="685" y="295">环大小 n</text><text x="15" y="34">环张力</text><text x="30" y="85">高</text><text x="30" y="225">低</text></g>
+  <g fill="currentColor" fontSize="11" opacity="0.7"><text x="105" y="55">环氧</text><text x="175" y="115">氧丁环</text><text x="235" y="260">THF</text><text x="315" y="270">6 元</text><text x="385" y="245">己内酯</text><text x="465" y="185">环辛烯</text></g>
+</svg>
+
+- **3、4 元环**：张力大（Baeyer 张力 + Pitzer 张力），开环剧烈，有的甚至爆炸性（环氧、氧丁环）。
+- **5 元环**：几乎无张力，开环倾向弱。THF 是唯一例外——阳离子引发下可以开环，产物是聚四氢呋喃（PTMEG，聚醚多元醇，做 spandex 的一部分）。$\gamma$-丁内酯根本聚合不了。
+- **6 元环**：椅型稳定，无张力，一般不开环。$\delta$-戊内酯就聚合困难。
+- **7 元及以上**：环张力回升（跨环相互作用），可开环。**己内酰胺 → 尼龙 6，己内酯 → PCL** 都是这一类。
+
+## 2. 尼龙 6 的合成：己内酰胺开环
+
+**己内酰胺**（$\text{C}_6$ 环内酰胺，$\varepsilon$-caprolactam）在 250 °C 下水或氨基酸催化，开环成尼龙 6：
+
+$$
+n \; \text{cyclic (CH}_2\text{)}_5\text{C(O)NH} \longrightarrow -(\text{NH(CH}_2\text{)}_5\text{C(O)})_n-
+$$
+
+反应可以走**水解开环**（水作引发和链转移剂，也开单体环）或**阴离子机理**（Na/K 己内酰胺 + 促进剂，如己二酸己内酰胺；反应可在几分钟内完成，甚至能常压熔铸）。
+
+对比：**尼龙 66 用己二酸 + 己二胺缩聚**（第 2 章），**尼龙 6 用己内酰胺开环**。两者化学结构相近，性能微差别（尼龙 6 熔点 220 °C 略低于尼龙 66 的 265 °C，吸水性略高），加工方便性因此各有市场。
+
+## 3. 环氧化物开环
+
+环氧乙烷、环氧丙烷、环氧氯丙烷等 3 元环氧化物开环极容易，是**聚醚多元醇**和**聚乙二醇**的原料。
+
+阴离子机理（KOH 催化）：
+
+$$
+\text{RO}^- + \text{oxirane} \longrightarrow \text{RO-CH}_2\text{-CHR}'\text{-O}^-
+$$
+
+产物是端羟基聚醚。工业上用**双官能起始剂（乙二醇）**得线型 PEG；用**三官能起始剂（甘油）**得三臂聚醚多元醇——这是聚氨酯泡沫的原料。
+
+**环氧丙烷开环有立构问题**（甲基取向），但工业聚醚多元醇不追求立构规整，只要软段柔性即可。学术上用 salen 型金属络合物做立构选择性开环，制**等规聚环氧丙烷**（可结晶，实际应用较少）。
+
+**环氧树脂**：双酚 A 与环氧氯丙烷反应得到 diglycidyl bisphenol A（DGEBA），再与胺、酸酐固化剂反应交联。工业上做电子封装、结构复合材料基体、金属涂料。这里的开环发生在**固化过程**，而不是预聚阶段。
+
+## 4. 聚甲醛（POM）
+
+**甲醛的环三聚体三聚甲醛 → POM**，阳离子催化（$\text{BF}_3$ 或 $\text{HClO}_4$）：
+
+$$
+n \; \text{trioxane} \longrightarrow -(\text{OCH}_2)_{3n}-
+$$
+
+产物是**结晶度极高的乙缩醛链**，力学性能类似金属：拉伸模量 2.8 GPa、$T_g \sim -60$ °C（但 $T_m \sim 175$ °C）、耐磨、尺寸稳定——齿轮、拉链、汽车零部件的经典材料。
+
+问题：末端 -OH 在高温下**解拉链（unzipping）**分解回甲醛。工业解决办法是端基**乙酰化**封端（$-\text{OH} \to -\text{OC(O)CH}_3$）或与少量 EO/DO 共聚打断解拉链（POM 共聚物 DuPont Delrin 均聚 vs Celanese Celcon 共聚）。
+
+## 5. 聚硅氧烷
+
+环三硅氧烷（$\text{D}_3$）、环四硅氧烷（$\text{D}_4$）在 KOH 或强酸催化下开环得到聚二甲基硅氧烷（PDMS，硅橡胶的主链）。$\text{D}_4$ 无张力但工业用得多，$\text{D}_3$ 张力大速率快用于窄分布合成。
+
+反应本质是 **Si-O 键的可逆断裂-重排**——不是常规意义上的"环张力开环"，而是化学平衡下的分子量重新分布。控制反应时间和引发剂量可以做窄分布 PDMS，加封端剂（三甲基硅氯）得定长活性 PDMS 用于化妆品和硅油。
+
+## 6. 聚乳酸和聚己内酯
+
+可生物降解、可堆肥的**脂肪族聚酯**。工业上不用羟基酸缩聚（Carothers 方程下分子量做不高），而用**环二聚体开环**：
+
+- 乳酸 → 丙交酯（lactide，6 元环）→ PLA。
+- 己内酯（7 元环）→ PCL。
+
+催化剂用**辛酸亚锡（$\text{Sn}(\text{Oct})_2$）**（配位插入机理）或稀土络合物，可以做窄分布的高分子量产物。丙交酯有 L、D、meso 三种异构体，选不同异构体和比例可以调控 PLA 的结晶度：
+
+- 纯 L-丙交酯 → PLLA，$T_m = 175$ °C，高结晶度。
+- 消旋 D,L → PDLLA，无定形，加工温度低。
+- 立构复合（PLLA + PDLA 混合）→ $T_m = 230$ °C，比单一手性熔点高很多。
+
+PLA 是 3D 打印线材主流之一，也是可堆肥餐具和纺织的关键原料。
+
+## 7. 阳离子 vs 阴离子 vs 配位开环
+
+开环聚合的机理选择由**单体电子结构**决定：
+
+- **环氧、内酯**（含 $\text{O}$）：阴离子或配位。
+- **THF、氧丁环**（含 $\text{O}$，无羰基）：阳离子。
+- **内酰胺**：阴离子或阳离子。
+- **环硅氧烷**：阴离子（$\text{OH}^-$）或阳离子（$\text{H}^+$），都是通过 Si-O 断裂重排。
+- **环烯烃**（降冰片烯、环辛烯）：**开环易位（ROMP）**，Ru 或 Mo 卡宾催化剂。产物含双键，可继续改性。
+
+**活性开环聚合**：多数体系（尤其配位 ROP 和 ROMP）可以做到近活性——分子量线性依赖转化率、PDI 窄、能做嵌段。PLA、PCL、聚硅氧烷、POM 都有窄分布的实验室路线。
+
+## 8. 热力学与临界温度
+
+**平衡开环聚合**中有一个**上限温度** $T_c$（ceiling temperature）：
+
+$$
+T_c = \frac{\Delta H^\circ}{\Delta S^\circ + R \ln[\text{M}]_e}
+$$
+
+**高于 $T_c$，聚合物解聚回单体**。$\alpha$-甲基苯乙烯 $T_c \sim 60$ °C，就是这个原因不能高温聚合。THF 阳离子聚合 $T_c \sim 80$ °C，超过就退聚。
+
+反过来，$\text{POM}$ 主链聚缩醛在高温（>150 °C）会不断解拉链回甲醛——这是**动力学**问题（端基不稳定）+ **热力学**问题（$T_c$ 与工作温度接近）**共同作用**。
+
+## 9. 开环聚合的工业地位
+
+按产量排序：
+
+1. 聚醚多元醇（环氧丙烷 + 环氧乙烷）——聚氨酯软/硬泡最大原料，全球年产量千万吨级。
+2. 尼龙 6——世界纤维和工程塑料主力之一。
+3. 聚甲醛——工程塑料中"性价比之王"。
+4. 聚硅氧烷——从硅橡胶、硅油到医疗和电子封装的全谱。
+5. 环氧树脂——虽然预聚只是"半环开环"，固化才是完整开环，但材料生态巨大。
+6. PLA、PCL——可降解材料，量小但增长快。
+
+**开环聚合从化学上打通了环状小分子到线型高分子的桥梁**，为线型缩聚做不到的领域（高分子量脂肪族聚酯、聚醚、聚酰胺）提供了合成路线。
+
+下一章讲最后一个主题：**聚合物的化学反应**——把已经合成好的高分子当作反应物，进一步做取代、交联、降解、共混改性。
+
+</WordCount>

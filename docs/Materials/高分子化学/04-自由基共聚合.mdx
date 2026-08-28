@@ -1,0 +1,177 @@
+import WordCount from '../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+# 自由基共聚合
+
+均聚只能得到一种单元的高分子。要**兼顾两种或多种单体各自的优点**——比如既要 PS 的刚性又要 PB 的弹性——就要做共聚。工业上大部分实用聚合物都是共聚物：ABS、SBR、乙丙橡胶、丁腈橡胶、乙烯-醋酸乙烯酯……
+
+共聚不是把两种单体混起来聚合那么简单。**共聚物的组成、单元排列（无规、交替、嵌段、接枝）、瞬时和整体组成漂移**都要用一套定量框架来描述。
+
+## 1. 共聚物的四种类型
+
+- **无规共聚物**：单体 A、B 沿链随机排列。SBR（丁二烯 + 苯乙烯，乳液法自由基）。
+- **交替共聚物**：A-B-A-B-A-B。马来酸酐 + 苯乙烯几乎理想交替。
+- **嵌段共聚物**：AAAA-BBBB。需要活性聚合（阴离子、CRP），自由基做不到。
+- **接枝共聚物**：主链 A 上悬挂 B 支链。HIPS（PS 骨架上接枝聚丁二烯）。
+
+自由基共聚**天然只能做前两类**——因为链自由基没有寿命长到足以先聚完 A 再聚 B。要嵌段就得换机理（第 6 章离子）或用 CRP。
+
+## 2. 竞聚率与 Mayo-Lewis 方程
+
+假设增长阶段只看**末端单元**（末端模型），$\text{M}_1\cdot$ 和 $\text{M}_2\cdot$ 都可以加 $\text{M}_1$ 或 $\text{M}_2$，共四个基元：
+
+$$
+\begin{aligned}
+\text{M}_1\cdot + \text{M}_1 &\xrightarrow{k_{11}} \text{M}_1\cdot \\
+\text{M}_1\cdot + \text{M}_2 &\xrightarrow{k_{12}} \text{M}_2\cdot \\
+\text{M}_2\cdot + \text{M}_1 &\xrightarrow{k_{21}} \text{M}_1\cdot \\
+\text{M}_2\cdot + \text{M}_2 &\xrightarrow{k_{22}} \text{M}_2\cdot
+\end{aligned}
+$$
+
+定义**竞聚率**：
+
+$$
+r_1 = \frac{k_{11}}{k_{12}}, \qquad r_2 = \frac{k_{22}}{k_{21}}
+$$
+
+意义：$r_1$ 是 $\text{M}_1\cdot$ 加自己 vs 加对方的相对倾向。$r_1 > 1$ 说明 M₁· 偏好同类。
+
+**Mayo-Lewis 方程**（用稳态假设消去 $[\text{M}_1\cdot]$、$[\text{M}_2\cdot]$）：
+
+$$
+\frac{d[\text{M}_1]}{d[\text{M}_2]} = \frac{[\text{M}_1](r_1[\text{M}_1] + [\text{M}_2])}{[\text{M}_2]([\text{M}_1] + r_2[\text{M}_2])}
+$$
+
+用摩尔分数 $f_1 = [\text{M}_1]/([\text{M}_1]+[\text{M}_2])$（feed 中）和 $F_1 = d[\text{M}_1]/(d[\text{M}_1]+d[\text{M}_2])$（瞬时共聚物中）：
+
+$$
+F_1 = \frac{r_1 f_1^2 + f_1 f_2}{r_1 f_1^2 + 2 f_1 f_2 + r_2 f_2^2}
+$$
+
+**画共聚组成曲线 $F_1$-$f_1$ 是共聚合的第一张图**——教材反复使用。
+
+<svg viewBox="0 0 700 400" role="img" aria-label="共聚组成曲线：不同 r1 r2 下 F1 随 f1 的变化" style={{maxWidth:'700px',width:'100%',color:'var(--ifm-font-color-base)'}}>
+  <defs><marker id="ch4a-arrow" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8 Z" fill="currentColor"/></marker></defs>
+  <g stroke="currentColor" strokeWidth="2" fill="none" markerEnd="url(#ch4a-arrow)"><path d="M80 350 H660"/><path d="M80 350 V30"/></g>
+  <g stroke="currentColor" strokeWidth="1" opacity="0.4"><path d="M80 60 H620" strokeDasharray="4 4"/><path d="M620 350 V60" strokeDasharray="4 4"/></g>
+  <path d="M80 350 L620 60" stroke="currentColor" strokeWidth="1.5" strokeDasharray="6 5" opacity="0.6"/>
+  <path d="M80 350 C150 130 220 90 620 60" fill="none" stroke="var(--ifm-color-primary)" strokeWidth="3"/>
+  <path d="M80 350 C300 340 400 300 500 200 C560 130 600 80 620 60" fill="none" stroke="var(--ifm-color-warning)" strokeWidth="3"/>
+  <path d="M80 350 C300 205 400 205 620 60" fill="none" stroke="var(--ifm-color-success)" strokeWidth="3"/>
+  <circle cx="350" cy="205" r="6" fill="var(--ifm-color-success)"/>
+  <g fill="currentColor" fontSize="14">
+    <text x="670" y="355">f₁</text>
+    <text x="30" y="34">F₁</text>
+    <text x="60" y="365">0</text><text x="610" y="370">1</text><text x="58" y="65">1</text>
+    <text x="345" y="230" fill="var(--ifm-color-success)">恒比点</text>
+    <text x="180" y="200" fill="var(--ifm-color-primary)">r₁ ≫ 1，r₂ ≪ 1</text>
+    <text x="380" y="290" fill="var(--ifm-color-warning)">r₁ ≪ 1，r₂ ≫ 1</text>
+    <text x="410" y="180" fill="var(--ifm-color-success)">r₁ ＜ 1，r₂ ＜ 1（有恒比）</text>
+    <text x="200" y="340">对角线 F₁ = f₁</text>
+  </g>
+</svg>
+
+## 3. 竞聚率的物理意义与几种典型情形
+
+| 情形 | $r_1$, $r_2$ | 共聚物结构 | 例子 |
+|---|---|---|---|
+| 理想共聚 | $r_1 r_2 = 1$ | 无规，$F_1$ 单调依赖 $f_1$ | 乙烯-醋酸乙烯酯（自由基） |
+| 理想恒比 | $r_1 = r_2 = 1$ | $F_1 = f_1$ | 罕见 |
+| 交替共聚 | $r_1 = r_2 = 0$ | 严格 -ABAB- | 马来酸酐-苯乙烯（$r_1 \approx 0.02, r_2 \approx 0.05$） |
+| 嵌段倾向 | $r_1 > 1, r_2 > 1$ | 链段长 | 自由基罕见（需活性种） |
+| 有恒比点 | $r_1 < 1, r_2 < 1$，且 $r_1 \neq r_2$ | 组成曲线穿越 $F_1 = f_1$ 一次 | SAN（St-AN） |
+| 单体 1 很活泼 | $r_1 \gg 1, r_2 \ll 1$ | 先聚 M₁，剩下几乎纯 M₂ | 醋酸乙烯酯-苯乙烯 |
+
+**恒比点**：$F_1 = f_1$，代入 Mayo-Lewis 得
+
+$$
+f_1^{\text{az}} = \frac{1 - r_2}{2 - r_1 - r_2}
+$$
+
+在这个进料比下，瞬时共聚物组成 = 单体组成 = 累积共聚物组成，**整个转化过程共聚物组成不漂移**。工业上做 SAN、ABS 时要么用恒比点进料、要么半连续补料来维持等效恒比条件。
+
+## 4. 组成漂移与半连续补料
+
+$r_1, r_2 \neq 1$ 时，先反应快的那种单体消耗更快，剩余单体越来越富集慢反应的那种。累积共聚物组成 $\overline{F}_1$ 随转化率 $C$ 变化：
+
+$$
+\overline{F}_1 = \frac{[\text{M}_1]_0 - [\text{M}_1]}{[\text{M}]_0 - [\text{M}]}
+$$
+
+**工程上有两种对策**：
+
+1. **恒比点进料**：只能在特定 $f_1$ 工作。
+2. **半连续补料（starved feed）**：把活性单体慢慢滴加，反应体系永远处于低单体浓度，实际反应组成由**滴加速率比**而非平衡浓度决定。这是丙烯酸乳液涂料生产的标准做法。
+
+## 5. 竞聚率的测定
+
+**Fineman-Ross 法**：把 Mayo-Lewis 线性化：
+
+$$
+\frac{f_1(1-2F_1)}{(1-f_1)F_1} \cdot \frac{f_1}{1-f_1} \quad \text{vs} \quad \frac{f_1^2(1-F_1)}{(1-f_1)^2 F_1}
+$$
+
+$y = r_1 x - r_2$ 线性回归。缺点：把误差偏向组成两端。
+
+**Kelen-Tüdös 法**：引入归一化常数消除端点权重不均。是文献上更常用的方法。
+
+**Q-e 方案（Alfrey-Price）**：给每个单体一个共振稳定性 $Q$ 和极性参数 $e$。
+
+$$
+r_1 = \frac{Q_1}{Q_2}\exp[-e_1(e_1 - e_2)], \qquad r_2 = \frac{Q_2}{Q_1}\exp[-e_2(e_2 - e_1)]
+$$
+
+以苯乙烯为参照定 $Q = 1, e = -0.8$，其它单体的 $Q, e$ 可以通过一系列共聚实验反推。手册数据能预测任意两种单体的 $r_1 r_2$，虽然只是半定量。
+
+## 6. Alfrey-Price Q-e 的直觉
+
+$Q$ 反映**共振稳定化**：Q 大的单体自由基稳定，反应活性低，但相对来说吸引对方也强。$e$ 反映**极性**：$e > 0$ 是缺电子（丙烯腈、马来酸酐），$e < 0$ 是富电子（乙烯基醚、苯乙烯的负值来自 $\pi$ 共轭）。
+
+**极性相反的一对倾向交替**：$e_1$ 和 $e_2$ 差得大，指数因子把 $r_1, r_2$ 都压低，得到 $r_1 r_2 \to 0$。马来酸酐（$e = +2.25$）+ 苯乙烯（$e = -0.8$）就是极端例子。
+
+## 7. 三元共聚
+
+Ternary Mayo-Lewis 方程要引入 $r_{12}, r_{13}, r_{21}, r_{23}, r_{31}, r_{32}$ 共 6 个竞聚率（不独立，$r_{ij} r_{ji}$ 有约束）。实际使用时假设两两之间的 $r$ 与二元共聚测得的相同——**这个假设不太严格**，但工业配方筛选够用。
+
+ABS 就是三元共聚 + 相分离：先做 SAN（S + AN），然后接枝到聚丁二烯胶乳上，得到刚硬 SAN 基体中分散着橡胶粒子的结构。这里的"共聚"不仅是化学组成问题，还是**微观相形态问题**——不同的接枝密度和 rubber 粒径给出很不同的抗冲击性能。
+
+## 8. 末端模型的失效
+
+末端模型假设**只有末端单元决定加成倾向**。实际有反例：
+
+- $r_1 r_2$ 显著偏离 Q-e 预测：说明**倒数第二个单元**也参与决定活性。要用**末端-次末端模型**（penultimate model），引入 4 个而不是 2 个竞聚率。
+- 空间位阻明显、有共振复合物形成时，甚至要用**电荷转移复合物模型**。
+
+工程上如果只关心工业配方，末端模型的 $F_1$-$f_1$ 曲线已经够用；如果关心序列分布（NMR 三元组、五元组统计），必须上末端-次末端模型。
+
+## 9. 序列分布
+
+共聚物不仅有组成，还有**序列**。定义**平均序列长度** $\bar{n}_1, \bar{n}_2$（连续 M₁ 单元或 M₂ 单元的段长）：
+
+$$
+\bar{n}_1 = 1 + \frac{r_1 [\text{M}_1]}{[\text{M}_2]}, \qquad \bar{n}_2 = 1 + \frac{r_2 [\text{M}_2]}{[\text{M}_1]}
+$$
+
+理想交替 $r_1 = r_2 = 0$，$\bar{n}_1 = \bar{n}_2 = 1$。$r_1 r_2 = 1$（理想无规）时，序列长度符合 Bernoulli 分布。
+
+**为什么这个重要**：透过 ¹³C NMR 的三元组积分（比如 SAN 的 SSS、SSA、SAS、SAA、ASA、AAA），可以反推链上单元的实际统计——不只是化学分析上的整体组成。这是 NMR 表征共聚物结构的核心手段。
+
+## 10. 实际共聚合体系一览
+
+- **SBR**（丁苯橡胶）：St + Bd，乳液自由基，$r_{\text{St}} \approx 0.6, r_{\text{Bd}} \approx 1.4$。倾向丁二烯先反应，工业上用恒比点附近 23% St 进料。
+- **NBR**（丁腈）：AN + Bd。同上，AN 是活泼单体，恒比点在 40% AN 附近。
+- **SAN**：St + AN。$r_{\text{St}} \approx 0.4, r_{\text{AN}} \approx 0.04$——AN 是弱自由基但强吸电子，倾向交替。恒比点 76% St。
+- **EVA**：Et + VAc。乙烯参与自由基聚合要高压高温（同 LDPE 条件），VAc 常量比 5–40%。
+- **马来酸酐-苯乙烯**：交替明显，工业做无卤阻燃剂载体。
+
+## 11. 什么时候不能只靠自由基
+
+**要嵌段共聚**、**要精确控制序列**、**要窄分布**——都要放弃传统自由基，走活性/可控聚合（第 6 章离子，或 CRP）。
+
+自由基共聚的强项是**放大简单、单体宽泛、成本低**。ABS、乳液涂料、丁苯胶等大宗产品几乎不可能被离子或配位取代。
+
+下一章从**聚合反应的实施方法**（本体、溶液、悬浮、乳液）切入——同样一个自由基聚合，选不同的方法，得到的产品形态、分子量、加工性会差很多。
+
+</WordCount>

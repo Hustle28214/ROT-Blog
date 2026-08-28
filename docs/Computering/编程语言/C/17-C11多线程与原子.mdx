@@ -1,0 +1,437 @@
+import WordCount from '../../../../src/components/WordCount/WordCount';
+import Mermaid from '@theme/Mermaid';
+
+<WordCount>
+
+C11 是 C 语言正式拥抱多核时代的标志——引入了 **标准线程库 `<threads.h>`**、**原子操作 `<stdatomic.h>`** 与 **内存模型**，让 C 首次成为一门"线程感知"的语言。
+
+## 一、多线程编程的核心问题
+
+单线程程序的行为直观易懂：语句按顺序执行，一次读一次写。多线程加入后，**数据竞争（data race）** 和 **可见性（visibility）** 让一切复杂化。
+
+**数据竞争**的定义（C11 5.1.2.4）：
+- 两个或更多线程
+- 访问同一内存位置
+- 至少一个是**写**
+- 且**未通过同步操作排序**
+
+数据竞争 → **UB**。C11 之前，C 甚至没有正式规定多线程语义！
+
+## 二、C11 线程 API `<threads.h>`
+
+```c
+#include <threads.h>
+
+int worker(void *arg) {
+    int id = *(int *)arg;
+    printf("worker %d\n", id);
+    return 0;
+}
+
+int main(void) {
+    thrd_t t;
+    int arg = 42;
+    if (thrd_create(&t, worker, &arg) != thrd_success) return 1;
+    thrd_join(t, NULL);
+    return 0;
+}
+```
+
+### 关键函数
+
+| 函数 | 用途 |
+| --- | --- |
+| `thrd_create` | 启动线程 |
+| `thrd_join` | 等待线程结束，回收资源 |
+| `thrd_detach` | 分离，无需 join |
+| `thrd_exit` | 退出当前线程 |
+| `thrd_yield` | 让出 CPU |
+| `thrd_sleep` | 睡眠 |
+| `thrd_current` | 获取当前线程 ID |
+| `thrd_equal` | 比较线程 ID |
+
+### 互斥量 `mtx_t`
+
+```c
+mtx_t mtx;
+mtx_init(&mtx, mtx_plain);
+
+mtx_lock(&mtx);
+// 临界区
+mtx_unlock(&mtx);
+
+mtx_destroy(&mtx);
+```
+
+类型：
+- `mtx_plain` — 普通
+- `mtx_recursive` — 递归（同线程可重复 lock）
+- `mtx_timed` — 支持带超时
+- 可组合：`mtx_plain | mtx_recursive`
+
+### 条件变量 `cnd_t`
+
+```c
+cnd_t  cond;
+mtx_t  mtx;
+int    ready = 0;
+
+// 生产者
+mtx_lock(&mtx);
+ready = 1;
+cnd_signal(&cond);
+mtx_unlock(&mtx);
+
+// 消费者
+mtx_lock(&mtx);
+while (!ready) cnd_wait(&cond, &mtx);
+mtx_unlock(&mtx);
+```
+
+**永远用 while 循环**检查条件——避免虚假唤醒（spurious wakeup）。
+
+### `thread_local`
+
+```c
+#include <threads.h>
+thread_local int per_thread_counter = 0;   // C11 关键字（宏别名 _Thread_local）
+```
+
+每个线程独立拷贝。C23 中 `thread_local` 直接是关键字。
+
+### `once_flag` / `call_once`
+
+一次性初始化：
+
+```c
+once_flag flag = ONCE_FLAG_INIT;
+void init(void) { /* one-time setup */ }
+
+call_once(&flag, init);   // 只有一个线程会执行 init
+```
+
+## 三、C11 线程 vs POSIX `pthread`
+
+C11 `<threads.h>` 的语义**模仿自 pthread**。但存在两个现实：
+
+1. **glibc 早期不支持** `<threads.h>`（直到 glibc 2.28 才完整实现，2018 年）。
+2. **MSVC 早期不支持**（直到 VS 2022 才对 C11 threads 有较好支持）。
+
+**因此**：跨平台代码通常仍用 pthread（Unix）+ Win32 API（Windows），或第三方封装（`tinycthread`、`c11threads`）。
+
+对比：
+
+| C11 | POSIX pthread |
+| --- | --- |
+| `thrd_create` | `pthread_create` |
+| `thrd_join` | `pthread_join` |
+| `mtx_lock` | `pthread_mutex_lock` |
+| `cnd_wait` | `pthread_cond_wait` |
+| `call_once` | `pthread_once` |
+| `thread_local` | `__thread` (GCC) / `pthread_key_create` |
+
+## 四、内存模型（Memory Model）
+
+C11 引入**顺序一致性（sequential consistency）** 与更宽松的模型，让并发有精确语义。
+
+### 4.1 硬件为什么会重排
+
+CPU 与编译器为性能会重排指令：
+- **编译器重排**：优化寄存器分配、指令调度。
+- **CPU 乱序执行**：如 x86 的 store buffer，ARM 的更弱模型。
+
+单线程下"as-if" 规则保证行为不变，但**多线程可见性**会出问题：
+
+```c
+// 线程 A          // 线程 B
+data = 42;         if (ready)
+ready = 1;             printf("%d\n", data);
+```
+
+在弱内存模型下，`ready = 1` 可能先于 `data = 42` 对 B 可见 → B 打印 0。
+
+### 4.2 六种内存序（memory order）
+
+`<stdatomic.h>` 定义：
+
+| 内存序 | 含义 | 常用场景 |
+| --- | --- | --- |
+| `memory_order_relaxed` | 无同步，仅原子性 | 计数器 |
+| `memory_order_consume` | 依赖顺序（已废弃/退化） | 极少 |
+| `memory_order_acquire` | 后续读写不能提前 | 读锁获取 |
+| `memory_order_release` | 之前读写不能延后 | 写锁释放 |
+| `memory_order_acq_rel` | acquire + release | RMW 操作 |
+| `memory_order_seq_cst` | 顺序一致（默认） | 简单/安全 |
+
+**Acquire-Release 语义**：
+- Release 保证：之前的所有写操作对做了 Acquire 的其他线程可见。
+- Acquire 保证：之后的所有读操作能看到相应 Release 之前的所有写。
+
+## 五、原子操作 `<stdatomic.h>`
+
+### 5.1 原子类型
+
+```c
+#include <stdatomic.h>
+
+atomic_int   counter;
+atomic_bool  flag;
+_Atomic(long) x;                         // 通用形式
+_Atomic(struct Point) p;                 // 可以是任何满足"trivially copyable"的类型
+```
+
+对 `_Atomic(T)`：
+- 读写是原子的
+- 大小/对齐可能与 `T` 不同（编译器会补齐）
+- 大对象可能通过锁实现（`atomic_is_lock_free` 检查）
+
+### 5.2 基本操作
+
+```c
+atomic_int c = 0;
+
+atomic_store(&c, 42);
+int v = atomic_load(&c);
+int old = atomic_fetch_add(&c, 1);    // c++
+int old = atomic_fetch_sub(&c, 1);
+int old = atomic_exchange(&c, 100);   // c=100, 返回旧值
+
+int expected = 0;
+if (atomic_compare_exchange_strong(&c, &expected, 1)) {
+    // 若 c==0 则 c=1，返回 true；否则 expected 被更新为当前 c 值
+}
+```
+
+**CAS**（Compare And Swap）是无锁编程的核心：
+
+```c
+atomic_int val;
+
+int expected;
+do {
+    expected = atomic_load(&val);
+    // 计算 new_value = f(expected)
+} while (!atomic_compare_exchange_weak(&val, &expected, new_value));
+```
+
+`weak` 允许虚假失败（在某些架构上更快）；`strong` 保证仅在值不等时才失败。
+
+### 5.3 内存序显式版本
+
+```c
+atomic_store_explicit(&flag, 1, memory_order_release);
+if (atomic_load_explicit(&flag, memory_order_acquire)) { ... }
+```
+
+只有需要极致性能或懂内存模型时才用非默认序。**大多数场景 seq_cst 就够了**。
+
+### 5.4 `atomic_thread_fence`
+
+发出显式内存屏障：
+
+```c
+atomic_thread_fence(memory_order_seq_cst);
+```
+
+## 六、经典无锁模式
+
+### 6.1 自旋锁（Spinlock）
+
+```c
+typedef struct { atomic_flag flag; } SpinLock;
+
+void spin_lock(SpinLock *l) {
+    while (atomic_flag_test_and_set_explicit(&l->flag, memory_order_acquire))
+        ; // 忙等
+}
+void spin_unlock(SpinLock *l) {
+    atomic_flag_clear_explicit(&l->flag, memory_order_release);
+}
+```
+
+`atomic_flag` 是 C11 保证 lock-free 的唯一类型。
+
+### 6.2 无锁队列（Michael-Scott，简化示意）
+
+```c
+typedef struct Node {
+    void *data;
+    _Atomic(struct Node *) next;
+} Node;
+
+typedef struct {
+    _Atomic(Node *) head, tail;
+} Queue;
+
+void enqueue(Queue *q, void *data) {
+    Node *n = malloc(sizeof *n);
+    n->data = data;
+    atomic_store(&n->next, NULL);
+    Node *tail;
+    for (;;) {
+        tail = atomic_load(&q->tail);
+        Node *next = atomic_load(&tail->next);
+        if (tail == atomic_load(&q->tail)) {
+            if (!next) {
+                if (atomic_compare_exchange_weak(&tail->next, &next, n)) break;
+            } else {
+                atomic_compare_exchange_weak(&q->tail, &tail, next);
+            }
+        }
+    }
+    atomic_compare_exchange_weak(&q->tail, &tail, n);
+}
+```
+
+**注意**：真实无锁队列还要处理 ABA 问题、内存回收（hazard pointers / RCU）、内存序。
+
+### 6.3 原子计数器
+
+```c
+atomic_int stat;
+
+// 各线程递增
+atomic_fetch_add_explicit(&stat, 1, memory_order_relaxed);
+
+// 主线程读取
+int total = atomic_load_explicit(&stat, memory_order_relaxed);
+```
+
+计数器只关心最终数值，`relaxed` 就够，无需内存同步。
+
+## 七、`volatile` vs `_Atomic`
+
+**极常见误区**：`volatile` 不足以做线程同步。
+
+| 特性 | `volatile` | `_Atomic` |
+| --- | --- | --- |
+| 禁止编译器优化 | ✓ | ✓ |
+| 保证原子读写 | ✗ | ✓ |
+| 提供内存屏障 | ✗ | ✓ |
+| 适用场景 | 硬件寄存器、signal handler | 多线程共享 |
+
+`volatile int` 在多线程下**不够**，必须用 `atomic_int` 或加锁。
+
+## 八、`errno` 与线程
+
+- C11 保证 `errno` 是 **线程本地** 的（等价于 `_Thread_local`）。
+- POSIX 也保证。
+- 老代码里全局 `errno` 已成过去时。
+
+## 九、信号处理与线程
+
+- 只有 `sig_atomic_t` 类型的写在信号处理程序中是安全的。
+- 更严格：`_Atomic sig_atomic_t` 与 `atomic_signal_fence`。
+- 一般设计：信号处理程序仅设置标志位，主循环轮询处理。
+
+```c
+volatile sig_atomic_t signaled = 0;
+void handler(int sig) { signaled = 1; }
+```
+
+## 十、TSan — Thread Sanitizer
+
+Google 的动态数据竞争检测：
+
+```bash
+gcc -fsanitize=thread -g prog.c
+./a.out
+```
+
+在运行时监测未同步访问同一内存的情况，是并发调试的必备工具。
+
+## 十一、经典陷阱
+
+### 11.1 双检查锁（Double-Checked Locking）
+
+```c
+// ✗ 错误：非原子读+锁
+if (!inst) {
+    lock();
+    if (!inst) inst = init();
+    unlock();
+}
+```
+
+正确 C11 版：
+
+```c
+_Atomic(Instance *) inst = NULL;
+
+Instance *get(void) {
+    Instance *i = atomic_load_explicit(&inst, memory_order_acquire);
+    if (!i) {
+        lock();
+        i = atomic_load_explicit(&inst, memory_order_relaxed);
+        if (!i) {
+            i = new_instance();
+            atomic_store_explicit(&inst, i, memory_order_release);
+        }
+        unlock();
+    }
+    return i;
+}
+```
+
+### 11.2 死锁
+
+两个线程按不同顺序获取多把锁：
+
+```
+线程 A: lock(m1) → lock(m2)
+线程 B: lock(m2) → lock(m1)
+```
+
+**修法**：始终按**全局固定顺序**加锁；或用 `try_lock` + 回退。
+
+### 11.3 优先级反转
+
+低优先级线程持有锁，高优先级线程等待；中优先级线程霸占 CPU → 高优先级饥饿。解法：优先级继承（priority inheritance），如 pthread 的 `PTHREAD_PRIO_INHERIT`。
+
+### 11.4 忘记 join 或 detach
+
+`thrd_t` 未 join 也未 detach → 资源泄漏。
+
+## 十二、并发原语层次
+
+从底层到高层：
+
+```
+硬件原语（load/store/CAS/fence）
+        ↓
+原子类型 <stdatomic.h>
+        ↓
+互斥量、条件变量 <threads.h>
+        ↓
+读写锁、信号量、屏障（pthread）
+        ↓
+线程池、任务队列、Actor 模型（应用/库层）
+```
+
+## 十三、并发替代方案
+
+- **Fork + IPC**：多进程避开共享内存问题（`fork`、`shmget`）。
+- **协程**：`ucontext` / 自旋 setjmp/longjmp / 现代 `libco`。
+- **异步 I/O**：`epoll` + 状态机；`io_uring`。
+- **消息传递**：ZeroMQ、nng；避免共享状态。
+
+C 并不像 Go/Rust 那样有一等语言级并发抽象——工程中往往在 C 上层封装事件循环或线程池。
+
+## 十四、实用建议
+
+1. **默认 seq_cst，性能瓶颈再考虑弱序**。
+2. **共享数据要么加锁，要么原子**——不要靠 `volatile` 或"祈祷"。
+3. **锁的粒度**：太粗损失并发；太细易死锁。
+4. **数据结构选择比同步优化更重要**：如线程本地累加 + 定期合并 > 单个全局锁。
+5. **调试三件套**：TSan、ASan、UBSan 全开。
+6. **压力测试**：race condition 只在高并发下出现；写 stress test。
+
+## 十五、总结
+
+- C11 补齐了 C 的多线程与内存模型语义。
+- `<stdatomic.h>` 提供硬件级原子操作；`<threads.h>` 提供线程 API。
+- **`volatile` 不是同步机制**——用 `_Atomic` 或锁。
+- 数据竞争 = UB，用 TSan 检测。
+- 掌握内存序需要理解 acquire/release 模型，默认 seq_cst 最安全。
+
+</WordCount>

@@ -1,0 +1,424 @@
+import WordCount from '../../../../src/components/WordCount/WordCount';
+import Mermaid from '@theme/Mermaid';
+
+<WordCount>
+
+C 提供三类控制流：**分支**、**循环**、**跳转**。它们看似简单，但每一个都有独特的语义细节与工程惯用法。
+
+## 一、语句概念
+
+在 C 中一切「命令」都是语句（statement）：
+
+- **表达式语句**：`a = 1;` `f();`
+- **复合语句（块）**：`{ ... }`，引入新作用域。
+- **选择语句**：`if`、`switch`。
+- **循环语句**：`while`、`do-while`、`for`。
+- **跳转语句**：`break`、`continue`、`goto`、`return`。
+- **空语句**：`;`
+
+## 二、`if` / `else if` / `else`
+
+### 基本形式
+
+```c
+if (cond)
+    stmt_a;
+else if (cond2)
+    stmt_b;
+else
+    stmt_c;
+```
+
+- `cond` 是任意标量类型（整数、浮点、指针）；非零即真。
+- `else` **就近匹配** 最近的未匹配 `if`（Dangling Else 问题）：
+
+```c
+if (a)
+    if (b) x();
+    else   y();     // 属于内层 if b，不是外层 if a
+```
+
+**建议**：**永远给分支加大括号**。可读性、维护性、避免 `goto fail` 类漏洞（Apple SSL bug）。
+
+```c
+if (a) {
+    if (b) { x(); }
+    else   { y(); }
+}
+```
+
+### 常见简写与惯用法
+
+```c
+if (ptr)            // 等价 if (ptr != NULL)
+if (!x)             // 等价 if (x == 0)
+if (a > 0) { ... }
+```
+
+**Yoda 条件**：`if (42 == x)`。把常量写在左边，防止误写 `=`，编译器会立即报错。
+
+### 条件表达式作为语句
+
+C 不支持像 Python 那样的 `x = 1 if a else 2`——但三元运算符可以实现：
+
+```c
+int x = a ? 1 : 2;
+```
+
+见 [[03-运算符与表达式]]。
+
+## 三、`switch`
+
+### 基本形式
+
+```c
+switch (expr) {
+    case 1:
+        stmt_a;
+        break;
+    case 2:
+    case 3:                    // 多值共用
+        stmt_b;
+        break;
+    default:
+        stmt_default;
+}
+```
+
+- `expr` 必须是 **整数类型**（`int`、`enum`、`long`……），**不能是浮点或字符串**。
+- `case` 后必须是 **编译期常量**（字面量、`enum` 成员、常量表达式，但 C 中 `const int` 不算！C++ 才算）。
+- 分支之间 **默认贯穿（fall-through）**，需要 `break` 显式跳出。
+- `default` 位置不限，但建议放最后。
+
+### Fall-through 陷阱
+
+```c
+switch (x) {
+    case 1:
+        a();          // 忘写 break，会继续执行 case 2
+    case 2:
+        b();
+        break;
+}
+```
+
+**故意贯穿**建议用注释或 C23 `[[fallthrough]]` 显式标注：
+
+```c
+switch (x) {
+    case 1:
+        a();
+        [[fallthrough]];
+    case 2:
+        b();
+        break;
+}
+```
+
+### `switch` 内部的作用域
+
+`switch` 的分支 **不是独立作用域**！所有 case 共享同一个块作用域。
+
+```c
+switch (x) {
+    case 1:
+        int y = 10;   // ✗ C 中此处声明变量需加块 { }
+        break;
+}
+```
+
+正确：
+```c
+switch (x) {
+    case 1: {
+        int y = 10;
+        break;
+    }
+}
+```
+
+### 编译器如何实现 `switch`
+
+- **稀疏 case**：编译成 `if-else` 链或二分查找。
+- **稠密 case**：编译成 **跳转表（jump table）**，`O(1)` 分派。
+- **精度优化**：GCC/Clang 会分析 case 分布自动选择。
+
+## 四、循环
+
+### `while`
+
+```c
+while (cond) {
+    stmt;
+}
+```
+
+先判断后执行；可能一次都不执行。
+
+### `do-while`
+
+```c
+do {
+    stmt;
+} while (cond);
+```
+
+先执行后判断；**至少执行一次**。适合「先做后校验」的场景。
+
+**宏中的 `do-while(0)` 惯用法**：
+
+```c
+#define SWAP(a, b) do { int t = a; a = b; b = t; } while (0)
+```
+
+用 `do-while(0)` 而不是 `{ ... }` 是因为：
+1. 允许宏后面加分号 `SWAP(x, y);` 而不冲突。
+2. 允许在 `if (...) SWAP(...); else ...` 中使用而不破坏语义。
+
+### `for`
+
+```c
+for (init; cond; update) {
+    stmt;
+}
+```
+
+等价于：
+```c
+init;
+while (cond) {
+    stmt;
+    update;
+}
+```
+
+C99 起，可以在初始化里声明变量：
+
+```c
+for (int i = 0; i < n; i++) { ... }   // i 作用域仅在循环内
+```
+
+三部分皆可省略：
+
+```c
+for (;;) { ... }          // 死循环，等价 while (1)
+for (; i < n; i++) { }    // 无 init
+for (int i = 0; ; i++) {} // 无 cond，默认真
+```
+
+### 常见循环惯用法
+
+**遍历数组**：
+```c
+for (size_t i = 0; i < N; i++) arr[i]...
+```
+
+**遍历字符串**：
+```c
+for (const char *p = s; *p; p++) ...
+```
+
+**反向遍历**（注意 `size_t` 陷阱）：
+```c
+for (size_t i = N; i-- > 0;) arr[i]...
+```
+
+**双索引移动**：
+```c
+for (size_t i = 0, j = N - 1; i < j; i++, j--) ...
+```
+
+### 循环无限化与优化
+
+编译器允许假设**不含副作用的循环终止**（C11）。故意的死循环建议加副作用或 `volatile`：
+
+```c
+for (;;) __asm__ volatile("");   // 空循环，防被优化
+```
+
+## 五、`break` 与 `continue`
+
+- `break`：跳出**最内层**的 `switch` 或循环。
+- `continue`：**跳过当前迭代**的剩余部分，进入下一次循环。
+
+```c
+for (int i = 0; i < n; i++) {
+    if (arr[i] == 0) continue;   // 跳过 0
+    if (arr[i] < 0)  break;      // 遇负数结束
+    sum += arr[i];
+}
+```
+
+**多层循环跳出**：C 不支持带标签的 `break`（Java 有）。用 `goto` 或 flag：
+
+```c
+// 方案 A: goto（在这种场景推荐）
+for (i = 0; i < N; i++) {
+    for (j = 0; j < M; j++) {
+        if (mat[i][j] == target) goto found;
+    }
+}
+found: ...;
+
+// 方案 B: flag
+int done = 0;
+for (i = 0; i < N && !done; i++) {
+    for (j = 0; j < M && !done; j++) {
+        if (mat[i][j] == target) done = 1;
+    }
+}
+```
+
+## 六、`goto`
+
+### 基本语义
+
+```c
+    goto label;
+    ...
+label:
+    stmt;
+```
+
+- 只能跳到**当前函数内**的标签。
+- 不能跨函数、不能跳入变长数组的作用域。
+- 可以跳过声明，但**不能跳过初始化**（C++ 严禁；C 允许但危险）。
+
+### 合理使用：单出口清理
+
+嵌入式 / 内核代码中广泛使用 `goto` 实现「统一错误处理」：
+
+```c
+int process(void) {
+    FILE *fp = fopen("data", "r");
+    if (!fp) goto err_open;
+
+    char *buf = malloc(1024);
+    if (!buf) goto err_alloc;
+
+    if (fread(buf, 1, 1024, fp) < 1024) goto err_read;
+
+    // ...业务处理...
+
+    free(buf);
+    fclose(fp);
+    return 0;
+
+err_read:
+    free(buf);
+err_alloc:
+    fclose(fp);
+err_open:
+    return -1;
+}
+```
+
+**优点**：
+- 集中管理资源释放，避免 5 层 if 嵌套。
+- 与 C++ 的 RAII 效果类似。
+- Linux 内核代码大量采用。
+
+### `goto` 的反例：Apple `goto fail` bug
+
+2014 年 Apple SSL 库中的一个漏洞，源码类似：
+
+```c
+if (err = SSLHashSHA1.update(...) != 0)
+    goto fail;
+    goto fail;                   // ← 多写一行
+if (err = SSLHashSHA1.final(...) != 0)
+    goto fail;
+```
+
+第二个 `goto fail` **无条件执行**，跳过了后续所有签名验证，导致 SSL 校验形同虚设。**教训**：if 分支永远加 `{ }`。
+
+## 七、`return`
+
+- 从当前函数返回。
+- 若函数返回 `void`，可以写 `return;`。
+- `main` 中的 `return 0` 等价于 `exit(0)`；不写默认返回 0（C99 起）。
+
+### 提前返回（early return）
+
+```c
+int process(Foo *f) {
+    if (!f)         return -1;
+    if (!f->ready)  return -2;
+    if (f->size==0) return  0;
+    // 主逻辑
+    return do_work(f);
+}
+```
+
+比深层嵌套更可读。
+
+## 八、`setjmp` / `longjmp` — 非局部跳转
+
+C 提供了跨函数跳转能力，用于异常仿真、协程实现：
+
+```c
+#include <setjmp.h>
+
+jmp_buf env;
+
+void deep_error(void) {
+    longjmp(env, 42);   // 跳回 setjmp 处，返回值 42
+}
+
+int main(void) {
+    if (setjmp(env) == 0) {
+        // 首次调用，返回 0
+        deep_error();   // 从这里跳走
+    } else {
+        // 从 longjmp 跳回来，setjmp 返回 42
+        puts("caught");
+    }
+}
+```
+
+**限制**：
+- 只能跳回**尚在栈上的** `setjmp` 位置（跳到已返回的函数是 UB）。
+- 不会调用析构（C 没有析构，但资源泄漏风险大）。
+- 不是异常处理，无类型信息，谨慎使用。
+- 与信号处理有 `sigsetjmp` / `siglongjmp` 变体。
+
+## 九、结构化编程与 Dijkstra 之战
+
+1968 年 Dijkstra 发表 *Go To Statement Considered Harmful*，掀起结构化编程运动：
+- 用 `if/while/for` 代替任意跳转
+- 每个函数单入口、（理想上）单出口
+
+C 保留 `goto` 是有意为之——用来做**受限的**跳转（尤其是错误清理）。**核心原则**：`goto` 只**向下**跳，且只跳到**函数末尾**的清理块。
+
+## 十、注意事项与最佳实践
+
+| 场景 | 建议 |
+| --- | --- |
+| `if/else` 分支 | 永远加 `{ }` |
+| 常量比较 | Yoda 条件 `if (42 == x)` |
+| `switch` 分支 | 显式 `break`，故意贯穿加注释 / `[[fallthrough]]` |
+| `switch` 变量声明 | 加块 `{ ... }` |
+| 循环下标 | `size_t` 而非 `int`（除非反向） |
+| 反向循环 | `for (size_t i = n; i-- > 0;)` |
+| 死循环 | `for (;;)` 明确表意 |
+| 多层跳出 | `goto` 或 flag |
+| 错误清理 | 单出口 + `goto err_xxx` 模式 |
+| 长条件 | 拆成有意义的临时变量或辅助函数 |
+
+## 十一、控制流图示例
+
+<Mermaid value={`
+flowchart TD
+    A[Start] --> B{cond1}
+    B -- true --> C[Body 1]
+    B -- false --> D{cond2}
+    C --> E[Update]
+    D -- true --> F[Body 2]
+    D -- false --> G[End]
+    E --> B
+    F --> G
+`} />
+
+理解每种控制流语句对应的 CFG（控制流图）形状，是阅读汇编、理解编译器优化的基础。
+
+</WordCount>

@@ -1,0 +1,453 @@
+import WordCount from '../../../../src/components/WordCount/WordCount';
+import Mermaid from '@theme/Mermaid';
+
+<WordCount>
+
+C 预处理器（C PreProcessor，**cpp**）是**编译之前的文本替换阶段**。它自成一门微型语言，与 C 本身相互独立。理解它对读懂标准库、内核代码、跨平台头文件至关重要，同时也是「宏灾难」的源头。
+
+## 一、预处理阶段
+
+C 编译分为四阶段，预处理是**第一阶段**：
+
+<Mermaid value={`
+flowchart LR
+    A[source.c] --> B[Preprocessor cpp]
+    B --> C[Compiler cc1]
+    C --> D[Assembler as]
+    D --> E[Linker ld]
+    E --> F[Executable]
+`} />
+
+预处理器完成：
+1. **注释删除**（`//` 与 `/* */` 都替换为一个空格）
+2. **物理源码行拼接**（行末 `\` 续行）
+3. **执行 `#` 开头的预处理指令**（`#include`、`#define` 等）
+4. **宏展开**
+5. **字符串字面量拼接**（`"ab" "cd"` → `"abcd"`）
+
+**查看预处理输出**：
+```bash
+gcc -E prog.c -o prog.i
+gcc -E -P prog.c   # 不输出 #line 标记
+```
+
+## 二、宏定义
+
+### 对象宏（Object-like Macro）
+
+```c
+#define PI 3.14159
+#define MAX_SIZE 1024
+
+double area = PI * r * r;   // 展开为 3.14159 * r * r
+```
+
+- 只是**文本替换**，不是常量。
+- 无类型检查。
+- 无内存占用（不是变量）。
+
+### 函数宏（Function-like Macro）
+
+```c
+#define SQUARE(x) ((x) * (x))
+int y = SQUARE(3 + 1);   // 展开为 ((3 + 1) * (3 + 1))
+```
+
+**关键：加括号！**
+
+```c
+#define BAD(x)  x * x
+BAD(3 + 1)    // 3 + 1 * 3 + 1 = 7 ✗
+
+#define GOOD(x) ((x) * (x))
+GOOD(3 + 1)   // ((3+1) * (3+1)) = 16 ✓
+```
+
+### 参数副作用陷阱
+
+```c
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
+int x = MAX(i++, j);   // ✗ i++ 可能被求值两次
+```
+
+**修法**：语句表达式（GCC 扩展）：
+
+```c
+#define MAX(a, b) ({ \
+    __typeof__(a) _a = (a); \
+    __typeof__(b) _b = (b); \
+    _a > _b ? _a : _b; \
+})
+```
+
+## 三、`#include`
+
+```c
+#include <stdio.h>       // 系统头，从 -I / 默认路径查找
+#include "myheader.h"    // 本地头，先当前目录，再系统路径
+```
+
+预处理器把整个头文件内容**逐字**插入 `#include` 位置。
+
+### 头文件保护（Include Guard）
+
+防止重复展开：
+
+```c
+// myheader.h
+#ifndef MYHEADER_H
+#define MYHEADER_H
+
+// declarations
+
+#endif
+```
+
+**现代惯用**：`#pragma once`——所有主流编译器支持，简洁但非标准。
+
+## 四、条件编译
+
+```c
+#if / #ifdef / #ifndef / #elif / #else / #endif
+```
+
+### 例子
+
+```c
+#ifdef DEBUG
+    printf("debug: %d\n", x);
+#endif
+
+#if defined(__linux__)
+    #include <sys/epoll.h>
+#elif defined(_WIN32)
+    #include <windows.h>
+#endif
+
+#if __STDC_VERSION__ >= 201112L
+    // C11 或更新
+#endif
+```
+
+### 常用检测宏
+
+| 宏 | 含义 |
+| --- | --- |
+| `__STDC__` | 支持标准 C（=1） |
+| `__STDC_VERSION__` | 199901L (C99), 201112L (C11), 201710L (C17), 202311L (C23) |
+| `__GNUC__` | GCC 主版本 |
+| `__clang__` | Clang |
+| `_MSC_VER` | MSVC 版本 |
+| `__linux__` / `_WIN32` / `__APPLE__` | 平台 |
+| `__x86_64__` / `__aarch64__` | 架构 |
+| `__cplusplus` | C++ 编译（数值即标准年份） |
+
+### `#pragma` 指令
+
+不影响标准语义，编译器扩展：
+
+```c
+#pragma once
+#pragma pack(1)
+#pragma GCC optimize("O3")
+#pragma GCC diagnostic ignored "-Wunused-variable"
+```
+
+## 五、字符串化 `#` 与拼接 `##`
+
+### `#` — 字符串化
+
+将宏参数变为字符串字面量：
+
+```c
+#define STR(x) #x
+STR(hello)   // → "hello"
+STR(1 + 2)   // → "1 + 2"
+```
+
+### `##` — token 拼接
+
+拼接两个 token：
+
+```c
+#define CAT(a, b) a##b
+int CAT(foo, 42) = 0;    // int foo42 = 0;
+
+#define VAR(n) var_##n
+VAR(alpha) = 1;          // var_alpha = 1;
+```
+
+### 二次展开陷阱
+
+宏参数在展开前**不会先展开自己**，除非用了 `#` 或 `##`。技巧是加一层间接：
+
+```c
+#define STR(x)  #x
+#define XSTR(x) STR(x)
+
+#define VERSION 1
+STR(VERSION)   // "VERSION"
+XSTR(VERSION)  // "1"  ← 因为 x 先在 XSTR 里展开
+```
+
+## 六、可变参数宏（C99）
+
+```c
+#define LOG(fmt, ...) fprintf(stderr, "[LOG] " fmt "\n", __VA_ARGS__)
+
+LOG("x = %d, y = %d", x, y);
+```
+
+**C99 陷阱**：如果没有可变参数，`__VA_ARGS__` 展开成空，逗号成为语法错误。GCC 扩展 `, ##__VA_ARGS__` 或 C23 `__VA_OPT__(,)` 解决：
+
+```c
+// GCC 扩展
+#define LOG(fmt, ...) fprintf(stderr, fmt, ##__VA_ARGS__)
+
+// C23 标准
+#define LOG(fmt, ...) fprintf(stderr, fmt __VA_OPT__(,) __VA_ARGS__)
+```
+
+## 七、预定义宏
+
+标准强制提供：
+
+| 宏 | 值 |
+| --- | --- |
+| `__FILE__` | 当前源文件名 |
+| `__LINE__` | 当前行号 |
+| `__DATE__` | 编译日期 |
+| `__TIME__` | 编译时间 |
+| `__func__` | 当前函数名（C99，其实是变量非宏） |
+| `__STDC_HOSTED__` | 是否是宿主环境 |
+
+**用途**：日志、断言、错误定位。
+
+```c
+#define ASSERT(cond) \
+    do { if (!(cond)) { \
+        fprintf(stderr, "%s:%d: assertion failed: %s\n", \
+                __FILE__, __LINE__, #cond); \
+        abort(); \
+    } } while (0)
+```
+
+## 八、`assert` 与 `NDEBUG`
+
+`<assert.h>` 提供 `assert(cond)`：
+
+```c
+#include <assert.h>
+assert(p != NULL);
+```
+
+- 编译时若定义了 `NDEBUG` 宏，则 `assert` **展开为空**——发布版本关掉断言。
+- 副作用陷阱：`assert(x++ > 0)` 在 release 下不会执行！
+
+## 九、`_Static_assert` — 编译期断言（C11）
+
+```c
+_Static_assert(sizeof(int) >= 4, "int must be at least 32 bits");
+_Static_assert(sizeof(struct S) == 16, "struct S size mismatch");
+```
+
+C23 允许直接写 `static_assert`。条件必须编译期可求值，失败则**编译错误**。
+
+## 十、宏的经典应用
+
+### 10.1 类型无关的最大最小
+
+```c
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
+#define MIN(a, b) ((a) < (b) ? (a) : (b))
+```
+
+或用 `_Generic` 提供类型安全版本（[[16-高级技巧与惯用法]]）。
+
+### 10.2 数组长度
+
+```c
+#define ARRAY_SIZE(a) (sizeof(a) / sizeof((a)[0]))
+```
+
+**注意**：只对**真正的数组**有效；对指针得到错误值。Linux 内核用 `__must_be_array` 加编译期校验：
+
+```c
+#define ARRAY_SIZE(arr) \
+    (sizeof(arr) / sizeof((arr)[0]) + __must_be_array(arr))
+```
+
+### 10.3 循环遍历
+
+```c
+#define FOR_EACH(item, arr) \
+    for (typeof(*(arr)) *item = (arr); item < (arr) + ARRAY_SIZE(arr); item++)
+
+int a[] = {1, 2, 3};
+FOR_EACH(p, a) printf("%d\n", *p);
+```
+
+### 10.4 `container_of` — 通过成员得到宿主结构体
+
+```c
+#define container_of(ptr, type, member) ({ \
+    const typeof(((type *)0)->member) *__mptr = (ptr); \
+    (type *)((char *)__mptr - offsetof(type, member)); \
+})
+```
+
+Linux 内核的核心宏，实现"intrusive linked list"。见 [[16-高级技巧与惯用法]]。
+
+### 10.5 位域操作
+
+```c
+#define BIT(n)         (1U << (n))
+#define SET_BIT(x, n)  ((x) |= BIT(n))
+#define CLR_BIT(x, n)  ((x) &= ~BIT(n))
+#define GET_BIT(x, n)  (((x) >> (n)) & 1U)
+```
+
+## 十一、X-Macro 技术
+
+同一份数据既生成代码又生成描述表。用于：
+
+```c
+#define COLORS \
+    X(RED,   "red",   0xff0000) \
+    X(GREEN, "green", 0x00ff00) \
+    X(BLUE,  "blue",  0x0000ff)
+
+// 生成枚举
+enum Color {
+#define X(name, str, val) name,
+    COLORS
+#undef X
+};
+
+// 生成名称表
+const char *color_name(enum Color c) {
+    switch (c) {
+#define X(name, str, val) case name: return str;
+        COLORS
+#undef X
+    }
+    return NULL;
+}
+
+// 生成值表
+static const uint32_t color_rgb[] = {
+#define X(name, str, val) [name] = val,
+    COLORS
+#undef X
+};
+```
+
+一份数据、多个视角。见 [[16-高级技巧与惯用法]]。
+
+## 十二、其他指令
+
+### `#line` — 修改行号 / 文件名
+
+```c
+#line 100 "custom.c"
+```
+
+供代码生成器使用，让编译错误定位到原始文件。
+
+### `#error` / `#warning`
+
+```c
+#if !defined(__STDC_VERSION__) || __STDC_VERSION__ < 201112L
+    #error "This code requires C11 or newer"
+#endif
+
+#ifdef DEPRECATED_API
+    #warning "This API is deprecated"
+#endif
+```
+
+### `#embed`（C23）
+
+直接嵌入二进制文件：
+
+```c
+static const unsigned char font[] = {
+    #embed "font.bin"
+};
+```
+
+在 C23 之前需要用 `xxd -i` 或链接器 trick。
+
+## 十三、宏的问题与最佳实践
+
+### 宏的缺点
+
+1. **无类型检查**：`SQUARE("hello")` 也能编译。
+2. **副作用陷阱**：参数被多次求值。
+3. **调试困难**：调试器看不到宏内部。
+4. **命名污染**：宏是全局的，无作用域。
+5. **可读性差**：复杂宏难以维护。
+
+### 何时用宏 vs 函数
+
+| 场景 | 用宏 | 用函数 |
+| --- | --- | --- |
+| 类型无关 | ✓ | ✗（除非 `_Generic`） |
+| 编译期常量 | ✓ | ✗ |
+| 需要 `##`/`#` | ✓ | ✗ |
+| 简单常量 | 也可 enum/const | ✗ |
+| 逻辑复杂 | ✗ | ✓ |
+| 需要 debug | ✗ | ✓ |
+| 类型安全 | ✗ | ✓ |
+
+**优先顺序**：
+1. `const` / `enum` / `static inline` 函数
+2. `_Generic`（C11+）
+3. 简单宏
+4. 复杂宏（尽量避免）
+
+### 宏命名惯例
+
+- **全大写**：`ARRAY_SIZE`、`MAX_LEN`。
+- 避免与标准库/系统头冲突：加前缀 `MYLIB_`。
+- 参数用 `(a)` `(b)` 保护。
+
+### 惯用防错模式
+
+```c
+#define STMT(x) do { x } while (0)   // 让宏在 if 中安全使用
+```
+
+## 十四、`printf` 与 `#include` 的完整旅程
+
+```c
+#include <stdio.h>
+int main() {
+    printf("hello\n");
+    return 0;
+}
+```
+
+预处理后（简化）：
+
+```c
+// <stdio.h> 展开的几百行声明
+int printf(const char *format, ...);
+// ...
+
+int main() {
+    printf("hello\n");
+    return 0;
+}
+```
+
+## 十五、总结
+
+预处理器是 C 独特的强大工具，也是最容易被滥用的地方。**核心原则**：
+1. **能用函数就不用宏**——除非类型无关或需要 `#/##`。
+2. **参数永远加括号**。
+3. **`do-while(0)` 包裹语句宏**。
+4. **头文件加保护**。
+5. **有意义的命名，全大写**。
+
+</WordCount>

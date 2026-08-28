@@ -1,0 +1,401 @@
+import WordCount from '../../../../src/components/WordCount/WordCount';
+import Mermaid from '@theme/Mermaid';
+
+<WordCount>
+
+C 提供两层 I/O 抽象：**标准 I/O（`<stdio.h>`）** 与 **低级 I/O**（POSIX `<unistd.h>`）。前者跨平台、带缓冲；后者贴近内核。理解二者差异是写高性能与正确 I/O 代码的基础。
+
+## 一、标准 I/O 概览
+
+`<stdio.h>` 提供 `FILE *` 抽象，屏蔽底层 fd/HANDLE 差异。
+
+### 三个标准流
+
+- `stdin` — 标准输入（默认键盘）
+- `stdout` — 标准输出（默认终端）
+- `stderr` — 标准错误（默认终端，**无缓冲**）
+
+## 二、打开 / 关闭
+
+### `fopen`
+
+```c
+FILE *fp = fopen("data.txt", "r");
+if (!fp) {
+    perror("fopen");
+    return -1;
+}
+```
+
+**模式字符串**：
+
+| 模式 | 含义 |
+| --- | --- |
+| `"r"` | 只读，文件必须存在 |
+| `"w"` | 只写，**清空**或创建 |
+| `"a"` | 追加，创建或末尾写 |
+| `"r+"` | 读写，文件必须存在 |
+| `"w+"` | 读写，清空或创建 |
+| `"a+"` | 读写，追加 |
+| `"b"` | 二进制（Windows 关键，Unix 无差异） |
+| `"x"` (C11) | 独占创建，若已存在则失败 |
+
+### `fclose`
+
+```c
+if (fclose(fp) == EOF) { /* 错误处理 */ }
+```
+
+- 刷新缓冲区、释放资源。
+- **必须**成功检查——`write` 失败可能推迟到 `fclose` 才暴露。
+
+## 三、格式化输入输出
+
+### `printf` 家族
+
+```c
+int printf(const char *fmt, ...);       // to stdout
+int fprintf(FILE *fp, const char *fmt, ...);
+int sprintf(char *buf, const char *fmt, ...);      // ✗ 不安全
+int snprintf(char *buf, size_t n, const char *fmt, ...);  // ✓ 推荐
+int vprintf(const char *fmt, va_list args);
+```
+
+**返回值**：写入的字符数（不含 `\0`）；错误返 `<0`。
+
+`snprintf` 特点：
+- 最多写 `n-1` 个字符 + `\0`。
+- **返回值是"如果 n 足够大会写入的字符数"**——可能大于实际写入。这样可以先探测所需长度。
+
+```c
+int need = snprintf(NULL, 0, "%d + %d = %d", a, b, a+b);
+char *buf = malloc(need + 1);
+snprintf(buf, need + 1, "%d + %d = %d", a, b, a+b);
+```
+
+### `scanf` 家族
+
+```c
+int scanf(const char *fmt, ...);
+int fscanf(FILE *fp, const char *fmt, ...);
+int sscanf(const char *buf, const char *fmt, ...);
+```
+
+**返回值**：成功匹配并赋值的项数；`EOF` 表读到文件末尾。
+
+```c
+int n;
+if (scanf("%d", &n) != 1) { /* 错误 */ }
+```
+
+**陷阱**：
+- `scanf("%s", buf)` **不指定最大长度**，缓冲区溢出。用 `scanf("%99s", buf)`（buf 至少 100）。
+- `%d` 后紧跟 `%c` 会读到残留的换行符——通常先跳空白 `" %c"`。
+- 出错后**留下的字符**会残留在缓冲区，需要 `getchar` 清空。
+
+**建议**：新代码优先 `fgets` + `sscanf`，或 `getline`（POSIX）：
+
+```c
+char line[256];
+if (fgets(line, sizeof line, stdin)) {
+    int n;
+    if (sscanf(line, "%d", &n) == 1) { ... }
+}
+```
+
+### 常用格式说明符
+
+| 说明符 | 类型 |
+| --- | --- |
+| `%d` `%i` | `int`（十进制/自动进制） |
+| `%u` | `unsigned int` |
+| `%x` `%X` | 十六进制 |
+| `%o` | 八进制 |
+| `%f` `%e` `%g` | `double` |
+| `%c` | `int`（当字符） |
+| `%s` | `char *`（字符串，需 `\0` 结尾） |
+| `%p` | `void *`（指针） |
+| `%zu` | `size_t` |
+| `%td` | `ptrdiff_t` |
+| `%lld` | `long long` |
+| `%ld` | `long` |
+| `%.3f` | 精度 3 |
+| `%10d` | 宽度 10 |
+| `%-10d` | 左对齐 |
+| `%08d` | 填 0 |
+| `%*d` | 宽度从参数取 |
+| `%%` | 字面 % |
+
+**C99 长度修饰符**：`hh`（`char`）、`h`（`short`）、`l`（`long`）、`ll`（`long long`）、`j`（`intmax_t`）、`z`（`size_t`）、`t`（`ptrdiff_t`）、`L`（`long double`）。
+
+**类型不匹配 = UB**：
+```c
+printf("%d", 3.14);       // ✗ UB
+printf("%s", NULL);       // 实现定义（glibc 打印 "(null)"）
+```
+
+编译器 `-Wformat` 或 GCC `__attribute__((format(printf, ...)))` 可以在编译期检查。
+
+## 四、逐字符 / 逐行
+
+### 字符
+
+```c
+int c = fgetc(fp);          // 一字节，EOF 或 (unsigned char)
+int c = getchar();          // 从 stdin
+int r = fputc(c, fp);       // 写一字节
+int r = putchar(c);
+int u = ungetc(c, fp);      // 回放一个字符（下一次读取会返回它）
+```
+
+**注意**：`fgetc` 返回 `int`，因为要能表达 `EOF`（通常 -1）。用 `char` 存返回值 → `EOF` 被截断，无法区分。
+
+### 行
+
+```c
+char *fgets(char *buf, int n, FILE *fp);   // 最多 n-1 字符 + \0，含换行
+int   fputs(const char *s, FILE *fp);      // 不加换行
+int   puts(const char *s);                 // 自动加换行 to stdout
+```
+
+**POSIX `getline`**：动态分配缓冲，处理任意长度行：
+
+```c
+char *line = NULL;
+size_t cap = 0;
+ssize_t len;
+while ((len = getline(&line, &cap, stdin)) != -1) {
+    process(line);
+}
+free(line);
+```
+
+## 五、二进制 I/O
+
+### `fread` / `fwrite`
+
+```c
+size_t fread(void *buf, size_t size, size_t nmemb, FILE *fp);
+size_t fwrite(const void *buf, size_t size, size_t nmemb, FILE *fp);
+```
+
+- 返回**成功读/写的元素数**（非字节数）。
+- 出错或 EOF 时返回小于 `nmemb`。
+
+```c
+int arr[100];
+size_t n = fread(arr, sizeof(int), 100, fp);   // 读 n 个 int
+```
+
+**注意**：直接把结构体写入文件时，内部对齐/padding/字节序都会影响兼容性——建议用**显式协议**（写每个字段的字节序化表示）。
+
+## 六、定位
+
+```c
+long ftell(FILE *fp);                    // 当前位置
+int fseek(FILE *fp, long off, int whence);   // whence: SEEK_SET, SEEK_CUR, SEEK_END
+void rewind(FILE *fp);                   // 回到开头
+```
+
+C99 起有 `fgetpos` / `fsetpos` 处理大文件（`fpos_t`）。
+
+## 七、缓冲
+
+`FILE *` 默认带缓冲，避免每字节都系统调用：
+
+- **全缓冲**（fully buffered）：文件流的默认。缓冲区满或 `fflush` 才写出。
+- **行缓冲**（line buffered）：`stdout` 连接到终端时。遇 `\n` 或缓冲区满才写。
+- **无缓冲**（unbuffered）：`stderr`。立即写。
+
+### 手动控制
+
+```c
+setvbuf(fp, buf, _IOFBF, 4096);   // 全缓冲
+setvbuf(fp, NULL, _IONBF, 0);      // 无缓冲
+setvbuf(fp, buf, _IOLBF, 1024);    // 行缓冲
+
+fflush(fp);        // 立即刷新缓冲
+fflush(NULL);      // 刷所有打开的输出流
+```
+
+**陷阱**：程序崩溃时，全缓冲的输出可能**丢失**。调试用 `stderr`（无缓冲）或调用 `fflush(stdout)`。
+
+## 八、错误处理
+
+```c
+int feof(FILE *fp);     // 是否到文件末尾（在**尝试读取之后**才置位！）
+int ferror(FILE *fp);   // 是否有错误
+void clearerr(FILE *fp);
+```
+
+**惯用错误检查**：
+
+```c
+if (fread(buf, 1, N, fp) < N) {
+    if (feof(fp)) { /* 正常 EOF */ }
+    else if (ferror(fp)) { /* IO 错误 */ perror("fread"); }
+}
+```
+
+**反例**：
+```c
+while (!feof(fp)) {   // ✗ EOF 只在"尝试读且失败"后才为真
+    fscanf(fp, ...);   // 最后一次可能读到 EOF，处理旧值
+}
+```
+
+**正例**：
+```c
+while (fscanf(fp, "%d", &n) == 1) { ... }
+```
+
+## 九、`errno` 与 `perror`
+
+系统调用/库函数失败时设置全局变量 `errno`：
+
+```c
+#include <errno.h>
+#include <string.h>
+
+FILE *fp = fopen("no.txt", "r");
+if (!fp) {
+    fprintf(stderr, "open failed: %s\n", strerror(errno));
+    // 或直接：
+    perror("fopen");
+}
+```
+
+`errno` 常见值：`ENOENT`（不存在）、`EACCES`（权限）、`EEXIST`（已存在）、`ENOMEM`（内存不足）。
+
+**注意**：`errno` 是**线程本地**（C11+ 与 POSIX 保证）。
+
+## 十、POSIX 低级 I/O
+
+跳过 `FILE *` 抽象，直接用文件描述符：
+
+```c
+#include <fcntl.h>
+#include <unistd.h>
+
+int fd = open("data.txt", O_RDONLY);
+if (fd < 0) { perror("open"); return -1; }
+
+char buf[1024];
+ssize_t n = read(fd, buf, sizeof buf);
+
+write(fd, buf, n);
+lseek(fd, 0, SEEK_SET);
+close(fd);
+```
+
+### `open` 标志
+
+| 标志 | 含义 |
+| --- | --- |
+| `O_RDONLY` / `O_WRONLY` / `O_RDWR` | 访问模式（三选一） |
+| `O_CREAT` | 不存在则创建 |
+| `O_EXCL` | 与 O_CREAT：已存在则失败 |
+| `O_TRUNC` | 打开时清空 |
+| `O_APPEND` | 每次写追加 |
+| `O_NONBLOCK` | 非阻塞 |
+| `O_CLOEXEC` | exec 时自动关闭 |
+
+带 `O_CREAT` 时需要第三个参数——权限模式：
+
+```c
+int fd = open("f", O_WRONLY | O_CREAT | O_TRUNC, 0644);
+```
+
+### `read` / `write` 部分完成
+
+**注意**：`read/write` 可能**返回小于请求的字节数**——比如信号中断、管道缓冲满。要循环：
+
+```c
+ssize_t write_all(int fd, const void *buf, size_t n) {
+    const char *p = buf;
+    size_t left = n;
+    while (left > 0) {
+        ssize_t w = write(fd, p, left);
+        if (w < 0) {
+            if (errno == EINTR) continue;
+            return -1;
+        }
+        p += w; left -= w;
+    }
+    return n;
+}
+```
+
+### `FILE *` vs fd
+
+- `FILE *` 由 libc 管理，带缓冲，**跨平台**。
+- `fd`（int）由内核管理，**无缓冲**（除非用 `setvbuf`）。
+- 转换：`fileno(fp)`、`fdopen(fd, "r")`。
+
+## 十一、内存映射 I/O（`mmap`）
+
+将文件直接映射到进程虚拟地址空间，通过指针访问：
+
+```c
+#include <sys/mman.h>
+int fd = open("big.dat", O_RDONLY);
+struct stat sb; fstat(fd, &sb);
+
+char *p = mmap(NULL, sb.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
+if (p == MAP_FAILED) { perror("mmap"); }
+// 直接读取 p[0..sb.st_size]
+
+munmap(p, sb.st_size);
+close(fd);
+```
+
+**优势**：无需 `read` 拷贝；页面 lazy load；多进程共享物理页。
+**代价**：需要处理 SIGBUS（截断的文件）；不适合小文件；不适合流式操作。
+
+广泛用于数据库、字体渲染、mmap 序列化格式（Cap'n Proto、FlatBuffers）。
+
+## 十二、异步与非阻塞 I/O
+
+- **`select` / `poll` / `epoll`（Linux）/ `kqueue`（BSD/macOS）**：I/O 多路复用。
+- **`io_uring`（Linux 5.1+）**：现代异步 I/O。
+- **`aio_*`（POSIX AIO）**：老 API，很少用。
+- **`libuv`、`libevent`**：跨平台事件循环封装。
+
+超出本文范围，参考并发/网络编程章节。
+
+## 十三、格式化打印的自定义
+
+### `printf` 的可扩展性
+
+`glibc` 允许注册自定义 `%` 说明符（`register_printf_specifier`），但不可移植。
+
+### 位置参数（POSIX）
+
+```c
+printf("%2$s %1$s\n", "world", "hello");   // "hello world"
+```
+
+用于国际化——不同语言的词序不同。
+
+## 十四、常见陷阱
+
+| 陷阱 | 症状 | 修法 |
+| --- | --- | --- |
+| `scanf("%s", buf)` | 缓冲区溢出 | 限长 `%99s` 或用 `fgets` |
+| `sprintf` | 溢出 | 用 `snprintf` |
+| `printf` 格式与参数不匹配 | UB | 编译器 `-Wformat` |
+| `while (!feof(fp))` | 多读一次 | 用读取函数返回值判定 |
+| 忘 fclose | 缓冲未写、fd 泄漏 | 结构化清理 |
+| `strchr` 返回值忘检 NULL | 段错误 | 判空 |
+| stdin/stdout 混用 fd 与 FILE* | 缓冲乱 | 保持一致；`fflush` |
+| Windows 下 `"r"` 转义 CRLF | 二进制错乱 | 用 `"rb"` |
+
+## 十五、总结
+
+- **首选 `FILE *`**：跨平台、带缓冲、格式化方便。
+- **需要精细控制、异步、mmap**：用 fd。
+- **网络编程、进程间通信**：几乎总是 fd + 多路复用。
+- **打印/日志**：`snprintf` + `fputs`，绝不用 `sprintf`。
+- **缓冲一定要 flush**：崩溃前的输出可能丢失。
+
+</WordCount>

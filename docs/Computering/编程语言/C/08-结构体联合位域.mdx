@@ -1,0 +1,448 @@
+import WordCount from '../../../../src/components/WordCount/WordCount';
+import Mermaid from '@theme/Mermaid';
+
+<WordCount>
+
+`struct`、`union`、位域是 C 组织复合数据的三种手段。理解它们的内存布局、对齐规则、位段模式，是编写协议解析器、驱动程序、系统级代码的基本功。
+
+## 一、`struct` — 结构体
+
+### 定义与使用
+
+```c
+struct Point {
+    int x;
+    int y;
+};
+
+struct Point p1 = {1, 2};        // 顺序初始化
+struct Point p2 = {.x=1, .y=2};  // 指定初始化（C99）
+p1.x = 10;
+```
+
+**注意**：C 中每次使用要写 `struct Point`（除非用 `typedef`），与 C++ 不同。
+
+### `typedef` 简化
+
+```c
+typedef struct Point {
+    int x, y;
+} Point;
+
+Point p = {1, 2};   // 不用写 struct
+```
+
+### 前向声明
+
+```c
+struct Node;                       // 前向声明（不完整类型）
+typedef struct Node Node;
+struct Node {
+    int  val;
+    Node *next;                    // 自引用只能通过指针
+};
+```
+
+## 二、内存布局与对齐
+
+### 对齐要求
+
+每种类型都有 **对齐要求**（`_Alignof(T)`）：
+- `char`：1
+- `short`：2
+- `int`：4
+- `double`：8
+- 指针：8（64 位）
+
+结构体的对齐 = **成员中最大对齐要求**。
+
+### 填充（Padding）
+
+编译器在成员间插入 padding 保证每个成员都对齐：
+
+```c
+struct S {
+    char  a;    // offset 0
+    // padding 3 bytes
+    int   b;    // offset 4
+    char  c;    // offset 8
+    // padding 3 bytes（结构末尾也要对齐到最大成员，才能在数组中每个元素都对齐）
+};
+sizeof(struct S) == 12
+```
+
+<Mermaid value={`
+graph TB
+    subgraph Layout["struct S 布局 (12 字节)"]
+        A["byte 0: a"]
+        P1["byte 1-3: padding"]
+        B["byte 4-7: b"]
+        C["byte 8: c"]
+        P2["byte 9-11: padding"]
+    end
+`} />
+
+### 成员顺序影响 sizeof
+
+调整成员顺序可以显著减少 padding：
+
+```c
+struct Bad  { char a; int b; char c; };   // 12 字节
+struct Good { char a; char c; int b; };   //  8 字节
+```
+
+**规则**：按 **对齐要求从大到小** 排列成员通常最紧凑。
+
+### `offsetof` 与 `_Alignof`
+
+```c
+#include <stddef.h>
+offsetof(struct S, b)   // 4
+_Alignof(struct S)      // 4
+```
+
+`offsetof` 是编译期常量，广泛用于容器操作、序列化。见 [[16-高级技巧与惯用法]] 的 `container_of` 宏。
+
+### 打包（Packed）
+
+关掉 padding：
+
+```c
+struct __attribute__((packed)) Packed {
+    char a;
+    int  b;
+    char c;
+};
+// sizeof == 6，但访问 b 可能未对齐！
+```
+
+**权衡**：省内存 / 匹配协议格式，但可能触发未对齐访问异常（ARM 严格）或性能下降。
+
+C11 也可用 `#pragma pack(1)`：
+
+```c
+#pragma pack(push, 1)
+struct Wire { uint16_t magic; uint32_t len; char data[]; };
+#pragma pack(pop)
+```
+
+## 三、结构体的运算
+
+### 赋值
+
+```c
+struct Point a = {1, 2}, b;
+b = a;   // ✓ 逐成员拷贝
+```
+
+允许结构体整体赋值——按字节拷贝所有成员（含 padding，值不确定）。
+
+### 比较
+
+```c
+if (a == b)   // ✗ 非法！C 不支持结构体比较
+```
+
+原因：padding 里的字节值不确定，`memcmp` 也不可靠。手动比较每个字段：
+
+```c
+int point_eq(Point a, Point b) { return a.x == b.x && a.y == b.y; }
+```
+
+### 传参与返回
+
+```c
+Point add(Point a, Point b);
+```
+
+按值传递会拷贝整个结构体。大结构体建议传指针 `const Point *`。
+
+### 复合字面量（C99）
+
+```c
+draw_point((Point){3, 4});           // 临时对象
+Point *p = &(Point){.x=1, .y=2};     // 指向临时对象
+```
+
+## 四、灵活数组成员（Flexible Array Member，C99）
+
+结构体末尾可以放**未指定长度**的数组：
+
+```c
+struct Message {
+    uint32_t len;
+    char     data[];   // 灵活数组
+};
+
+struct Message *m = malloc(sizeof(*m) + 100);
+m->len = 100;
+memcpy(m->data, "hello", 5);
+```
+
+- `sizeof(struct Message)` 不含 `data`。
+- 必须是最后一个成员。
+- 只能在动态分配的对象中使用（不能放栈上）。
+
+**C99 前**惯用法：`char data[1];`（"struct hack"），但严格来说是 UB。
+
+## 五、位域（Bit-field）
+
+在成员声明后加 `:N` 指定位宽：
+
+```c
+struct Flags {
+    unsigned int is_ready : 1;
+    unsigned int mode     : 3;
+    unsigned int count    : 12;
+    unsigned int          : 0;   // 强制对齐到下一个 int 边界
+    unsigned int extra    : 8;
+};
+```
+
+**用途**：
+- 硬件寄存器映射（每一位有特定含义）
+- 网络协议头部（如 IP header）
+- 紧凑存储标志位
+
+**限制与陷阱**：
+- **不能取地址**（`&flags.is_ready` 非法）。
+- 具体位排列（高位在前 or 低位在前）**由实现定义**——同一份代码在不同编译器/平台可能布局不同！
+- 底层类型必须是整数（C99 允许 `_Bool`、`int`、`unsigned int`；扩展类型如 `uint32_t` 依赖实现）。
+- 跨字节的位域也是实现定义。
+
+**结论**：位域**不可移植**，跨平台协议解析请用 **手动位运算**（`x & MASK`、`x >> SHIFT`）。
+
+## 六、`union` — 联合
+
+所有成员**共享同一块内存**，占用等于最大成员的空间：
+
+```c
+union Value {
+    int    i;
+    float  f;
+    char   bytes[4];
+};
+
+union Value v;
+v.i = 0x40490fdb;
+printf("%f\n", v.f);   // 3.14159（类型双关）
+```
+
+**用途**：
+
+### 6.1 类型双关（Type Punning）
+
+C 中通过 `union` 做类型转换是**允许的**（C99 起明确）：
+
+```c
+union { float f; uint32_t u; } u = { .f = 3.14f };
+printf("%x\n", u.u);   // 打印浮点的位表示
+```
+
+### 6.2 标签联合（Tagged Union）
+
+配合枚举实现"多种类型的值"：
+
+```c
+typedef struct {
+    enum { T_INT, T_FLOAT, T_STR } tag;
+    union {
+        int    i;
+        float  f;
+        char  *s;
+    };   // 匿名 union（C11）
+} Value;
+
+void print(Value v) {
+    switch (v.tag) {
+        case T_INT:   printf("%d\n", v.i);  break;
+        case T_FLOAT: printf("%f\n", v.f);  break;
+        case T_STR:   printf("%s\n", v.s);  break;
+    }
+}
+```
+
+这是 C 里表达"sum type"（求和类型）的标准做法。
+
+### 6.3 节省内存
+
+对不会同时存在的字段共用空间。
+
+**注意**：写入一个成员、读另一个成员时，只有明确规定的"类型双关"才是良定义的；否则是 **实现定义** 或 UB。
+
+## 七、匿名结构体与联合（C11）
+
+嵌套时省略名字：
+
+```c
+struct Rect {
+    struct {
+        int x, y;
+    };   // 匿名 struct
+    int w, h;
+};
+
+Rect r;
+r.x = 1;   // 直接访问，不用 r.<name>.x
+```
+
+方便实现「继承」式布局：
+
+```c
+typedef struct Base {
+    int type;
+} Base;
+
+typedef struct Derived {
+    Base;         // 匿名嵌入
+    int extra;
+} Derived;
+
+Derived d;
+d.type = 1;       // 访问 base 成员
+```
+
+## 八、结构体与协议解析
+
+### 惯用做法：直接映射
+
+```c
+struct EthHeader {
+    uint8_t  dst[6];
+    uint8_t  src[6];
+    uint16_t type;
+} __attribute__((packed));
+
+EthHeader *hdr = (EthHeader *)pkt;
+uint16_t type = ntohs(hdr->type);   // 网络字节序转换
+```
+
+**注意事项**：
+- 字节序（大端/小端）——网络多为大端，需 `ntohs`、`ntohl`。
+- 对齐——若原始数据未对齐，用 `memcpy` 拷贝到对齐后的结构体更安全。
+- 位域顺序不可靠——跨平台协议用位运算。
+- Packed 结构体的成员访问在 ARM 需谨慎。
+
+### 更稳妥：手动解析
+
+```c
+uint16_t read_be16(const uint8_t *p) {
+    return (uint16_t)p[0] << 8 | p[1];
+}
+uint32_t read_be32(const uint8_t *p) {
+    return (uint32_t)p[0] << 24 | (uint32_t)p[1] << 16
+         | (uint32_t)p[2] <<  8 | (uint32_t)p[3];
+}
+```
+
+## 九、位域 vs 位运算
+
+需要单个位标志时的两种方案：
+
+**位域**：
+```c
+struct {
+    unsigned int a : 1;
+    unsigned int b : 1;
+    unsigned int c : 1;
+} flags;
+flags.a = 1;
+```
+
+**位运算**：
+```c
+#define FLAG_A (1U << 0)
+#define FLAG_B (1U << 1)
+#define FLAG_C (1U << 2)
+
+unsigned int flags = 0;
+flags |= FLAG_A;
+if (flags & FLAG_A) ...
+```
+
+推荐 **位运算**：布局可预测、可移植、可组合。
+
+## 十、结构体大小的技巧
+
+### `_Static_assert` 校验大小
+
+在编译期确保布局正确：
+
+```c
+_Static_assert(sizeof(struct Header) == 14, "Header size mismatch");
+_Static_assert(offsetof(struct Header, type) == 12, "type offset wrong");
+```
+
+### 结构体内存布局可视化
+
+用 `pahole`（Linux 工具）分析：
+
+```bash
+pahole -C Header prog.o
+```
+
+输出成员偏移与 padding，非常直观。
+
+### 减小结构体的技巧
+
+- 按大到小排列。
+- 相同类型合并到位段或子结构体。
+- 冷字段放末尾或用指针间接引用。
+- 若必须紧凑（协议、mmap 文件），用 `__attribute__((packed))`。
+
+## 十一、深入：结构体的 C ABI 传参
+
+对不同 ABI，结构体传参规则不同：
+
+- **System V AMD64**：小结构体（≤16 字节）拆分到寄存器，大的走栈。
+- **ARM64 AAPCS**：类似，最多 2 个寄存器；否则内存。
+- **老式 x86 cdecl**：全部走栈。
+
+这直接影响 FFI 与二进制兼容——比如 C 库导出 `Point` 结构体时，Python/Rust 侧必须匹配同样的布局。
+
+## 十二、常见错误
+
+### 误 1：忘记初始化
+
+```c
+struct S s;      // 未初始化：栈上垃圾
+struct S s = {0}; // ✓ 所有成员置零
+struct S s = {}; // C23 起等价 {0}
+```
+
+### 误 2：拷贝结构体但含指针
+
+```c
+struct S { char *data; };
+struct S a = { malloc(10) };
+struct S b = a;   // b.data 指向同一块内存！
+free(a.data);
+free(b.data);     // ✗ double free
+```
+
+**修法**：实现深拷贝（自己的 clone 函数）。
+
+### 误 3：位域跨平台
+
+```c
+struct IPHeader {
+    unsigned int version : 4;
+    unsigned int ihl     : 4;
+    // ...
+};
+```
+
+在大端小端平台上 version 和 ihl 的高低位可能颠倒。**协议头一律用位运算**。
+
+## 十三、总结
+
+| 类型 | 用途 | 关键注意 |
+| --- | --- | --- |
+| `struct` | 组合数据 | 对齐、padding |
+| `union` | 共享空间/类型双关 | 只读一个"活的"成员 |
+| 位域 | 紧凑存储 | 不可移植 |
+| 匿名 struct/union | 内联嵌入 | C11 起 |
+| 灵活数组 | 变长数据 | 必须动态分配 |
+| Packed | 匹配协议 | 未对齐访问代价 |
+
+</WordCount>

@@ -1,0 +1,452 @@
+import WordCount from '../../../../src/components/WordCount/WordCount';
+import Mermaid from '@theme/Mermaid';
+
+<WordCount>
+
+位操作是 C 相对高级语言的独特优势——它让你直接操纵二进制位。位运算广泛用于底层驱动、图形处理、密码学、压缩算法、性能优化中。
+
+## 一、六大位运算符
+
+| 运算符 | 名称 | 例子 | 结果（用二进制看） |
+| --- | --- | --- | --- |
+| `&` | 按位与 (AND) | `0b1100 & 0b1010` | `0b1000` |
+| `\|` | 按位或 (OR) | `0b1100 \| 0b1010` | `0b1110` |
+| `^` | 按位异或 (XOR) | `0b1100 ^ 0b1010` | `0b0110` |
+| `~` | 按位取反 (NOT) | `~0b1100` (8-bit) | `0b11110011` |
+| `<<` | 左移 | `0b0011 << 2` | `0b1100` |
+| `>>` | 右移 | `0b1100 >> 2` | `0b0011` |
+
+**真值表**：
+
+| A | B | A&B | A\|B | A^B |
+| :-: | :-: | :-: | :-: | :-: |
+| 0 | 0 | 0 | 0 | 0 |
+| 0 | 1 | 0 | 1 | 1 |
+| 1 | 0 | 0 | 1 | 1 |
+| 1 | 1 | 1 | 1 | 0 |
+
+## 二、移位的语义细节
+
+### 左移 `<<`
+
+- **左移 n 位** = 乘以 2ⁿ（对无符号数总成立）。
+- 高位丢弃，低位补 0。
+- **有符号数左移到符号位或超出位宽 → UB**（C11 起）。
+
+```c
+int x = 1 << 30;   // 1073741824
+int y = 1 << 31;   // UB (int 是 32 位有符号时)
+unsigned u = 1U << 31;   // ✓ 无符号
+```
+
+### 右移 `>>`
+
+- **右移 n 位** = 除以 2ⁿ（向下取整）。
+- **无符号数**：高位补 0（逻辑右移）。
+- **有符号数**：**由实现定义**。多数编译器保留符号位（算术右移），但标准不保证。
+
+```c
+unsigned u = 0xFFFFFFFF;
+u >> 4;    // 0x0FFFFFFF
+
+int i = -8;
+i >> 1;    // 通常是 -4（算术右移），但实现定义
+```
+
+**实践**：位运算优先用 **无符号** 类型（`unsigned`、`uint32_t`）。
+
+### 移位量
+
+- 移位量 `n` 必须满足 `0 <= n < 位宽`；否则 UB。
+- `1 << 32`（对 32 位 int）是 UB！
+
+```c
+int shift = 32;
+uint32_t x = 1U << shift;   // ✗ UB
+```
+
+## 三、基础位操作套路
+
+### 3.1 提取第 n 位
+
+```c
+int bit_n = (x >> n) & 1;
+```
+
+### 3.2 置第 n 位
+
+```c
+x |= (1U << n);
+```
+
+### 3.3 清第 n 位
+
+```c
+x &= ~(1U << n);
+```
+
+### 3.4 翻转第 n 位
+
+```c
+x ^= (1U << n);
+```
+
+### 3.5 更新第 n 位到 b
+
+```c
+x = (x & ~(1U << n)) | ((b & 1U) << n);
+```
+
+### 3.6 提取 [lo, hi) 位
+
+```c
+unsigned mask = ((1U << (hi - lo)) - 1) << lo;
+unsigned field = (x & mask) >> lo;
+```
+
+## 四、常用位技巧
+
+### 4.1 判断 2 的幂
+
+```c
+bool is_power_of_two(unsigned x) {
+    return x && !(x & (x - 1));
+}
+```
+
+**原理**：`x` 是 2^k → 只有一个 1，`x-1` 全 1 → 与运算为 0。
+
+### 4.2 消去最低位的 1
+
+```c
+x & (x - 1)
+```
+
+用于 Brian Kernighan popcount：
+
+```c
+int popcount(unsigned x) {
+    int c = 0;
+    while (x) { x &= x - 1; c++; }
+    return c;
+}
+```
+
+### 4.3 取最低位的 1
+
+```c
+x & -x
+```
+
+**原理**：`-x`（补码）= `~x + 1`，只在最低 1 处相等，其余相反。用于二叉索引树（Fenwick Tree）。
+
+### 4.4 交换（异或）
+
+```c
+if (&a != &b) {
+    a ^= b;
+    b ^= a;
+    a ^= b;
+}
+```
+
+**警告**：`a` 与 `b` 若指向同一变量，会清零。工程中用临时变量更清晰。
+
+### 4.5 判断奇偶
+
+```c
+bool is_odd = (x & 1);
+```
+
+### 4.6 绝对值（无分支，二补数）
+
+```c
+int abs_x(int x) {
+    int mask = x >> 31;              // -1 if x<0 else 0（依赖算术右移）
+    return (x + mask) ^ mask;
+}
+```
+
+### 4.7 无分支 min / max
+
+```c
+int min(int a, int b) {
+    return b + ((a - b) & ((a - b) >> 31));
+}
+int max(int a, int b) {
+    return a - ((a - b) & ((a - b) >> 31));
+}
+```
+
+**注意**：依赖有符号右移的实现定义行为，且减法可能溢出（UB）。可读性不如三元。
+
+### 4.8 计数末尾 0（CTZ / Count Trailing Zeros）
+
+```c
+int ctz(unsigned x) {
+    if (x == 0) return 32;
+    int c = 0;
+    while (!(x & 1)) { x >>= 1; c++; }
+    return c;
+}
+```
+
+GCC 内建：`__builtin_ctz(x)`，通常一条指令（BSF）。
+
+### 4.9 计数前导 0（CLZ）
+
+```c
+int clz(unsigned x);   // 通常用 __builtin_clz(x)
+```
+
+用于求 `log2` 上/下取整。
+
+### 4.10 反转位
+
+```c
+unsigned bit_reverse32(unsigned x) {
+    x = ((x & 0x55555555) <<  1) | ((x >>  1) & 0x55555555);
+    x = ((x & 0x33333333) <<  2) | ((x >>  2) & 0x33333333);
+    x = ((x & 0x0F0F0F0F) <<  4) | ((x >>  4) & 0x0F0F0F0F);
+    x = ((x & 0x00FF00FF) <<  8) | ((x >>  8) & 0x00FF00FF);
+    x = ( x                << 16) | ( x                >> 16);
+    return x;
+}
+```
+
+分治：2 位组内反 → 4 位组内反 → …
+
+### 4.11 popcount（SWAR 法）
+
+```c
+int popcount(unsigned x) {
+    x = x - ((x >> 1) & 0x55555555);
+    x = (x & 0x33333333) + ((x >> 2) & 0x33333333);
+    x = (x + (x >> 4)) & 0x0F0F0F0F;
+    return (x * 0x01010101) >> 24;
+}
+```
+
+比 Brian Kernighan 更快（固定循环次数），x86 有专用指令 `popcnt`。
+
+## 五、掩码（Mask）
+
+掩码是位操作的核心工具。
+
+### 常用掩码
+
+```c
+#define MASK_LOW(n)    ((1U << (n)) - 1)         // 低 n 位为 1
+#define MASK_HIGH(n)   (~MASK_LOW(32 - (n)))     // 高 n 位为 1
+
+MASK_LOW(4)    // 0x0000000F
+MASK_HIGH(4)   // 0xF0000000
+```
+
+### 应用：提取字段
+
+```c
+uint32_t packet = 0xABCD1234;
+uint32_t low16 = packet & 0xFFFF;              // 0x1234
+uint32_t high16 = (packet >> 16) & 0xFFFF;     // 0xABCD
+```
+
+### 应用：批量操作
+
+```c
+uint8_t rgb[4];
+memcpy(rgb, &pixel, 4);
+uint8_t r = (pixel >> 16) & 0xFF;
+uint8_t g = (pixel >>  8) & 0xFF;
+uint8_t b =  pixel        & 0xFF;
+```
+
+## 六、字节序（Endianness）
+
+### 概念
+
+多字节数据在内存中的字节顺序：
+
+- **大端（Big-Endian, BE）**：高位字节放低地址。网络字节序、旧 Sun、PowerPC。
+- **小端（Little-Endian, LE）**：低位字节放低地址。x86、ARM 默认、RISC-V。
+
+例：`0x12345678` 存放在地址 `p` 起的 4 字节：
+
+| 字节序 | p[0] | p[1] | p[2] | p[3] |
+| :-: | :-: | :-: | :-: | :-: |
+| BE | `0x12` | `0x34` | `0x56` | `0x78` |
+| LE | `0x78` | `0x56` | `0x34` | `0x12` |
+
+### 判断
+
+```c
+int is_le() {
+    uint32_t x = 1;
+    return *(uint8_t *)&x == 1;
+}
+```
+
+### 转换
+
+```c
+// 手动
+uint32_t bswap32(uint32_t x) {
+    return  ((x & 0xFF000000) >> 24) |
+            ((x & 0x00FF0000) >>  8) |
+            ((x & 0x0000FF00) <<  8) |
+            ((x & 0x000000FF) << 24);
+}
+
+// GCC 内建
+__builtin_bswap16(x);
+__builtin_bswap32(x);
+__builtin_bswap64(x);
+
+// 网络字节序 <-> 主机字节序（<arpa/inet.h>）
+htons(x)    // host to net short
+htonl(x)
+ntohs(x)
+ntohl(x)
+```
+
+### 序列化
+
+写协议时**总是按字节手动读写**，避免依赖 endianness：
+
+```c
+void write_be32(uint8_t *p, uint32_t v) {
+    p[0] = (v >> 24) & 0xFF;
+    p[1] = (v >> 16) & 0xFF;
+    p[2] = (v >>  8) & 0xFF;
+    p[3] =  v        & 0xFF;
+}
+uint32_t read_be32(const uint8_t *p) {
+    return ((uint32_t)p[0] << 24)
+         | ((uint32_t)p[1] << 16)
+         | ((uint32_t)p[2] <<  8)
+         |  (uint32_t)p[3];
+}
+```
+
+## 七、位域标志（Flag Bitmask）
+
+```c
+#define OPT_VERBOSE  (1U << 0)
+#define OPT_QUIET    (1U << 1)
+#define OPT_DEBUG    (1U << 2)
+#define OPT_TRACE    (1U << 3)
+
+unsigned opts = OPT_VERBOSE | OPT_DEBUG;
+
+if (opts & OPT_VERBOSE) ...
+opts &= ~OPT_QUIET;    // 关闭
+opts ^= OPT_DEBUG;     // 翻转
+```
+
+比布尔字段紧凑，且可以位运算组合。
+
+## 八、位集合（Bitset）
+
+用位串表示大集合：
+
+```c
+#define BITSET_BITS  1024
+#define BITSET_WORDS (BITSET_BITS / 32)
+uint32_t set[BITSET_WORDS] = {0};
+
+void set_bit(unsigned n) {
+    set[n / 32] |= 1U << (n % 32);
+}
+int test_bit(unsigned n) {
+    return (set[n / 32] >> (n % 32)) & 1;
+}
+void clear_bit(unsigned n) {
+    set[n / 32] &= ~(1U << (n % 32));
+}
+```
+
+100 万个 bool 只需 128 KB。
+
+## 九、异或的高级用法
+
+### 9.1 单次交换（如前所述）
+
+### 9.2 找出唯一的不成对元素
+
+```c
+int find_single(int arr[], int n) {
+    int r = 0;
+    for (int i = 0; i < n; i++) r ^= arr[i];
+    return r;
+}
+```
+
+成对元素异或抵消，只剩唯一。
+
+### 9.3 简单加密
+
+```c
+void xor_encrypt(char *data, size_t n, char key) {
+    for (size_t i = 0; i < n; i++) data[i] ^= key;
+}
+```
+
+对同数据再运行一次即解密。不安全（弱加密），仅用于混淆。
+
+### 9.4 校验和
+
+```c
+uint32_t xor_checksum(uint32_t *data, size_t n) {
+    uint32_t s = 0;
+    for (size_t i = 0; i < n; i++) s ^= data[i];
+    return s;
+}
+```
+
+## 十、GCC/Clang 内建位操作
+
+| 内建 | 功能 | 通常指令 |
+| --- | --- | --- |
+| `__builtin_popcount(x)` | 1 的个数 | `popcnt` |
+| `__builtin_clz(x)` | 前导 0 数（x=0 时 UB） | `lzcnt`/`bsr` |
+| `__builtin_ctz(x)` | 末尾 0 数（x=0 时 UB） | `tzcnt`/`bsf` |
+| `__builtin_parity(x)` | 1 的个数奇偶性 | `xor` 链 |
+| `__builtin_bswap32(x)` | 字节反转 | `bswap` |
+
+对 `long`/`long long` 加后缀：`__builtin_popcountl`、`__builtin_popcountll`。
+
+## 十一、位操作与浮点
+
+浮点数的位模式可以用位运算 hack。**经典**：Quake III 的快速 `1/sqrt(x)`：
+
+```c
+float Q_rsqrt(float x) {
+    long i;
+    float x2 = x * 0.5f;
+    float y  = x;
+    i = *(long *)&y;              // ✗ 严格意义违反 strict aliasing
+    i = 0x5f3759df - (i >> 1);    // 神奇的初值
+    y = *(float *)&i;
+    y = y * (1.5f - x2 * y * y);  // 牛顿迭代一次
+    return y;
+}
+```
+
+**改进**：用 `memcpy` 做类型双关避免 UB。现代硬件用 `rsqrtss` 指令，此技巧已过时，但作为教学案例经典。
+
+## 十二、性能小结
+
+- 位运算通常 **1 个 CPU 周期**，比乘除快得多。
+- 编译器会**自动**把 `x * 2` 优化为 `x << 1`，不必手动。
+- 但**不会**把 `x / 3` 变成位运算——只有 2 的幂才能。
+- SIMD 位操作：`__m128i _mm_and_si128()` 等（SSE）、`vandq_u32`（NEON）。
+
+## 十三、总结
+
+- 位操作核心工具：`& | ^ ~ << >>` + 掩码。
+- **无符号优先**，避免有符号 shift 的 UB。
+- 记忆掩码技巧：`x & (x-1)`、`x & -x`、`~(1<<n)`。
+- 字节序处理：手写按字节读写，或用 `htonl/ntohl`。
+- 需要极致性能：用 `__builtin_*` 内建或 SIMD。
+
+</WordCount>

@@ -1,0 +1,420 @@
+import WordCount from '../../../../src/components/WordCount/WordCount';
+import Mermaid from '@theme/Mermaid';
+
+<WordCount>
+
+从 `hello.c` 到 `./hello` 的完整构建流程分为四阶段：**预处理 → 编译 → 汇编 → 链接**。理解每个环节能让你更好地排查符号错误、优化二进制、做交叉编译。
+
+## 一、构建总览
+
+<Mermaid value={`
+flowchart LR
+    A["hello.c"] -->|cpp| B["hello.i (预处理后源码)"]
+    B -->|cc1| C["hello.s (汇编)"]
+    C -->|as| D["hello.o (目标文件)"]
+    D -->|ld + crt + libc| E["hello (可执行)"]
+    F["crt1.o crti.o crtn.o"] --> E
+    G["libc.a / libc.so"] --> E
+`} />
+
+一条命令 `gcc hello.c -o hello` 隐式做完这四步。可以拆开单独运行：
+
+```bash
+gcc -E hello.c -o hello.i        # 预处理
+gcc -S hello.i -o hello.s        # 编译
+gcc -c hello.s -o hello.o        # 汇编
+gcc hello.o -o hello             # 链接
+```
+
+或一步查看：`gcc -v hello.c -o hello` 会打印实际调用的 cpp/cc1/as/ld 命令。
+
+## 二、预处理
+
+见 [[10-预处理器与宏]]。核心：
+- 展开 `#include`（把头文件内容嵌入）
+- 替换宏
+- 处理条件编译
+- 删除注释
+- 拼接续行
+
+**产物**：`.i` 文件——是完全展开的 C 源码（有时几万行）。
+
+## 三、编译
+
+`cc1`（GCC 内部）或 `clang -cc1` 完成：
+
+1. **词法分析**：源码 → token 流
+2. **语法分析**：token → AST
+3. **语义分析**：类型检查、作用域解析
+4. **中间表示（IR）**：GCC 用 GIMPLE/RTL；LLVM 用 LLVM IR
+5. **优化**：常量传播、内联、死代码删除、循环变换、向量化……
+6. **代码生成**：IR → 目标平台汇编
+
+**产物**：`.s` 文件——目标平台的汇编代码。
+
+### 优化级别
+
+```bash
+gcc -O0   # 无优化，最方便调试
+gcc -O1   # 基础优化
+gcc -O2   # 常用发布级别
+gcc -O3   # 激进（内联、向量化），可能显著变大
+gcc -Os   # 优化大小
+gcc -Ofast# 违反 IEEE 严格性换速度
+gcc -Og   # 优化 + 保留调试信息
+```
+
+### 常用编译选项
+
+```bash
+-Wall -Wextra -Werror       # 打开常用警告并转错误
+-std=c11                    # 指定标准
+-pedantic                   # 严格标准合规
+-g                          # 生成调试信息
+-fsanitize=address          # ASan
+-fsanitize=undefined        # UBSan
+-fno-omit-frame-pointer     # 保留帧指针便于 profiling
+-march=native               # 使用宿主 CPU 全部指令集
+-flto                       # 链接时优化
+```
+
+## 四、汇编
+
+`as` 或 GCC 内部把汇编翻译成机器码，得到**可重定位目标文件**（ELF、Mach-O、COFF/PE）。
+
+### 目标文件结构（ELF）
+
+```
+ELF Header
+Program Header Table
+    (存在于可执行文件与共享库)
+Sections:
+    .text       — 代码
+    .data       — 已初始化数据
+    .bss        — 未初始化数据（不占文件空间）
+    .rodata     — 只读常量、字符串字面量
+    .symtab     — 符号表
+    .strtab     — 字符串表
+    .rel.text   — 重定位信息
+    .debug_info — 调试信息 (-g 时生成)
+    ...
+Section Header Table
+```
+
+### 查看
+
+```bash
+file hello.o
+readelf -h hello.o        # ELF header
+readelf -S hello.o        # sections
+readelf -s hello.o        # symbols
+objdump -d hello.o        # 反汇编
+objdump -h hello.o        # section 头
+nm hello.o                # 简洁符号列表
+size hello.o              # 各段大小
+```
+
+### 重定位（Relocation）
+
+编译器生成 `.o` 时不知道最终地址，用**符号引用**和**重定位表**代替：
+
+```c
+extern int global;
+void f() { global++; }
+```
+
+`.o` 中 `f` 引用 `global` 会记入重定位表；链接器在合并时填入实际地址。
+
+## 五、链接
+
+`ld`（GNU）或 `lld`（LLVM）负责：
+
+1. **符号解析**：把每个引用绑定到某个定义。
+2. **重定位**：把符号引用的占位符替换为实际地址。
+3. **段合并**：把各 `.o` 的同名段（`.text`、`.data`）合并。
+4. **加入启动代码**（`crt*.o`）、C 运行时库（libc）。
+5. **生成可执行文件**（ELF + Program Header）。
+
+### 符号种类
+
+用 `nm` 查看：
+
+| 符号类型 | 含义 |
+| --- | --- |
+| `T` / `t` | 定义在 `.text` 段（大写 = 外部，小写 = 内部） |
+| `D` / `d` | 已初始化数据 |
+| `B` / `b` | 未初始化数据 (`.bss`) |
+| `R` / `r` | 只读数据 |
+| `U` | 未定义（引用外部符号） |
+| `W` | 弱符号 |
+| `V` | 弱对象 |
+| `C` | Common 符号（未初始化全局，可合并） |
+
+### 常见链接错误
+
+**`undefined reference to 'foo'`**
+- 未提供 `foo` 的定义；忘 `-lm`（数学库）；文件名顺序错。
+
+**`multiple definition of 'foo'`**
+- 多次定义。检查头文件是否直接定义变量/函数。
+
+### 静态链接 vs 动态链接
+
+**静态链接**：把库的代码直接拷贝进可执行文件。
+
+```bash
+gcc hello.c -o hello -static
+```
+
+- ✓ 无运行时依赖
+- ✗ 二进制大；安全更新需重编
+
+**动态链接**：加载时才把库映射进来。
+
+```bash
+gcc hello.c -o hello -lm       # 动态链接 libm.so
+```
+
+- ✓ 二进制小；库更新自动生效；多个进程共享库代码
+- ✗ 依赖运行时能找到库；启动稍慢；版本冲突（"DLL Hell"）
+
+**查看动态依赖**：
+```bash
+ldd hello
+# Linux:
+# linux-vdso.so.1 (0x00007ffe1...)
+# libm.so.6 => /lib/x86_64-linux-gnu/libm.so.6 (...)
+# libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (...)
+# /lib64/ld-linux-x86-64.so.2 (...)
+```
+
+## 六、程序启动 (`_start` 到 `main`)
+
+`main` **不是**真正的程序入口。
+
+<Mermaid value={`
+sequenceDiagram
+    participant OS
+    participant Loader as 内核 execve
+    participant Rtld as 动态链接器
+    participant Crt as crt1.o (_start)
+    participant Libc as __libc_start_main
+    participant User as main
+
+    OS->>Loader: execve("hello")
+    Loader->>Rtld: 加载 ld-linux.so
+    Rtld->>Rtld: 加载 libc.so, 解析 GOT/PLT
+    Rtld->>Crt: 跳转到 _start
+    Crt->>Libc: 调用 __libc_start_main
+    Libc->>Libc: 初始化 stdin/stdout/stderr、setup argv/envp
+    Libc->>User: call main(argc, argv, envp)
+    User-->>Libc: return status
+    Libc->>Libc: 运行 atexit 钩子, 刷新缓冲
+    Libc->>OS: exit(status)
+`} />
+
+关键文件：
+- `crt1.o` / `Scrt1.o`：包含 `_start` 入口
+- `crti.o` / `crtn.o`：`.init` / `.fini` 段的开头与结尾
+- `crtbegin.o` / `crtend.o`：`.ctors`/`.dtors` 数组的起止
+
+## 七、静态库 `.a`
+
+一堆 `.o` 打包成 archive：
+
+```bash
+gcc -c a.c b.c c.c
+ar rcs libmy.a a.o b.o c.o
+gcc main.c -L. -lmy -o main       # -lmy 展开为 libmy.a
+```
+
+- 链接时只挑**用到的** `.o`，未使用的丢弃。
+- 顺序敏感：`gcc a.o -lmy` 与 `gcc -lmy a.o` 效果不同——被依赖的库要写在使用者之后。
+
+## 八、动态库 `.so` / `.dll` / `.dylib`
+
+### 编译动态库（Linux）
+
+```bash
+gcc -fPIC -c foo.c bar.c            # -fPIC 位置无关代码
+gcc -shared foo.o bar.o -o libmy.so
+
+gcc main.c -L. -lmy -o main
+LD_LIBRARY_PATH=. ./main
+```
+
+### 位置无关代码（PIC）
+
+动态库可能加载到任意地址，代码不能包含绝对地址。**GOT**（Global Offset Table）与 **PLT**（Procedure Linkage Table）实现间接寻址：
+
+- **GOT**：数据/函数地址表，加载时填充。
+- **PLT**：函数跳板，第一次调用时通过 lazy binding 解析。
+
+### soname / 版本控制
+
+Linux 动态库通常有三级命名：
+
+```
+libfoo.so.1.2.3        # 实际文件（含 minor/patch）
+libfoo.so.1  -> libfoo.so.1.2.3   # soname（ABI 版本）
+libfoo.so    -> libfoo.so.1       # 开发链接名
+```
+
+`ldconfig` 维护 soname 到实际路径的映射。
+
+### `dlopen` 动态加载
+
+```c
+#include <dlfcn.h>
+void *h = dlopen("libmy.so", RTLD_NOW);
+if (!h) { fprintf(stderr, "%s\n", dlerror()); }
+
+typedef int (*func_t)(int);
+func_t f = dlsym(h, "compute");
+int r = f(42);
+dlclose(h);
+```
+
+用于插件系统、延迟加载。
+
+## 九、符号可见性
+
+默认情况下，动态库导出所有非 static 符号——但这会：
+- 使二进制变大
+- 减慢加载
+- 泄漏内部实现
+
+**推荐**：默认不导出，显式标记要导出的：
+
+```bash
+gcc -fvisibility=hidden ...
+```
+
+```c
+#define API __attribute__((visibility("default")))
+
+API int public_func(void);   // 导出
+int private_func(void);      // 不导出
+```
+
+## 十、链接顺序与循环依赖
+
+链接器**单遍扫描**（GNU ld，除非 `-Wl,--start-group`）：
+
+```bash
+gcc main.o -la -lb -lc     # a 用 b，b 用 c
+# 若 c 反过来需要 a，会报未解析符号
+gcc main.o -Wl,--start-group -la -lb -lc -Wl,--end-group
+```
+
+MSVC 和 macOS 的 ld 自动多遍。
+
+## 十一、链接时优化 LTO
+
+```bash
+gcc -O2 -flto -c a.c b.c
+gcc -O2 -flto a.o b.o -o prog
+```
+
+- 编译时把 IR（GIMPLE）也存进 `.o`。
+- 链接阶段做跨 TU 的内联、死代码删除、去虚拟化。
+- 显著优化性能，但编译慢、内存大。
+
+## 十二、剥离与减小体积
+
+```bash
+strip hello              # 去掉调试符号，二进制小很多
+strip --strip-unneeded libfoo.so
+```
+
+其他手段：
+- `-Os` 优化尺寸
+- `-fdata-sections -ffunction-sections -Wl,--gc-sections` 去除未使用段
+- `-flto` 链接优化
+
+## 十三、交叉编译
+
+给不同架构生成二进制：
+
+```bash
+aarch64-linux-gnu-gcc -o prog prog.c        # 编译给 ARM64
+arm-none-eabi-gcc -mcpu=cortex-m4 ...       # 裸机 STM32
+riscv64-unknown-elf-gcc ...                 # RISC-V
+i686-w64-mingw32-gcc ...                    # 32 位 Windows
+```
+
+需要对应的 sysroot（头文件 + 库）。
+
+## 十四、`Makefile` / 构建系统简介
+
+大项目手动编译不现实。常见构建系统：
+
+- **Make**：经典，简单但语法古老
+- **CMake**：跨平台，生成 Makefile/Ninja/VS 项目
+- **Meson**：现代，写起来更简洁
+- **Bazel**：Google，超大项目
+- **Ninja**：低层快速执行器
+
+最小 Makefile：
+
+```make
+CC = gcc
+CFLAGS = -Wall -O2
+
+hello: hello.o
+	$(CC) $^ -o $@
+
+hello.o: hello.c
+	$(CC) $(CFLAGS) -c $< -o $@
+
+clean:
+	rm -f hello *.o
+```
+
+## 十五、调试信息
+
+`-g` 生成 DWARF 调试信息（Linux）或 CodeView（Windows）：
+
+```bash
+gcc -g hello.c -o hello
+gdb ./hello
+```
+
+Split debug：`objcopy --only-keep-debug hello hello.debug` 把调试信息分离，减小 release 二进制。
+
+## 十六、二进制分析工具
+
+| 工具 | 用途 |
+| --- | --- |
+| `file` | 识别文件类型 |
+| `nm` | 符号表 |
+| `readelf` | ELF 详细信息 |
+| `objdump` | 反汇编、段查看 |
+| `ldd` | 动态依赖 |
+| `strings` | 提取可打印字符串 |
+| `strace` | 系统调用跟踪 |
+| `ltrace` | 库调用跟踪 |
+| `gdb` / `lldb` | 调试器 |
+| `perf` | 性能分析 |
+| `addr2line` | 地址转文件/行 |
+
+## 十七、常见问题
+
+| 症状 | 原因 |
+| --- | --- |
+| `undefined reference to 'sqrt'` | 需 `-lm` |
+| `.so 找不到` | 设置 `LD_LIBRARY_PATH` 或 `RPATH` |
+| 版本不匹配 | 检查 soname |
+| 段错误但源码无问题 | 优化改变行为？关掉 `-O` 试试 |
+| 静态与动态混链接 | 一般避免；有需要用 `-Bstatic`/`-Bdynamic` |
+| 崩溃只在 release | UB？未初始化变量？ASan 跑一遍 |
+
+## 十八、总结
+
+- C 的构建 = 预处理 + 编译 + 汇编 + 链接。
+- 每个 .c 独立编译为 .o；链接器合并 + 解析符号。
+- 静态链接 vs 动态链接是 ABI/发布策略的核心选择。
+- 掌握 `nm/readelf/objdump/ldd` 就能诊断绝大多数链接问题。
+- 大项目用构建系统（CMake/Meson）；调优上 LTO + -O2/-O3。
+
+</WordCount>

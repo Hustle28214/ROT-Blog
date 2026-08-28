@@ -1,0 +1,375 @@
+import WordCount from '../../../../src/components/WordCount/WordCount';
+import Mermaid from '@theme/Mermaid';
+
+<WordCount>
+
+C 语言的每个标识符都有三个正交属性：**存储期（storage duration）**、**作用域（scope）**、**链接（linkage）**。它们决定了变量/函数在内存中的位置、可见性、以及能否跨翻译单元共享。
+
+## 一、四个存储类说明符
+
+C 提供 4 个存储类关键字（C11 起 `_Thread_local` 是第 5 个）：
+
+| 关键字 | 用途 |
+| --- | --- |
+| `auto` | 局部自动变量（默认，几乎不写） |
+| `register` | 建议编译器放寄存器（几乎废弃） |
+| `static` | 静态存储 + 内部链接（视位置） |
+| `extern` | 外部链接的声明 |
+| `_Thread_local` (C11) | 线程局部存储 |
+
+## 二、`auto`
+
+局部变量的默认存储类：
+
+```c
+void f() {
+    auto int x = 1;    // 与 int x = 1 完全相同
+}
+```
+
+`auto` 在 C 中**几乎不用写**——所有函数内变量默认就是 auto。C23 起 `auto` 变成**类型推导**关键字（与 C++ 一致）。
+
+## 三、`register`
+
+请求把变量放入寄存器：
+
+```c
+void f() {
+    register int i;
+    for (i = 0; i < N; i++) ...
+}
+```
+
+- **限制**：`register` 变量不能取地址 `&i`（因为可能不在内存中）。
+- 现代编译器**忽略**这个提示——它们能做出比程序员更好的寄存器分配。
+- 遗留用途：`register int i asm("r15")`（GCC 扩展，指定寄存器）。
+
+## 四、`static` — 多重含义
+
+`static` 是 C 里含义最复杂的关键字，取决于位置：
+
+### 4.1 局部变量：延长生命期
+
+```c
+void f() {
+    static int count = 0;   // 只初始化一次，存放在 .data 段
+    count++;
+    printf("%d\n", count);
+}
+```
+
+调用多次会累加。类似于其他语言的"函数级持久变量"。
+
+- **静态存储期**：程序开始到结束。
+- **块作用域**：只在函数内可见。
+- 初始化必须是**编译期常量**（C99 起可以是运行时表达式，但只求一次）。
+
+### 4.2 全局变量：内部链接
+
+```c
+// file1.c
+static int counter = 0;   // 只在本翻译单元可见
+```
+
+`counter` 无法在 `file2.c` 通过 `extern int counter;` 访问——用于**封装/隐藏**。
+
+### 4.3 函数：内部链接
+
+```c
+static void helper(void) { ... }   // 只在本 .c 里可用
+```
+
+不会被链接器导出为全局符号，其他文件无法调用。**头文件里的 static 函数**：每个 include 它的 .c 都有一份独立拷贝。
+
+### 4.4 数组形参：告知最小长度
+
+```c
+void f(int arr[static 10]);   // 编译器知道 arr 至少有 10 个元素
+```
+
+C99 起的特性，方便优化与静态分析。
+
+## 五、`extern`
+
+### 5.1 声明外部变量/函数
+
+告诉编译器"这个符号在别的翻译单元定义"：
+
+```c
+// header.h
+extern int global_counter;
+void log_msg(const char *msg);
+
+// file1.c
+int global_counter = 0;   // 定义
+
+// file2.c
+#include "header.h"
+void f() { global_counter++; }
+```
+
+**关键**：
+- 变量**定义**只能在一个 .c 里（会分配存储）。
+- 变量**声明**（带 `extern`）可以出现多次（只是告知编译器名字与类型）。
+- 函数默认就是 `extern`——所以 `extern void f(void);` 与 `void f(void);` 等价。
+
+### 5.2 与 `static` 的关系
+
+- 全局变量默认是 `extern`（**外部链接**）。
+- 加 `static` → 内部链接。
+- 局部变量不能是 `extern`（除非声明引用外部符号）。
+
+## 六、存储期（Storage Duration）
+
+C 定义了 4 种存储期：
+
+### 6.1 静态存储期（Static Duration）
+
+对象在程序运行期间**始终存在**：
+- 全局变量
+- `static` 局部变量
+- 字符串字面量
+
+位于 `.data`（初始化）或 `.bss`（未初始化，启动时清零）。
+
+### 6.2 线程存储期（Thread Duration，C11）
+
+```c
+#include <threads.h>
+_Thread_local int per_thread_counter;
+// 或 thread_local（C23）
+```
+
+每个线程有自己的一份拷贝。见 [[17-C11多线程与原子]]。
+
+### 6.3 自动存储期（Automatic Duration）
+
+普通局部变量、函数参数：
+- 进入作用域时创建。
+- 离开作用域时销毁。
+- 位于栈上。
+
+### 6.4 分配存储期（Allocated Duration）
+
+`malloc/calloc/realloc` 返回的对象：
+- 显式 `free` 才销毁。
+- 位于堆上。
+- 详见 [[09-内存管理与堆栈]]。
+
+## 七、作用域（Scope）
+
+### 7.1 文件作用域（File Scope）
+
+在所有函数外声明的标识符，从声明处直到文件末尾可见：
+
+```c
+int global = 1;    // 文件作用域
+
+void f() { global++; }
+```
+
+### 7.2 函数作用域
+
+标签（`label`）的作用域是整个函数：
+
+```c
+void f() {
+    if (a) goto end;
+    // ...
+end:
+    ;
+}
+```
+
+### 7.3 块作用域
+
+`{ ... }` 内声明的标识符：
+
+```c
+void f() {
+    int x = 1;
+    {
+        int x = 2;   // 遮蔽外层 x
+        printf("%d\n", x);   // 2
+    }
+    printf("%d\n", x);       // 1
+}
+```
+
+### 7.4 函数原型作用域
+
+原型参数名的作用域仅限原型：
+
+```c
+int f(int n, int arr[n]);   // n 在参数列表可见（VLA 参数）
+```
+
+## 八、链接（Linkage）
+
+链接决定了同名标识符是否指向同一个对象：
+
+### 8.1 外部链接（External Linkage）
+
+多个翻译单元中的同名符号引用**同一对象**：
+- 全局变量（不带 `static`）
+- 函数（不带 `static`）
+
+### 8.2 内部链接（Internal Linkage）
+
+同一翻译单元中的同名符号引用同一对象，但**不跨翻译单元**：
+- `static` 全局变量
+- `static` 函数
+- 匿名命名空间（C++ 概念，C 没有）
+
+### 8.3 无链接（No Linkage）
+
+每次声明都指向不同对象：
+- 局部变量
+- 函数参数
+- typedef 名字、struct 标签等（这些无链接，但可以引用同一定义）
+
+## 九、组合表：类型 × 位置 × 说明符
+
+| 位置 | 无说明符 | `static` | `extern` |
+| --- | --- | --- | --- |
+| 全局变量 | 静态存储期 + 外部链接 | 静态存储期 + 内部链接 | 声明外部变量 |
+| 局部变量 | 自动存储期 + 无链接 | 静态存储期 + 无链接 | 引用外部变量（罕见） |
+| 函数 | 外部链接 | 内部链接 | 与默认等价 |
+
+## 十、翻译单元（Translation Unit）
+
+一次预处理后的 .c 文件称为一个翻译单元。编译器**独立编译**每个 TU，得到 .o 文件，再由链接器合并。
+
+**含义**：
+- TU 之间只能通过 **有链接** 的符号交流。
+- 每个 TU 的头文件都是独立展开的——内联函数、宏、typedef 在 TU 间不"共享"。
+- **静态变量**：每个 TU 有独立拷贝。
+
+## 十一、`inline` 与链接
+
+C99 的 `inline` 规则复杂：
+
+- `inline` 函数默认**没有外部定义**——若被真的调用（而非内联），链接器找不到符号会报错。
+- 加 `extern inline`：生成一份外部可见的**定义**。
+- 加 `static inline`：内部链接，每个 TU 独立，最常用。
+
+**推荐**：**头文件里的可内联函数一律 `static inline`**：
+
+```c
+// header.h
+static inline int max(int a, int b) {
+    return a > b ? a : b;
+}
+```
+
+## 十二、Multiple Definition 问题
+
+**错误示范**：在头文件里定义变量或函数：
+
+```c
+// bad.h
+int shared = 0;    // ✗ 每个 include 它的 .c 都会有一份定义 → 链接错误
+void hello(void) { puts("hi"); }  // ✗ 同上
+```
+
+正确：
+```c
+// header.h
+extern int shared;   // 声明
+void hello(void);    // 声明
+
+// impl.c
+int shared = 0;
+void hello(void) { puts("hi"); }
+```
+
+## 十三、常见惯用法
+
+### 单例计数器
+
+```c
+int next_id(void) {
+    static int id = 0;
+    return ++id;
+}
+```
+
+**注意**：非线程安全，多线程要用 `atomic_int` 或锁。
+
+### 局部常量表
+
+```c
+const char *day_name(int i) {
+    static const char *names[] = {
+        "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"
+    };
+    return (i >= 0 && i < 7) ? names[i] : NULL;
+}
+```
+
+### 私有辅助函数
+
+```c
+// module.c
+static int helper(int x) { ... }   // 只在本文件用
+
+int public_api(int y) {
+    return helper(y * 2);
+}
+```
+
+### 线程局部计数器
+
+```c
+#include <threads.h>
+_Thread_local int local_cnt;
+```
+
+每个线程独立。
+
+## 十四、C++ 差异
+
+- C++ 的 `static` 全局变量仍有内部链接。
+- C++ 的匿名命名空间（`namespace { }`）替代 static 提供内部链接。
+- C++ 的 `inline` 语义**完全不同**——每个使用点单独实例化，多份定义合并。
+- C++ 的 `const` 全局默认是内部链接。
+
+## 十五、诊断技巧
+
+### 查看符号表
+
+```bash
+nm prog.o
+# T = 已定义外部符号 (text)
+# t = 已定义内部符号（static 函数）
+# U = 未定义（extern 引用）
+# D = 已定义数据（.data）
+# B = 已定义 BSS
+```
+
+### 检查未解析符号
+
+```bash
+gcc -c *.c
+ld -r *.o -o combined.o
+nm combined.o | grep " U "
+```
+
+### 常见链接错误
+
+- `undefined reference to 'foo'`：找不到定义，可能忘了链接某个 .o 或库。
+- `multiple definition of 'foo'`：多次定义，检查是否在头文件里定义。
+
+## 十六、总结表
+
+| 场景 | 建议 |
+| --- | --- |
+| 只在一个函数用的持久状态 | `static` 局部 |
+| 只在一个文件用的辅助函数 | `static` 函数 |
+| 只在一个文件用的常量数据 | `static const` 全局 |
+| 多文件共享的变量 | 声明放头文件（`extern`），定义放一个 .c |
+| 多文件共享的函数 | 声明放头文件，定义放一个 .c |
+| 头文件内的小函数 | `static inline` |
+| 线程独有的变量 | `_Thread_local` |
+
+</WordCount>

@@ -1,0 +1,225 @@
+import WordCount from '../../../../src/components/WordCount/WordCount';
+import Mermaid from '@theme/Mermaid';
+
+<WordCount>
+
+## 一、C 语言的定位
+
+C 是一门 **面向过程、编译型、静态类型、低层级抽象** 的通用编程语言。它介于「汇编」与「高级语言」之间，被称为 **可移植的汇编**：既能直接操作内存、寄存器、指针，又提供函数、结构体、控制流等结构化抽象。
+
+它至今在系统级软件的核心地位无人撼动：
+
+- 操作系统内核（Linux、Windows NT 内核、macOS XNU、FreeBSD、RTOS）
+- 编译器与运行时（GCC、LLVM、CPython 解释器、V8 底层、JVM HotSpot）
+- 数据库引擎（SQLite、PostgreSQL、Redis、MySQL）
+- 嵌入式与固件（MCU 裸机程序、Arduino、STM32 HAL、RT-Thread）
+- 网络协议栈与驱动程序（TCP/IP 实现、网卡驱动、GPU 驱动 shim）
+- 语言互操作层（Python C API、Node.js N-API、Rust FFI、几乎所有语言的 C ABI）
+
+**关键设计目标**（Dennis Ritchie 原话概括）：
+1. **贴近机器**：语言语义与硬件行为一一对应，没有隐藏成本（*"you don't pay for what you don't use"*，这句话后来成为 C++ 的口号，但源自 C）。
+2. **可移植**：只依赖抽象的机器模型（字节可寻址、有寄存器、有栈），不绑定具体指令集。
+3. **简洁**：语言规范可以印在几张纸上，编译器实现相对简单，方便新平台快速自举。
+
+## 二、发展历史
+
+<Mermaid value={`
+timeline
+    title C 语言演进
+    1969-1970 : B 语言 : Ken Thompson 在 PDP-7 上开发
+    1972 : C 语言诞生 : Dennis Ritchie 在贝尔实验室基于 B 改造
+    1973 : Unix 用 C 重写 : Unix V4 内核完全用 C
+    1978 : K&R C : Kernighan & Ritchie《The C Programming Language》
+    1989 : ANSI C (C89) : ANSI X3.159-1989
+    1990 : ISO C (C90) : 与 ANSI C89 内容等价
+    1995 : C95 修正 : Amendment 1，加入宽字符
+    1999 : C99 : VLA / inline / //注释 / stdint / bool
+    2011 : C11 : 多线程 / 原子操作 / _Generic / 静态断言
+    2018 : C17 : 缺陷修复版
+    2023 : C23 : nullptr / typeof / constexpr / #embed
+`} />
+
+### 2.1 从 BCPL 到 B 到 C
+
+- **BCPL**（Basic Combined Programming Language，1966，Martin Richards）：无类型语言，一切都是「字」（word）。
+- **B**（1969，Ken Thompson）：BCPL 的简化版，同样是无类型的字机器语言。运行在 PDP-7 上，用于早期 Unix。
+- **C**（1972，Dennis Ritchie）：为了把 Unix 移植到有字节寻址能力的 PDP-11，引入了 **类型系统**（`char`/`int`/`float`）与 **结构体**。名字上是 B 的下一个字母。
+
+### 2.2 K&R C（1978）
+
+Brian Kernighan 与 Dennis Ritchie 出版的《The C Programming Language》第一版，事实上定义了早期 C 的规范。特征：
+
+- 函数参数使用「老式」声明：
+  ```c
+  int add(a, b)
+      int a;
+      int b;
+  {
+      return a + b;
+  }
+  ```
+- 默认返回 `int`，不写返回类型即默认整型。
+- 没有 `void` 类型。
+- 没有函数原型，编译器无法在调用点检查参数类型。
+
+### 2.3 ANSI C / C89 / C90
+
+1989 年 ANSI 委员会（X3J11）标准化，1990 年 ISO 采纳为 **ISO/IEC 9899:1990**（内容一致）。这是我们说「标准 C」的起点。引入：
+
+- **函数原型**（`int add(int a, int b);`）
+- **`void`** 类型与 `void *`
+- **`const`、`volatile`** 类型限定符
+- **标准库**（`<stdio.h>`、`<string.h>`、`<stdlib.h>` 等）
+- **三字符序列**（trigraphs），如 `??=` 表示 `#`（应对早期键盘缺失字符）
+
+### 2.4 C99（1999）
+
+标准编号 **ISO/IEC 9899:1999**。这是 C 语言的一次重大升级：
+
+| 特性 | 说明 |
+| --- | --- |
+| `//` 单行注释 | 从 C++ 借来 |
+| `long long` | 至少 64 位整数 |
+| `bool` / `_Bool` | 布尔类型（`<stdbool.h>`） |
+| `stdint.h` | `int8_t`、`uint64_t` 等定长整数 |
+| VLA | 变长数组（Variable Length Array） |
+| 复合字面量 | `(struct Point){1, 2}` |
+| 指定初始化 | `struct S s = { .x = 1, .y = 2 };` |
+| `inline` | 内联函数建议 |
+| `restrict` | 指针别名优化提示 |
+| `_Complex` | 复数类型 |
+| 可变宏 | `#define LOG(...) printf(__VA_ARGS__)` |
+| `snprintf` | 安全格式化 |
+
+### 2.5 C11（2011）
+
+标准编号 **ISO/IEC 9899:2011**。响应多核时代与安全需求：
+
+| 特性 | 说明 |
+| --- | --- |
+| `<threads.h>` | 标准线程库 |
+| `<stdatomic.h>` | 原子操作与内存模型 |
+| `_Alignof` / `_Alignas` | 显式对齐控制 |
+| `_Static_assert` | 编译期断言 |
+| `_Generic` | 类型泛型选择（type-generic selection） |
+| 匿名结构体/联合 | 嵌套时省略名字 |
+| `char16_t` / `char32_t` | Unicode 支持 |
+| 移除 `gets` | 危险函数正式弃用 |
+
+### 2.6 C17（2018）
+
+标准编号 **ISO/IEC 9899:2018**。**无新语言特性**，纯粹是 C11 的缺陷修复版（DR = Defect Report），通常被视为 "C11 SP1"。
+
+### 2.7 C23（2023）
+
+标准编号 **ISO/IEC 9899:2024**（虽然叫 C23）。现代化 C 的一次跃迁：
+
+| 特性 | 说明 |
+| --- | --- |
+| `nullptr` | 类型安全的空指针常量 |
+| `typeof` / `typeof_unqual` | 标准化的类型推导 |
+| `constexpr` | 编译期常量（对象非仅字面量） |
+| `bool` / `true` / `false` | 直接内置，无需 `<stdbool.h>` |
+| `#embed` | 直接嵌入二进制文件 |
+| `[[attribute]]` | C++ 风格属性语法 |
+| 二进制字面量 | `0b1010` |
+| `'` 数字分隔符 | `1'000'000` |
+| UTF-8 字符字面量 | `u8'A'` |
+| `auto` | 类型推导 |
+| `enum : type` | 显式指定枚举底层类型 |
+| 更严格的对齐 | `alignas` 成为关键字 |
+
+## 三、C 的编译模型
+
+C 是 **静态编译** 语言，源代码要经过完整的编译链路才能执行。
+
+<Mermaid value={`
+flowchart LR
+    A[".c 源文件"] --> B["预处理器 cpp"]
+    B --> C[".i 预处理后源文件"]
+    C --> D["编译器 cc1"]
+    D --> E[".s 汇编代码"]
+    E --> F["汇编器 as"]
+    F --> G[".o 目标文件"]
+    G --> H["链接器 ld"]
+    I[["静态库 .a"]] --> H
+    J[["动态库 .so"]] --> H
+    H --> K["可执行文件"]
+`} />
+
+- **预处理**：处理 `#include`、`#define`、`#if`、`#pragma`；输出仍是 C 源码。
+- **编译**：语法分析、语义检查、优化、生成目标平台汇编。
+- **汇编**：把汇编翻译为机器码，产出可重定位目标文件（ELF / Mach-O / PE / COFF）。
+- **链接**：合并多个目标文件与库，解析符号引用，安排最终地址布局。
+
+## 四、C 的抽象机器模型
+
+C 标准并不描述 CPU 指令，而是描述一个 **抽象机**：
+
+- 内存是一片按字节寻址的线性空间；每个字节有唯一地址。
+- 变量位于内存中，通过 **左值（lvalue）** 与 **右值（rvalue）** 参与运算。
+- 表达式的求值受 **序列点（sequence point）** 约束（C11 起改称 **sequenced before** 关系）。
+- 编译器可以任意重排、内联、消除代码，**只要不改变可观察行为**（"as-if" rule）。
+
+「可观察行为」包括：
+1. 对 `volatile` 变量的读写。
+2. 程序结束时的 `stdout` 内容。
+3. 交互式设备的 I/O 时序。
+
+这个模型是 C 一切优化的基石，也是初学者最易踩坑的抽象：**你写的代码不一定按你写的顺序执行**。
+
+## 五、Hello World 的完整旅程
+
+```c
+#include <stdio.h>
+
+int main(void) {
+    printf("Hello, World!\n");
+    return 0;
+}
+```
+
+看似 5 行，实则涉及：
+
+1. 预处理器把 `<stdio.h>` 的 800+ 行声明展开进来。
+2. 编译器识别 `main` 是入口函数（由 C 运行时 `_start` → `__libc_start_main` → `main` 触发）。
+3. `printf` 是标准库导出的动态符号，链接器把它绑到 `libc.so.6`。
+4. `"Hello, World!\n"` 是只读字符串常量，存放在只读数据段 `.rodata`。
+5. `return 0` 的值经系统调用 `exit(0)` 传给操作系统作为退出码。
+
+如果我们用 `gcc -E`、`-S`、`-c`、`-o` 拆开每一步：
+
+```bash
+gcc -E hello.c -o hello.i    # 预处理
+gcc -S hello.i -o hello.s    # 编译
+gcc -c hello.s -o hello.o    # 汇编
+gcc hello.o -o hello         # 链接
+```
+
+理解这一链条，是从「写代码」到「懂 C」的分水岭。后续章节会一一展开每个环节。
+
+## 六、本系列导航
+
+| 章节 | 主题 |
+| --- | --- |
+| 01 | C 语言概述与历史（本篇） |
+| 02 | 数据类型与变量 |
+| 03 | 运算符与表达式 |
+| 04 | 控制流 |
+| 05 | 函数与栈帧 |
+| 06 | 指针深入 |
+| 07 | 数组与字符串 |
+| 08 | 结构体、联合、位域 |
+| 09 | 内存管理与堆栈 |
+| 10 | 预处理器与宏 |
+| 11 | 存储类与链接 |
+| 12 | 位操作 |
+| 13 | 文件与 I/O |
+| 14 | 编译链接过程 |
+| 15 | 未定义行为 |
+| 16 | 高级技巧与惯用法 |
+| 17 | C11 多线程与原子 |
+| 18 | C 标准演进对比 |
+| 19 | 独立实现基本操作函数 |
+
+</WordCount>

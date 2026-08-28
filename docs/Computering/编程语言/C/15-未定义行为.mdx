@@ -1,0 +1,377 @@
+import WordCount from '../../../../src/components/WordCount/WordCount';
+import Mermaid from '@theme/Mermaid';
+
+<WordCount>
+
+C 标准里有 **200+ 处** 未定义或未指定行为——它们是 C 危险的根源，也是编译器优化的地基。理解 UB 是从"能写 C"到"能写对 C"的关键跨越。
+
+## 一、四种"不良行为"
+
+C 标准区分四种：
+
+| 类别 | 英文 | 含义 |
+| --- | --- | --- |
+| **未定义行为** | Undefined Behavior (UB) | 标准完全不做任何要求；程序可能崩溃、给出错误结果、格式化硬盘（笑）。**最危险**。 |
+| **未指定行为** | Unspecified Behavior | 有几种可能的合法结果，标准不指定哪一种；编译器**不必**记录选择。 |
+| **实现定义行为** | Implementation-Defined | 有几种可能的合法结果；编译器**必须**记录选择。 |
+| **区域行为** | Locale-Specific | 与地区/字符集设置相关（`setlocale`）。 |
+
+### 例子对照
+
+```c
+// UB：解引用空指针
+int *p = NULL;
+*p = 42;
+
+// Unspecified：函数参数求值顺序
+f(a++, a++);
+
+// Implementation-defined：char 是否有符号；有符号右移
+char c;
+int x = -1 >> 1;
+
+// Locale-specific：isalpha('é') 是否为真
+```
+
+## 二、UB 的"编译器视角"
+
+**核心原则**：编译器**假设 UB 永不发生**。这个假设是许多优化的前提。
+
+```c
+int *p;
+if (p != NULL) {
+    *p = 42;      // 只有 p != NULL 才会执行到这
+}
+*p = 43;          // ✗ 无条件解引用！
+
+// 编译器推理：既然 *p 无条件执行且 *p 是 UB 当 p==NULL
+// → 那 p 必然 != NULL
+// → 可以删掉前面的 if 判断（作为死代码）
+```
+
+真实案例：Linux 内核 CVE-2009-1897——`tun_chr_poll` 里对 `NULL` 指针的检查被 GCC 优化掉。
+
+## 三、常见 UB 详解
+
+### 3.1 空指针解引用
+
+```c
+int *p = NULL;
+*p;             // ✗
+p->x;           // ✗
+```
+
+大多数系统 segfault，但**标准不保证**（嵌入式 0 地址可能可读写）。
+
+### 3.2 未初始化变量的读取
+
+```c
+int x;
+printf("%d\n", x);   // ✗ UB
+```
+
+用 `-Wall` 或 UBSan 检测。修法：**初始化即声明**。
+
+### 3.3 有符号整数溢出
+
+```c
+int x = INT_MAX;
+x + 1;          // ✗ UB
+```
+
+`-fwrapv` 强制成回绕语义（可预测但非标准）；`-ftrapv` 溢出时 trap。
+
+**无符号整数溢出**是**回绕**（well-defined）：
+```c
+unsigned u = UINT_MAX;
+u + 1;          // = 0，合法
+```
+
+### 3.4 除以零
+
+```c
+int y = x / 0;    // ✗ UB（浮点除零 → INFINITY/NAN，视 IEEE 754）
+int y = x % 0;    // ✗ UB
+```
+
+浮点除零：`1.0/0.0 == INFINITY`，标准允许。
+
+### 3.5 移位越界
+
+```c
+int x = 1 << 32;   // ✗ UB（对 32 位 int）
+int x = 1 << -1;   // ✗ UB
+int x = -1 << 1;   // ✗ UB（左移负数）
+```
+
+移位量必须在 `[0, 位宽)`。
+
+### 3.6 数组越界
+
+```c
+int arr[10];
+arr[10];         // ✗ 越界读，UB
+arr[-1];         // ✗
+```
+
+指向"最后一个元素之后"的指针是**合法的**（`arr + 10`），但**解引用它是 UB**。
+
+### 3.7 悬垂指针
+
+```c
+int *p;
+{
+    int x = 1;
+    p = &x;
+}
+*p;              // ✗ UB
+```
+
+见 [[06-指针深入]] 与 [[09-内存管理与堆栈]]。
+
+### 3.8 释放后使用（Use-After-Free）
+
+```c
+free(p);
+*p;              // ✗
+```
+
+### 3.9 双重释放
+
+```c
+free(p);
+free(p);         // ✗
+```
+
+### 3.10 违反严格别名
+
+```c
+float f = 3.14f;
+int   i = *(int *)&f;    // ✗ 违反 strict aliasing，UB
+```
+
+修法：`memcpy` 或 `union`。
+
+### 3.11 修改字符串字面量
+
+```c
+char *s = "hello";
+s[0] = 'H';      // ✗ UB
+```
+
+### 3.12 同一表达式内多次修改
+
+```c
+i = i++;         // ✗
+a[i] = i++;      // ✗
+```
+
+### 3.13 无 `return` 的非 void 函数
+
+```c
+int f() {
+    // 忘 return
+}
+int x = f();     // ✗ UB（读了未定义返回值）
+```
+
+`main` 是特例——C99 起自动返回 0。
+
+### 3.14 函数指针类型不匹配
+
+```c
+void f(int);
+void (*fp)(void) = (void (*)(void))f;
+fp();            // ✗ UB
+```
+
+### 3.15 volatile 缺失的信号处理
+
+信号处理程序访问的变量必须是 `volatile sig_atomic_t`，否则 UB。
+
+## 四、未指定行为
+
+编译器可以选择，且**不同调用可以选择不同**：
+
+- 函数参数求值顺序：`f(a(), b())` 中 `a` 和 `b` 谁先执行。
+- 位域内的具体位排列。
+- `malloc(0)` 返回什么。
+- 空块 `{}` 之间的顺序无关操作顺序。
+
+**代码不该依赖任何一个具体选择**。
+
+## 五、实现定义行为
+
+编译器必须在文档里说清楚：
+
+- `char` 是否有符号。
+- `int` 是几位。
+- 有符号右移是算术还是逻辑。
+- `enum` 的底层类型。
+- 空指针的位模式（不一定全 0！）。
+- 浮点是不是 IEEE 754。
+
+**跨平台代码应查阅编译器手册或用定长类型规避**。
+
+## 六、UB 导致的经典 Bug
+
+### 6.1 GCC 优化掉空指针检查（Linux CVE）
+
+```c
+struct sock *sk = tun->sk;   // sk 可能为 NULL
+// ...
+if (!tun)                     // 检查太晚
+    return POLLERR;
+```
+
+`tun->sk` 先解引用 `tun`，编译器推断 `tun != NULL`，删除后面的检查。修法：先检查再解引用。
+
+### 6.2 Time Bomb（时间炸弹）
+
+有符号溢出 UB 让某些循环变为无限循环或提前终止：
+
+```c
+for (int i = 0; i < INT_MAX; i++) { ... }   // OK
+for (int i = 0; i * i > 0; i++) { ... }     // i*i 溢出后可能负、但 UB → 编译器可能推断"永远不溢出"，循环变无限
+```
+
+### 6.3 未初始化变量的"神秘"值
+
+```c
+int x;
+if (x == 42) launch_missiles();   // "从不会执行"？不，UB，编译器可以任意假设
+```
+
+### 6.4 双重释放引发 heap 漏洞
+
+`free(p); free(p);` 可被 attacker 利用绕过 ASLR、Canary。
+
+## 七、检测工具
+
+### 7.1 编译器警告
+
+```bash
+gcc -Wall -Wextra -Wpedantic -Werror
+```
+
+常用有价值的额外警告：
+- `-Wshadow` 变量遮蔽
+- `-Wcast-align` 强转破坏对齐
+- `-Wstrict-aliasing`
+- `-Wnull-dereference`
+- `-Wformat=2` 更严格 printf 检查
+
+### 7.2 UBSan（UndefinedBehaviorSanitizer）
+
+```bash
+gcc -fsanitize=undefined -g prog.c
+./a.out
+```
+
+运行时检测：
+- 有符号溢出
+- 移位越界
+- 空指针解引用
+- 数组越界（配合 `-fsanitize=bounds`）
+- 未对齐访问
+
+### 7.3 ASan（AddressSanitizer）
+
+检测内存错误（越界、UAF、双释放）。
+
+### 7.4 静态分析
+
+- **`clang --analyze`**：Clang Static Analyzer
+- **`scan-build`**：包装
+- **`cppcheck`**：轻量
+- **Coverity / SonarQube**：商业级
+- **`-fanalyzer`**（GCC 10+）：新兴 GCC 分析器
+
+### 7.5 Fuzzing
+
+用随机/畸形输入疯狂触发路径：
+- **AFL / AFL++**：Coverage-guided fuzzer
+- **libFuzzer**：LLVM 内建
+- **OSS-Fuzz**：Google 免费给开源项目做 fuzzing
+
+许多 UB 靠 fuzzing 才能被发现。
+
+## 八、防御性编程
+
+### 8.1 使用 `-fwrapv` / `-fno-strict-aliasing`
+
+强制部分 UB 变为可预测行为——代价是丧失一些优化。
+
+```bash
+gcc -fwrapv          # 有符号溢出回绕
+gcc -fno-strict-aliasing  # 允许类型双关
+gcc -fno-delete-null-pointer-checks  # 内核常用
+```
+
+Linux 内核编译几乎必开这几个。
+
+### 8.2 断言
+
+```c
+assert(p != NULL);
+assert(idx < ARRAY_SIZE(arr));
+```
+
+Release 版本会被 `NDEBUG` 关掉——重要检查用 `if (unlikely(...)) abort()` 或运行时检查。
+
+### 8.3 使用现代 C 标准
+
+C11 起有 `_Static_assert` 编译期检查；`stdatomic.h` 明确定义了多线程行为。
+
+## 九、UB vs UB-lite（编译器有承诺的 UB）
+
+某些编译器把某些 UB 定义得更清晰：
+
+- **MSVC**：有符号溢出定义为回绕。
+- **GCC/Clang -fwrapv**：同上。
+- **C 标准**：不做承诺。
+
+**为可移植性**：写代码不依赖具体编译器的额外承诺。
+
+## 十、未指定 vs UB 的一个实用差别
+
+- **未指定**：程序仍是"合法程序"，只是结果可能变化。
+- **UB**：程序可能"整体"不合法——不仅那一处，前后代码都可能被优化掉。
+
+一句名言：*"Once your program hits UB, all bets are off."*
+
+## 十一、UB 快查表
+
+| UB | 修法 |
+| --- | --- |
+| 空指针解引用 | 检查 NULL |
+| 未初始化读 | 声明即初始化 |
+| 数组越界 | 边界检查 |
+| 有符号溢出 | 用无符号或加检查 |
+| 除零 | 判 0 |
+| 移位越界 | 检查 shift 量 |
+| 悬垂指针 | free 后置 NULL |
+| 双释放 | free 后置 NULL |
+| 严格别名违反 | 用 memcpy / union |
+| 修改字面量 | 用数组 |
+| `void` 函数缺 return | 让编译器发警告 |
+| 表达式内多次修改 | 拆语句 |
+| 函数指针类型不符 | 严格匹配 |
+| 使用未定义信号处理 | 用 sig_atomic_t |
+
+## 十二、名家论 UB
+
+- **John Regehr**：《A Guide to Undefined Behavior in C and C++》——UB 圣经。
+- **Chris Lattner**：《What Every C Programmer Should Know About Undefined Behavior》——LLVM 视角。
+- **Krister Walfridsson**：GCC 内部人士的一系列博客。
+- **Nikita Popov**：CS 团队关于优化与 UB 的分析。
+
+## 十三、总结
+
+- UB 是**编译器与程序员的契约**：程序员承诺不触发，编译器基于此优化。
+- **不要**依靠 UB 的"通常行为"——它可能在下个版本编译器变化。
+- **用现代工具**（ASan、UBSan、静态分析）把 UB 消灭在开发期。
+- **警告零容忍**：`-Wall -Wextra -Werror` 常态化。
+- **优选安全 API**：`snprintf`、`strn*`、`memcpy` + `memcmp`。
+
+</WordCount>

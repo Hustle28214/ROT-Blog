@@ -1,0 +1,683 @@
+import WordCount from '../../../../src/components/WordCount/WordCount';
+import Mermaid from '@theme/Mermaid';
+
+<WordCount>
+
+C 标准库中很多函数（`memcpy`、`strcpy`、`strlen` 等）是面试与工程实践中的高频考点。手写实现这些函数，不仅是对 C 语言指针、内存、边界条件掌握程度的直接检验，也是理解标准库内部机制、性能优化思路的最佳途径。
+
+本文按功能分类，给出常见基础函数的**独立实现**、**边界处理**、**易错点**、**优化思路**以及**与标准库行为的差异**。
+
+:::tip 通用约定
+- 所有实现均使用 `size_t`（C 中表示大小的无符号类型）替代 `int`，避免负数与截断问题。
+- 涉及只读输入的形参统一使用 `const` 修饰。
+- 返回值尽量与标准库保持一致，方便对齐语义。
+- 除非明确说明，函数不做 `NULL` 检查（标准库 C99 也不做，UB 由调用方负责）。工程实践中可选择性加断言 `assert(dest != NULL)`。
+:::
+
+## 一、内存操作函数（`<string.h>`）
+
+### memcpy
+
+**实现目标**：从源地址 `src` 复制 `n` 个字节到目标缓冲区 `dest`。要求 `src` 和 `dest` **不重叠**（重叠时行为未定义，应改用 `memmove`）。
+
+```c
+void *my_memcpy(void *dest, const void *src, size_t n) {
+    // 字节级复制：转为 char* 便于逐字节推进
+    char *d = (char *)dest;
+    const char *s = (const char *)src;
+    while (n--) {
+        *d++ = *s++;
+    }
+    return dest;  // 返回原始 dest 指针，方便链式调用
+}
+```
+
+**易错点**：
+- `src` 必须用 `const void *`，`s` 必须用 `const char *`，否则会丢失只读语义。
+- 返回的是原始 `dest`（未被修改），不要返回被 `++` 推进后的 `d`。
+- 不能处理内存重叠：例如 `memcpy(arr+1, arr, 5)` 可能出错。
+
+**优化思路**（工业级实现常用）：
+
+```c
+void *my_memcpy_fast(void *dest, const void *src, size_t n) {
+    char *d = (char *)dest;
+    const char *s = (const char *)src;
+
+    // 1. 按字长（word）批量复制，减少循环次数
+    size_t word_size = sizeof(size_t);
+    while (n >= word_size) {
+        *(size_t *)d = *(const size_t *)s;
+        d += word_size;
+        s += word_size;
+        n -= word_size;
+    }
+    // 2. 剩余尾部按字节处理
+    while (n--) {
+        *d++ = *s++;
+    }
+    return dest;
+}
+```
+
+:::caution
+按字长复制需保证 `dest` 与 `src` 均按 `sizeof(size_t)` 对齐，否则某些架构（ARM、MIPS）会触发对齐异常。真实的 `glibc memcpy` 会先处理开头未对齐部分，再进入 SIMD 批量搬运。
+:::
+
+---
+
+### memmove
+
+**实现目标**：与 `memcpy` 语义相同，但**支持源、目标区域重叠**。
+
+**核心思路**：判断 `src` 与 `dest` 的先后关系：
+- 若 `dest < src`：从前往后复制（前面的字节先被读走后再被覆盖）。
+- 若 `dest > src`：从后往前复制（防止后面的源数据被前面的目标覆盖）。
+
+```c
+void *my_memmove(void *dest, const void *src, size_t n) {
+    char *d = (char *)dest;
+    const char *s = (const char *)src;
+
+    if (d == s || n == 0) return dest;
+
+    if (d < s) {
+        // 正向复制
+        while (n--) *d++ = *s++;
+    } else {
+        // 反向复制：先指向末尾
+        d += n;
+        s += n;
+        while (n--) *--d = *--s;
+    }
+    return dest;
+}
+```
+
+**示意图**：
+
+```
+情况 1: dest < src（正向安全）
+[ a b c d e f g h ]
+   ↑     ↑
+  dest  src        →  从左往右复制不会污染 src
+
+情况 2: dest > src（必须反向）
+[ a b c d e f g h ]
+   ↑     ↑
+  src   dest       →  必须从右往左，否则 src 后段先被覆盖
+```
+
+---
+
+### memset
+
+**实现目标**：将 `dest` 起始的 `n` 个字节全部设为值 `c`（低 8 位）。
+
+```c
+void *my_memset(void *dest, int c, size_t n) {
+    unsigned char *d = (unsigned char *)dest;
+    unsigned char byte = (unsigned char)c;  // 只取低 8 位
+    while (n--) {
+        *d++ = byte;
+    }
+    return dest;
+}
+```
+
+**易错点**：
+- 参数 `c` 是 `int`，但**只使用低 8 位**。因此 `memset(arr, 1, sizeof(arr))` 不会把 `int` 数组每个元素设为 `1`，而是每字节设为 `0x01`（即每个 `int` 变成 `0x01010101`）。
+- 常用技巧：`memset(arr, 0, sizeof(arr))` 与 `memset(arr, -1, sizeof(arr))`（每字节 `0xFF`，`int` 视为 `-1`）是常用惯用法。
+
+**优化**：同样可以按字长批量填充：
+
+```c
+void *my_memset_fast(void *dest, int c, size_t n) {
+    unsigned char *d = (unsigned char *)dest;
+    unsigned char byte = (unsigned char)c;
+    // 构造一个 size_t 大小的 pattern：0xCCCCCCCC...
+    size_t pattern = 0;
+    for (size_t i = 0; i < sizeof(size_t); i++) {
+        pattern = (pattern << 8) | byte;
+    }
+    while (n >= sizeof(size_t)) {
+        *(size_t *)d = pattern;
+        d += sizeof(size_t);
+        n -= sizeof(size_t);
+    }
+    while (n--) *d++ = byte;
+    return dest;
+}
+```
+
+---
+
+### memcmp
+
+**实现目标**：按字节比较两块内存，返回值符号表示大小关系。
+
+```c
+int my_memcmp(const void *s1, const void *s2, size_t n) {
+    const unsigned char *p1 = (const unsigned char *)s1;
+    const unsigned char *p2 = (const unsigned char *)s2;
+    while (n--) {
+        if (*p1 != *p2) {
+            return (int)(*p1) - (int)(*p2);
+        }
+        p1++;
+        p2++;
+    }
+    return 0;
+}
+```
+
+**易错点**：必须用 `unsigned char` 比较，否则 `0xFF` 与 `0x01` 的比较结果会因符号扩展而错误。
+
+---
+
+### memchr
+
+**实现目标**：在 `s` 起始的 `n` 个字节中查找第一次出现的字节 `c`，找到返回其地址，否则返回 `NULL`。
+
+```c
+void *my_memchr(const void *s, int c, size_t n) {
+    const unsigned char *p = (const unsigned char *)s;
+    unsigned char target = (unsigned char)c;
+    while (n--) {
+        if (*p == target) {
+            return (void *)p;  // 剥离 const 是标准库的做法
+        }
+        p++;
+    }
+    return NULL;
+}
+```
+
+---
+
+## 二、字符串操作函数（`<string.h>`）
+
+C 字符串以 `'\0'` 结尾，因此这一类函数无需显式长度参数，但也因此**存在缓冲区溢出风险**。
+
+### strlen
+
+**实现目标**：返回字符串长度（不含结尾 `'\0'`）。
+
+```c
+size_t my_strlen(const char *s) {
+    const char *p = s;
+    while (*p) p++;
+    return (size_t)(p - s);
+}
+```
+
+**优化**：`glibc` 采用「按字长扫描 + bit trick」检测零字节，比逐字节快数倍。核心思想：一次读 8 字节，通过 `(word - 0x0101...01) & ~word & 0x8080...80` 判断是否含零字节。
+
+---
+
+### strcpy
+
+**实现目标**：将源字符串（含末尾 `'\0'`）复制到目标缓冲区，返回 `dest`。
+
+```c
+char *my_strcpy(char *dest, const char *src) {
+    char *ret = dest;                        // 保留原始 dest 用于返回
+    while ((*dest++ = *src++) != '\0');      // '\0' 也被复制，作为结束条件
+    return ret;
+}
+```
+
+:::caution 常见 bug
+初版实现容易写成 `return dest`，此时 `dest` 已被 `++` 推进到末尾。正确做法是**保留原始指针**再返回。
+:::
+
+**风险**：`strcpy` 不检查目标缓冲区大小，是历史上最常见的缓冲区溢出源之一。工程实践应使用 `strncpy` 或 `snprintf`。
+
+---
+
+### strncpy
+
+**实现目标**：最多复制 `n` 个字节；若 `src` 长度不足 `n`，剩余部分用 `'\0'` 填充；若 `src` 长度大于等于 `n`，**目标不会以 `'\0'` 结尾**。
+
+```c
+char *my_strncpy(char *dest, const char *src, size_t n) {
+    char *ret = dest;
+    size_t i = 0;
+    // 阶段 1: 复制 src 直到 '\0' 或达到 n
+    while (i < n && src[i] != '\0') {
+        dest[i] = src[i];
+        i++;
+    }
+    // 阶段 2: 剩余部分填 '\0'
+    while (i < n) {
+        dest[i++] = '\0';
+    }
+    return ret;
+}
+```
+
+:::warning strncpy 陷阱
+`strncpy` **并不保证以 `\0` 结尾**，这是与直觉不符的行为，也是 CVE 常客。安全替代品是 `strlcpy`（BSD）或 `snprintf(dest, n, "%s", src)`。
+:::
+
+---
+
+### strcat / strncat
+
+**实现目标**：将 `src` 追加到 `dest` 已有字符串之后（含 `'\0'`）。
+
+```c
+char *my_strcat(char *dest, const char *src) {
+    char *ret = dest;
+    while (*dest) dest++;                    // 定位到 dest 末尾的 '\0'
+    while ((*dest++ = *src++) != '\0');      // 从 '\0' 位置开始追加
+    return ret;
+}
+
+char *my_strncat(char *dest, const char *src, size_t n) {
+    char *ret = dest;
+    while (*dest) dest++;
+    while (n-- && *src) {
+        *dest++ = *src++;
+    }
+    *dest = '\0';                            // 显式补零（strncat 保证 \0 结尾）
+    return ret;
+}
+```
+
+**注意**：`strncat` 与 `strncpy` 不同，**保证结果以 `\0` 结尾**，且 `n` 只限制**追加**的最大长度，不含 `\0` 本身。
+
+---
+
+### strcmp / strncmp
+
+```c
+int my_strcmp(const char *s1, const char *s2) {
+    while (*s1 && *s1 == *s2) {
+        s1++;
+        s2++;
+    }
+    return (int)(unsigned char)*s1 - (int)(unsigned char)*s2;
+}
+
+int my_strncmp(const char *s1, const char *s2, size_t n) {
+    while (n && *s1 && *s1 == *s2) {
+        s1++;
+        s2++;
+        n--;
+    }
+    if (n == 0) return 0;
+    return (int)(unsigned char)*s1 - (int)(unsigned char)*s2;
+}
+```
+
+**易错点**：与 `memcmp` 相同，需强转 `unsigned char` 保证大小语义。
+
+---
+
+### strchr / strrchr
+
+```c
+char *my_strchr(const char *s, int c) {
+    char target = (char)c;
+    while (*s) {
+        if (*s == target) return (char *)s;
+        s++;
+    }
+    // 特别地，'\0' 也在查找范围内（标准要求）
+    return (target == '\0') ? (char *)s : NULL;
+}
+
+char *my_strrchr(const char *s, int c) {
+    char target = (char)c;
+    const char *last = NULL;
+    while (*s) {
+        if (*s == target) last = s;
+        s++;
+    }
+    if (target == '\0') return (char *)s;
+    return (char *)last;
+}
+```
+
+---
+
+### strstr
+
+**实现目标**：在 `haystack` 中查找 `needle` 首次出现的位置。
+
+**朴素实现**（时间复杂度 O(mn)）：
+
+```c
+char *my_strstr(const char *haystack, const char *needle) {
+    if (*needle == '\0') return (char *)haystack;  // 空串永远匹配
+    for (; *haystack; haystack++) {
+        const char *h = haystack;
+        const char *n = needle;
+        while (*h && *n && *h == *n) {
+            h++;
+            n++;
+        }
+        if (*n == '\0') return (char *)haystack;
+    }
+    return NULL;
+}
+```
+
+**优化**：工业级实现通常采用 **KMP** 或 **Two-way string matching** 算法（`glibc` 使用后者），最坏时间复杂度可降至 O(m+n)。
+
+---
+
+## 三、字符串与数值转换（`<stdlib.h>`）
+
+### atoi
+
+**实现目标**：将字符串转为 `int`。规则：跳过前导空白、可选正负号、解析连续数字直到非数字字符。
+
+```c
+#include <limits.h>
+#include <ctype.h>
+
+int my_atoi(const char *s) {
+    // 1. 跳过前导空白
+    while (isspace((unsigned char)*s)) s++;
+
+    // 2. 处理符号
+    int sign = 1;
+    if (*s == '+' || *s == '-') {
+        if (*s == '-') sign = -1;
+        s++;
+    }
+
+    // 3. 解析数字并处理溢出
+    long result = 0;
+    while (*s >= '0' && *s <= '9') {
+        result = result * 10 + (*s - '0');
+        // 溢出饱和：向 INT_MAX/INT_MIN 截断（LeetCode 8 语义）
+        if (sign == 1 && result > INT_MAX) return INT_MAX;
+        if (sign == -1 && -result < INT_MIN) return INT_MIN;
+        s++;
+    }
+    return (int)(sign * result);
+}
+```
+
+**易错点**：
+- 忽略前导空白与符号处理。
+- 溢出未处理时，超大数字会产生 UB（有符号溢出）。
+- 严格按 C 标准，`atoi` 遇错返回 0 且不报错；`strtol` 才提供完整错误信息（`errno`、`endptr`）。
+
+---
+
+### itoa（非标准，Windows 特有）
+
+**实现目标**：将 `int` 转为字符串（支持任意进制）。
+
+```c
+char *my_itoa(int value, char *buf, int base) {
+    if (base < 2 || base > 36) {
+        *buf = '\0';
+        return buf;
+    }
+
+    char *ptr = buf, *ptr1 = buf, tmp_char;
+    int tmp_value;
+
+    // 反向填充数字
+    do {
+        tmp_value = value;
+        value /= base;
+        *ptr++ = "zyxwvutsrqponmlkjihgfedcba9876543210123456789abcdefghijklmnopqrstuvwxyz"
+                 [35 + (tmp_value - value * base)];
+    } while (value);
+
+    // 处理负号（仅十进制有意义）
+    if (tmp_value < 0) *ptr++ = '-';
+    *ptr-- = '\0';
+
+    // 反转字符串
+    while (ptr1 < ptr) {
+        tmp_char = *ptr;
+        *ptr-- = *ptr1;
+        *ptr1++ = tmp_char;
+    }
+    return buf;
+}
+```
+
+:::tip
+上面的实现来自 K&R，用一个静态字符串同时支持正负、并巧妙利用「35 + 负数」索引 `zyxw...` 段来支持负进制表示。工程中更推荐使用 `snprintf(buf, sz, "%d", value)`。
+:::
+
+---
+
+### atof（简化版）
+
+```c
+double my_atof(const char *s) {
+    while (isspace((unsigned char)*s)) s++;
+    double sign = 1.0;
+    if (*s == '+' || *s == '-') {
+        if (*s == '-') sign = -1.0;
+        s++;
+    }
+    // 整数部分
+    double result = 0.0;
+    while (*s >= '0' && *s <= '9') {
+        result = result * 10.0 + (*s - '0');
+        s++;
+    }
+    // 小数部分
+    if (*s == '.') {
+        s++;
+        double frac = 0.1;
+        while (*s >= '0' && *s <= '9') {
+            result += (*s - '0') * frac;
+            frac *= 0.1;
+            s++;
+        }
+    }
+    // 科学计数法
+    if (*s == 'e' || *s == 'E') {
+        s++;
+        int exp_sign = 1;
+        if (*s == '+' || *s == '-') {
+            if (*s == '-') exp_sign = -1;
+            s++;
+        }
+        int exp = 0;
+        while (*s >= '0' && *s <= '9') {
+            exp = exp * 10 + (*s - '0');
+            s++;
+        }
+        double p = 1.0;
+        for (int i = 0; i < exp; i++) p *= 10.0;
+        result = (exp_sign > 0) ? result * p : result / p;
+    }
+    return sign * result;
+}
+```
+
+:::caution
+上述实现是**教学版**，浮点解析的工业级实现（如 `strtod`）远比这复杂，涉及正确舍入（round-to-nearest-even）、次正规数、无穷大/NaN 处理，且需保证 double 类型的位精确。生产代码请使用 `strtod`。
+:::
+
+---
+
+## 四、简易内存分配器（`malloc/free`）
+
+真实的 `malloc` 极为复杂（分级 free list、mmap 大块、tcmalloc/jemalloc 等），下面给出**教学级 First-Fit** 实现，帮助理解基本原理。
+
+```c
+#include <unistd.h>   // sbrk
+#include <string.h>
+
+typedef struct block_header {
+    size_t size;                // 数据区大小
+    int free;                   // 是否空闲
+    struct block_header *next;  // 链表下一个块
+} block_t;
+
+#define BLOCK_SIZE sizeof(block_t)
+static block_t *head = NULL;
+
+// 查找空闲块（First-Fit）
+static block_t *find_free_block(block_t **last, size_t size) {
+    block_t *cur = head;
+    while (cur && !(cur->free && cur->size >= size)) {
+        *last = cur;
+        cur = cur->next;
+    }
+    return cur;
+}
+
+// 通过 sbrk 向系统申请新内存
+static block_t *request_space(block_t *last, size_t size) {
+    block_t *blk = (block_t *)sbrk(0);
+    void *req = sbrk(BLOCK_SIZE + size);
+    if (req == (void *)-1) return NULL;
+    if (last) last->next = blk;
+    blk->size = size;
+    blk->free = 0;
+    blk->next = NULL;
+    return blk;
+}
+
+void *my_malloc(size_t size) {
+    if (size == 0) return NULL;
+    block_t *blk;
+    if (!head) {
+        blk = request_space(NULL, size);
+        if (!blk) return NULL;
+        head = blk;
+    } else {
+        block_t *last = head;
+        blk = find_free_block(&last, size);
+        if (!blk) {
+            blk = request_space(last, size);
+            if (!blk) return NULL;
+        } else {
+            blk->free = 0;
+            // 生产实现还应尝试 split（当剩余空间足以容纳新块头时切分）
+        }
+    }
+    return (void *)(blk + 1);  // 跳过 header 返回数据区
+}
+
+void my_free(void *ptr) {
+    if (!ptr) return;
+    block_t *blk = (block_t *)ptr - 1;
+    blk->free = 1;
+    // 生产实现还应做 coalesce：合并相邻空闲块以减少碎片
+}
+```
+
+**扩展方向**：
+- **切分（split）**：分配时若空闲块过大，切出剩余部分挂回 free list。
+- **合并（coalesce）**：释放时若前后邻居空闲，合并成大块，缓解外部碎片。
+- **对齐**：数据区起始地址应满足最严格对齐（通常 8 或 16 字节），可用 `alignas(max_align_t)` 或位运算取整。
+- **分级 free list**：按大小分桶（如 `glibc` 的 fastbins/smallbins/largebins），减少查找开销。
+
+---
+
+## 五、其他常用工具函数
+
+### swap（不使用临时变量）
+
+```c
+// 通用版本（安全）
+#define SWAP(a, b, T) do { T _tmp = (a); (a) = (b); (b) = _tmp; } while (0)
+
+// 位异或版本（仅整数，且 a、b 必须是不同内存位置）
+#define SWAP_XOR(a, b) do { \
+    if (&(a) != &(b)) { (a) ^= (b); (b) ^= (a); (a) ^= (b); } \
+} while (0)
+```
+
+:::caution
+异或交换是「面试炫技」，工程中不推荐：不能用于浮点、指针；`a` 与 `b` 是同一变量时会将该值清零；`do-while(0)` 是宏封装成语句的标准技巧。
+:::
+
+---
+
+### 大小写转换
+
+```c
+int my_toupper(int c) {
+    return (c >= 'a' && c <= 'z') ? c - 32 : c;
+}
+
+int my_tolower(int c) {
+    return (c >= 'A' && c <= 'Z') ? c + 32 : c;
+}
+```
+
+`ASCII` 中大写与小写字母相差 32（`0x20`），因此位运算 `c & ~0x20` 转大写、`c | 0x20` 转小写更快，但需先确认 `c` 是字母。
+
+---
+
+### 判断大小端
+
+```c
+int is_little_endian(void) {
+    unsigned int x = 1;
+    return *(unsigned char *)&x == 1;   // 若首字节是 1，则小端
+}
+
+// 或用 union 更直观
+int is_little_endian_union(void) {
+    union { unsigned int u; unsigned char c; } t = { .u = 1 };
+    return t.c == 1;
+}
+```
+
+---
+
+### 位操作宏
+
+```c
+#define BIT_SET(x, n)    ((x) |=  (1U << (n)))
+#define BIT_CLR(x, n)    ((x) &= ~(1U << (n)))
+#define BIT_FLIP(x, n)   ((x) ^=  (1U << (n)))
+#define BIT_GET(x, n)    (((x) >> (n)) & 1U)
+
+// 求 x 的二进制中 1 的个数（Brian Kernighan 算法）
+int popcount(unsigned int x) {
+    int cnt = 0;
+    while (x) {
+        x &= (x - 1);   // 消去最低位的 1
+        cnt++;
+    }
+    return cnt;
+}
+```
+
+---
+
+## 六、易错点速查表
+
+| 类别 | 常见错误 | 正确做法 |
+| --- | --- | --- |
+| 类型 | 用 `int` 表示大小 | 用 `size_t` |
+| 常量 | 丢失 `const` 语义 | 输入指针加 `const` |
+| 返回值 | 返回被 `++` 后的指针 | 提前保存原始指针 |
+| 比较 | 用 `char` 比较导致符号扩展 | 强转 `unsigned char` |
+| 重叠 | `memcpy` 处理重叠区域 | 改用 `memmove` |
+| 缓冲区 | 不检查目标大小 | 使用 `strn*` 系列或显式长度参数 |
+| `strncpy` | 期待自动补 `\0` | 手动补 `\0` 或改用 `snprintf` |
+| `memset` | 期望按元素设值 | 只能按字节设 `0` 或 `-1` |
+| `atoi` | 未处理溢出/空白/符号 | 按标准流程分阶段处理 |
+| 位操作 | 移位数超过类型位宽 | 保证 `n < sizeof(T) * 8` |
+| 宏 | 表达式副作用（`SWAP(i++, j)`）| 用 `do-while(0)` + 类型参数 |
+
+---
+
+## 七、面试实战建议
+
+1. **先问清语义**：是否处理重叠？是否需要返回原指针？空指针是否合法？——这些是与面试官对齐需求的第一步。
+2. **写出边界条件**：`n == 0`、`dest == src`、`src == NULL`、超长输入……主动列出可展现工程思维。
+3. **先正确、再优化**：面试官更关心「你是否理解内存与指针」，而不是能否写出 SIMD 版本。逐字节实现 + 说明可用字长优化即可。
+4. **主动指出 UB**：例如 `memcpy` 重叠是 UB、`strcpy` 溢出是 UB、有符号溢出是 UB，明确指出能让你脱颖而出。
+5. **对比标准库行为**：主动提到「`strncpy` 不保证以 `\0` 结尾」「`memset` 只按字节」「`atoi` 不报错，`strtol` 才报错」等细节。
+
+</WordCount>

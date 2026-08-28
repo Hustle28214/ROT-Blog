@@ -1,0 +1,442 @@
+import WordCount from '../../../../src/components/WordCount/WordCount';
+import Mermaid from '@theme/Mermaid';
+
+<WordCount>
+
+指针是 C 语言最强大也最危险的抽象。它把「内存地址」从硬件概念提升到语言层面，让 C 能表达底层控制、动态数据结构、多态、回调，也导致了 C 程序中绝大多数灾难性 bug。
+
+## 一、指针的本质
+
+指针是一个变量，它的值是 **另一个对象的地址**。地址在硬件层面就是一个整数（32 位系统是 4 字节，64 位系统是 8 字节），但 C 通过类型给它加上了「指向什么」的语义。
+
+```c
+int  x = 42;
+int *p = &x;    // p 存 x 的地址
+*p = 100;       // 通过 p 修改 x：x 变成 100
+```
+
+<Mermaid value={`
+graph LR
+    P["p = 0x7ffe1234"] -->|指向| X["x = 42"]
+    style X fill:#eef
+    style P fill:#fee
+`} />
+
+关键运算符：
+- `&x`：**取地址**——获得 `x` 的地址。
+- `*p`：**解引用**——访问 `p` 指向的对象。
+
+`&` 与 `*` 互为逆运算：`*&x` 等价 `x`；`&*p` 等价 `p`。
+
+## 二、指针类型与算术
+
+指针**必须有类型**（除了 `void *`），因为**指针算术依赖于所指对象的大小**。
+
+```c
+int  arr[10];
+int *p = arr;
+p + 1;    // 不是 arr + 1 字节，而是 arr + sizeof(int) 字节
+```
+
+指针算术规则：
+- `p + n`：向后移动 `n * sizeof(*p)` 字节。
+- `p - n`：向前移动 `n * sizeof(*p)` 字节。
+- `p1 - p2`：返回两指针之间的元素个数（`ptrdiff_t`），**要求二者指向同一数组**。
+- 指针 + 指针：**非法**（没意义）。
+- 指针与整数比较：允许，语义就是地址比较。
+
+```c
+for (int *p = arr; p < arr + 10; p++) {
+    printf("%d\n", *p);
+}
+```
+
+## 三、指针的层级
+
+指针本身也可以有指针指向：
+
+```c
+int   x  = 1;
+int  *p  = &x;      // 一级指针
+int **pp = &p;      // 二级指针
+int ***ppp = &pp;   // 三级指针
+
+**pp   // 得 x = 1
+***ppp // 得 x
+```
+
+**常见用法**：
+- **修改指针本身**：`void alloc(int **out) { *out = malloc(4); }`
+- **二维数组模拟**：`char **argv`
+- **链表操作**：`struct node **pp` 在插入删除中减少特殊情况。
+
+## 四、`void *` — 通用指针
+
+`void *` 可以指向 **任意对象类型**，与其他指针类型可以互相隐式转换（C 中，C++ 需要显式）。**不能**：
+- 解引用 `*p`
+- 做指针算术（GCC 扩展中允许，按字节 +1）
+
+```c
+void *p = malloc(100);
+int  *q = p;          // 自动转换
+char *c = p;          // 也可以
+```
+
+`memcpy`、`qsort`、`malloc` 等标准库通过 `void *` 实现类型无关接口。
+
+## 五、`const` 与指针（右左法则）
+
+### 三种组合
+
+```c
+const int *p;      // 指向 const int：*p 只读，p 可变
+int * const p;     // const 指针：*p 可变，p 不可变
+const int * const p; // 都只读
+```
+
+**判断规则**：`const` 修饰**其左边**的东西；左边空则修饰右边。
+
+```c
+const int  *p;   // "const 在 int 左边，且 int 左边空" → const 修饰 int
+int const *p;   // 等价上面 —— const 修饰左边的 int
+int * const p;   // "const 修饰左边的 *" → 指针本身是 const
+```
+
+### `const` 是接口契约
+
+- `const T *`：**输入**参数（承诺不改）。
+- `T *`：**输入输出**或**输出**参数。
+- `T * const`：函数内不重新赋值指针（对调用者无意义）。
+
+```c
+size_t strlen(const char *s);          // 只读
+char  *strcpy(char *d, const char *s); // 只读 src，写 dst
+```
+
+### 强制去 const 是 UB
+
+```c
+const int x = 42;
+int *p = (int *)&x;   // 编译过，但…
+*p = 100;             // ✗ 修改 const 对象是 UB
+```
+
+## 六、`NULL` 与空指针
+
+`NULL` 是空指针常量，通常定义为 `((void*)0)` 或 `0`。**取值为 0 的整数常量表达式** 是空指针常量。
+
+```c
+int *p = NULL;
+if (p == NULL) ...   // ✓
+if (!p) ...          // ✓ 惯用法
+if (p == 0) ...      // ✓ 但可读性差
+```
+
+**C23**：引入 `nullptr` 关键字，是**类型安全**的空指针，类型为 `nullptr_t`，避免 `NULL == 0` 的整型二义性。
+
+**解引用 NULL 是 UB**——通常触发 segfault（因为 0 页被 OS 标记不可访问），但标准不保证。
+
+## 七、函数指针
+
+见 [[05-函数与栈帧]] 的详细讨论，这里补充**复杂声明**的解读：
+
+```c
+void (*signal(int sig, void (*func)(int)))(int);
+```
+
+用 cdecl 翻译：`signal` 是一个函数，接受 `(int, void(*)(int))` 两个参数，返回一个「指向 `void(int)` 函数的指针」。
+
+用 `typedef` 拆解：
+```c
+typedef void (*SigHandler)(int);
+SigHandler signal(int sig, SigHandler func);
+```
+
+一目了然。
+
+## 八、数组与指针的关系
+
+### 数组名的「衰减」
+
+除三种情况外，**数组名在表达式中会退化为指向首元素的指针**：
+
+```c
+int arr[10];
+arr;         // 退化为 &arr[0]，类型 int*
+sizeof(arr); // ✓ 不退化：40
+&arr;        // ✓ 不退化：类型是 int(*)[10]
+"string";    // 字符串字面量：类型是 char[7]，也可退化
+```
+
+### `arr` vs `&arr`
+
+```c
+int arr[10];
+arr    // int *      指向首元素
+&arr   // int (*)[10]  指向整个数组
+```
+
+数值相同，但类型不同——`arr + 1` 移 `sizeof(int)` 字节，`&arr + 1` 移 `sizeof(arr) = 40` 字节。
+
+### 下标即指针算术
+
+```c
+arr[i]   // 完全等价 *(arr + i)
+i[arr]   // 也合法！等价 *(i + arr)，加法可交换
+```
+
+C 标准将 `E1[E2]` 定义为 `*((E1) + (E2))`，因此上面两种写法合法。**不要**在生产代码里写 `i[arr]`——只作为面试趣题。
+
+## 九、指针与字符串
+
+字符串是以 `'\0'` 结尾的 `char` 数组。C 中通常用 `char *` 或 `const char *` 表示：
+
+```c
+char *s1 = "hello";        // ✗ C89 允许但不建议：字符串字面量是只读的
+const char *s2 = "hello";  // ✓
+char s3[] = "hello";       // 数组，可修改；分配栈空间并复制
+```
+
+- `"hello"` 是**字符串字面量**，存放在只读段。修改它是 UB。
+- `char s[] = "hello"` 是**数组**，字符被复制到 `s`；可修改。
+
+## 十、指针作为参数
+
+C 只有值传递，指针传递是让 callee 修改 caller 的对象：
+
+```c
+void increment(int *p) { (*p)++; }
+
+int x = 5;
+increment(&x);
+// x = 6
+```
+
+**注意**：修改指针本身要用二级指针：
+
+```c
+void alloc(int **out) {
+    *out = malloc(sizeof(int));
+}
+int *p;
+alloc(&p);   // p 指向 malloc 分配的内存
+```
+
+## 十一、指针的常见错误
+
+### 1. 野指针（Wild Pointer）
+
+未初始化的指针，值是垃圾：
+
+```c
+int *p;      // 未初始化
+*p = 42;     // ✗ 写入随机地址，UB
+```
+
+**修法**：所有指针**声明即初始化**为 `NULL`。
+
+### 2. 悬垂指针（Dangling Pointer）
+
+指向已释放/销毁对象的指针：
+
+```c
+int *p = malloc(4);
+free(p);
+*p = 42;     // ✗ UB
+
+int *bad() {
+    int x = 1;
+    return &x;   // ✗ x 出栈即失效
+}
+```
+
+**修法**：`free` 后立即置 `NULL`；不要返回局部变量地址。
+
+### 3. 内存泄漏（Memory Leak）
+
+`malloc` 后未 `free`：
+
+```c
+void f() {
+    char *p = malloc(1024);
+    // 忘记 free
+}   // p 出栈，但堆内存永远丢失
+```
+
+**检测工具**：Valgrind (`valgrind --leak-check=full ./a.out`)、AddressSanitizer (`-fsanitize=address`)。
+
+### 4. 二次释放（Double Free）
+
+```c
+free(p);
+free(p);   // ✗ 堆管理数据结构损坏，可能被利用为漏洞
+```
+
+**修法**：`free(p); p = NULL;`——`free(NULL)` 是合法的空操作。
+
+### 5. 缓冲区溢出
+
+```c
+char buf[8];
+strcpy(buf, "very long string");   // ✗ 越界写
+```
+
+**修法**：`strncpy`、`snprintf`、显式长度检查。
+
+### 6. 类型双关（Strict Aliasing 违反）
+
+```c
+int  i = 0x40490fdb;
+float f = *(float *)&i;   // ✗ 违反 strict aliasing
+```
+
+**修法**：`memcpy(&f, &i, sizeof(f))`——编译器会优化掉这次拷贝。
+
+## 十二、指针别名与 `restrict`
+
+**别名（aliasing）**：两个指针指向同一对象或重叠区域。别名会阻止编译器优化：
+
+```c
+void add(int *dest, const int *a, const int *b, size_t n) {
+    for (size_t i = 0; i < n; i++)
+        dest[i] = a[i] + b[i];
+    // 编译器要考虑 dest 可能与 a 或 b 重叠：每次都得重新加载 a/b
+}
+```
+
+`restrict`（C99）告诉编译器：**这些指针不别名**：
+
+```c
+void add(int * restrict dest, const int * restrict a, const int * restrict b, size_t n);
+```
+
+编译器可以放心地做向量化、寄存器缓存。若实际重叠 → UB。
+
+## 十三、内存对齐与指针
+
+对象的地址必须是其 **对齐要求** 的整数倍（大多数硬件强制要求）：
+
+```c
+int  x;   // 通常 4 字节对齐
+double d; // 通常 8 字节对齐
+```
+
+从 `void *` 或 `char *` 强转到更严格对齐的类型指针，且实际地址未对齐，是 UB（ARM 会硬件异常，x86 允许但性能下降）：
+
+```c
+char buf[16];
+int *p = (int *)(buf + 1);   // ✗ 未对齐到 int，UB
+```
+
+**安全做法**：`_Alignas` 或用 `memcpy`。
+
+## 十四、指针技巧
+
+### 指针差算元素索引
+
+```c
+size_t index = p - arr;
+```
+
+### 二维数组按行访问
+
+```c
+int mat[R][C];
+int *row = mat[i];     // 第 i 行
+int  cell = row[j];
+```
+
+### 快慢指针
+
+```c
+Node *slow = head, *fast = head;
+while (fast && fast->next) {
+    slow = slow->next;
+    fast = fast->next->next;
+    if (slow == fast) return 1;   // 环检测
+}
+return 0;
+```
+
+### 指向指针的指针简化链表操作
+
+```c
+void remove_node(Node **pp, int val) {
+    while (*pp) {
+        if ((*pp)->val == val) {
+            Node *tmp = *pp;
+            *pp = (*pp)->next;
+            free(tmp);
+            return;
+        }
+        pp = &(*pp)->next;
+    }
+}
+```
+
+无需特判「删除首节点」——`pp` 一开始指向 `head` 指针本身。
+
+## 十五、指针的调试
+
+**打印指针**：
+```c
+printf("%p\n", (void *)p);   // 需转 void*
+```
+
+**用 GDB 查看**：
+```
+(gdb) p p            → 打印指针值
+(gdb) p *p           → 打印指向的对象
+(gdb) x /16xb p      → 从 p 处 dump 16 字节
+(gdb) watch *p       → 监视 *p 变化
+```
+
+**AddressSanitizer**：
+```bash
+gcc -fsanitize=address -g prog.c
+./a.out
+# 越界、UAF、双释放都会立刻报告
+```
+
+## 十六、常见面试题
+
+### Q: `char *p = "hello"; p[0] = 'H';` 会发生什么？
+
+字符串字面量在只读段，修改 UB。多数系统 segfault。
+
+### Q: `int (*p)[5]` 和 `int *p[5]` 区别？
+
+- `int (*p)[5]`：`p` 是**指针**，指向 int[5]。
+- `int *p[5]`：`p` 是**数组**，5 个 `int*` 元素。
+
+### Q: `sizeof(数组名)` 与 `sizeof(指针)` 区别？
+
+- 数组名：整个数组的字节数。
+- 指针：指针本身大小（8 字节 on 64-bit）。
+- 函数形参：**总是**指针大小（因为衰减）。
+
+### Q: 为什么 `free(p)` 后要置 `NULL`？
+
+避免悬垂指针。`free(NULL)` 是安全的空操作，再次误 free 不会崩溃。
+
+## 十七、指针 vs 引用（对比 C++）
+
+C 只有指针，没有引用。指针的等价物 + 一些额外能力：
+
+| 特性 | 指针 | 引用（C++） |
+| --- | --- | --- |
+| 可为 NULL | ✓ | ✗ |
+| 可重绑定 | ✓ | ✗ |
+| 需解引用 `*` | ✓ | 隐式 |
+| 指针算术 | ✓ | ✗ |
+| 数组交互 | ✓ | 有限 |
+
+## 十八、总结
+
+指针是 C 强大的原因，也是复杂性的根源。**记住三条**：
+
+1. **指针有类型**：类型决定了算术步长和访问方式。
+2. **指针有生命周期**：指向的对象必须在解引用时仍有效。
+3. **NULL 是有效状态**：养成初始化和 free 后置 NULL 的习惯。
+
+</WordCount>

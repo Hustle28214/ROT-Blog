@@ -1,0 +1,376 @@
+import WordCount from '../../../../src/components/WordCount/WordCount';
+import Mermaid from '@theme/Mermaid';
+
+<WordCount>
+
+C 的类型系统是理解一切内存与指针语义的基础。C 只有 **少量内建类型**，但通过 **限定符、修饰符、复合类型** 组合出丰富的表达能力。
+
+## 一、基本类型总览
+
+C 标准只规定了每种类型的 **最小宽度** 与 **符号性**，具体宽度由实现（编译器 + 平台）决定。
+
+| 类别 | 类型 | 最小宽度 | 常见宽度（64 位 Linux/x86-64） |
+| --- | --- | --- | --- |
+| 字符 | `char` | 8 位 | 8 位（是否有符号由实现决定） |
+| 字符 | `signed char` / `unsigned char` | 8 位 | 8 位 |
+| 整数 | `short` | 16 位 | 16 位 |
+| 整数 | `int` | 16 位 | 32 位 |
+| 整数 | `long` | 32 位 | 64 位（Linux）/ 32 位（Windows） |
+| 整数 | `long long` | 64 位 | 64 位 |
+| 浮点 | `float` | — | 32 位 IEEE 754 |
+| 浮点 | `double` | — | 64 位 IEEE 754 |
+| 浮点 | `long double` | 精度 ≥ `double` | 80 位（x86）/ 128 位（其他） |
+| 布尔 | `_Bool` / `bool` (C99+) | — | 8 位 |
+| 空 | `void` | — | 无值/占位 |
+
+:::caution
+`int` 只保证 **至少 16 位**！在 8 位/16 位 MCU 上 `int` 可能就是 16 位。跨平台代码请使用 `<stdint.h>` 中的定长类型（`int32_t`、`uint64_t`）。
+:::
+
+## 二、`char` 的符号性陷阱
+
+`char` 是 C 中**唯一由实现决定符号性**的类型：可能是有符号，也可能是无符号。
+
+```c
+char c = 200;
+if (c < 0) puts("signed char, wrapped to -56");
+else       puts("unsigned char, still 200");
+```
+
+x86 平台上 `char` 默认有符号，ARM 上默认无符号。因此涉及字节比较、位扩展的代码必须显式写 `signed char` 或 `unsigned char`。这是 [[19-独立实现基本操作函数]] 中 `memcmp` 需强转 `unsigned char` 的根本原因。
+
+## 三、`<stdint.h>` 定长整数
+
+C99 起提供跨平台可靠的定长类型：
+
+```c
+#include <stdint.h>
+
+int8_t   / uint8_t     // 精确 8 位
+int16_t  / uint16_t    // 精确 16 位
+int32_t  / uint32_t    // 精确 32 位
+int64_t  / uint64_t    // 精确 64 位
+
+int_least8_t           // 至少 8 位
+int_fast32_t           // 至少 32 位，且平台上最快的
+intmax_t / uintmax_t   // 最大宽度整数
+intptr_t / uintptr_t   // 能容纳指针的整数
+
+INT32_MAX, INT32_MIN, UINT64_MAX  // 相应边界宏
+INT32_C(42)                        // 定长整数字面量
+```
+
+**建议**：任何涉及协议、文件格式、跨平台通信的地方，一律用定长类型。业务逻辑用 `int` 即可（编译器优化最好）。
+
+## 四、`size_t` 与 `ptrdiff_t`
+
+- `size_t`（`<stddef.h>` / `<stdlib.h>`）：**无符号**，容纳任意对象大小。`sizeof`、`strlen`、数组下标应使用它。
+- `ptrdiff_t`：**有符号**，两个指针相减的结果类型。
+- `intptr_t` / `uintptr_t`：能无损容纳指针的整型。**指针转 int 请转到这里**，避免截断。
+
+```c
+size_t n = sizeof(arr);
+for (size_t i = 0; i < n; i++) { ... }  // ✓ 正确
+
+int i;                                   // ✗ 大数组会越界或溢出
+```
+
+:::warning `size_t` 是无符号
+`for (size_t i = n - 1; i >= 0; i--)` 会 **永远为真**（`i` 减到 0 后再减变为 `SIZE_MAX`）。反向遍历需要写 `for (size_t i = n; i-- > 0;)`。
+:::
+
+## 五、整数字面量
+
+```c
+42          // int
+42U         // unsigned int
+42L         // long
+42LL        // long long
+42ULL       // unsigned long long
+0x2A        // 十六进制
+042         // 八进制！(= 十进制 34)
+0b101010    // 二进制 (C23，之前 GCC 扩展)
+1'000'000   // 数字分隔符 (C23)
+```
+
+**坑**：`0` 开头的整数字面量是 **八进制**。`013` 是 11，不是 13。这个设计常被吐槽但延续至今。
+
+## 六、浮点类型与 IEEE 754
+
+C 的浮点类型通常遵循 IEEE 754：
+
+| 类型 | 大小 | 有效位数 | 指数范围 |
+| --- | --- | --- | --- |
+| `float` | 32 位 | ~7 位十进制 | 10⁻³⁸ ~ 10³⁸ |
+| `double` | 64 位 | ~15 位十进制 | 10⁻³⁰⁸ ~ 10³⁰⁸ |
+| `long double` | 80/128 位 | ~19/33 位 | 更大 |
+
+**浮点常见陷阱**：
+
+```c
+0.1 + 0.2 == 0.3    // false！IEEE 754 精度问题
+float x = 1e10;
+x + 1.0f == x       // true！超出精度，1.0 被吞掉
+```
+
+**比较浮点数**：
+```c
+#include <math.h>
+#include <float.h>
+
+int nearly_equal(double a, double b) {
+    return fabs(a - b) < DBL_EPSILON * fmax(fabs(a), fabs(b));
+}
+```
+
+**特殊值**：
+- `NAN`：非数字。`NAN == NAN` 永远为 **假**，用 `isnan(x)` 判断。
+- `INFINITY`：正无穷。除零、溢出的结果。
+- `-0.0` 与 `0.0`：位模式不同但比较相等。
+
+## 七、`_Bool` / `bool`
+
+C99 引入 `_Bool`；`<stdbool.h>` 定义 `bool`、`true`、`false` 别名。C23 起 `bool`、`true`、`false` 成为关键字。
+
+```c
+#include <stdbool.h>
+bool ok = true;
+_Bool b  = 42;   // 会变成 1（非零即真）
+```
+
+C99 之前的代码通常用 `int` 或 `typedef enum { false, true } bool;` 模拟。
+
+## 八、`void`
+
+`void` 有三种用途：
+
+1. **函数无返回值**：`void print(void);`
+2. **函数无参数**：`int f(void);`（**不写 `void` 表示接受任意参数！** K&R 遗风，容易踩坑）
+3. **`void *`**：通用指针，可与任意对象指针互转，不能解引用，不能做指针算术（GCC 扩展中允许，按字节 +1）。
+
+```c
+void *p = malloc(100);
+int  *q = p;             // 隐式转换，C 中合法（C++ 不允许）
+```
+
+## 九、类型限定符
+
+### `const` — 只读约定
+
+```c
+const int x = 42;         // x 不可修改
+int *p       = &x;        // ✗ 编译告警：丢失 const
+const int *p = &x;        // ✓ p 指向 const int
+
+const int * p;    // 指向 const int（指向物只读）
+int * const p;    // const 指针（指针本身只读，指向物可改）
+const int * const p;  // 都只读
+```
+
+**记忆诀窍**：`const` 修饰其 **左边** 的东西；左边空则修饰右边。
+
+### `volatile` — 禁止优化
+
+告诉编译器：这个变量的值可能在任意时刻被外部改变（硬件寄存器、中断、其他线程），**每次访问都要真的读内存**，不能缓存到寄存器。
+
+```c
+volatile uint32_t *STATUS = (uint32_t *)0x40001000;
+while ((*STATUS & 0x1) == 0);   // 轮询硬件状态位
+```
+
+不加 `volatile`，编译器可能把 `*STATUS` 读进寄存器一次就无限循环。
+
+**注意**：`volatile` **不保证线程安全**！它只禁止编译器优化，不产生内存屏障。多线程用 `<stdatomic.h>`。见 [[17-C11多线程与原子]]。
+
+### `restrict` (C99)
+
+指针别名优化提示：告诉编译器「这个指针在其生存期内是访问该对象的**唯一途径**」，允许编译器做更激进的重排/向量化。
+
+```c
+void add(int * restrict dest, const int * restrict a, const int * restrict b, size_t n) {
+    for (size_t i = 0; i < n; i++)
+        dest[i] = a[i] + b[i];
+}
+```
+
+若违反承诺（`dest` 和 `a` 指向重叠区域）→ 未定义行为。
+
+### `_Atomic` (C11)
+
+见 [[17-C11多线程与原子]]。
+
+## 十、类型转换
+
+### 隐式转换（integer promotion & usual arithmetic conversions）
+
+C 有一套复杂的隐式转换规则：
+
+1. **整型提升**：`char`、`short` 参与运算前，先提升为 `int`（若 `int` 能容纳其所有值），否则提升为 `unsigned int`。
+2. **常用算术转换**：二元运算的两个操作数按「秩」提升到共同类型。有符号 vs 无符号时，通常向无符号靠拢——这里最容易出 bug。
+
+```c
+unsigned int u = 1;
+int          i = -1;
+if (i < u) puts("负数小");   // 期望
+else       puts("反直觉！");  // 实际输出：i 被转成 UINT_MAX
+```
+
+原因：比较时 `i` 被转为 `unsigned int`，`-1` 变成 `UINT_MAX = 4294967295`。
+
+### 显式转换（cast）
+
+```c
+double d = 3.7;
+int    i = (int)d;   // 截断，i = 3
+
+void  *p = malloc(10);
+int   *q = (int *)p; // void* 可以显式转任意对象指针
+```
+
+**别名规则（strict aliasing）**：不能通过不同类型的指针访问同一块内存（`char *` 例外），否则 UB。
+
+```c
+float f = 3.14f;
+int   i = *(int *)&f;   // ✗ 违反 strict aliasing，UB
+
+// 正确做法：
+int   i;
+memcpy(&i, &f, sizeof(i));   // ✓
+```
+
+或使用 `union`（编译器扩展，但主流编译器都允许）：
+
+```c
+union { float f; int i; } u = { .f = 3.14f };
+int i = u.i;   // ✓ 类型双关（type punning）
+```
+
+## 十一、`typedef` 与 `enum`
+
+### `typedef` 类型别名
+
+```c
+typedef unsigned long long u64;
+typedef struct Point { int x, y; } Point;
+typedef int (*Comparator)(const void *, const void *);   // 函数指针别名
+```
+
+`typedef` **不创建新类型**，只是别名——编译器把 `u64` 和 `unsigned long long` 视为完全相同的类型。
+
+### `enum` 枚举
+
+```c
+enum Color { RED, GREEN, BLUE };            // 0, 1, 2
+enum Flag  { F1 = 1, F2 = 2, F4 = 4 };
+enum State { OK = 0, ERROR = -1 } state;
+```
+
+- C 中 `enum` 的底层类型是 **`int`**（C23 起可显式指定：`enum E : uint8_t { ... };`）。
+- 枚举常量是 `int`，不是枚举类型；可以随意与 `int` 混算。
+- 与 C++ 不同，C 的 `enum` **不提供命名空间**，成员泄漏到外层作用域。
+
+## 十二、`sizeof` 与 `_Alignof`
+
+```c
+sizeof(int)          // 4（通常）
+sizeof(int[10])      // 40
+sizeof(char)         // 1（永远，标准规定）
+sizeof "hello"       // 6（包括 '\0'）
+sizeof(void)         // ✗ 错误（GCC 扩展中为 1）
+sizeof(&arr)         // 指针大小，通常 8
+```
+
+- `sizeof` 是 **编译期常量**（除非作用于 VLA）。
+- `sizeof` 返回 `size_t`。
+- `_Alignof(T)`（C11）：类型的对齐要求。
+- `_Alignas(N)` / `alignas`（C11）：强制对齐。
+
+```c
+_Alignas(64) char cacheline[64];   // 强制 64 字节对齐（cache line）
+```
+
+## 十三、变量声明与初始化
+
+### 声明形式
+
+```c
+int a;              // 未初始化（栈上是垃圾值，静态区是 0）
+int b = 42;         // 初始化
+int c, d = 0, e;    // 一次多个
+
+const int * const p = &b;   // 复杂声明
+```
+
+### 复杂声明的阅读（右左法则）
+
+从变量名开始，**先右后左**：
+
+```c
+int *arr[10];              // arr 是 数组[10]，元素是 int*
+int (*p)[10];              // p 是 指针，指向 int[10]
+int *f(void);              // f 是 函数，返回 int*
+int (*fp)(int, int);       // fp 是 指针，指向 函数(int,int)->int
+int (*(*g)(int))[5];       // g 是 指针，指向 函数(int) 返回 指针指向 int[5]
+```
+
+工具：`cdecl` 命令行程序，可以将声明翻译成人话。
+
+### 复合字面量与指定初始化（C99）
+
+```c
+struct Point p = { .x = 10, .y = 20 };
+int arr[100]   = { [0] = 1, [50] = 2, [99] = 3 };  // 其他为 0
+struct Point *pp = &(struct Point){ 3, 4 };        // 复合字面量
+```
+
+## 十四、类型系统层次图
+
+<Mermaid value={`
+graph TD
+    T[类型 type]
+    T --> O[对象类型 object type]
+    T --> F[函数类型 function type]
+    T --> I[不完整类型 incomplete type]
+
+    O --> S[标量 scalar]
+    O --> A[聚合 aggregate]
+    O --> U[联合 union]
+
+    S --> AR[算术 arithmetic]
+    S --> P[指针 pointer]
+
+    AR --> INT[整数]
+    AR --> FLT[浮点]
+    AR --> B[_Bool]
+
+    INT --> C[char]
+    INT --> SN[有符号 int 系列]
+    INT --> UN[无符号 int 系列]
+    INT --> EN[枚举]
+
+    FLT --> R[实数 float/double]
+    FLT --> CX[复数 _Complex]
+
+    A --> ARR[数组]
+    A --> STR[结构体]
+`} />
+
+- **完整类型**：大小已知，可以定义变量、`sizeof`。
+- **不完整类型**：只声明未定义。典型：`struct S;`（未定义体）、`void`、无长度的 `int arr[]`。可以定义指向它的指针，但不能实例化。
+
+## 十五、实践速查
+
+| 用途 | 推荐类型 |
+| --- | --- |
+| 循环下标、大小 | `size_t` |
+| 反向循环下标 | `size_t` + 前置递减惯用法 |
+| 通用整数 | `int` |
+| 协议/文件格式 | `int32_t` / `uint16_t` 等定长 |
+| 布尔标志 | `bool` |
+| 字节缓冲区 | `uint8_t *` 或 `unsigned char *` |
+| 指针整数化 | `uintptr_t` |
+| 指针差 | `ptrdiff_t` |
+| 硬件寄存器 | `volatile uint32_t *` |
+| 时间戳 | `time_t`（`<time.h>`） |
+
+</WordCount>

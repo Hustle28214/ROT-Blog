@@ -1,0 +1,417 @@
+import WordCount from '../../../../src/components/WordCount/WordCount';
+import Mermaid from '@theme/Mermaid';
+
+<WordCount>
+
+C 是**过程式**语言，程序由若干函数构成，`main` 是入口。函数的调用、参数传递、返回、栈帧管理，是理解程序运行时行为的核心。
+
+## 一、函数的声明与定义
+
+### 声明（原型）
+
+告诉编译器函数的签名，通常放在头文件中：
+
+```c
+int add(int a, int b);
+void log_msg(const char *fmt, ...);
+```
+
+### 定义
+
+```c
+int add(int a, int b) {
+    return a + b;
+}
+```
+
+- **一次定义原则（ODR-like）**：函数只能定义一次；可以在多个 `.c` 文件中声明。
+- 不写返回类型 → C99 前默认 `int`；C99 起 **非法**，必须显式写。
+- 不写参数 → `f()` 表示 **接受任意参数**（K&R 遗风）。要表达"无参"必须写 `f(void)`。
+- **C23 起**：`f()` 也严格等价于 `f(void)`，向 C++ 靠拢。
+
+```c
+void f();       // 接受任意参数（C89-C17）
+void f(void);   // 明确无参
+void f();       // C23：等价 void f(void)
+```
+
+## 二、参数传递
+
+**C 中参数传递永远是「按值传递」（pass by value）**——包括指针本身。
+
+```c
+void swap_bad(int a, int b) {
+    int t = a; a = b; b = t;   // 只交换局部拷贝
+}
+void swap_ok(int *a, int *b) {
+    int t = *a; *a = *b; *b = t;  // 通过指针间接修改
+}
+
+int x = 1, y = 2;
+swap_bad(x, y);   // 无效
+swap_ok(&x, &y);  // ✓
+```
+
+### 数组参数
+
+```c
+void f(int arr[10]);   // 等价于 int *arr（数组名退化为指针）
+void f(int arr[]);     // 也等价
+void f(int *arr);      // 完全等价
+```
+
+**关键**：函数形参中的 `int arr[10]` **不是**数组类型！`sizeof(arr)` 是指针大小，不是 40 字节。要在函数里知道数组长度，必须**额外传长度**：
+
+```c
+void print(int *arr, size_t n) {
+    for (size_t i = 0; i < n; i++) printf("%d ", arr[i]);
+}
+```
+
+C99 起可以在参数中写 `static N`，向编译器承诺至少有 N 个元素：
+
+```c
+void f(int arr[static 10]);   // 告诉编译器：arr 至少有 10 个元素
+```
+
+### 传结构体
+
+**按值传递结构体是拷贝整个结构体**，代价可能很高。大结构体建议传指针：
+
+```c
+void print_p(const Point *p);   // 通常更好
+void print_v(Point p);          // 简单，但会拷贝
+```
+
+`const` 表示函数不会修改指向的对象，是良好的接口设计。
+
+### `const` 参数
+
+```c
+size_t strlen(const char *s);           // s 指向的内容只读
+void   strcpy(char *dest, const char *src);  // src 只读
+```
+
+`const` 是**接口契约**，让调用者放心传入常量字符串或只读缓冲区。
+
+## 三、返回值
+
+- 函数最多返回**一个值**。
+- 返回结构体是按值返回（拷贝）；大结构体建议返回指针或用输出参数。
+- 不能返回数组或函数（可以返回指针）。
+
+### 返回局部变量的地址（严重错误）
+
+```c
+int *bad(void) {
+    int x = 42;
+    return &x;    // ✗ 悬垂指针！x 出作用域即失效
+}
+```
+
+正确做法：
+- 返回 `static` 变量（线程不安全）
+- 返回 `malloc` 分配的内存（调用者负责释放）
+- 用**输出参数**（`out` 指针）
+
+```c
+void get(int *out) {   // 常用惯用法
+    *out = 42;
+}
+int x;
+get(&x);
+```
+
+### 多返回值：结构体 / 输出参数 / 全局变量
+
+```c
+// 方案 A: 输出参数
+int divmod(int a, int b, int *q, int *r) {
+    if (b == 0) return -1;
+    *q = a / b;
+    *r = a % b;
+    return 0;
+}
+
+// 方案 B: 返回结构体
+typedef struct { int q, r; } DivMod;
+DivMod divmod2(int a, int b) { return (DivMod){a/b, a%b}; }
+```
+
+## 四、可变参数函数
+
+`<stdarg.h>` 提供访问可变参数的能力：
+
+```c
+#include <stdarg.h>
+#include <stdio.h>
+
+int my_printf(const char *fmt, ...) {
+    va_list args;
+    va_start(args, fmt);      // fmt 是最后一个具名参数
+    int n = vprintf(fmt, args);
+    va_end(args);
+    return n;
+}
+
+int sum(int count, ...) {
+    va_list args;
+    va_start(args, count);
+    int total = 0;
+    for (int i = 0; i < count; i++) {
+        total += va_arg(args, int);   // 必须知道类型！
+    }
+    va_end(args);
+    return total;
+}
+```
+
+**关键**：
+- 编译器**不检查**可变参数的类型（除了 `printf` 因为格式串是特殊 attribute 处理）。
+- `va_arg` 需要正确的类型；错了就是 UB。
+- 至少一个具名参数在前（C 要求），C23 起可以完全不需要。
+
+## 五、递归
+
+C 支持递归调用。每次调用**独立**入栈，参数、局部变量、返回地址都被保存。
+
+```c
+int factorial(int n) {
+    if (n <= 1) return 1;
+    return n * factorial(n - 1);
+}
+```
+
+**栈深度限制**：默认栈约 8 MB（Linux），单帧几十字节时可递归 ~10 万次；过深会栈溢出（segfault）。
+
+**尾递归优化（TCO）**：若递归调用是函数的最后一条指令，编译器**可能**（不强制）复用栈帧。C 标准不保证 TCO；GCC `-O2` 可做，但不能依赖。
+
+**转换为迭代**：性能敏感处或深递归应改写为迭代 + 显式栈。
+
+## 六、栈帧与调用约定
+
+### 栈帧（Stack Frame）
+
+每次函数调用都会在栈上分配一块内存：
+
+```
+高地址 ┌───────────────────┐
+       │  caller 参数溢出区  │
+       ├───────────────────┤
+       │  返回地址          │  ← call 指令压入
+       ├───────────────────┤
+       │  保存的 rbp（旧帧指针）│
+       ├───────────────────┤ ← rbp 指向这里
+       │  局部变量           │
+       │  callee-saved 寄存器 │
+       │  被调用者临时区       │
+       ├───────────────────┤ ← rsp 指向栈顶
+低地址
+```
+
+调试器 `bt` 命令能打印这些帧，就是遍历 `rbp` 链。
+
+### 调用约定（Calling Convention）
+
+规定：
+- 参数如何传（寄存器 or 栈）
+- 谁负责清栈（caller-cleaned or callee-cleaned）
+- 返回值放哪
+- 哪些寄存器 caller-saved / callee-saved
+
+**主流 ABI**：
+
+| ABI | 平台 | 前几个整数参数 | 前几个浮点参数 | 返回值 |
+| --- | --- | --- | --- | --- |
+| System V AMD64 | Linux/macOS x86-64 | `rdi, rsi, rdx, rcx, r8, r9` | `xmm0-xmm7` | `rax` (`rdx:rax` 双寄存器) |
+| Microsoft x64 | Windows x86-64 | `rcx, rdx, r8, r9` | `xmm0-xmm3` | `rax` |
+| ARM64 AAPCS | ARM64 | `x0-x7` | `v0-v7` | `x0` (`x0:x1`) |
+| cdecl | 32 位 x86 | 全部走栈，右→左 | 走栈 | `eax` |
+| stdcall | Windows 32 | 全部走栈，右→左 | 走栈 | `eax`（callee 清栈） |
+
+超过寄存器数量的参数走栈。ARM64、AMD64 都是 caller 清栈。
+
+### 一次调用的汇编示例（x86-64 SysV）
+
+```c
+int add(int a, int b) { return a + b; }
+int main(void) { return add(3, 4); }
+```
+
+编译为：
+```asm
+add:
+    lea eax, [rdi + rsi]   ; a in edi, b in esi, 返回在 eax
+    ret
+main:
+    mov edi, 3
+    mov esi, 4
+    call add
+    ret
+```
+
+## 七、栈溢出与栈保护
+
+### 栈溢出（Stack Overflow）
+
+递归过深、局部数组过大都会耗尽栈空间。Linux 默认栈 8 MB（`ulimit -s`），Windows 通常 1 MB。
+
+```c
+void deep(int n) {
+    char buf[1024];   // 每帧 1 KB，8192 层即溢出
+    if (n > 0) deep(n - 1);
+}
+```
+
+### 栈缓冲区溢出（Buffer Overflow）
+
+历史上最经典的漏洞类型：
+
+```c
+void gets_bad(void) {
+    char buf[8];
+    gets(buf);   // ✗ 用户输入超过 8 字节即覆盖返回地址
+}
+```
+
+**缓解措施**：
+- **Stack Canary**（`-fstack-protector`）：编译器在返回地址前插入随机值，函数返回时检查。
+- **NX（No-eXecute）位**：栈不可执行，阻止 shellcode。
+- **ASLR（地址空间随机化）**：栈基址随机，攻击者难以预测。
+- **RELRO / PIE / CFI** 等运行时防护。
+
+## 八、函数指针
+
+函数在 C 中是**一等公民**（可以取地址、赋值给指针、作为参数传递、作为返回值），但**不是**对象。
+
+### 声明与使用
+
+```c
+int (*fp)(int, int);        // fp 是指针，指向 int(int,int) 类型函数
+fp = &add;                  // 取地址（& 可省）
+int r = fp(3, 4);           // 调用（* 可省）
+int r = (*fp)(3, 4);        // 也合法
+```
+
+### `typedef` 简化
+
+```c
+typedef int (*BinOp)(int, int);
+BinOp op = add;
+int r = op(1, 2);
+```
+
+### 常见应用
+
+- **回调**：`qsort`、`bsearch`、事件循环。
+- **策略模式**：不同算法作为函数指针传入。
+- **虚函数模拟**：结构体里放函数指针，C 里的「面向对象」。
+
+```c
+typedef struct {
+    void (*draw)(void *self);
+    void (*free)(void *self);
+} Shape_vtable;
+
+typedef struct {
+    Shape_vtable *vt;
+    /* 数据 */
+} Shape;
+
+shape->vt->draw(shape);   // "虚函数调用"
+```
+
+Linux 内核里到处是这种模式。
+
+## 九、`inline` 与 `static inline`
+
+C99 引入 `inline` 关键字，**建议**编译器把函数体内联展开：
+
+```c
+inline int max(int a, int b) { return a > b ? a : b; }
+```
+
+- `inline` **只是建议**，编译器可以忽略。
+- 声明为 `inline` 的函数如果**没有 extern 定义**，需要注意 ODR：多个翻译单元里能否找到一份能被链接的定义。
+- **实践惯用法**：在头文件里写 `static inline`。`static` 保证每个翻译单元有自己的私有拷贝，编译器可自由内联，不产生外部符号。
+
+```c
+// util.h
+static inline int clamp(int x, int lo, int hi) {
+    return x < lo ? lo : x > hi ? hi : x;
+}
+```
+
+## 十、`noreturn`
+
+C11 引入 `_Noreturn`，告诉编译器函数不会返回（`abort`、`exit`、无限循环）：
+
+```c
+#include <stdnoreturn.h>
+noreturn void panic(const char *msg) {
+    fprintf(stderr, "PANIC: %s\n", msg);
+    exit(1);
+}
+```
+
+允许编译器做优化（不必生成保存返回地址的代码），且调用点不会因"缺少 return"报错。
+
+C23 用属性 `[[noreturn]]` 替代。
+
+## 十一、`main` 函数
+
+标准形式：
+
+```c
+int main(void) { ... return 0; }
+int main(int argc, char *argv[]) { ... }
+int main(int argc, char **argv) { ... }
+```
+
+某些平台还有 `int main(int argc, char *argv[], char *envp[])`。
+
+- `argc` ≥ 0，`argv[0]` 是程序名，`argv[argc] == NULL`。
+- 从 `main` 返回等价 `exit(返回值)`。
+- C99 起可以不写 `return 0`——编译器自动补。
+
+**`main` 之前**：`_start` 是真正的程序入口（由 libc 提供），负责初始化 `.bss`、构建 `argv/envp`、调用 `__libc_start_main`，后者才调用 `main`。见 [[14-编译链接过程]]。
+
+## 十二、函数属性（GCC / Clang 扩展）
+
+```c
+__attribute__((noreturn))     // 与 _Noreturn 类似
+__attribute__((pure))         // 无副作用，可优化
+__attribute__((const))        // 更强：不读全局
+__attribute__((unused))       // 不发未使用告警
+__attribute__((deprecated))   // 弃用告警
+__attribute__((format(printf, 1, 2)))  // 检查 printf 风格格式串
+__attribute__((always_inline))
+__attribute__((cold))         // 冷路径，优化倾向
+__attribute__((hot))
+```
+
+C23 起用 `[[attribute]]` 语法，兼容 C++。
+
+## 十三、递归与迭代对比
+
+| 场景 | 推荐 |
+| --- | --- |
+| 树形结构遍历 | 递归 |
+| 图形 DFS | 递归（若深度小） |
+| 尾递归 | 改成迭代（不依赖 TCO） |
+| 深递归（>1000 层） | 迭代 + 显式栈 |
+| 分治算法 | 递归 |
+| 简单累加 | 迭代 |
+
+## 十四、常见问题速查
+
+| 问题 | 原因 | 修法 |
+| --- | --- | --- |
+| `sizeof(arr)` 在函数里返回指针大小 | 数组退化 | 额外传长度 |
+| 返回局部变量地址 | 悬垂指针 | 用 out 参数 / malloc / static |
+| 变参 `va_arg` 类型错 | UB | 严格按声明取 |
+| 递归栈溢出 | 深度大 | 改迭代 |
+| `inline` 定义未内联 | 编译器决定 | 用 `static inline` / `-O2` |
+| 函数指针类型不匹配 | 编译告警 | 强转前审慎 |
+
+</WordCount>

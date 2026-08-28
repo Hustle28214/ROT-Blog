@@ -1,0 +1,368 @@
+import WordCount from '../../../../src/components/WordCount/WordCount';
+import Mermaid from '@theme/Mermaid';
+
+<WordCount>
+
+数组和字符串是 C 语言的核心复合类型。它们的语义看似简单——「连续内存」——但内部埋着大量陷阱：数组衰减、多维数组、VLA、字符串生命周期、宽字符……
+
+## 一、一维数组
+
+### 声明与定义
+
+```c
+int   a[10];          // 未初始化：栈上是垃圾值
+int   b[5] = {1, 2, 3};       // 剩余补 0：{1,2,3,0,0}
+int   c[]  = {1, 2, 3, 4};    // 长度自动推导为 4
+char  s[8] = "hello";         // 6 字节 "hello\0" 加 2 个 '\0'
+```
+
+**关键约束**：
+- 数组长度必须是**编译期常量**（C89），或运行时表达式（C99 VLA）。
+- 数组不能整体赋值：`a = b;` 非法。要用 `memcpy`。
+- 数组不能作为函数返回值（可以包在结构体里返）。
+
+### 元素访问
+
+```c
+a[0], a[1], ..., a[n-1]
+```
+
+C **不做边界检查**！`a[100]`、`a[-1]` 都能编译通过，但访问越界内存是 UB。这是所有缓冲区漏洞的根源。
+
+### 数组名衰减
+
+除三种情况外，**数组名在表达式中会退化为指向首元素的指针**：
+
+```c
+int a[10];
+a          // 退化为 &a[0]，类型 int*
+sizeof(a)  // ✓ 不衰减：40
+&a         // ✓ 不衰减：类型 int(*)[10]
+_Alignof(a)// ✓ 不衰减
+```
+
+## 二、指针与数组：等价与差异
+
+```c
+int a[10];
+int *p = a;
+
+a[i]     // 等价 *(a + i)
+p[i]     // 等价 *(p + i)
+```
+
+看起来完全一样，但**类型不同**：
+
+```c
+sizeof(a)         // 40
+sizeof(p)         // 8
+
+int (*pa)[10] = &a;  // ✓
+int (*pp)[10] = &p;  // ✗ 类型不匹配
+```
+
+**记住**：数组和指针**不是同一个东西**——它们只在表达式求值上等价。
+
+## 三、多维数组
+
+### 二维数组的内存布局
+
+```c
+int mat[3][4] = {
+    {1, 2, 3, 4},
+    {5, 6, 7, 8},
+    {9,10,11,12}
+};
+```
+
+在内存中是 **行主序（row-major）** 连续存放：
+
+```
+1 2 3 4 | 5 6 7 8 | 9 10 11 12
+```
+
+- `mat[i][j]` 等价 `*(*(mat+i)+j)` 等价 `*((int*)mat + i*4 + j)`。
+- `mat[i]` 类型是 `int[4]`（一行）；在表达式中衰减为 `int *`。
+
+### 传递给函数
+
+```c
+// 三种等价写法：
+void f(int m[3][4]);
+void f(int m[][4]);
+void f(int (*m)[4]);   // 指向 int[4] 的指针
+
+// ✗ 错误：形参不能是二级指针
+void f(int **m);   // 内存布局完全不同！
+```
+
+因为 `int**` 需要额外的一层间接（指针数组），而二维数组是连续块。二者内存布局根本不同。
+
+### 高维
+
+```c
+int cube[3][4][5];    // 3 * 4 * 5 = 60 个 int
+// 访问：cube[i][j][k]
+// 等价：*(int*)cube + i*4*5 + j*5 + k
+```
+
+## 四、VLA — 变长数组（C99）
+
+C99 引入 VLA：长度是运行时表达式。
+
+```c
+void f(int n) {
+    int arr[n];       // 栈上分配 n * sizeof(int) 字节
+    for (int i = 0; i < n; i++) arr[i] = i;
+}
+```
+
+- `sizeof(arr)` 在 VLA 上是 **运行时求值**（返回 `n * sizeof(int)`）。
+- 不能有初始化列表。
+- 只能是 automatic（栈上）。
+- **C11 起：可选特性**——`__STDC_NO_VLA__` 宏为 1 则不支持。MSVC 一直不支持。
+- **风险**：n 过大导致栈溢出；不易 debug。
+
+**替代方案**：`alloca`（GCC 扩展）、`malloc` + `free`。
+
+## 五、字符串：以 `\0` 结尾的字符数组
+
+C **没有字符串类型**，只有约定：一段连续的 `char`，以 `'\0'` 结尾。
+
+```c
+char s1[] = "hello";       // 6 字节数组：'h','e','l','l','o','\0'
+char *s2  = "hello";       // 指针 → 只读段
+```
+
+### 字符串字面量的存储
+
+- **只读段（rodata）**：不可修改，多次出现的相同字面量**可能被合并**。
+- 相邻字面量自动拼接：`"abc" "def"` == `"abcdef"`。
+
+### 长度：`strlen` vs `sizeof`
+
+```c
+char s[] = "hello";
+strlen(s)   // 5，不含 '\0'
+sizeof(s)   // 6，含 '\0'
+```
+
+## 六、`<string.h>` 常用函数
+
+| 函数 | 用途 | 备注 |
+| --- | --- | --- |
+| `strlen` | 长度（不含 `\0`） | 遇 `\0` 停 |
+| `strcpy`/`strncpy` | 复制 | strncpy 不保证 `\0` 结尾 |
+| `strcat`/`strncat` | 拼接 | strncat 保证 `\0` 结尾 |
+| `strcmp`/`strncmp` | 比较 | 按 `unsigned char` |
+| `strchr`/`strrchr` | 查字符 | 从前/从后 |
+| `strstr` | 查子串 | 朴素或优化算法 |
+| `strspn`/`strcspn` | 匹配/不匹配集合 | |
+| `strtok` | 分割 | **非线程安全**；`strtok_r` 是可重入版 |
+| `strdup` (POSIX) | 复制并分配 | 需 `free` |
+| `snprintf` | 格式化到缓冲区 | **安全**，推荐 |
+
+`strncpy` 的**奇怪行为**：不足 n 补 `\0`；到 n 不加 `\0`；容易踩坑。工程中优先 `snprintf`。
+
+参考 [[19-独立实现基本操作函数]] 中的手写实现。
+
+## 七、字符串常见陷阱
+
+### 陷阱 1：修改字符串字面量
+
+```c
+char *s = "hello";
+s[0] = 'H';   // ✗ UB，字面量在只读段
+```
+
+改用数组：
+```c
+char s[] = "hello";
+s[0] = 'H';   // ✓
+```
+
+### 陷阱 2：`char *` 数组的初始化
+
+```c
+char *arr[] = { "apple", "banana" };  // 字符串在只读段
+arr[0][0] = 'A';   // ✗ UB
+
+char arr[][10] = { "apple", "banana" };  // 拷贝到栈/静态区
+arr[0][0] = 'A';   // ✓
+```
+
+### 陷阱 3：未终结的字符串
+
+```c
+char buf[4] = "hello";   // ✗ 5 字节数据放不进 4 字节
+// 编译报错：excess elements
+```
+
+```c
+char buf[5];
+strncpy(buf, "hello", 5);   // 缓冲区刚好装下但没 '\0'
+strlen(buf);                // ✗ 越界读，UB
+```
+
+始终留一个字节给 `\0`：`char buf[N+1]`。
+
+### 陷阱 4：使用 `strcpy` 的溢出
+
+```c
+char buf[16];
+strcpy(buf, argv[1]);   // ✗ 若 argv[1] > 15，缓冲区溢出
+```
+
+用 `snprintf(buf, sizeof buf, "%s", argv[1])` 或 `strncpy` + 手动补 `\0`。
+
+## 八、宽字符与 Unicode
+
+### `wchar_t`
+
+历史遗留类型，宽度不固定（Windows 是 16 位，Linux 是 32 位），**不建议**用于新代码。
+
+### C11 引入 UTF-16 / UTF-32 定长字符
+
+```c
+#include <uchar.h>
+char16_t c16 = u'字';    // UTF-16 code unit
+char32_t c32 = U'字';    // UTF-32 code point
+const char *s = u8"你好"; // UTF-8 编码
+```
+
+### 推荐做法
+
+- 内部一律用 **UTF-8** 存字符串（`char *`），所有 I/O 保持 UTF-8。
+- 需要 Unicode 处理时用 **ICU** 库。
+- Windows API 层调用时按需转 UTF-16。
+
+## 九、字符串 vs `char *` 数组
+
+```c
+// 命令行参数
+int main(int argc, char *argv[]);   // argv 是 char** 或 char*[argc+1]
+```
+
+`argv` 是**指向指针数组**的指针；`argv[i]` 是一个 C 字符串。
+
+## 十、字符串处理惯用法
+
+### 遍历字符串
+
+```c
+for (const char *p = s; *p; p++) {
+    // do something with *p
+}
+```
+
+### 拷贝字符串
+
+```c
+snprintf(dst, sizeof dst, "%s", src);   // ✓ 首选：安全 + 保证 \0
+```
+
+### 拼接字符串
+
+```c
+snprintf(dst, sizeof dst, "%s%s", a, b);  // 简单场景
+// 或分段：
+size_t n = strlen(dst);
+snprintf(dst + n, sizeof dst - n, "%s", tail);
+```
+
+### 分割字符串
+
+```c
+char s[] = "a,b,c";
+char *save;
+for (char *tok = strtok_r(s, ",", &save); tok; tok = strtok_r(NULL, ",", &save)) {
+    puts(tok);
+}
+```
+
+`strtok` **会修改原字符串**（在分隔符处写 `\0`）。
+
+### 数字转字符串
+
+```c
+char buf[32];
+snprintf(buf, sizeof buf, "%d", 42);
+```
+
+`itoa` **不是标准函数**（Windows 特有）。
+
+## 十一、性能考量
+
+- **`strlen` 是 O(n)**。频繁调用请缓存结果：
+  ```c
+  size_t n = strlen(s);
+  for (size_t i = 0; i < n; i++) ...   // ✓
+  for (size_t i = 0; i < strlen(s); i++) ...   // ✗ O(n²)
+  ```
+- **`strcat` 也是 O(n)**（需先找末尾）。反复拼接建议维护指针：
+  ```c
+  char buf[N], *p = buf;
+  p += snprintf(p, buf + N - p, "%s", s1);
+  p += snprintf(p, buf + N - p, "%s", s2);
+  ```
+- **`memcpy` vs `strcpy`**：若已知长度，`memcpy` 更快（不需要检查 `\0`）。
+
+## 十二、Pascal 字符串 vs C 字符串
+
+历史上有两种设计：
+
+| 特征 | C 字符串 | Pascal / 现代（Rust `str`） |
+| --- | --- | --- |
+| 表示 | `\0` 终结 | 长度 + 指针 |
+| 长度获取 | O(n) | O(1) |
+| 支持 `\0` in string | ✗ | ✓ |
+| 内存效率 | 无额外字节 | 需 4/8 字节 len |
+
+C 的选择是历史遗留。现代二进制协议（如 Length-Prefixed）几乎全用 length-based 表示。
+
+## 十三、数组与字符串速查
+
+| 操作 | 数组 | 字符串 |
+| --- | --- | --- |
+| 声明 | `int a[N]` | `char s[N]` |
+| 初始化 | `{1,2,3}` | `"abc"` |
+| 长度 | `sizeof(a)/sizeof(a[0])` | `strlen(s)` |
+| 复制 | `memcpy(dst, src, n)` | `snprintf` / `strcpy` |
+| 比较 | 循环或 `memcmp` | `strcmp` |
+| 拼接 | 手写 | `strcat` / `snprintf` |
+| 查找 | 循环 | `strchr` / `strstr` |
+
+## 十四、常用模式：动态字符串
+
+C 标准库没有 `std::string`。工程中常见做法：
+
+```c
+typedef struct {
+    char  *data;
+    size_t len;
+    size_t cap;
+} String;
+
+void s_append(String *s, const char *src) {
+    size_t n = strlen(src);
+    if (s->len + n + 1 > s->cap) {
+        size_t new_cap = (s->len + n + 1) * 2;
+        s->data = realloc(s->data, new_cap);
+        s->cap  = new_cap;
+    }
+    memcpy(s->data + s->len, src, n);
+    s->len += n;
+    s->data[s->len] = '\0';
+}
+```
+
+或使用第三方库：`sds`（Redis）、`stb_sprintf`、`glib GString`。
+
+## 十五、总结
+
+- 数组是连续内存 + 类型 + 长度信息；表达式中会**退化**为指针。
+- 字符串是 `\0` 结尾的 `char` 数组；C 没有真正的字符串类型。
+- 多维数组按行主序连续存放；**不等价**多级指针。
+- 边界检查**由程序员负责**——安全性依赖 `strn*`、`snprintf` 与运行时工具（ASan、UBSan）。
+
+</WordCount>

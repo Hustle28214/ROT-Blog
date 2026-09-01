@@ -9,7 +9,7 @@ import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 
 
-const announcementBarContent = `本博客文字数突破一百万，文章总数突破一千+，什么时候吃顿好的庆祝一下！`
+const announcementBarContent = `本博客文字数突破150w，文章总数突破1000+，什么时候吃顿好的庆祝一下！`
 
 
 /** @type {import('@docusaurus/types').Config} */

@@ -1,0 +1,169 @@
+import WordCount from '../../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+## 1. 为什么要深度迁移学习
+
+前几章的 TCA、JDA、CORAL 等方法，虽在浅层特征上有效，但在图像、语音、文本这类高维复杂数据上表现有限。深度神经网络具有强大的表示学习能力，若能在网络中直接完成特征学习 + 分布对齐 + 任务预测三件事，效果与效率都会大幅提升。这就是 **深度迁移学习（Deep Transfer Learning, DTL）** 。
+
+## 2. 深度网络的可迁移性
+
+Yosinski 等人的经典实验（NeurIPS 2014）为深度迁移奠定了理论直觉：
+
+- 深度网络的**底层特征通用性强** （边缘、纹理、颜色），几乎在所有视觉任务中都可复用；
+- **高层特征任务专用性强** （物体类别、语义模式），越靠近输出层越难迁移；
+- 存在一个"**过渡带**" ，是可迁移性最强的位置——大部分方法把分布对齐损失加在这些层上。
+
+这解释了为什么"底层冻结、高层微调"是深度迁移最经典、最有效的策略。
+
+## 3. 微调（Fine-tuning）
+
+### 3.1 基本流程
+
+微调是深度迁移学习最广泛的形式：
+
+1. 在大规模数据集（ImageNet、Wikipedia）上预训练一个大模型；
+2. 用预训练权重初始化目标网络；
+3. 替换输出层（分类头）以适应新的类别数；
+4. 在目标域数据上用较小的学习率继续训练。
+
+### 3.2 常见策略
+
+- **全网络微调** ：所有层都可训练；适合目标域数据较多的情况。
+- **冻结 + 微调** ：底层冻结，仅训练高层；适合目标域数据较少。
+- **分层学习率（Discriminative Fine-tuning）** ：越靠近输入的层学习率越小，越靠近输出的层学习率越大。
+- **Warmup + 学习率退火** ：先小学习率预热，避免破坏预训练权重。
+
+### 3.3 何时微调可能失败
+
+- 目标域与源域差异过大（如自然图像 → 医学 CT）；
+- 目标域数据极少（数十个样本），此时"零样本 / 提示学习 / 少样本学习"可能更适合；
+- 未做任何正则化，容易在小数据上过拟合。
+
+## 4. 深度网络中的分布对齐
+
+比起简单微调，"分布对齐 + 微调"通常表现更好。核心思路是在网络中间层加入 **分布对齐损失** ：
+
+$$
+\mathcal{L} = \mathcal{L}_{\text{cls}}(f(x^s), y^s) + \lambda \cdot \mathcal{L}_{\text{align}}(f(x^s), f(x^t))
+$$
+
+其中 $\mathcal{L}_{\text{align}}$ 可选：MMD、多核 MMD、CORAL、JMMD 等。
+
+### 4.1 DDC：Deep Domain Confusion
+
+Tzeng 等人在 AlexNet 的倒数第二层加入 MMD 损失，从而学到域不变的特征。DDC 是深度迁移学习中"第一枪"。
+
+### 4.2 DAN：Deep Adaptation Network
+
+Long 等人扩展 DDC，在多个高层同时使用 **多核 MMD（MK-MMD）** ：
+
+$$
+\mathcal{L}_{\text{DAN}} = \mathcal{L}_{\text{cls}} + \lambda \sum_{l \in L} \text{MK-MMD}^2(D_s^l, D_t^l)
+$$
+
+其中 $L$ 是需要对齐的多个层集合。DAN 显著优于 DDC。
+
+### 4.3 JAN：Joint Adaptation Network
+
+JAN 进一步在多个层的 **联合分布** 上对齐，通过引入 JMMD（Joint MMD），把不同层之间的相关性纳入考虑，使对齐更彻底。
+
+### 4.4 Deep CORAL
+
+Sun 等人的 Deep CORAL 只需将 CORAL 损失加在深度网络的高层特征上，简单却在多个基准上媲美 DAN。
+
+### 4.5 DSAN：Deep Subdomain Adaptation Network
+
+DSAN 认为，只对齐"整体"分布是粗粒度的，应对齐"子域"（每个类别）的局部 MMD（LMMD）：
+
+$$
+\text{LMMD}^2 = \sum_c w_c \left\| \frac{1}{n_s^c}\sum \phi(x^s_c) - \frac{1}{n_t^c}\sum \phi(x^t_c) \right\|^2_{\mathcal{H}}
+$$
+
+DSAN 在 Office-Home 等基准上取得非常强的结果，是"类感知深度迁移"的代表。
+
+## 5. 深度迁移学习网络的通用架构
+
+大多数深度迁移网络遵循同一范式：
+
+```
+输入 x
+  │
+  ▼
+[共享特征提取器 F(·)]  ←— 通常是 CNN / ViT / BERT 等主干网络
+  │
+  ├── 源域样本 → [分类器 C]     → 分类损失 L_cls
+  │
+  └── 源、目标特征 → [对齐模块]   → 对齐损失 L_align (MMD / CORAL / 对抗 …)
+
+总损失 = L_cls + λ · L_align
+```
+
+- 特征提取器 $F$ 是"迁移的核心" ，其参数在两个域间共享；
+- 分类器 $C$ 通常只在源域有标签时训练；
+- 对齐模块可以是统计对齐、几何对齐、也可以是对抗学习（见下一章）。
+
+## 6. 一个 DDC 风格的实现片段
+
+```python
+import torch
+import torch.nn as nn
+from torchvision.models import resnet50
+
+class DDCNet(nn.Module):
+    def __init__(self, num_classes):
+        super().__init__()
+        backbone = resnet50(pretrained=True)
+        self.features = nn.Sequential(*list(backbone.children())[:-1])
+        self.bottleneck = nn.Linear(2048, 256)
+        self.classifier = nn.Linear(256, num_classes)
+
+    def forward(self, x):
+        x = self.features(x).flatten(1)
+        feat = self.bottleneck(x)
+        logits = self.classifier(feat)
+        return feat, logits
+
+def train_step(model, xs, ys, xt, optimizer, mmd_fn, lam=1.0):
+    feat_s, logits_s = model(xs)
+    feat_t, _ = model(xt)
+    loss_cls = nn.functional.cross_entropy(logits_s, ys)
+    loss_mmd = mmd_fn(feat_s, feat_t)
+    loss = loss_cls + lam * loss_mmd
+    optimizer.zero_grad(); loss.backward(); optimizer.step()
+    return loss.item()
+```
+
+在训练时，需要每个 batch 同时采样源域 `(xs, ys)` 与目标域 `xt`，让主干网络同时"看到"两侧数据。
+
+## 7. 常见坑与最佳实践
+
+- **学习率** ：主干网络学习率应远小于分类器/瓶颈层，例如主干 1e-4、分类器 1e-3。
+- **λ 的调节** ：对齐损失的权重通常从 0 缓慢上升，公式一般为 $\lambda_t = \frac{2}{1 + \exp(-10 t / T)} - 1$。
+- **BatchNorm** ：AdaBN 提出，可为源、目标域分别维护 BN 统计量，效果显著。
+- **数据增强** ：几乎所有深度迁移方法都强烈依赖数据增强；在目标域用同样强度的增强通常有帮助。
+- **模型选择** ：无监督迁移下目标域没有标签，最佳超参无法直接用目标域验证集选择。常用做法：源域交叉验证 + 反向验证 + A-distance 监测。
+
+## 8. 小结
+
+深度迁移学习将"特征提取"和"分布对齐"融于一个端到端网络中：
+
+- **微调** 是最简单也是最强的基线；
+- **DDC / DAN / JAN / Deep CORAL / DSAN** 是统计对齐深度化的主线；
+- 下一章我们将看到 **对抗迁移学习** ，一种更"暴力"的分布对齐范式。
+
+## References
+
+\[1\]. 王晋东,陈益强. 迁移学习导论（第二版）. 电子工业出版社, 2022.
+
+\[2\]. Yosinski J, et al. How Transferable are Features in Deep Neural Networks? NeurIPS, 2014.
+
+\[3\]. Tzeng E, et al. Deep Domain Confusion: Maximizing for Domain Invariance. arXiv, 2014.
+
+\[4\]. Long M, et al. Learning Transferable Features with Deep Adaptation Networks. ICML, 2015.
+
+\[5\]. Long M, et al. Deep Transfer Learning with Joint Adaptation Networks. ICML, 2017.
+
+\[6\]. Zhu Y, et al. Deep Subdomain Adaptation Network for Image Classification. IEEE TNNLS, 2020.
+
+</WordCount>

@@ -1,0 +1,154 @@
+import WordCount from '../../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+## 1. 从"分布"到"特征"
+
+上一章我们讨论了如何直接在数据分布层面进行对齐。本章的视角转向 **特征** ：如果我们能构造一个"共享的、可迁移的特征空间" ，那么源域和目标域自然就"看起来一样"了。
+
+这一类方法在王晋东书中被称为 **基于特征变换的迁移学习** 。它可以进一步细分为两个子方向：
+
+- **特征选择（Feature Selection）** ：从原始特征中挑选出对源、目标域都有用的子集；
+- **特征变换（Feature Transformation）** ：把原始特征映射到新的空间中。
+
+## 2. 特征选择方法
+
+### 2.1 基本思想
+
+假设源域和目标域共享一些"跨域稳定"的特征——这些特征在两个域中的语义和作用是一致的。特征选择方法试图找出这一子集，只在这些特征上训练模型，从而降低跨域差异。
+
+### 2.2 结构对应学习（SCL）
+
+Blitzer 等人提出的 SCL（Structural Correspondence Learning）是最经典的特征选择方法之一。其核心步骤：
+
+1. **选择枢轴特征（Pivot Features）** ：选择在两个域中都频繁出现的、具有代表性的特征。
+2. **训练枢轴预测器** ：用其他特征去预测枢轴特征的取值，得到一系列辅助任务。
+3. **提取共享结构** ：对预测器权重矩阵做 SVD，得到低维的、跨域共享的特征表示。
+
+SCL 在跨域情感分类（如 Amazon 商品评论跨类目迁移）中取得了成功。
+
+### 2.3 特征选择的优缺点
+
+- **优点** ：结果可解释；无需引入额外维度；
+- **局限** ：受限于原始特征空间，无法构造原空间中不存在的"跨域概念"。
+
+## 3. 统计特征变换
+
+### 3.1 迁移成分分析（TCA）
+
+TCA 已在上一章介绍。它通过在 RKHS 中最小化 MMD，得到一个低维投影 $W$：
+
+$$
+\min_W \text{tr}(W^\top K L K W) + \mu \|W\|^2 \quad \text{s.t.} \; W^\top K H K W = I
+$$
+
+TCA 是一种 **统计意义下的线性变换** ，与 PCA 有着相似的求解形式（广义特征值分解）。
+
+### 3.2 联合分布对齐：JDA
+
+在 TCA 只对齐 $P(X)$ 的基础上，JDA 同时对齐类条件 $P(X \mid Y = c)$，通过迭代式伪标签获得目标域标签近似。
+
+### 3.3 平衡分布对齐：BDA
+
+BDA 在 JDA 基础上引入平衡因子 $\mu$，动态调整边缘与条件对齐的重要性。这一改进在很多真实场景中效果显著。
+
+### 3.4 CORAL 与 Deep CORAL
+
+CORAL 通过对齐协方差：
+
+$$
+\ell_{\text{CORAL}} = \frac{1}{4d^2} \|C_s - C_t\|_F^2
+$$
+
+将其嵌入深度网络就是 Deep CORAL。相比 MMD，CORAL 只涉及二阶统计量，计算简单、稳定。
+
+## 4. 几何特征变换
+
+### 4.1 为什么用几何？
+
+统计对齐方法把两个分布看作 RKHS 或欧氏空间中的点云；而几何方法则更进一步，把 **数据的整体流形结构** 纳入考虑：假设数据点分布在低维流形上，源、目标域是这个流形上"相邻"的两块区域。
+
+### 4.2 Grassmann 流形
+
+Grassmann 流形 $\mathcal{G}(d, D)$ 表示 $D$ 维空间中所有 $d$ 维子空间构成的集合。将源域、目标域各自的 PCA 子空间看作 Grassmann 上的点，两点之间存在一条 **测地线（Geodesic）** 。
+
+### 4.3 采样几何流：SGF
+
+SGF（Sampling Geodesic Flow）在测地线上采样若干中间子空间，将样本投影到这些子空间中，得到从源域到目标域的"平滑过渡"表示。
+
+### 4.4 测地线流核：GFK
+
+GFK（Geodesic Flow Kernel）不再离散地采样，而是在测地线上做 **连续积分** ，得到一个核函数：
+
+$$
+G(x_i, x_j) = \int_0^1 \Phi(t)^\top x_i \; \Phi(t)^\top x_j \, dt
+$$
+
+其中 $\Phi(t)$ 是测地线上 $t$ 处的子空间。这一核函数可以直接与 SVM、KNN 等分类器结合。
+
+### 4.5 流形嵌入分布对齐：MEDA
+
+MEDA 结合几何和统计两方面，先通过 GFK 将数据嵌入到共同的流形空间，再在此空间进行动态分布对齐（DDA）。MEDA 曾在 Office-31、Office-Home 等经典基准上刷新纪录。
+
+## 5. 特征变换方法的通用框架
+
+无论 TCA、JDA、BDA、GFK、CORAL 还是它们的深度版本，其内核思想都可以抽象为一个**双目标优化** ：
+
+$$
+\min_{\phi} \; \underbrace{\text{Discrepancy}(\phi(X_s), \phi(X_t))}_{\text{对齐分布/流形}} \;+\; \lambda \cdot \underbrace{\Omega(\phi)}_{\text{保持结构或判别力}}
+$$
+
+不同方法的差异体现在：
+
+- 采用的距离度量（MMD、CORAL、KL、Grassmann 距离…）
+- 变换 $\phi$ 的形式（线性、核化、深度网络）
+- 结构约束（判别性、流形保持、稀疏性）
+
+## 6. 一个最小实现：CORAL
+
+CORAL 因其"看似平平却非常有效"的特点，很适合作为入门实现：
+
+```python
+import numpy as np
+
+def coral(source, target):
+    """将 source 特征做 CORAL 变换以对齐到 target"""
+    d = source.shape[1]
+
+    # 中心化并计算协方差
+    Xs = source - source.mean(0)
+    Xt = target - target.mean(0)
+    Cs = (Xs.T @ Xs) / (source.shape[0] - 1) + np.eye(d)
+    Ct = (Xt.T @ Xt) / (target.shape[0] - 1) + np.eye(d)
+
+    # 白化 + 再着色
+    Cs_inv_sqrt = np.linalg.cholesky(np.linalg.inv(Cs))
+    Ct_sqrt = np.linalg.cholesky(Ct)
+    return Xs @ Cs_inv_sqrt @ Ct_sqrt
+```
+
+用它做迁移的完整流程：`Xs_aligned = coral(Xs, Xt)`，然后在 `Xs_aligned` 上训练分类器，直接用于目标域。
+
+## 7. 方法选择建议
+
+| 场景 | 建议方法 |
+| :--- | :--- |
+| 特征稀疏、文本类跨域 | SCL、TCA |
+| 类别较多、需要类内对齐 | JDA、BDA、MEDA |
+| 只想快速尝试、代码要简单 | CORAL、Deep CORAL |
+| 数据存在明显流形结构 | GFK、MEDA |
+| 端到端深度模型 | Deep CORAL、DAN、JAN |
+
+## References
+
+\[1\]. 王晋东,陈益强. 迁移学习导论（第二版）. 电子工业出版社, 2022.
+
+\[2\]. Blitzer J, et al. Domain Adaptation with Structural Correspondence Learning. EMNLP, 2006.
+
+\[3\]. Gong B, et al. Geodesic Flow Kernel for Unsupervised Domain Adaptation. CVPR, 2012.
+
+\[4\]. Wang J, et al. Visual Domain Adaptation with Manifold Embedded Distribution Alignment. ACM MM, 2018.
+
+\[5\]. Sun B, Saenko K. Return of Frustratingly Easy Domain Adaptation. AAAI, 2016.
+
+</WordCount>

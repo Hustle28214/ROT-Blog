@@ -1,0 +1,196 @@
+import WordCount from '../../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+## 1. 什么是数据分布自适应
+
+**数据分布自适应（Distribution Adaptation）** 是迁移学习中最基础、最经典的一类方法。它假设源域和目标域 **特征空间和标签空间相同** ，只在数据分布上存在差异，目标是通过变换或加权将两个域的分布对齐。
+
+数据分布可以从三个角度对齐：
+
+- **边缘分布自适应** ： $P_s(X) \approx P_t(X)$
+- **条件分布自适应** ： $P_s(Y \mid X) \approx P_t(Y \mid X)$
+- **联合分布自适应** ：同时对齐边缘和条件分布
+
+## 2. 距离度量
+
+要"对齐"两个分布，就必须定义"距离"。常用的分布距离有：
+
+### 2.1 KL 散度与 JS 散度
+
+$$
+D_{KL}(P \| Q) = \int P(x) \log \frac{P(x)}{Q(x)} \, dx
+$$
+
+KL 散度不对称，且需要密度估计，因此在实际中较少直接使用。JS 散度是其对称化版本。
+
+### 2.2 最大均值差异（MMD）
+
+Maximum Mean Discrepancy，是迁移学习中最常用的度量之一：
+
+$$
+\text{MMD}^2(P, Q) = \left\| \frac{1}{n_s}\sum_{i=1}^{n_s} \phi(x_i^s) - \frac{1}{n_t}\sum_{j=1}^{n_t} \phi(x_j^t) \right\|^2_{\mathcal{H}}
+$$
+
+其中 $\phi(\cdot)$ 是将样本映射到再生核希尔伯特空间（RKHS）的特征映射。MMD 只需样本，无需密度估计，是深度迁移学习中最流行的度量。
+
+### 2.3 CORAL 距离（二阶统计对齐）
+
+$$
+\ell_{\text{CORAL}} = \frac{1}{4d^2} \| C_s - C_t \|_F^2
+$$
+
+其中 $C_s, C_t$ 分别是源、目标域的协方差矩阵。CORAL 简单有效，是"最简单可行的对齐方法"之一。
+
+### 2.4 A-distance / $\mathcal{H}$-divergence
+
+Ben-David 提出，用一个域分类器区分两个域样本的能力来衡量域距离：
+
+$$
+d_{\mathcal{A}} = 2(1 - 2\epsilon)
+$$
+
+其中 $\epsilon$ 是域分类器的最小分类误差。这一度量为对抗迁移学习提供了理论基础。
+
+## 3. 边缘分布自适应
+
+### 3.1 迁移成分分析（TCA）
+
+TCA（Transfer Component Analysis）由 Pan 等人提出，是最经典的边缘分布对齐算法之一。其核心思想是：在 RKHS 中寻找一个低维投影 $W$，使得投影后源、目标域的 MMD 最小，同时保留数据的方差信息。
+
+优化目标可写为：
+
+$$
+\min_W \; \text{tr}(W^\top K L K W) + \mu \text{tr}(W^\top W) \quad \text{s.t.} \; W^\top K H K W = I
+$$
+
+其中 $K$ 是核矩阵， $L$ 与 MMD 相关， $H$ 是中心化矩阵。求解本质上是一个广义特征值问题。
+
+### 3.2 CORAL
+
+CORAL（CORrelation ALignment）通过白化 + 重着色的方式对齐协方差：
+
+$$
+X_s' = X_s C_s^{-1/2} C_t^{1/2}
+$$
+
+其中 $C_s^{-1/2}$ 相当于白化， $C_t^{1/2}$ 是用目标域协方差进行"再着色"。简单直观、无需训练。
+
+## 4. 条件分布自适应
+
+### 4.1 为什么要对齐条件分布
+
+即使 $P_s(X) = P_t(X)$，若 $P(Y \mid X)$ 不同，模型依然无法迁移。条件分布对齐关注 **不同类别下的特征分布** 是否一致。
+
+### 4.2 类条件 MMD
+
+由于目标域无标签，通常先用源域模型给出伪标签 $\hat{y}_t$，然后对每个类别 $c$ 计算类条件 MMD：
+
+$$
+\text{MMD}_c^2 = \left\| \frac{1}{n_s^{(c)}}\sum_{x \in \mathcal{D}_s^{(c)}} \phi(x) - \frac{1}{n_t^{(c)}}\sum_{x \in \mathcal{D}_t^{(c)}} \phi(x) \right\|^2_{\mathcal{H}}
+$$
+
+## 5. 联合分布自适应
+
+### 5.1 JDA（Joint Distribution Adaptation）
+
+Long 等人提出的 JDA 同时对齐边缘和条件分布，是最经典的联合分布对齐方法：
+
+$$
+\min_W \; \text{MMD}(P_s(X), P_t(X)) + \sum_{c=1}^{C} \text{MMD}(P_s(X \mid y = c), P_t(X \mid y = c))
+$$
+
+由于目标域无标签，JDA 采用 **迭代式伪标签** ：用当前模型预测目标域标签，再基于伪标签更新条件分布对齐项。
+
+### 5.2 BDA（Balanced Distribution Adaptation）
+
+王晋东等人指出，在不同任务下，边缘分布和条件分布的重要性并不相同。BDA 引入平衡因子 $\mu$：
+
+$$
+\mathcal{L}_{\text{BDA}} = (1 - \mu) \cdot \text{MMD}_{\text{marginal}} + \mu \cdot \text{MMD}_{\text{conditional}}
+$$
+
+- $\mu \to 0$ 时退化为 TCA；
+- $\mu \to 1$ 时只关注条件分布；
+- $\mu = 0.5$ 相当于 JDA。
+
+$\mu$ 可通过 A-distance 等方式自适应估计。
+
+### 5.3 DDA / MEDA
+
+进一步的方法（如 MEDA，Manifold Embedded Distribution Alignment）将分布对齐置于 **流形（Manifold）** 空间中进行，利用 Grassmann 流形上的几何性质，同时对齐分布并保持结构。这类方法通常在 Office-31、Office-Home 等基准上取得极强的表现。
+
+## 6. 深度分布自适应
+
+将分布对齐嵌入到神经网络，是深度迁移学习的核心思路：
+
+- **DDC（Deep Domain Confusion）** ：在深度网络的某一层后加上 MMD 损失。
+- **DAN（Deep Adaptation Network）** ：在多个层上使用多核 MMD（MK-MMD）。
+- **JAN（Joint Adaptation Network）** ：对齐多个层上的联合分布。
+- **Deep CORAL** ：把 CORAL 损失加到深度网络中。
+
+深度分布自适应的总损失通常形如：
+
+$$
+\mathcal{L} = \mathcal{L}_{\text{cls}} + \lambda \cdot \mathcal{L}_{\text{transfer}}
+$$
+
+其中 $\mathcal{L}_{\text{cls}}$ 是源域上的分类损失， $\mathcal{L}_{\text{transfer}}$ 是分布对齐损失， $\lambda$ 用于平衡两者。
+
+## 7. 代码示例：MMD 计算
+
+一个多核 MMD 的常见 PyTorch 实现：
+
+```python
+import torch
+
+def gaussian_kernel(source, target, kernel_mul=2.0, kernel_num=5, fix_sigma=None):
+    n_samples = int(source.size(0)) + int(target.size(0))
+    total = torch.cat([source, target], dim=0)
+    total0 = total.unsqueeze(0).expand(n_samples, n_samples, -1)
+    total1 = total.unsqueeze(1).expand(n_samples, n_samples, -1)
+    L2_distance = ((total0 - total1) ** 2).sum(2)
+
+    if fix_sigma:
+        bandwidth = fix_sigma
+    else:
+        bandwidth = torch.sum(L2_distance.detach()) / (n_samples ** 2 - n_samples)
+    bandwidth /= kernel_mul ** (kernel_num // 2)
+    bandwidth_list = [bandwidth * (kernel_mul ** i) for i in range(kernel_num)]
+    kernel_val = [torch.exp(-L2_distance / bw) for bw in bandwidth_list]
+    return sum(kernel_val)
+
+def mmd_loss(source, target):
+    batch_size = source.size(0)
+    kernels = gaussian_kernel(source, target)
+    XX = kernels[:batch_size, :batch_size]
+    YY = kernels[batch_size:, batch_size:]
+    XY = kernels[:batch_size, batch_size:]
+    YX = kernels[batch_size:, :batch_size]
+    return (XX + YY - XY - YX).mean()
+```
+
+## 8. 小结
+
+数据分布自适应的核心是 **让源域与目标域在某个空间中"看起来一样"** ：
+
+- 边缘对齐关注整体特征分布；
+- 条件对齐关注类内一致性；
+- 联合对齐兼顾两者；
+- 深度分布自适应将上述思路无缝嵌入端到端网络。
+
+理解分布自适应，是通向对抗迁移、领域泛化等更高级方法的必经之路。
+
+## References
+
+\[1\]. 王晋东,陈益强. 迁移学习导论（第二版）. 电子工业出版社, 2022.
+
+\[2\]. Pan S J, et al. Domain Adaptation via Transfer Component Analysis. IEEE TNN, 2011.
+
+\[3\]. Long M, et al. Transfer Feature Learning with Joint Distribution Adaptation. ICCV, 2013.
+
+\[4\]. Wang J, et al. Balanced Distribution Adaptation for Transfer Learning. ICDM, 2017.
+
+\[5\]. Sun B, Saenko K. Deep CORAL: Correlation Alignment for Deep Domain Adaptation. ECCV Workshops, 2016.
+
+</WordCount>

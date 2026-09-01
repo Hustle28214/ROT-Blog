@@ -1,0 +1,130 @@
+import WordCount from '../../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+## 1. 从领域自适应到领域泛化
+
+领域自适应假设**目标域数据（哪怕无标签）在训练时是可见的** 。但现实中有大量场景，目标域样本在训练时完全不可用：
+
+- 一个训练好的自动驾驶模型，被部署到从未见过的国家、城市；
+- 一个医院训练的模型，要泛化到全新的医院；
+- 一个用户没有历史数据，冷启动就要开始推荐。
+
+这种"训练时看不到目标域"的问题，就是 **领域泛化（Domain Generalization, DG）** 。
+
+**领域泛化的目标** ：给定多个源域 $\{\mathcal{D}_1, \dots, \mathcal{D}_K\}$，学到一个模型 $f$，使其在未见过的目标域 $\mathcal{D}_t$ 上仍然表现良好。
+
+## 2. 领域泛化的形式化
+
+- 训练阶段： $K$ 个源域 $\{\mathcal{D}_k\}_{k=1}^{K}$，每个域包含带标签样本；
+- 测试阶段：目标域 $\mathcal{D}_t$ 从与训练不同的分布采样，训练阶段完全不可见；
+- 学习目标：
+
+$$
+\min_{f} \; \mathbb{E}_{\mathcal{D}_t \sim P(\mathcal{D})} \; \mathbb{E}_{(x,y) \sim \mathcal{D}_t} \; \ell(f(x), y)
+$$
+
+由于 $\mathcal{D}_t$ 不可见，实际优化目标只能落到源域上，并配以某种正则或约束以促进泛化。
+
+## 3. 领域泛化的主要方法
+
+### 3.1 数据操控（Data Manipulation）
+
+- **数据增强** ：Mixup、AugMix、RandAugment 等，通过更丰富的增广提升泛化；
+- **风格迁移增强** ：将不同源域的风格随机混合，模拟未知目标域；
+- **域随机化（Domain Randomization）** ：在仿真中大量随机改变场景参数，让模型对分布变化不敏感。
+
+### 3.2 表示学习（Representation Learning）
+
+核心是学一个**域不变的表示** ：
+
+- **对抗式** ：多域版 DANN，让特征提取器骗过"识别当前域"的判别器；
+- **对齐式** ：跨多个源域做 MMD、CORAL 对齐；
+- **不变风险最小化（IRM）** ：要求最优分类器在所有源域上相同：
+  $$
+  \min_{\Phi, w} \sum_k \mathcal{R}_k(w \circ \Phi) + \lambda \sum_k \|\nabla_{w \mid w=1} \mathcal{R}_k(w \circ \Phi)\|^2
+  $$
+
+### 3.3 元学习（Meta-Learning）
+
+以 MLDG（Meta-Learning for Domain Generalization）为代表：将源域划分为"元训练域"和"元测试域"，训练时模拟"泛化到新域"这一过程本身，让模型学会"如何在未知域上快速泛化"。
+
+### 3.4 域特定 + 域共享的解耦
+
+将表示分为两部分：
+
+- 域共享分量 $z_c$ ：跨域可迁移的语义特征；
+- 域特定分量 $z_d$ ：与具体域相关的风格/噪声。
+
+只用 $z_c$ 做预测，$z_d$ 通过重构、对抗、互信息约束等被"剥离"。
+
+### 3.5 因果建模
+
+- **不变风险最小化（IRM）** 、**REx** 、**因果表征学习** 等方法从因果的视角提出：真正可泛化的特征应对应 **因果机制而非虚假相关** 。
+- 例如在牛 vs. 骆驼的分类任务中，若模型学到"绿色草地 = 牛"这一虚假相关，就无法泛化到"沙漠中的牛"。
+
+## 4. 一个 DG-DANN 的示例：多域对抗
+
+多域版 DANN 可这样实现：
+
+```python
+# feature: [B, d]  labels: [B]  domain_labels: [B] (取值 0..K-1)
+feat = feature_extractor(x)                     # 特征
+logits_y = classifier(feat)                      # 类别预测
+logits_d = domain_disc(grad_reverse(feat, lam))  # 多域判别
+
+loss_cls = F.cross_entropy(logits_y, labels)
+loss_dom = F.cross_entropy(logits_d, domain_labels)   # 多类，K 个源域
+loss = loss_cls + lam * loss_dom
+```
+
+通过让特征骗过"K 类"域分类器，模型倾向于学习跨所有源域一致的表示，从而对未见目标域也更鲁棒。
+
+## 5. 常用基准
+
+- **PACS** ：Photo、Art、Cartoon、Sketch 四个风格域；
+- **Office-Home** ：Art、Clipart、Product、Real World 四域；
+- **DomainNet** ：6 个域，345 类，规模最大；
+- **VLCS** ：4 个自然图像数据集组成的域集合；
+- **Wilds** ：面向真实世界分布偏移的大规模基准。
+
+DomainBed 是一个统一的评测框架，指出很多"看似效果显著"的 DG 方法在严格调参下并未超越 ERM（经验风险最小化）。这一发现对 DG 领域产生了深远影响。
+
+## 6. 领域泛化 vs. 领域自适应
+
+| 维度 | 领域自适应（DA） | 领域泛化（DG） |
+| :--- | :--- | :--- |
+| 目标域数据 | 训练时可见（可能无标签） | 训练时完全不可见 |
+| 主要挑战 | 分布对齐 | 未知分布下的泛化 |
+| 常用方法 | MMD/CORAL/对抗 | 数据增强/IRM/元学习 |
+| 现实意义 | 部署前有一批目标域样本 | 完全冷启动到新环境 |
+
+## 7. 领域泛化的开放问题
+
+- **评测公平性** ：DomainBed 的启示——严谨的评测应包含统一的超参搜索预算与多次随机种子；
+- **可扩展性** ：多数 DG 算法在小规模基准有效，能否扩展到大规模、复杂场景？
+- **与预训练大模型的关系** ：CLIP、ViT-L 等基础模型在 DG 上表现极强，是否 DG 已被基础模型"自然解决"？答案是部分——但特定行业（医疗、工业）仍需要专门的 DG 技术。
+- **可信性与可解释性** ：DG 与因果、鲁棒性、公平性的交叉正成为前沿。
+
+## 8. 小结
+
+- 领域泛化关注的是 **训练不见目标域** 的分布外泛化问题；
+- 主流路线：数据增强、表示学习、元学习、因果建模；
+- 严谨评测（DomainBed）提醒我们要保持谦逊——ERM 在公平比较下依然强大；
+- 基础模型时代，DG 的边界与内涵都在被重新定义。
+
+## References
+
+\[1\]. 王晋东,陈益强. 迁移学习导论（第二版）. 电子工业出版社, 2022.
+
+\[2\]. Muandet K, et al. Domain Generalization via Invariant Feature Representation. ICML, 2013.
+
+\[3\]. Arjovsky M, et al. Invariant Risk Minimization. arXiv, 2019.
+
+\[4\]. Li D, et al. Learning to Generalize: Meta-Learning for Domain Generalization. AAAI, 2018.
+
+\[5\]. Gulrajani I, Lopez-Paz D. In Search of Lost Domain Generalization. ICLR, 2021.
+
+\[6\]. Wang J, et al. Generalizing to Unseen Domains: A Survey on Domain Generalization. IEEE TKDE, 2022.
+
+</WordCount>

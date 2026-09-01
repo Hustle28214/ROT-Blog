@@ -1,0 +1,140 @@
+import WordCount from '../../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+## 反调试与加壳
+
+前面几节我们讲的都是"程序愿意被读"的情况:符号表齐全、控制流清晰、代码原样躺在 `.text` 里。真实世界里很多样本不是这样——商业软件为了防破解,恶意样本为了防分析,都会主动给自己套一层防护。这一节讲两件事:程序怎么检测被分析,以及怎么绕过。
+
+### 反调试:程序怎么发现自己被调试
+
+反调试的核心逻辑是"调试环境跟正常运行环境有某些可观测差异"。样本利用这些差异来判断。差异越隐蔽越难绕。
+
+**读操作系统提供的调试标志**是最直白的一类。Windows 的 PEB 里有 `BeingDebugged` 字节,还有 `NtGlobalFlag`(被调试时 bit 0/4/5 会被置位)、`ProcessHeap.Flags`。Linux 上等价的是 `/proc/self/status` 里的 `TracerPid` 字段——被谁附加,PID 就写在那里。样本读到非零就知道有人在看。
+
+```c
+// Linux 上一个最朴素的反调试
+FILE *f = fopen("/proc/self/status", "r");
+char buf[256];
+while (fgets(buf, sizeof(buf), f)) {
+    if (strncmp(buf, "TracerPid:", 10) == 0) {
+        int pid = atoi(buf + 10);
+        if (pid != 0) exit(1);
+    }
+}
+```
+
+这类检查绕起来最容易:hook 掉 `fopen`/`open` 让它读一个假的 status 文件,或者在 GDB 里断在 `atoi` 返回前直接改 `rax`。
+
+**主动调用 `ptrace`**。Linux 下调 `ptrace(PTRACE_TRACEME, 0, 0, 0)`,每个进程只能被 attach 一次;如果已经被调试器附加,这个调用会失败返回 -1。这是 Linux 平台最经典的反调试原语,好在也是最容易发现的——`strace` 一下就能看到调用点。
+
+绕过方式:LD_PRELOAD 一个自己写的 `ptrace` 函数直接返回 0;或者在动态调试时手动 nop 掉调用;或者用 `catchpoint` 拦下这个 syscall 改返回值。
+
+**时间差检测**。CPU 的 `rdtsc` 指令返回当前时钟周期。样本在一段代码前后各读一次,如果差值很大,说明中间被暂停了(单步/断点/VMEnter)。
+
+```c
+uint64_t t1 = __rdtsc();
+// 一段短代码
+uint64_t t2 = __rdtsc();
+if (t2 - t1 > 1000000) exit(1);
+```
+
+这类检测很难在源码级绕过——因为它不依赖任何 API。可行的绕法有:硬件断点代替软件断点(不产生大延迟);VMware/QEMU 的 rdtsc 虚拟化;或者 hook `rdtsc` 让它每次返回递增的假值,PIN、Frida 这类工具都能做到。
+
+**软件断点扫描**。样本自己扫 `.text` 段,统计 `0xcc` 字节的数量。正常代码里 `0xcc` 出现概率极低,如果我们下了几十个软件断点,扫一遍立刻暴露。绕过:全用硬件断点,或者用 uprobe 之类不改内存的断点机制。
+
+**父进程检测**。正常启动时父进程是 shell 或 explorer.exe,被调试时父进程是 gdb 或 x64dbg。样本读 `getppid` 或对应 API,发现父进程可疑就退出。绕过:先 `setsid` 让 GDB 脱离终端,或者用 `--pid` attach 到已启动的进程。
+
+**异常处理反常识**。这类比较狡猾:故意执行一条会触发异常的指令(除零、无效访问),自己注册 SEH/signal handler 处理它。如果被调试器接住,程序发现异常没走到自己的 handler,就知道被调了。绕过要靠"透传异常"——GDB 的 `handle SIGSEGV nostop pass` 让信号直接送给目标处理。
+
+**其他**:通过检查窗口标题("OllyDbg"、"x64dbg")、检查 CPUID 的 Hypervisor 位、通过 API hook 检测(自己函数序言被改成 jmp)……大量样本都不是只用一种,而是几种叠加,任何一处触发都退出。
+
+### 加壳:让代码本身看不见
+
+反调试是防"运行时被观察",加壳是防"静态时被读到"。原理是把真代码加密或压缩,只在启动时由一段小的解密 stub 还原到内存,然后跳过去执行。
+
+一个最简单的自制壳大致这样:
+
+```
+[ stub 代码 ]    <- 明文,负责解密
+[ 加密的原始代码 ] <- 密文,静态看是乱码
+```
+
+运行时:
+
+1. 从 ELF/PE 入口进入 stub
+2. stub 拿到解密密钥(硬编码/环境变量/自解压)
+3. 把密文段解密到内存(可能是同一块地址,也可能是新分配的一块)
+4. 修改内存权限为可执行(`mprotect`/`VirtualProtect`)
+5. 跳到解密好的原始入口点(OEP,Original Entry Point)
+
+从这一步开始,程序就正常跑了。逆向工程师要做的事叫"脱壳"——让程序跑到 OEP 那一步,dump 内存里的明文代码。
+
+### 常见的壳
+
+**UPX** 是最出名的开源壳,压缩为主,防护极弱。上手第一个练手对象:
+
+```bash
+upx -d packed.exe -o unpacked.exe
+```
+
+一行命令脱掉。UPX 有一个特征字符串 "This file is packed with the UPX",随便一 `strings` 就能识别。它主要用途是给合法软件减小体积,而非防护。
+
+**VMProtect** 和 **Themida** 是商业级壳,主流破解 vs 保护的战场。它们不是简单加密,而是用"代码虚拟化":把原始 x86 指令翻译成一套自定义的虚拟机字节码,配一个 VM 解释器执行。逆向 VM 化的代码意味着要先逆向 VM 本身,再翻译字节码,工作量高一个数量级。
+
+**PyArmor / py-obfuscator** 是 Python 生态的等价物。Python 字节码本身容易反编译(uncompyle6、decompyle3、pycdc),PyArmor 通过 C 扩展和字节码加密来阻止。破解方法:hook `PyEval_EvalFrame` 系列函数,在字节码执行前 dump 出来。
+
+**ProGuard/DexGuard** 是 Android 上的混淆器,主要做名字混淆和控制流平坦化,而非加密。
+
+### 脱壳的一般思路
+
+脱壳没有万能公式,但有几条常见路径。
+
+**手动跟 OEP**。在 stub 里下断点跟着走,一路 F8 单步过(跳过每次循环),直到看见一个明显的"跨段大跳转"——从 packer 段跳到 .text 段。那个目标地址就是 OEP。到达 OEP 后用 Scylla/ScyllaHide 或 x64dbg 的 dump 功能把内存镜像保存成 PE 文件,再修 IAT(导入表)。
+
+**内存断点 trick**。给可疑的目标段设内存执行断点。程序解密完跳过去的一瞬间会触发。这个方法比单步跟省事很多,尤其对付带反单步的壳。
+
+**API 断点**。壳最后往往会调 `GetProcAddress`/`LoadLibrary` 修 IAT,或者调 `VirtualProtect` 改代码段权限。在这些 API 上下断,断下后往上看栈就在 OEP 附近。
+
+**Bochs/Unicorn 全指令模拟**。装一台仿真 CPU,不用真调试器,通过纯模拟来观察。反调试用户态的所有招数都能绕过,代价是速度慢,而且要处理系统调用桥接。angr 和 Triton 都能干类似的事。
+
+**内存 dump**。让程序正常跑起来,然后从外面 dump 它的进程内存。Linux 上 `gcore <pid>`,Windows 上 Process Hacker / procdump。这不是精确脱壳,但对分析行为、提取字符串/密钥、恢复关键片段够用了。
+
+### 一个 UPX 简单脱壳的例子
+
+拿一个 UPX 加壳的 ELF 练手:
+
+```bash
+$ file packed
+packed: ELF 64-bit LSB executable, ..., not stripped, no section header
+$ readelf -S packed
+There are no sections in this file.  # 典型 UPX 特征
+```
+
+丢进 gdb:
+
+```gdb
+$ gdb ./packed
+(gdb) starti           # 停在入口点
+(gdb) x/10i $rip
+=> 0x400000 <_start>:  push rax
+   ...
+```
+
+UPX 的 stub 尾部是一段 push 一堆寄存器 + jmp 的结构,jmp 目标就是 OEP。可以看 UPX 源码知道具体特征,也可以直接 `catch syscall write` 让程序跑到第一次输出——这个时候肯定已经解压完了,栈上还留着 UPX stub 的返回地址踪迹。dump 内存段之后按 ELF 格式重组就能得到脱壳后文件。
+
+当然实际操作直接 `upx -d` 秒杀。上面这套是拿来学的,真到复杂的商业壳,思路一样但每一步都要精细。
+
+### 谈一下伦理和边界
+
+反调试和脱壳的技术本身是中性的:恶意样本用它防分析,防病毒厂商用它逆向;商业软件用它反破解,安全研究者也用它做兼容性研究和漏洞挖掘。技术手段没有立场,判断合法性看具体行为和授权。
+
+在这条线内的例子:分析给自己的样本(甲方委托、公司自有软件、开源软件)、做 CTF、给漏洞赏金项目做逆向、研究恶意软件行为。越出这条线的例子:破解商业软件、绕过 DRM 分发、逆向他人服务的通信协议来做流量抢注。做逆向要习惯性问一句:我这份分析结果能公开发出来吗,当事方会追责吗?
+
+### 走到这里
+
+到这里,汇编逆向这个栏目的五节就串齐了:[[汇编基础]] 教我们读机器指令,[[可执行文件格式]] 教我们理解容器,[[静态分析]] 教我们从字节堆里恢复语义,[[动态调试]] 教我们观察运行时的真实行为,这一节 [[反调试与加壳]] 教我们对付那些不愿意被读的东西。合在一起就是一个逆向工程师的完整基本功。
+
+再往上是各个专门方向:漏洞利用(pwn)、恶意软件分析、固件与 IoT 逆向、移动端逆向。它们都以这五节为基础,再加上各自领域的知识,构成完整能力栈。
+
+</WordCount>

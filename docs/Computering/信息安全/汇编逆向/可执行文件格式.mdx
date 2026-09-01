@@ -1,0 +1,133 @@
+import WordCount from '../../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+## 可执行文件格式
+
+我们在 [[汇编基础]] 里看到的汇编指令,最终要被打包进一个文件,由操作系统的加载器读进内存、拉起来跑。这一节我们把这个"容器"讲清楚:Linux 上的 ELF,Windows 上的 PE,以及 macOS 上的 Mach-O。理解它们的结构,是逆向时"知道该从哪里找 main 函数"的前提。
+
+### 为什么要有格式
+
+假设我们自己设计一份可执行文件。最简单的做法是把机器码原样写到磁盘上,操作系统读进内存,直接跳到第一个字节开始执行。DOS 时代的 `.COM` 文件就是这么干的,只有 64KB 上限。
+
+问题一多起来这套就不行了。程序要有代码段、数据段、只读数据段,权限还不一样;要能引用外部动态库里的符号;要有调试信息、重定位信息、多线程 TLS。所有这些东西必须打包在一个文件里,加载器要能从里面识别出"哪一段拷到哪里,权限设成什么"。
+
+于是就有了 ELF/PE/Mach-O 这类格式。它们的核心都是一样的:一个头部描述整个文件,一张表告诉加载器怎么把文件切分成"节"或"段",再加上符号表和重定位信息。差别在语法和一些历史包袱。
+
+### ELF 的骨架
+
+ELF(Executable and Linkable Format)是 Linux/BSD 的标准格式。我们先用 `readelf` 看一个最简单的 hello world。
+
+```bash
+$ readelf -h hello
+ELF Header:
+  Magic:   7f 45 4c 46 02 01 01 00 00 00 00 00 00 00 00 00
+  Class:                             ELF64
+  Data:                              2's complement, little endian
+  Type:                              DYN (Position-Independent Executable file)
+  Machine:                           Advanced Micro Devices X86-64
+  Entry point address:               0x1060
+  Start of program headers:          64 (bytes into file)
+  Start of section headers:          14312 (bytes into file)
+```
+
+前四个字节 `7f 45 4c 46` 就是 ELF 的魔数。看到这四个字节我们就知道拿到手的是 ELF 文件了。文件的第一部分是 ELF Header,里面有几个关键字段:类别(32/64 位)、字节序、类型(可执行/共享库/目标文件/核心转储)、目标架构、入口点地址,以及两张表的偏移——Program Header Table 和 Section Header Table。
+
+这两张表体现了 ELF 的双重身份。Program Header 是运行时视角,告诉加载器"把哪一段文件内容映射到哪个虚拟地址、权限是什么";Section Header 是链接时视角,把文件切成 `.text`、`.data`、`.rodata`、`.bss` 等一大堆逻辑节,给链接器和逆向工具用。同一份内容,两种切法。
+
+跑起来之后,加载器只看 Program Header。剥掉 Section Header 的 ELF 仍然能运行,这也是恶意样本常用的一种反分析手段——用 `strip` 或者手动清掉节表让 IDA/objdump 一开始不知道函数边界。
+
+### 常见的节
+
+逆向时最常打交道的几个节:
+
+- `.text`:代码,可执行不可写
+- `.rodata`:只读数据,常量字符串、跳转表都在这里,`strings` 命令主要就是扫它
+- `.data`:已初始化的全局/静态变量,可读可写
+- `.bss`:未初始化的全局/静态变量,不占磁盘空间,加载时清零
+- `.plt` 和 `.got`:动态链接的"跳板"和"地址表",下面单独讲
+- `.rela.dyn` 和 `.rela.plt`:重定位表
+- `.dynsym` 和 `.dynstr`:动态符号名和字符串
+- `.symtab` 和 `.strtab`:完整符号表,strip 之后会被去掉
+
+一个规则:任何以 `.debug_` 开头的节都是 DWARF 调试信息,不影响运行,但对逆向极有帮助。样本里如果留着这些,几乎相当于附赠源码。
+
+### PLT/GOT:动态链接怎么工作
+
+调用 `printf` 这样的库函数,程序自己不知道 `printf` 在内存里的哪个位置——因为 libc 的加载地址每次都不一样(ASLR)。ELF 用两张表解决这个问题:
+
+**GOT(Global Offset Table)**是一张地址表,加载器/动态链接器把外部符号的真实地址写进这张表里。
+
+**PLT(Procedure Linkage Table)**是一段跳板代码。程序里所有对 `printf` 的调用,实际上都跳到 `printf@plt`,这段跳板做的是"读 GOT 里对应的项,间接跳过去"。
+
+大致长这样:
+
+```asm
+printf@plt:
+    jmp   QWORD PTR [rip + printf@got]   ; 间接跳到 GOT 里存的地址
+    push  <index>                         ; 第一次调用时才走的路径
+    jmp   plt[0]                          ; 跳到解析器
+```
+
+第一次调用时 GOT 项还没填,跳板里的 push+jmp 会触发 `_dl_runtime_resolve`,它算出 `printf` 的真实地址,写回 GOT,然后跳过去执行。以后再调用就直接走 GOT 表项了,这叫延迟绑定(lazy binding)。
+
+为什么要花这么大力气讲 PLT/GOT?因为几乎所有对二进制的常见攻击和防御都跟它有关。GOT 表原本可写,攻击者写它就能劫持后续所有对同名函数的调用,这类攻击叫 GOT overwrite。防御方法叫 RELRO(RELocation Read-Only):full RELRO 会在加载完成后把整个 GOT 标成只读,代价是失去 lazy binding。
+
+看一个 ELF 有没有开 RELRO,用 `checksec`:
+
+```bash
+$ checksec --file=./target
+RELRO           STACK CANARY      NX            PIE
+Full RELRO      Canary found      NX enabled    PIE enabled
+```
+
+这四个字段基本决定了这个二进制的攻击面有多宽,几乎是 pwn 题第一件要看的事。
+
+### PE 文件
+
+Windows 的 PE(Portable Executable)格式起源更早,兼容层更多,但内核思路差不多。PE 也有一个头:先是一段 DOS 头(那句著名的 "This program cannot be run in DOS mode."),然后是 NT 头,里面包含 File Header 和 Optional Header。之后是一张 Section Table,每一项描述一个节的名字、大小、内存权限。
+
+PE 里最关键的两个概念是 IAT 和 EAT。
+
+**IAT(Import Address Table)**类似 ELF 的 GOT,存的是导入的外部函数地址。程序调用 `MessageBoxA` 时,汇编上是 `call [IAT_entry]`,这个表项由加载器填。
+
+**EAT(Export Address Table)**是当前模块导出给别人用的函数地址表。DLL 里每一个 `__declspec(dllexport)` 函数最终都会在 EAT 里占一项。
+
+Windows 恶意样本非常喜欢做的一件事叫"API 哈希":为了不留下明显的字符串,不写 `LoadLibrary` 这几个字,而是遍历 `kernel32.dll` 的 EAT,对每一项的名字做哈希,和硬编码的目标哈希比较,找到就用。逆向时看到一个函数在遍历 PE 结构里的 EAT,几乎就能确定是这个模式。
+
+顺带一提,PE 有一个非常有用的字段叫 TimeDateStamp,是编译时的时间戳。虽然可以被伪造,但很多样本会忘记改这个字段,可以拿来做粗略的时间轴排序。
+
+### Mach-O
+
+macOS/iOS 用 Mach-O。魔数是 `feedface` (32 位) 或 `feedfacf` (64 位),或者 `cafebabe` 打头的 "Fat Binary"——一个文件里塞多份不同架构的可执行代码,加载器自己挑合适的。
+
+Mach-O 的组织粒度不叫 section 或 segment,叫 Load Commands,一条条命令告诉加载器要做什么:映射哪一段(`LC_SEGMENT_64`)、依赖哪些动态库(`LC_LOAD_DYLIB`)、代码签名放哪(`LC_CODE_SIGNATURE`)。
+
+关键差别是 macOS 强制代码签名。任何未签名或签名被破坏的 Mach-O 都跑不起来,这也是 iOS 越狱和 macOS 逆向要处理的第一件麻烦事。看到 `LC_CODE_SIGNATURE` 就知道:动了主体代码之后要么重签,要么走越狱旁路。
+
+### 加载过程
+
+三种格式的加载器逻辑其实都差不多,以 ELF 为例大致是这样:
+
+1. 内核 `execve` 检查文件头,识别是 ELF,创建新的进程地址空间
+2. 按 Program Header 的指示 mmap 各个段进虚拟地址空间,设置权限
+3. 如果程序是动态链接的(几乎所有实际程序都是),把控制权交给动态链接器(通常是 `/lib64/ld-linux-x86-64.so.2`)
+4. 动态链接器加载所有依赖的共享库,做符号解析和重定位
+5. 调用 `.init_array` 里的构造函数
+6. 跳到 ELF Header 里指定的入口点开始执行
+
+入口点不是 `main`。真正的入口点是 `_start`,由 CRT(C runtime)提供,它负责设置好参数、环境变量、命令行,再调用 `__libc_start_main`,最后由后者调用 `main`。这就是为什么用 `objdump -d` 看,你看到的第一个函数不叫 `main`。逆向找 `main` 的一个方法是从 `_start` 里追:它在调 `__libc_start_main` 时,`rdi` 指向的就是 `main` 的地址。
+
+### 工具小结
+
+日常逆向常用的读文件工具:
+
+- ELF:`readelf`(结构)、`objdump`(反汇编 + 结构)、`nm`(符号)、`strings`(字符串)、`file`(快速识别)
+- PE:`dumpbin`(VS 自带)、CFF Explorer(GUI)、`pe-parse`(命令行)
+- Mach-O:`otool`、`nm`、`jtool2`
+
+再往深走,这些格式的文档都是公开的:ELF 的规范在 System V ABI 的补充卷里,PE 的规范在微软官网,Mach-O 在 Apple 的 loader.h 头文件里。逆向到一定深度以后,遇到工具解析不了的字段查这些原始文档,基本都能查到。
+
+到这里我们已经能"打开一个二进制文件,认识各个部分"了。下一步是把它拆成函数、串成控制流图——那是 [[静态分析]] 的事。
+
+</WordCount>

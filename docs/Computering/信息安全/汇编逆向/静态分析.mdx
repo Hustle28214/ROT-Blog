@@ -1,0 +1,166 @@
+import WordCount from '../../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+## 静态分析
+
+静态分析就是不运行程序,只看它的字节。相对 [[动态调试]] 的最大优势是,你可以看到所有分支,而不是"这次执行走到的那条路径";最大劣势是,你没法直接观察到运行时才出现的值——加密密钥可能只在解密之后才落地在内存里,你在磁盘上永远看不到。
+
+这一节我们讲两件事:一是 IDA 和 Ghidra 这类工具的核心工作原理,二是拿到一个二进制怎么系统地把它拆开。
+
+### 反汇编器在做什么
+
+反汇编器要做的事听起来简单:把机器码翻回汇编。但这一步远不是"查表翻译"那么直白,因为 x86 是变长指令集,不知道从哪一个字节开始读,同一段字节可以被解释成完全不同的指令。
+
+有两种主流的反汇编策略。**线性扫描**从 `.text` 段的第一个字节开始,顺序解码;缺点是遇到数据、跳转表、加密代码会串行,后面全乱。**递归下降**从入口点出发,遇到调用/跳转就沿着控制流分叉,只反汇编"可达"的字节。IDA、Ghidra 走的都是递归下降,再辅以一堆启发式识别函数入口。
+
+这也是为什么反汇编器有时候会漏掉函数——比如通过间接调用触达的函数(虚函数、回调),或者故意用花指令混淆过控制流。这些漏掉的部分要么手动点开告诉工具"这里是代码",要么在识别不出的地方留意"是不是有猫腻"。
+
+### 反编译器又在做什么
+
+反编译器(decompiler)比反汇编器多做一大步:把汇编翻回类 C 的伪代码。这个过程涉及好几层变换:
+
+1. 把汇编先提升到中间表示(IL/IR),IDA 是 microcode,Ghidra 是 P-code
+2. 在 IR 上做常量传播、死代码消除、类型推断这些标准编译优化的逆向操作
+3. 识别高级语言结构:if-else、循环、switch、结构体、参数
+4. 输出伪 C 代码
+
+反编译不是无损的。变量名是编造的,类型经常猜错(尤其是无符号 vs 有符号),内联展开的函数无法还原,SIMD 指令可能被翻成一堆看不懂的位操作。所以反编译代码是好帮手,不是真相;逆向的时候习惯左边看汇编、右边看伪 C,两个对着看。
+
+### IDA vs Ghidra
+
+**IDA Pro** 是行业标配,反编译器 Hex-Rays 素质极高,插件生态成熟(FLIRT 库签名识别、Lumina 云端符号、bindiff 二进制比对),但一套许可证要几千美元起。免费的 IDA Free 只支持 x86-64,做不了 ARM。
+
+**Ghidra** 是 NSA 开源的逆向平台,免费,支持架构非常齐全(ARM、MIPS、PowerPC、RISC-V、S390 都有),反编译器质量接近 IDA,略微逊色但完全够用。缺点是 UI 相对生硬,基于 Java 启动慢。
+
+**Binary Ninja** 是新兴商业工具,中间有 MLIL 多层 IR,做程序分析研究非常强大,价格比 IDA 便宜。
+
+**radare2/rizin** 命令行,曲线陡但可脚本化,搞自动化和批量分析时非常顺手。
+
+给一个我个人的分配思路:日常小样本用 IDA,复杂架构或者纯脚本流水线用 Ghidra 或 rizin,做程序分析研究用 Binary Ninja。工具是趁手的就行,别陷进"哪个更好"的争论。
+
+### 开局四件套
+
+拿到一个陌生二进制,前几步几乎是机械的:
+
+```bash
+file target                 # 是不是 ELF/PE,32/64 位
+checksec --file=target      # NX/PIE/RELRO/Canary
+strings -n 8 target | less  # 找线索:错误信息、URL、库名
+strace ./target             # 看系统调用
+```
+
+`file` 和 `checksec` 五秒钟,给我们目标的基本画像:架构、保护措施。`strings` 是被严重低估的一个工具,大量样本的关键信息都藏在字符串里——协议头、加密算法名、C&C 域名、错误提示。
+
+看完这四件,再决定是丢进反汇编器还是有更快的路——比如样本是纯 Python 打包的 PyInstaller,直接解包提取 pyc 反编译就完了,不用碰汇编。
+
+### 定位关键函数
+
+丢进 IDA 之后,不要从 `main` 顺着往下读,那种"从头看到尾"的读法只适合几百行的小程序。真实的目标动辄几千个函数,得有更有针对性的方法。
+
+**从字符串反查**:在 `strings` 里看到 "Invalid password" 这样的东西,在 IDA 里 Shift+F12 打开字符串窗口,双击这个字符串,再按 X 键看谁引用了它。引用它的函数十有八九就是密码校验函数。
+
+**从导入函数反查**:目标调用 `recv` 说明它在收网络数据,`fopen` 说明在读文件,`CryptEncrypt` 说明在做加密。在 IDA 的 Imports 窗口找到这些 API,同样按 X 看谁在调,顺藤摸瓜。
+
+**从常量反查**:很多加密算法有特征常量,SHA-256 的初值 `0x6a09e667`、AES 的 S 盒、RC4 的 0..255 初始置换。看到这些常量就知道对应的算法。工具比如 `signsrch`、IDA 的 findcrypt 插件、Ghidra 的 CryptoIdentifier 都在做这件事。
+
+**从交叉引用图看整体结构**:IDA 的 "Function calls" 视图或 Ghidra 的 Function Call Graph 能可视化函数调用关系,通过节点度数可以快速识别"核心工具函数"和"叶子业务函数"。
+
+### 类型和结构体
+
+反编译代码可读性的一大瓶颈是类型。IDA 默认把很多东西当 `int` 或 `char*`,读起来像这样:
+
+```c
+v3 = *(_DWORD *)(a1 + 8);
+if (*(_BYTE *)(a1 + 12) & 1)
+    v4 = *(_QWORD *)(a1 + 16);
+```
+
+这种代码看多了会崩溃。正确做法是花时间把结构体建出来,告诉 IDA 这个指针指向什么类型:
+
+```c
+struct Message {
+    int magic;
+    int len;
+    char flags;
+    char pad[3];
+    void *payload;
+};
+```
+
+一旦 `a1` 被声明成 `Message *`,上面那段就会变成:
+
+```c
+v3 = a1->len;
+if (a1->flags & 1)
+    v4 = a1->payload;
+```
+
+阅读效率立刻上一个数量级。逆向老手花在建结构体上的时间往往比读代码的时间还长——因为读起来省下的时间会加倍还回来。IDA 的 Local Types 窗口和 Ghidra 的 Data Type Manager 都是干这个的。
+
+### 常见编译器习语
+
+编译器优化产生的汇编模式有很多套路,认得越多读得越快。
+
+**除以常数会被换成乘法加移位**。`x / 7` 会变成:
+
+```asm
+movsxd  rax, edi
+imul    rax, rax, 1227133513   ; 0x49249249,魔数
+shr     rax, 32
+sub     eax, edi
+sar     eax, 2
+mov     edx, eax
+shr     edx, 31
+add     eax, edx
+```
+
+看到一个诡异的大常数配 `imul` + `shr` + `sar`,大概率就是这样一个除法。工具能自动识别,肉眼扫过去也别陷进去分析每一位含义。
+
+**switch 会被编成跳转表**。当 case 值密集时,编译器会生成一张地址表,索引进去直接跳:
+
+```asm
+cmp     eax, 5
+ja      default_case
+lea     rcx, [rip + jumptable]
+movsxd  rax, DWORD PTR [rcx + rax*4]
+add     rax, rcx
+jmp     rax
+```
+
+看到 `lea + movsxd + add + jmp` 这个模式,基本就是 switch。IDA/Ghidra 都能识别并展开成 case,识别失败时手动标注跳转表的大小和目标。
+
+**虚函数调用**在 C++ 里表现为两次间接跳转:
+
+```asm
+mov     rax, [rdi]        ; 读 vtable 指针
+call    QWORD PTR [rax + 0x18]  ; 调 vtable 里 offset 0x18 的函数
+```
+
+看到这个模式就是虚函数,`rdi` 是 `this`,`0x18` 是虚函数表里的槽位。IDA 有 C++ 类恢复的功能,可以自动识别 vtable 和虚函数。
+
+### FLIRT 与函数签名
+
+静态链接的程序会把 libc、Boost、加密库整个塞进 `.text`,直接读会看到一堆和业务无关的常见函数。IDA 的 FLIRT(Fast Library Identification and Recognition Technology)通过字节模式识别这些标准库函数,自动打上名字。Ghidra 有对应的 Function ID。
+
+签名库对 Linux 常见的 glibc 版本都有,一键把 `_IO_vfprintf`、`__pthread_mutex_lock` 之类的函数认出来,业务函数一下子就浮出水面。做 CTF 逆向,先跑一遍签名识别几乎是必备步骤。
+
+### Ghidra 的一处优点
+
+我个人的习惯是重要样本用 IDA + Hex-Rays 反编译,但也会用 Ghidra 做二次验证。原因是 Ghidra 的反编译器有时候能处理 IDA 漏掉的边界情况——尤其是复杂的 SSA 结构、异常处理、非常规调用约定。两个反编译器对同一段代码有分歧时,汇编才是最终仲裁。
+
+自动化脚本的话,Ghidra 的 headless 模式非常好用:
+
+```bash
+$GHIDRA_HOME/support/analyzeHeadless /tmp proj \
+    -import ./target \
+    -postScript ./MyScript.java
+```
+
+批量分析上千个样本时,这种无 GUI 流水线是唯一现实的做法。
+
+### 静态分析的边界
+
+再强的静态分析也解决不了几类问题:密钥只在运行时被解密出来、控制流被 packer 加密、参数依赖用户输入才能确定。这些场景必须靠 [[动态调试]] 才能推进,静态和动态是互补的关系,不是替代。
+
+</WordCount>

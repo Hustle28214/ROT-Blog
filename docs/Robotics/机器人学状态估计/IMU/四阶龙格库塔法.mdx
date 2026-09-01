@@ -4,6 +4,100 @@ import WordCount from '../../../../src/components/WordCount/WordCount';
 
 ## 1. 数学推导
 
+考虑一阶常微分方程（ODE）的初值问题：
+
+$$
+\dot{y}(t) = f(t, y(t)), \quad y(t_0) = y_0
+$$
+
+给定步长 $h$，我们希望由 $y_n = y(t_n)$ 计算下一步的 $y_{n+1} \approx y(t_n + h)$。
+
+### 1.1 从欧拉法到显式龙格库塔
+
+将 $y(t_n + h)$ 在 $t_n$ 处做泰勒展开：
+
+$$
+y(t_n + h) = y_n + h\dot{y}_n + \frac{h^2}{2!}\ddot{y}_n + \frac{h^3}{3!}y_n^{(3)} + \frac{h^4}{4!}y_n^{(4)} + \mathcal{O}(h^5)
+$$
+
+只保留一阶项就是经典的**显式欧拉法**：
+
+$$
+y_{n+1} = y_n + h f(t_n, y_n)
+$$
+
+其单步截断误差为 $\mathcal{O}(h^2)$，全局误差为 $\mathcal{O}(h)$。要提高精度就必须匹配更高阶的泰勒项，但直接微分 $f$ 得到 $\ddot{y},\ y^{(3)},\ y^{(4)}$ 在多维/非线性情形下代价极高。
+
+**龙格库塔的思想**：用 $f$ 在若干个"探测点"的取值做加权平均，来间接匹配泰勒级数的高阶项，从而避免解析求导。$s$ 级显式 RK 方法可写为：
+
+$$
+y_{n+1} = y_n + h\sum_{i=1}^{s} b_i k_i,\qquad k_i = f\!\left(t_n + c_i h,\ y_n + h\sum_{j=1}^{i-1} a_{ij} k_j\right)
+$$
+
+其中 $c_i,\ a_{ij},\ b_i$ 是待定系数，通常写在 Butcher 表中。
+
+### 1.2 经典 RK4 的系数
+
+取 $s=4$，令中间节点为 $c_1 = 0,\ c_2 = c_3 = \tfrac{1}{2},\ c_4 = 1$。将 $y_{n+1}$ 按 $h$ 展开并与真实解的泰勒展开逐阶匹配，可得到关于 $b_i,\ a_{ij}$ 的**阶条件**（order conditions）：
+
+$$
+\sum_i b_i = 1,\qquad \sum_i b_i c_i = \tfrac{1}{2},\qquad \sum_i b_i c_i^2 = \tfrac{1}{3},\qquad \sum_i b_i c_i^3 = \tfrac{1}{4}
+$$
+
+$$
+\sum_{i,j} b_i a_{ij} c_j = \tfrac{1}{6},\qquad \sum_{i,j} b_i c_i a_{ij} c_j = \tfrac{1}{8},\qquad \sum_{i,j} b_i a_{ij} c_j^2 = \tfrac{1}{12},\qquad \sum_{i,j,k} b_i a_{ij} a_{jk} c_k = \tfrac{1}{24}
+$$
+
+求解上述方程组的一个标准解就是**经典 RK4**：
+
+$$
+\begin{array}{c|cccc}
+0 & & & & \\
+\tfrac{1}{2} & \tfrac{1}{2} & & & \\
+\tfrac{1}{2} & 0 & \tfrac{1}{2} & & \\
+1 & 0 & 0 & 1 & \\
+\hline
+& \tfrac{1}{6} & \tfrac{1}{3} & \tfrac{1}{3} & \tfrac{1}{6}
+\end{array}
+$$
+
+展开为递推形式：
+
+$$
+\begin{aligned}
+k_1 &= f(t_n,\ y_n) \\
+k_2 &= f\!\left(t_n + \tfrac{h}{2},\ y_n + \tfrac{h}{2}k_1\right) \\
+k_3 &= f\!\left(t_n + \tfrac{h}{2},\ y_n + \tfrac{h}{2}k_2\right) \\
+k_4 &= f\!\left(t_n + h,\ y_n + h k_3\right) \\
+y_{n+1} &= y_n + \tfrac{h}{6}\left(k_1 + 2k_2 + 2k_3 + k_4\right)
+\end{aligned}
+$$
+
+### 1.3 几何直观
+
+- $k_1$：区间**左端**斜率；
+- $k_2$：用 $k_1$ 走半步后，在**中点**估计的斜率；
+- $k_3$：用 $k_2$ 再走半步后，在**中点**修正一次的斜率；
+- $k_4$：用 $k_3$ 走完整步后，在**右端**估计的斜率。
+
+最终加权 $\tfrac{1}{6}(k_1 + 2k_2 + 2k_3 + k_4)$ 相当于 Simpson 积分公式在 $[t_n, t_n+h]$ 上对 $f$ 的积分近似，因此天然与 Simpson 公式同阶。
+
+### 1.4 精度与稳定性
+
+- **单步截断误差**为 $\mathcal{O}(h^5)$，**全局误差**为 $\mathcal{O}(h^4)$，故称"四阶"。
+- 每步需要 4 次 $f$ 求值，代价可控，是刚性不强的问题中默认的高阶显式方法。
+- 稳定域包含实轴上 $\left[-2.78,\ 0\right]$ 的一段，遇到强刚性系统仍需换用隐式方法（如 Radau、SDIRK）。
+
+### 1.5 应用到四元数运动学
+
+IMU 姿态更新中，四元数 $q = [q_w,\ q_x,\ q_y,\ q_z]^T$ 在角速度 $\boldsymbol{\omega}$ 作用下满足：
+
+$$
+\dot{q} = \tfrac{1}{2}\, q \otimes \begin{bmatrix} 0 \\ \boldsymbol{\omega} \end{bmatrix}
+$$
+
+将其视作 $\dot{y} = f(y)$（$\boldsymbol{\omega}$ 在一步内近似为常量），直接套用 §1.2 的四阶递推即可。由于数值积分不严格保范，每步末尾需将结果重新单位化 $q \leftarrow q / \lVert q \rVert$，以保持其表示旋转的几何意义。
+
 ## 2. 代码实现
 
 ```py
@@ -28,7 +122,7 @@ def quaternion_derivative(q, w):
 def update_pose_rk4(q, w, dt):
     """
     使用四阶龙格库塔法(RK4)更新姿态四元数
-    q: 档前四元数 np.array([qw, qx, qy, qz])
+    q: 当前四元数 np.array([qw, qx, qy, qz])
     w: 补偿后的角速度 np.array([gx, gy, gz])
     dt: 采样时间
     """## 

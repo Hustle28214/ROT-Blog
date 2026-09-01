@@ -358,7 +358,7 @@ LSN 55  <T1, commit>
 -- 崩溃发生 --
 ```
 
-分析阶段：从 LSN 25 起扫描，得 DPT = {P5:20, P7:50}，TT = {T2:50}（T1 已 commit 被移出），RedoLSN = 20。
+分析阶段：从 LSN 25 起扫描，得 `DPT = {P5:20, P7:50}`，`TT = {T2:50}`（T1 已 commit 被移出），RedoLSN = 20。
 Redo：从 LSN 20 顺序 redo LSN 20、50，若目标页 PageLSN 已 ≥ 记录 LSN 则跳过。
 Undo：TT 剩余 T2，从 LSN 50 逆向 undo，写 CLR，并写 `<T2, abort>`。
 

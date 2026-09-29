@@ -1,0 +1,126 @@
+import WordCount from '../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+## 1. 场景说明
+
+写博客时经常遇到这样的情况：手头有一张本地图片（截图、下载的图、AI 生成的图），需要：
+
+1. 上传到自己的腾讯云对象存储（COS）图床的**指定目录**；
+2. 拿到公网 URL，以 Markdown 语法插入到文章中。
+
+本站的图片部分托管在腾讯云 COS 上，这篇文章记录了完整的自动化流程，同时也作为一份 **AI 可执行的 SOP（标准作业程序）**——下次写作时把这篇文章丢给任意 AI 助手，再说一句"按这篇博客的流程把图片传上去"，它就能照着做，不需要再从头摸索。
+
+## 2. 前置准备
+
+### 2.1 安装 COSCLI
+
+COSCLI 是腾讯云官方的命令行工具，到 [GitHub Releases](https://github.com/tencentyun/coscli/releases) 下载对应平台的二进制即可，无需编译：
+
+```bash
+# Linux amd64 示例
+mkdir -p ~/.local/bin
+curl -sL -o ~/.local/bin/coscli \
+  https://github.com/tencentyun/coscli/releases/download/v1.0.9/coscli-v1.0.9-linux-amd64
+chmod +x ~/.local/bin/coscli
+coscli --version   # 验证安装
+```
+
+macOS 选 `darwin` 版本，Windows 选 `exe` 版本，ARM 机器选 `arm64`。
+
+### 2.2 配置密钥
+
+COSCLI 的默认配置文件是 `~/.cos.yaml`（注意是家目录下的单个文件，不是 `~/.cos/` 目录，**这一点很容易搞错**——如果把配置写到 `~/.cos/config.yaml`，COSCLI 不会读取，反而会进入交互式初始化流程）。
+
+配置结构如下：
+
+```yaml
+cos:
+  base:
+    secretid: <你的SecretId>
+    secretkey: <你的SecretKey>
+    sessiontoken: ""
+    protocol: https
+  buckets:
+  - name: <存储桶名-APPID>        # 例如 examplebucket-1250000000
+    alias: <别名>                 # 之后命令里用别名引用，如 mybucket
+    region: <地域>                # 如 ap-guangzhou
+    endpoint: cos.<region>.myqcloud.com
+    ofs: false
+    customized: false
+```
+
+密钥在 [腾讯云控制台 - API 密钥管理](https://console.cloud.tencent.com/cam/capi) 获取。建议使用**子账号密钥**，只授予目标桶的写权限（`cos:PutObject`、`cos:GetObject`），避免主密钥泄露的风险。
+
+> **安全提醒**：密钥永远不要写进博客、代码仓库或发给任何不可信的对象。本文中所有密钥均为占位符。
+
+## 3. 上传图片
+
+一条命令搞定：
+
+```bash
+coscli cp /path/to/本地图片.png "cos://<别名>/<目标目录>/<文件名>.png"
+```
+
+例如把一张 HID 描述符示意图传到图床的嵌入式目录下：
+
+```bash
+coscli cp ~/Pictures/hid-descriptor.png \
+  "cos://mybucket/rot-blog-images/Electronic/嵌入式/协议接口/HID/hid-descriptor.png"
+```
+
+成功后输出类似：
+
+```
+Succeed: Total num: 1, size: 18,037 Byte (17.61 KB). OK num: 1(upload 1 files).
+```
+
+几个实践建议：
+
+- **目录结构跟站点栏目走**：图片目录与博客栏目层级保持一致（如 `rot-blog-images/Electronic/嵌入式/...`），方便日后批量管理和迁移。
+- **文件名用有意义的英文短横线命名**（如 `hid-descriptor.png`），不要保留截图工具生成的随机串。
+- 中文目录名是合法的，但拼 URL 时需要做**百分号编码**（下文会提到）。
+
+## 4. 生成 URL 并插入文章
+
+上传成功后，图片的公网地址格式为：
+
+```
+https://<桶名-APPID>.cos.<region>.myqcloud.com/<对象键>
+```
+
+在 Markdown 中插入：
+
+```markdown
+![](https://<桶名-APPID>.cos.<region>.myqcloud.com/rot-blog-images/Electronic/%E5%B5%8C%E5%85%A5%E5%BC%8F/hid-descriptor.png)
+```
+
+注意：如果对象键里有中文，URL 中应使用百分号编码（如 `嵌入式` → `%E5%B5%8C%E5%85%A5%E5%BC%8F`）。大多数渲染器能兼容未编码的中文 URL，但编码后的兼容性最好，站内已有文章也统一采用编码风格。
+
+最后用 `curl` 验证图片可公开访问：
+
+```bash
+curl -s -o /dev/null -w "%{http_code}" "<图片URL>"
+# 返回 200 即为成功；403 说明桶是私有读写，需要去控制台改公有读
+```
+
+## 5. AI 执行 SOP（下次直接复制这段给 AI）
+
+以下流程写给 AI 助手（人类读者可以跳过），照做即可完成"本地图片 → COS 图床 → 插入文章"的闭环：
+
+```text
+1. 确认本地图片路径与目标文章路径。
+2. 检查 ~/.cos.yaml 是否已配置好密钥与桶（别名、地域）。
+   若未配置：引导用户到 https://console.cloud.tencent.com/cam/capi 获取密钥，
+   按第 2.2 节的模板写入 ~/.cos.yaml（密钥由用户自行填写，AI 不得索要明文存储到仓库）。
+3. 根据文章所属栏目确定图床目标目录，为图片起一个语义化英文文件名。
+4. 执行上传：
+   coscli cp <本地图片> "cos://<别名>/<目录路径>/<文件名>"
+5. 拼接公网 URL（中文路径做百分号编码），curl 验证返回 200。
+6. 在文章的合适位置插入 Markdown 图片引用，风格与文中已有图片保持一致。
+7. 清理过程中产生的临时文件（如多余的配置文件、下载残留）。
+```
+
+有了这套 SOP，配图从"打开/浏览器 → 登录控制台 → 手动上传 → 复制链接"的四步手工操作，变成了一句话的事。
+
+</WordCount>

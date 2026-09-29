@@ -2,7 +2,7 @@ import WordCount from '../../../../../src/components/WordCount/WordCount';
 
 <WordCount>
 
-## HID协议简介
+## 1. HID协议简介
 
 相信大家平时都用过鼠标、键盘、触摸屏等设备，这些设备都使用了HID协议，HID协议是USB协议的子集，用于连接USB设备和计算机。
 
@@ -14,11 +14,16 @@ HID最新版本是HID 1.11，于2001年发布。
 
 USB设备的信息存储在ROM的段中，这些段叫做描述符。描述符很重要，接口描述符可以将设备类型识别出来。就比如HID。
 
+
 知道了设备属于hid设备，系统会选择hid驱动来处理这个设备。然后系统去看描述符，由此知道设备是什么、数据怎么传、数据格式是什么。
 
 系统应该先读HID的类描述符，它相当于大哥，可以说出所有小弟HID设备的特征，比如报告描述符，协议描述符，物理描述符等。
 
-## HID功能特性
+![](https://rotblog-pic-1322347792.cos.ap-guangzhou.myqcloud.com/rot-blog-images/Electronic/%E5%B5%8C%E5%85%A5%E5%BC%8F/%E5%8D%8F%E8%AE%AE%E6%8E%A5%E5%8F%A3/HID/hid-descriptor.png)
+
+
+
+## 2. HID功能特性
 
 USB 设备被分成不同的 **设备类**（device classes）。同一类的设备通常有相似的数据传输需求；并且可以共用同一个类驱动程序。
 
@@ -43,6 +48,39 @@ HID设备的传输需求，对比音频设备等应该算是比较简单的。
 在usb标准中，`bInterfaceClass = 0x03` 表示 HID 类设备。
 
 在设备被检测到后，报告描述符立即由HID类驱动程序加载和解析。现有和新设备的协议，通过在报告描述符中混合数据类型来创建。
+
+![](https://rotblog-pic-1322347792.cos.ap-guangzhou.myqcloud.com/rot-blog-images/Electronic/%E5%B5%8C%E5%85%A5%E5%BC%8F/%E5%8D%8F%E8%AE%AE%E6%8E%A5%E5%8F%A3/HID/hid-report-descriptor.png)
+
+:::note
+注意：
+
+接口描述符的`bInterfaceProtocol`成员只有在`bInterfaceSubClass`成员声明设备支持引导接口时才有意义，否则为0。
+
+并且协议码对应什么设备也有规定：
+
+| Protocol Code | Description |
+|---:|---|
+| 0 | None |
+| 1 | Keyboard |
+| 2 | Mouse |
+| 3–255 | Reserved |
+
+
+:::
+
+### 2.1 HID类
+
+
+### 2.2 HID子类
+
+
+### 2.3 HID协议概述
+
+
+### 2.4 HID接口
+
+
+## 3. HID操作模型
 
 
 </WordCount>

@@ -3,11 +3,11 @@
 
 # Production
 /build
-
+/coscli_output
 # Generated files
 .docusaurus
 .cache-loader
-
+coscli.log
 # Misc
 .DS_Store
 __pycache__/

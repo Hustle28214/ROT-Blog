@@ -1,0 +1,44 @@
+---
+title: 替代料查询
+sidebar_label: 🔁 替代料查询
+sidebar_position: 1
+---
+
+import WordCount from '../src/components/WordCount/WordCount';
+import Pin2PinSearch from '../src/components/Pin2PinSearch/Pin2PinSearch';
+
+<WordCount>
+
+## 替代料查询
+
+按 pin-to-pin 兼容性查询可互换的器件型号。数据来源于各器件页 frontmatter 中的 `pin2pin` 字段。
+
+<Pin2PinSearch />
+
+## 如何为新器件补充替代料
+
+在对应器件的 mdx frontmatter 中加一个 `pin2pin` 数组即可：
+
+```markdown
+---
+title: STM32F103
+pin2pin:
+  - GD32F103
+  - APM32F103
+  - HK32F103
+  - MM32F103
+---
+
+## 描述...
+```
+
+下次构建时，聚合数据会自动更新到本页。
+
+## 字段说明
+
+- `pin2pin` 是双向关系，写一次即可；如 A 列表里有 B，则 B 也会反向关联 A
+- 顺序按本地 zh-Hans 排序，搜索支持子串匹配（不区分大小写）
+- 卡片右上的 "↗" 链接可跳转到该型号的文档页（如有）
+- 文档中尚无页面的型号会标"暂无文档"
+
+</WordCount>

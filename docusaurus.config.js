@@ -141,6 +141,18 @@ const config = {
         // 其他可选配置：editUrl、showLastUpdateAuthor 等
       },
     ],
+    [
+      '@docusaurus/plugin-content-docs',
+      {
+        id: 'hardware-and-silicon',                  // 必须唯一
+        path: 'hardware-and-silicon',                // 文章存放的文件夹
+        routeBasePath: '/hardware-and-silicon',      // 访问路径，例如 /hardware-and-silicon
+        sidebarPath: require.resolve('./sidebarsHardwareSilicon.js'),
+        remarkPlugins: [remarkMath],
+        rehypePlugins: [rehypeKatex],
+      },
+    ],
+    './plugins/pin2pin-data-plugin',
   ],
   
   // scripts: [
@@ -221,6 +233,14 @@ const config = {
             label: '✔️力扣题解',
             docsPluginId: 'leetcode-answer',
           },
+          {
+            type: 'docSidebar',
+            sidebarId: 'hardwareSiliconSidebar',
+            position: 'right',
+            label: '🔬元器件',
+            docsPluginId: 'hardware-and-silicon',
+          },
+          {to: '/hardware-and-silicon/pin2pin', label: '🔁替代料', position: 'right'},
           {to: '/blog', label: '📝随笔', position: 'right'},
           {  
             

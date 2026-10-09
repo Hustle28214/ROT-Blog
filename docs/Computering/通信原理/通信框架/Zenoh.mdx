@@ -18,4 +18,68 @@ Zenoh（Zero Overhead Network Protocol）是 ZettaScale（也是 ROS 2 默认中
 
 一句话总结：**Zenoh 想做的事是"通信中间件的统一接口 + 跨域透明"**——不管是云、边缘还是嵌入式 MCU，都用同一套 API、同一个协议去交换数据。如果你正在为"机器人控制器 ↔ 网关 ↔ 云端"三段链路选型，它值得进短名单。
 
+## Zenoh 的语法形式
+
+### 键表达式 Key Expression
+
+键表达式是一个 UTF-8 字符串，用于在 Zenoh 系统中标识一个或多个资源。
+
+它类似路径结构，并支持结构化通配符来做模式匹配。
+
+完整语法见：https://spec.zenoh.io/spec/1.0.0/appendix/grammar.html
+
+```text
+key-expr     = chunk *("/" chunk)
+chunk        = 1*(unreserved / pct-encoded) / wild1 / wildN
+wild1        = "*"
+wildN        = "**"
+unreserved   = ALPHA / DIGIT / "-" / "_" / "." / "~" / "@" / "$"
+pct-encoded  = "%" HEXDIG HEXDIG
+```
+
+一个格式良好的键表达式满足以下所有条件：
+
+- 末尾没有 /。
+- 没有空块（即 // 无效）。
+- 不得与另一个 * 或块相邻（例如 a// 无效）。
+- 总长度必须至少为 1 个字符。
+
+:::info
+
+本地应用传来的 key expression，必须检查合法性，不合法就拒绝。网络上收到的 key expression，推荐也检查合法性，但规范不强制。
+
+:::
+
+### 通配符 Locators
+
+| 通配符 | 名称  | 匹配规则                                                         | 示例                                                                       |
+| ------ | ----- | ---------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| `*`    | wild1 | 精确匹配一个块。这个块是非空、且不包含 `/` 的字符序列。        | `a/*/c` 匹配 `a/b/c`、`a/xyz/c`；不匹配 `a/b/d/c`、`a//c` |
+| `**`   | wildN | 匹配零个或多个完整块。可以是空序列，也可以是任意由 `/` 分隔的块序列。 | `a/**/c` 匹配 `a/c`、`a/b/c`、`a/b/d/c`；`**` 单独使用时匹配任意键表达式，包括空字符串 |
+
+
+### 交集与包含
+
+
+
+### 查询参数
+
+```text
+parameters = [ parameter *( ";" parameter ) ]
+```
+
+`parameters` 是可选的，也就是说可以为空，因为外面有 `[ ]`。
+
+如果不为空，必须由一个 `parameter` 开头。后面可以跟0个或多个 `; parameter`。
+
+合法形式：
+
+```text
+key
+key=value
+key1=value1;key2=value2
+key1;key2=value2;key3
+```
+一个 `parameter` 要么是 `key`，要么是 `key=value`。
+
 </WordCount>

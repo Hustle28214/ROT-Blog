@@ -1,8 +1,7 @@
 {
-    "label": "STM32",
-    "position": 2,
-    "link": {
-      "type": "generated-index"
-    }
+  "label": "STM32",
+  "position": 1,
+  "link": {
+    "type": "generated-index"
   }
-  
+}

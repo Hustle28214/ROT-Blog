@@ -1,8 +1,7 @@
 {
-    "label": "ARM",
-    "position": 1,
-    "link": {
-      "type": "generated-index"
-    }
+  "label": "ARM",
+  "position": 1,
+  "link": {
+    "type": "generated-index"
   }
-  
+}

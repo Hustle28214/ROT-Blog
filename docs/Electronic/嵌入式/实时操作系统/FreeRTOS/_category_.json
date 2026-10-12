@@ -1,8 +1,7 @@
 {
-    "label": "FreeRTOS",
-    "position": 2,
-    "link": {
-      "type": "generated-index"
-    }
+  "label": "FreeRTOS",
+  "position": 1,
+  "link": {
+    "type": "generated-index"
   }
-  
+}

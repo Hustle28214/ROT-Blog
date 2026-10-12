@@ -1,0 +1,88 @@
+import WordCount from '../../../../../src/components/WordCount/WordCount.jsx';
+
+<WordCount>
+
+## 1. Embassy 是什么
+
+Embassy 是一套面向嵌入式的 **Rust async/await 框架**（以及配套 crate 集合），目标是用安全的 Rust 写出正确、省电、可组合的固件。
+
+两句话抓住定位：
+
+1. **用 async 任务替代传统 RTOS 线程**：编译器把 `async fn` 变成状态机，由 executor 协作调度，默认无需动态分配、无需为每个任务单独调栈；
+2. **模块可拆开用**：executor、time、HAL、net、sync 等 crate 相对独立——可以只用 Embassy HAL 做阻塞驱动，也可以把 executor 跑在 Zephyr 线程上。
+
+它常被拿来和 FreeRTOS / RTIC 比较，但严格说 Embassy **不是**经典意义上带内核态上下文切换的 RTOS；它是“裸机/半裸机上的异步运行时 + 生态”。放在本栏目是因为：在并发模型选型上，它和 RTOS 处在同一决策层。
+
+## 2. 为什么能替代一部分 RTOS
+
+传统 RTOS：每个任务一条栈，内核按优先级抢占切换；阻塞通常靠睡眠队列 + 唤醒。
+
+Embassy / async：
+
+- 任务在 `.await` 点主动让出；
+- Future 就绪后由中断或定时器 wake，executor 再 poll；
+- **同一 executor 内协作调度**；需要抢占时，可开多个不同优先级的 executor（高优先级 executor 可抢低优先级上的任务）。
+
+好处：
+
+- 并发写起来像顺序代码（`await` 串起状态），尤其适合网络、USB、多连接 I/O；
+- 空闲时 executor 可让 CPU 睡眠，利于低功耗；
+- Rust 所有权与类型系统在编译期拦住大量数据竞争和生命周期错误。
+
+代价：
+
+- 同一优先级队列里，某任务长时间不 await 会拖住同 executor 上的其他任务（协作式抖动）；
+- Flash/代码体积有时比极简 C RTOS 更大；对极小 MCU 要实测；
+- 生态与调试习惯偏 Rust（probe-rs、defmt 等），和 Keil/CubeMX 工作流不同。
+
+## 3. 核心组件
+
+| Crate / 能力 | 作用 |
+| --- | --- |
+| `embassy-executor` | 嵌入式 async 执行器，任务多在启动时静态生成 |
+| `embassy-time` | 全局 `Instant` / `Duration` / `Timer`，避免手搓硬件定时器 |
+| HAL（`embassy-stm32` / `nrf` / `rp` 等） | 外设的安全 Rust API，常同时提供 async 与 blocking |
+| `embassy-sync` | async 友好的通道、信号、互斥等 |
+| `embassy-net` | 以太网/IP/TCP/UDP/DHCP 等异步网络栈 |
+| `embassy-boot` 等 | 引导与固件更新相关能力 |
+
+HAL 也可独立于 executor 使用；DMA、串口收发这类“等完成再继续”的路径特别适合 async。
+
+## 4. 和 FreeRTOS / Zephyr / RTIC
+
+| 方案 | 并发模型 | 语言 | 更适合 |
+| --- | --- | --- | --- |
+| FreeRTOS | 抢占式线程 | C/C++ | 控制周期明确、团队 C 栈成熟 |
+| Zephyr | 抢占式线程 + 庞大子系统 | C（Rust 绑定在演进） | 多协议、跨板卡产品 |
+| RTIC | 静态优先级、中断驱动并发 | Rust | 硬实时边界清晰、资源静态可知 |
+| Embassy | async 协作（+ 多 executor 优先级） | Rust | I/O 密集、事件驱动、希望用 async 简化状态机 |
+
+经验法则：
+
+- 硬实时控制环、最坏响应必须可分析 → 优先看 RTIC / 经典 RTOS + 中断设计；
+- 大量并发连接、协议状态机、传感器采集与联网交织 → Embassy 很舒服；
+- 要现成 BLE Mesh / 复杂网络与文件系统 → Zephyr 往往更省事；
+- 也可以组合：例如在 Zephyr 线程里跑 Embassy executor（官方 Rust 支持方向之一），用线程优先级补 async 协作的不足。
+
+## 5. 最小心智模型
+
+一个典型 Embassy 应用大致是：
+
+1. 用宏声明若干 `#[embassy_executor::task]`；
+2. 在 `main` 里初始化时钟/外设，把外设拆给各任务（Rust 所有权保证不双持）；
+3. `Spawner` 启动任务后进入 executor；
+4. 任务内部 `Timer::after(...).await` 或 `uart.read(...).await`，让出 CPU。
+
+调试时重点盯：**谁在 await、谁被 wake、是否有任务长时间占着 poll**。这和 RTOS 里看任务状态、堆栈水位是同一类问题，只是工具不同。
+
+## 6. 本栏目后续计划
+
+1. 工具链（Rust embedded、probe-rs）与最小 blink / 串口；
+2. Executor、任务与多优先级；
+3. `embassy-time` 与低功耗睡眠；
+4. 以 STM32 或 RP2040 为例串 HAL + DMA async；
+5. 与 FreeRTOS / Zephyr 的对照实验（延迟、RAM、功耗）。
+
+官方入口：[embassy.dev](https://embassy.dev/)、[Embassy Book](https://embassy.dev/book/)。
+
+</WordCount>

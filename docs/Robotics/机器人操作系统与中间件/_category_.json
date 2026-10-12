@@ -1,0 +1,8 @@
+{
+  "label": "机器人操作系统与中间件",
+  "position": 2,
+  "link": {
+    "type": "generated-index",
+    "description": "ROS、数据回放，以及车规/新一代通信框架。"
+  }
+}

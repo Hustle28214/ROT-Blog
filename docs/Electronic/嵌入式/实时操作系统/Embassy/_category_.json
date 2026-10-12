@@ -1,0 +1,8 @@
+{
+  "label": "Embassy",
+  "position": 4,
+  "link": {
+    "type": "generated-index",
+    "description": "Rust 嵌入式 async/await 框架：协作式 executor、HAL 与低功耗调度，可作为传统 RTOS 的并发替代方案。"
+  }
+}

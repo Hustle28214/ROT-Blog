@@ -4,6 +4,6 @@
   "position": 20,
   "link": {
     "type": "generated-index",
-    "description": "机器人操作 / VLA 领域的公共基准与数据集：LIBERO、CALVIN、SimplerEnv、Open X-Embodiment、DROID、RoboCasa 等。"
+    "description": "机器人操作 / VLA 的公共基准与数据集，以及评测方法论：LIBERO、CALVIN、SimplerEnv、Open X-Embodiment、DROID、RoboCasa；含 Rubric 多维评分合约与工程架构。"
   }
 }

@@ -1,0 +1,8 @@
+{
+  "label": "高等机器人控制",
+  "position": 3,
+  "link": {
+    "type": "generated-index",
+    "description": "强化学习、VLA、世界模型与任务规划等学习/编排栈。"
+  }
+}

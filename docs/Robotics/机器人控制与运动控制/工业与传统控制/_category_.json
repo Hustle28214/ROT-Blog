@@ -1,0 +1,8 @@
+{
+  "label": "工业与传统控制",
+  "position": 1,
+  "link": {
+    "type": "generated-index",
+    "description": "伺服、轨迹、工业臂与 AGV 运动导航控制。"
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "label": "AGV运动与导航控制",
+  "position": 3,
+  "link": {
+    "type": "generated-index",
+    "description": "差速/舵轮、路径跟踪、对接等工业移动控制。"
+  }
+}

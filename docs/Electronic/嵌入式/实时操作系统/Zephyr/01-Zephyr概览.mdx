@@ -1,0 +1,79 @@
+import WordCount from '../../../../../src/components/WordCount/WordCount.jsx';
+
+<WordCount>
+
+## 1. Zephyr 是什么
+
+Zephyr 是 Linux Foundation 托管的开源实时操作系统，内核体积可裁剪，面向资源受限的嵌入式设备：从环境传感器、可穿戴，到工业控制器、智能手表和无线 IoT 节点。
+
+两句话抓住定位：
+
+1. **完整的 RTOS + 子系统生态**：线程调度、IPC、驱动模型、网络、蓝牙、文件系统、日志/Shell、电源管理等模块化可选；
+2. **跨架构、设备树驱动配置**：同一套应用可通过 Devicetree + Kconfig 适配大量板卡与 SoC，而不是为每颗芯片手写一套板级胶水。
+
+许可证以 Apache 2.0 为主（部分第三方组件另有说明），工业与商业产品里很常见。
+
+## 2. 和 FreeRTOS / RT-Thread 怎么比
+
+| 维度 | FreeRTOS | RT-Thread | Zephyr |
+| --- | --- | --- | --- |
+| 内核体量 | 极轻，偏“调度内核” | 内核 + 组件较丰富 | 内核 + 大量子系统，可裁剪 |
+| 硬件描述 | 多为 BSP/厂商包 | BSP + 软件包生态 | Devicetree 一等公民 |
+| 网络/蓝牙 | 常依赖额外栈或厂商 SDK | 组件/软件包完善 | 原生网络栈、BLE/Mesh 成熟 |
+| 配置方式 | 宏/配置头文件 | menuconfig + 软件包 | Kconfig + Devicetree |
+| 典型场景 | MCU 控制、资源极紧 | 物联网、国人社区/中文资料 | 多协议连接、跨平台产品线 |
+
+选型直觉：
+
+- 只要抢占式多任务、资源很紧 → FreeRTOS 往往够用；
+- 要中文生态、设备框架和软件包 → RT-Thread 友好；
+- 要跨多 SoC、原生网络/蓝牙、统一驱动与设备树 → Zephyr 更合适。
+
+## 3. 内核能力速览
+
+Zephyr 内核提供熟悉的 RTOS 服务：
+
+- **多线程**：协作式 / 抢占式、可选时间片；也支持 EDF、Meta-IRQ（类似 bottom-half）等调度策略；
+- **中断**：编译期注册 ISR，ISR 优先级高于所有线程；
+- **同步与通信**：信号量、互斥锁、消息队列、管道等；
+- **内存**：固定块 / 可变块分配；资源多在编译期静态定义，利于长期运行设备；
+- **电源管理**：系统级策略 + 驱动级细粒度 PM；
+- **内存保护**：在支持 MPU/MMU 的平台上可做栈溢出保护、内核对象权限与线程隔离（userspace）。
+
+就绪队列实现也可选（链表、红黑树、多级队列），在代码体积与大量线程时的性能之间权衡。
+
+## 4. 子系统与连接能力
+
+Zephyr 的价值很大一部分在“内核之上的子系统”：
+
+- **原生网络栈**：IPv4/IPv6、TCP/UDP、BSD Socket、MQTT/CoAP/DNS 等，按 Kconfig 裁剪；
+- **蓝牙**：BLE 5.x、Host + Controller、Mesh；
+- **存储**：LittleFS / FatFS / ext2、NVS、Settings；
+- **开发体验**：多后端 logging、功能完整的 Shell、`native_sim` 可在 Linux 上当原生进程跑 Zephyr，方便联调。
+
+对机器人/工业网关这类“控制 + 连接”产品，Zephyr 往往比“纯内核 RTOS + 自己拼协议栈”省集成成本。
+
+## 5. 构建与移植心智模型
+
+一条常见的 Zephyr 工程路径：
+
+1. 用 west 管理多仓（Zephyr 本体 + HAL + 应用）；
+2. 板级信息写在 Devicetree（引脚、外设实例、时钟等）；
+3. 功能开关走 Kconfig（要不要网络、哪家驱动、线程栈默认大小等）；
+4. CMake 生成可烧录镜像。
+
+和 STM32Cube / 厂商 SDK 的差别在于：**硬件描述与功能裁剪被系统化了**，应用代码更偏向“声明依赖哪些节点和配置”，而不是散落一堆板级宏。
+
+## 6. 本栏目后续计划
+
+建议按这条线展开：
+
+1. West / 工具链与最小 Hello World；
+2. 线程、调度与同步原语；
+3. Devicetree 与驱动模型；
+4. 网络或 BLE 择一做端到端样例；
+5. 与 FreeRTOS、RT-Thread、Embassy 的选型对照。
+
+官方入口：[Zephyr 文档](https://docs.zephyrproject.org/)、[项目主页](https://www.zephyrproject.org/)。
+
+</WordCount>

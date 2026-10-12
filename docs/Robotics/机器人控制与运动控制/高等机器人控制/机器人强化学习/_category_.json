@@ -1,8 +1,7 @@
 {
-    "label": "机器人强化学习",
-    "position": 1,
-    "link": {
-      "type": "generated-index"
-    }
+  "label": "机器人强化学习",
+  "position": 1,
+  "link": {
+    "type": "generated-index"
   }
-  
+}

@@ -1,0 +1,8 @@
+{
+  "label": "实时操作系统",
+  "position": 3,
+  "link": {
+    "type": "generated-index",
+    "description": "嵌入式并发与实时调度：经典 RTOS（FreeRTOS、RT-Thread、Zephyr）与 Rust async 框架 Embassy。"
+  }
+}

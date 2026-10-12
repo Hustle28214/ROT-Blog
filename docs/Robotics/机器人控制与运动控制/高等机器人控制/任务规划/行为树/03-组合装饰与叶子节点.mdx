@@ -1,0 +1,67 @@
+---
+sidebar_position: 3
+---
+
+import WordCount from '../../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+> **L3 控制流层**：节点类型是表面，组合语义才是语言。
+
+## 大纲
+
+### 1. 三类节点
+| 类型 | 角色 | 例子 |
+| :--- | :--- | :--- |
+| Composite | 控制流，组织子节点 | Sequence、Selector、Parallel |
+| Decorator | 修饰单个子节点 | Inverter、Retry、Timeout、ForceSuccess |
+| Leaf | 真正干活 | Condition、Action |
+
+### 2. Sequence（与 / 顺序）
+- 子节点依次执行；一个 Failure → 整体 Failure；全 Success → Success
+- 中间 Running → 整体 Running
+- 机器人：`Approach → Grasp → Lift → Place`
+
+### 3. Selector / Fallback（或 / 优先）
+- 子节点依次尝试；一个 Success → 整体 Success；全 Failure → Failure
+- 常用于优先级策略：`若电量低则充电，否则执行任务，否则巡检`
+
+### 4. Parallel（并行）
+- 多子节点同 tick 推进；成功/失败策略用阈值定义（要几个成功才算成功）
+- 注意：并行不是多线程；默认仍是同线程同 tick 内依次调用
+- 机器人：一边移动一边监视急停条件
+
+### 5. 常用 Decorator
+- Inverter：翻转 Success/Failure
+- Repeat / Retry：次数或直到成功
+- Timeout / TimeLimit：超时失败或打断
+- ForceSuccess / ForceFailure：兼容上层控制流
+- KeepRunningUntilFailure：持续监控类技能
+
+### 6. Condition 与 Action
+- Condition：只读世界/黑板，通常立刻 Success/Failure（偶发 Running）
+- Action：调用导航、抓取、说话等，常跨帧 Running
+- 设计原则：叶子要小、可测、副作用清晰
+
+### 7. 优先级与“表面简单、实际难”
+- Sequence/Selector 好懂；真正坑在：
+  - 何时重置子树
+  - 并行下的取消语义
+  - 高优先级分支如何打断低优先级（引出 L4 中断）
+
+### 8. 一张推荐的最小节点集（落地）
+- Composite：Sequence、Selector、Parallel（简单阈值）
+- Decorator：Retry、Timeout、Inverter
+- Leaf：Condition、Action（再按领域扩展）
+
+## 写作要点（待填充）
+- 同一任务分别用 FSM 边 vs BT 节点对比可读性
+- 给出一棵“桌面抓取”示例树（可配 Mermaid）
+- 说明 Parallel 的成功策略参数为何容易配错
+
+## 本篇小结（预留）
+1. BT 的表达力来自组合子，不是叶子数量。
+2. Sequence/Selector 是基础语法；Decorator 是修饰语法。
+3. 下一篇把难点交给反应式：黑板与中断。
+
+</WordCount>

@@ -1,0 +1,8 @@
+{
+  "label": "MCU",
+  "position": 2,
+  "link": {
+    "type": "generated-index",
+    "description": "微控制器平台实践：STM32、ESP32、BEKEN 等。"
+  }
+}

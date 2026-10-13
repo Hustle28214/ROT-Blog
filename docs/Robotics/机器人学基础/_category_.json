@@ -1,0 +1,8 @@
+{
+  "label": "机器人学基础",
+  "position": 1,
+  "link": {
+    "type": "generated-index",
+    "description": "运动学、动力学与状态估计基础。"
+  }
+}

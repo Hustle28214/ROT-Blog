@@ -1,0 +1,65 @@
+---
+sidebar_position: 2
+---
+
+import WordCount from '../../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+> **L2 执行模型层**：不讲 Tick 和 Running，等于没讲行为树。
+
+## 大纲
+
+### 1. Tick 是什么
+- 行为树按固定或事件触发的节奏从根节点调用 `Tick()`
+- 每个节点返回三种状态之一：`Success` / `Failure` / `Running`
+- 状态自底向上传播，父节点据此决定继续、切换还是结束
+
+### 2. 三种返回状态的语义
+| 状态 | 含义 | 典型例子 |
+| :--- | :--- | :--- |
+| Success | 本节点目标已达成 | 抓取成功、到达航点 |
+| Failure | 本节点失败或条件不满足 | 夹爪未闭合、路径不可达 |
+| Running | 尚未结束，下一 tick 继续 | 移动中、等待传感器稳定 |
+
+### 3. Running 为什么是关键
+- 机器人动作天然跨多帧：不能一 tick 做完
+- Running 让树“记住”当前执行进度，避免每帧从头瞎选
+- 与 FSM 状态驻留不同：驻留位置由树结构和控制流节点共同决定
+
+### 4. 一次 Tick 的传播过程（拟用图）
+- 根 → Sequence → Action(Running) → 整棵树 Running
+- 下一 tick：优先回到上次 Running 的节点（视实现：resume / 记忆索引）
+- Action 变 Success 后，Sequence 推进到下一子节点
+
+### 5. 记忆（Memory）与无记忆
+- Memory Sequence / Selector：记住上次跑到哪
+- 无记忆：每 tick 从第一个子节点重来（更反应式，也可能更抖）
+- 机器人里两者都有用，取决于要不要“粘住”当前技能
+
+### 6. 和控制系统周期的关系
+- BT tick 频率 vs 底层控制频率（如 100Hz 控制、10–20Hz 决策）
+- 不要在叶子里阻塞整棵树；长动作应返回 Running
+- 确定性：相同输入序列应得到相同状态轨迹（仿真/回放基础）
+
+### 7. 最小伪代码
+```text
+enum Status { Success, Failure, Running }
+
+Status Node::Tick(Blackboard& bb)  // 子类实现
+Status Tree::Tick() { return root->Tick(bb) }
+```
+
+## 写作要点（待填充）
+- 用“移动到桌子旁再抓杯子”走一遍多帧 tick
+- 对照：若没有 Running，只能写成阻塞调用或外部状态机
+- 强调：父节点如何根据子节点状态推进，是 L3 的入口
+
+## 本篇小结（预留）
+1. Tick + 三态是 BT 的执行内核。
+2. Running 承载跨帧执行。
+3. 记忆策略影响反应性与稳定性。
+
+下一篇 L3：Sequence / Selector / Parallel / Decorator 如何组合这些返回值。
+
+</WordCount>

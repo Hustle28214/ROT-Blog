@@ -1,0 +1,8 @@
+{
+  "label": "数据记录与回放",
+  "position": 2,
+  "link": {
+    "type": "generated-index",
+    "description": "MCAP、bag 与录制回放。"
+  }
+}

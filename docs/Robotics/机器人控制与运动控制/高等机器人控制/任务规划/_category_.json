@@ -1,0 +1,8 @@
+{
+  "label": "任务规划",
+  "position": 4,
+  "link": {
+    "type": "generated-index",
+    "description": "行为树、规划器混合与学习型任务编排。"
+  }
+}

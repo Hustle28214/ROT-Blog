@@ -1,0 +1,8 @@
+{
+  "label": "内核",
+  "position": 1,
+  "link": {
+    "type": "generated-index",
+    "description": "处理器内核与指令集架构：ARM、RISC-V。"
+  }
+}

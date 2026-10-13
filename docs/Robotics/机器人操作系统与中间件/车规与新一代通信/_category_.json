@@ -1,0 +1,8 @@
+{
+  "label": "车规与新一代通信",
+  "position": 3,
+  "link": {
+    "type": "generated-index",
+    "description": "DDS 进阶、Zenoh、SOME/IP、AUTOSAR 等（专栏预开）。"
+  }
+}

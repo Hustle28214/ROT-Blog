@@ -1,0 +1,191 @@
+
+import WordCount from '../../../../../src/components/WordCount/WordCount.jsx';
+
+<WordCount>
+
+## 1. RTOS简介
+
+RTOS全称为：Real Time Operation System，即实时操作系统。
+
+在实时操作系统中，我们可以把要实现的功能划分为多个任务，每个任务负责实现一部分，这里的每个任务都是一个很简单的程序，通常是无限循环。
+
+实时的要求是：对时间精确可控。
+
+常见的操作系统：Windows和Linux都不是实时的。
+
+> 需要RTOS的场景：遥控接收、底盘运动、云台控制、自瞄...，FreeRTOS具有免费、开源、易移植、易开发的特点。
+
+> 机器人各个任务的功能独立，但是任务之间又互相关联时，就需要RTOS。这种场景出现在比如遥控，它就会同时对底盘和云台产生影响。此外，当机器人的实时性要求高，各类控制算法需要计算控制量对时间的积分/微分，要求按严格确定的周期执行，FreeRTOS就能派上用场。
+
+裸机编程的时候一般都是用``while(1)``做一个无限循环结合中断来完成所有的处理。相对于多任务系统而言，这个就是单任务系统，也称为前后台系统。
+
+:::danger
+前后台系统的实时性差，各个任务都是排队等着轮流执行，不管程序现在多紧急，都要等。
+:::
+
+RTOS则是有**优先级**之分，内核会管理不同优先级的任务的执行。
+
+
+
+## 2. 前后台编程与RTOS编程
+
+前后台：
+
+```c
+int add(int *a,int *b){
+    return *a + *b;
+}
+void main(){
+    int factor1 = 5;
+    int factor2 = 10;
+    int result;
+    while(1){
+        result = add(&factor1,&factor2);
+        factor2 = factor2 + 1;
+    }
+    return 0;
+}
+```
+
+RTOS：
+
+
+```c
+void TaskA(void const* argument){
+    int a;
+    while(1){
+        a = 1;
+    }
+
+}
+```
+
+
+## 3. CMSIS-RTOS
+
+CMSIS-RTOS提供了API，使得一个设计在不同的RTOS之间移植。
+
+通过宏进行对象定义，再进行函数调用转换。
+
+在使用CubeMX配置FreeRTOS的时候，接口API使用CMSIS_V2可以兼容更多型号的MCU。可以选择开启FPU，大大增强CPU的浮点数（小数）运算能力。
+
+CubeMX配置FreeRTOS会强制占用SysTick作为系统时钟。HAL库的时钟需要选用其他定时器。
+
+TICK_RATE_HZ：调度器执行频率，保持默认；
+
+MINIMAL_STACK_SIZE：最小栈大小（单位为字），默认即可。
+
+内存管理保持默认。动态分配的内存大小：15360字节。
+
+中断管理保持默认。规定中断优先级大于5（即0-4）的中断直接通过原本的硬件途径(NVIC)触发，触发后无法使用任何FreeRTOS提供的函数。中断优先级小于5的中断，由FreeRTOS接管，其内可使用“FromISR”结尾的API函数。中断按优先级嵌套的规律在一定程度上依旧成立。
+
+创建任务：任务描述结构体的定义->创建线程，并使其处于就绪态->开启调度器（启动RTOS内核）。
+
+
+
+
+
+## 4. 临界区
+
+临界区是指那些必须完整运行，不能被打断的代码段，比如有的外设的初始化需要严格的时序，初始化过程中不能被打断。
+
+进入临界区会关闭一切FreeRTOS接管的中断，因此临界区代码要尽量的简短。
+
+```c
+taskENTER_CRITICAL();//进入临界区
+taskEXIT_CRITICAL();//退出临界区
+```
+
+## 5. CMSIS-RTOS函数
+
+
+延时函数：osDelay()函数是相对延时函数，如果受到中断的干扰，计时时间会产生偏差，适合简单的单次长时间延时。
+
+在第一次执行时，要调用osKernelSysTick()函数，来获取第一次执行的开始时间。
+
+osDelayUntil函数是绝对延时函数，延时时比较的是当前时间-开始时间与目标延时时间。延时执行完后会自动给传入的开始时间变量加上延时的时间。
+
+任务删除：除了使用已有的ID变量，如果一个任务要删除自身，可以使用osThreadCetId()函数现场获取自身ID。
+
+:::warning
+在FreeRTOS中，传入NULL也可以删除自身。
+:::
+
+CMSIS_V2 API中使用osThreadExit()函数退出自身。**上述方法将不起作用。**
+
+## 6. 使用“启动任务”创建其他任务
+
+使用一个启动任务来实现任务的优先级管理和启动顺序管理，加入一段临界区，防止启动过程被其自身创建的高优先级任务或中断打断。启动任务只执行一次，因此在末尾会删除其自身。
+
+```c
+void Start_Task(void const *argument)
+{
+    taskENTER_CRITICAL();
+
+    osThreadDef(TaskA,TaskA,osPriorityNormal,0,120); // 创建任务A，栈大小为120字节
+    StartTaskHandle = osThreadCreate(osThread(TaskA),NULL);
+
+    osThreadDef(TaskB,TaskB,osPriorityNormal,0,120); // 创建任务B
+    StartTaskHandle = osThreadCreate(osThread(TaskB),NULL);
+
+    osThreadTerminate(StartTaskHandle); // 删除启动任务
+
+    taskEXIT_CRITICAL();
+}
+```
+
+CubeMX中，通常是在main函数中的MX_FREERTOS_Init()函数中创建启动任务。
+
+并且启动任务通常通过CubeMX中FreeRTOS的“Tasks and Queues”选项卡中添加。（Add-Priority）
+
+## 7. CMSIS-RTOS创建任务全过程
+
+在main函数里面创建启动任务，然后在启动任务的临界区中创建其他任务。
+
+```c
+osThreadId StartTaskHandle;
+int main(void)
+{
+
+    osThreadDef(StartTask,Start_Task,osPriorityNormal,0,120); // 创建启动任务
+    StartTaskHandle = osThreadCreate(osThread(StartTask),NULL); // 启动启动任务
+    // 必须先启动调度器，才能启动任务
+    osKernelStart(); // 启动RTOS内核
+    //之后，while(1)将不会执行，而是执行调度器，往里面写代码没有用!
+    while(1){
+
+    }
+}
+
+void Start_Task(void const *argument)
+{
+    taskENTER_CRITICAL();
+
+    osThreadDef(TaskA,TaskA,osPriorityNormal,0,120); // 创建任务A，栈大小为120字节
+    StartTaskHandle = osThreadCreate(osThread(TaskA),NULL);
+
+    osThreadDef(TaskB,TaskB,osPriorityNormal,0,120); // 创建任务B
+    StartTaskHandle = osThreadCreate(osThread(TaskB),NULL);
+
+    osThreadTerminate(StartTaskHandle); // 删除启动任务
+
+    taskEXIT_CRITICAL();
+}
+
+void TaskA(void const *argument)
+{
+    for (;;)
+    {
+        osDelay(100); // 延时100ms
+    }
+}
+void TaskB(void const *argument)
+{
+    for (;;)
+    {
+        osDelay(100); // 延时100ms
+    }
+}
+
+```
+</WordCount>

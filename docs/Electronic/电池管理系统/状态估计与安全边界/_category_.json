@@ -1,0 +1,8 @@
+{
+  "label": "状态估计与安全边界",
+  "position": 1,
+  "link": {
+    "type": "generated-index",
+    "description": "BMS 最不可替代的内核：基于电池模型的状态估计，以及由此驱动的动态安全边界控制。"
+  }
+}

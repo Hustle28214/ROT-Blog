@@ -1,0 +1,764 @@
+import WordCount from '../../../../../src/components/WordCount/WordCount.jsx';
+import Mermaid from '@theme/Mermaid';
+
+<WordCount>
+
+
+两个线程间的数据传递：
+
+![](https://github.com/user-attachments/assets/2e588072-e5e2-4666-ae45-1fd511a50e9c)
+
+如何使得这两个线程默契配合？如果两个线程都需要访问共享内存，我们甚至会遇到数据一致性的问题。
+
+首先，我们要保证，这两个线程访问的动作必须**互斥进行**，同一时间只应该有一个线程访问共享内存。
+
+我们称两个线程需要访问的同一块代码区称为**临界区**。
+
+:::danger
+牢记一个设计原则：在访问临界区的时候只允许一个 (或一类) 线程运行。
+:::
+
+在进行线程同步的时候我们需要设计一个优雅的同步机制。为此，引入信号量（semaphore）、互斥量（mutex）、和事件集（event）三大概念。
+
+## 信号量
+
+举个简单的例子理解信号量：去餐馆等位，服务员叫号，如果现在餐馆还有很多空位，服务员会让你直接进入，如果没有了，你需要等候，直到叫到你的号为止。
+
+此时，服务员就是信号量，空位个数就是信号量的值，你和其他食客相当于线程。
+
+信号量本质上是一个记录可用资源数量的整型计数器，在RT-Thread里是一个内核对象，线程可以获取或释放。
+
+### 信号量工作机制
+
+每个信号量对象都有一个信号量值和一个线程等待队列，信号量的值对应了信号量对象的实例数目、资源数目。
+
+假设现在信号量值为5，那就说明有5个实例可以使用，线程可以申请；为0则申请使用的线程必须挂起，直到有实例释放。
+
+![](https://github.com/user-attachments/assets/c7ab7781-1a48-41df-a552-a1797b9ee80d)
+
+### 信号量控制块
+
+信号量控制块`rt_semaphore`是操作系统用于管理信号量的一个数据结构: 
+
+```C
+struct rt_semaphore
+{
+   struct rt_ipc_object parent;  /* 继承自 ipc_object 类 */
+   rt_uint16_t value;            /* 信号量的值, max value = 65535 */
+};
+/* rt_sem_t 是指向 semaphore 结构体的指针类型 */
+typedef struct rt_semaphore* rt_sem_t;
+```
+
+### 信号量的管理方式
+
+如图是几大管理方式：
+
+![](https://github.com/user-attachments/assets/47ee85fe-d885-4d42-9494-da9201cb9e0d)
+
+#### 创建和删除信号量
+
+创建并初始化一个信号量: 
+```C
+/**
+ * @brief   创建并初始化一个信号量。
+ *
+ * @param   name    信号量的名称，用于调试和对象查找。
+ * @param   value   信号量的初始计数值，通常表示可用资源的数量。
+ * @param   flag    信号量的等待队列排序方式，支持以下标志：
+ *                  - RT_IPC_FLAG_FIFO: 先进先出队列，先等待的线程优先获得信号量。
+ *                  - RT_IPC_FLAG_PRIO: 优先级队列，高优先级线程优先获得信号量。
+ *
+ * @return  成功时返回指向信号量控制块的指针（rt_sem_t 类型）；
+ *          失败时返回 RT_NULL，通常由于系统内存不足或 flag 非法导致。
+ *
+ * @note    1. 该函数不能在中断服务例程（ISR）中调用。
+ *          2. 创建的信号量对象在系统堆中动态分配内存，不再使用时需通过
+ *             rt_sem_delete() 删除并释放内存。
+ *          3. flag 参数必须使用上述两个有效标志之一，否则创建失败。
+ *
+ * @see     rt_sem_delete()
+ */
+ rt_sem_t rt_sem_create(const char *name,
+                        rt_uint32_t value,
+                        rt_uint8_t flag);
+```
+
+删除：
+```C
+rt_err_t rt_sem_delete(rt_sem_t sem);
+```
+#### 初始化和脱离信号量
+
+初始化一个信号量（静态分配）：
+```C
+/**
+ * @brief   初始化静态信号量对象
+ *
+ * @note    该函数用于初始化一个静态分配的信号量对象。信号量是一种常用的同步机制，
+ *          可用于解决任务间或中断与服务任务间的同步问题。调用此函数前，信号量对象
+ *          的内存必须已经分配（可以是全局变量或静态分配的变量）。
+ *
+ * @param   sem     - 信号量对象的指针，指向已分配但未初始化的信号量控制块
+ * @param   name    - 信号量的名称，长度不能超过 RT_NAME_MAX 个字符
+ * @param   value   - 信号量的初始值，通常表示可用资源的数量
+ * @param   flag    - 信号量的标志，决定等待队列的排序方式，可取以下值：
+ *                    - RT_IPC_FLAG_FIFO  (0x00) 先进先出队列
+ *                    - RT_IPC_FLAG_PRIO  (0x01) 优先级等待队列
+ *
+ * @return  rt_err_t - 执行结果
+ * @retval  RT_EOK          (0)   : 初始化成功
+ * @retval  -RT_ERROR      (1)   : 初始化失败（如参数为空）
+ * @retval  -RT_EFULL      (-5)  : 标志参数非法（非 FIFO 或 PRIO）
+ *
+ * @see     rt_sem_create()    // 动态创建信号量
+ * @see     rt_sem_detach()    // 脱离静态信号量
+ */
+rt_err_t rt_sem_init(rt_sem_t       sem,
+                     const char     *name,
+                     rt_uint32_t    value,
+                     rt_uint8_t     flag);
+```
+脱离一个信号量：
+
+```C
+rt_err_t rt_sem_detach(rt_sem_t sem);
+```
+
+#### 获取信号量
+
+当信号量值大于零时，线程将获得信号量，并且相应的信号量值会减 1: 
+
+```C
+rt_err_t rt_sem_take (rt_sem_t sem, rt_int32_t time);
+// 如果在参数 time 指定的时间内依然得不到信号量，线程将超时返回，返回值是 - RT_ETIMEOUT。
+```
+
+
+#### 无等待获取信号量
+
+当用户不想在申请的信号量上挂起线程进行等待时，可以使用无等待方式获取信号量:
+
+```C
+rt_err_t rt_sem_trytake(rt_sem_t sem);
+```
+
+:::info
+这个函数与 rt_sem_take(sem, RT_WAITING_NO) 的作用相同.
+:::
+
+#### 释放信号量
+
+释放信号量可以唤醒挂起在该信号量上的线程。
+
+```C
+rt_err_t rt_sem_release(rt_sem_t sem);
+```
+
+例如当信号量的值等于零时，并且有线程等待这个信号量时，释放信号量将唤醒等待在该信号量线程队列中的第一个线程，由它获取信号量；否则将把信号量的值加 1。
+
+### 如何使用信号量
+
+#### 线程间同步
+
+两个线程需要进行同步，信号量的值初始化为0，尝试获得信号量的线程将直接等待。有实例被释放，等待结束，唤醒该线程。
+
+#### 锁
+
+锁，单一的锁常应用于多个线程间对同一共享资源（即临界区）的访问。
+
+信号量在作为锁来使用时，通常应将信号量资源实例初始化成 1，代表系统默认有一个资源可用，因为信号量的值始终在 1 和 0 之间变动，所以这类锁也叫做二值信号量。
+
+线程需要访问共享资源时，它需要先获得这个资源锁。那么由于只有一份可用资源，其他试图访问它的线程将挂起。（其他线程在试图获取这个锁时，信号量值是0，这个锁已经被锁上）
+
+![](https://github.com/user-attachments/assets/761a1129-c8e3-46d7-a77a-fdfae373db8e)
+
+获得信号量的线程处理完毕，退出临界区时，它将会释放信号量并把锁解开，而挂起在锁上的第一个等待线程将被唤醒从而获得临界区的访问权。
+
+#### 中断与线程的同步
+
+信号量也能够方便地应用于中断与线程间的同步，例如一个中断触发，中断服务例程需要通知线程进行相应的数据处理。
+
+这个时候可以设置信号量的初始值是 0，线程在试图持有这个信号量时，由于信号量的初始值是 0，线程直接在这个信号量上挂起直到信号量被释放。
+
+当中断触发时，先进行与硬件相关的动作，例如从硬件的 I/O 口中读取相应的数据，并确认中断以清除中断源，而后释放一个信号量来唤醒相应的线程以做后续的数据处理。
+
+FinSH 线程的处理方式:
+
+![](https://github.com/user-attachments/assets/d0b4aa2e-fa0d-4809-9104-ebd6dbd7bfee)
+
+信号量的值初始为0，FinSH线程会被挂起。当有数据进来，产生中断，进入中断服务例程。
+
+进入中断服务例程之后，读取数据，然后把数据存到UART Buffer里面去。之后释放信号量，唤醒FinSH线程。
+
+中断服务例程运行完毕后，若无更高优先级的就绪线程存在，shell线程将持有信号量并运行，获取Buffer中的数据。
+
+:::warning
+中断与线程间的互斥不能采用信号量（锁）的方式，而应采用开关中断的方式。
+:::
+
+#### 资源计数
+
+资源计数适合于线程间工作处理速度不匹配的场合。
+
+由于信号量本质上是一个记录可用资源数量的整型计数器，可以将其看作为一个递增/递减的计数器。
+
+信号量的值就是积压的工作数量。它可以对前一个线程完成的工作进行计数，也可以连续处理多个事件。
+
+
+## 互斥量
+
+互斥量又叫相互排斥的信号量，是一种特殊的二值信号量。
+
+互斥量和信号量不同的是：拥有互斥量的线程拥有互斥量的所有权，互斥量支持递归访问且能防止线程优先级翻转；并且互斥量只能由持有线程释放，而信号量则可以由任何线程释放。
+
+
+:::tip
+
+普通二值信号量就像一个公共厕所的插销：谁进去都可以把门插上，出来时谁都可以把插销拉开（即使是路过的人）。这会导致混乱。
+
+互斥量则像一把高级门禁卡：你刷开房门，门禁系统就记录下这张卡是谁的。只有持卡人才能再次刷卡锁门或开门，其他人即使捡到卡，系统也不认。
+
+是不是很像RUST的所有权机制？这就是为什么RUST天生更加安全。
+
+这个“所有权”是互斥量的灵魂。
+:::
+
+### 互斥量工作机制
+
+互斥量只有两种状态的区别，那就是开锁和关锁。
+
+![](https://github.com/user-attachments/assets/fdb72301-cfd3-42f3-a3d5-42fe8a26c8d6)
+
+当线程持有它时，它处于关锁状态，释放时，进入开锁状态，线程失去对它的所有权。
+
+当一个线程持有互斥量时，其他线程将不能够对它进行开锁或持有它，持有该互斥量的线程也能够再次获得这个锁而不被挂起。
+
+:::tip
+在信号量中，因为已经不存在实例，线程递归持有会发生主动挂起（最终形成死锁）。
+:::
+
+为什么非要引入互斥量？为什么非要引入所有权？
+
+
+来看一下只有信号量机制下，ABC三个优先级不同的线程，如果要访问共享内存的情况：
+
+<Mermaid
+value={`sequenceDiagram
+    participant A as 高优先级A;
+    participant B as 中优先级B;
+    participant C as 低优先级C;
+    participant M as 信号量M;
+
+    Note over C,M: C 持有 M (M=0);
+    activate C;
+    C->>M: take M (成功);
+    activate M;
+    
+    Note over A: A 就绪，抢占 C;
+    activate A;
+    A->>M: take M (阻塞);
+    deactivate A;
+    Note over A: A 等待 M;
+    
+    Note over B: B 就绪，优先级 > C;
+    deactivate C;
+    activate B;
+    B->>B: 运行 (无需 M);
+    
+    Note over B: B 长时间运行...;
+    B->>B: 运行结束;
+    deactivate B;
+    activate C;
+    
+    C->>M: release M;
+    deactivate M;
+    Note over A: A 获得 M;
+    activate A;
+    deactivate C;
+    A->>A: 运行...;
+    deactivate A;`}
+/>
+
+
+在这种情况下，优先级出现了倒置，B先于A执行了。这是我们不希望的。
+
+如果引入互斥量：
+<Mermaid
+value={`sequenceDiagram
+    participant A as 高优先级A;
+    participant B as 中优先级B;
+    participant C as 低优先级C;
+    participant M as 互斥量M;
+
+    Note over C,M: C 持有 M (已锁);
+    activate C;
+    C->>M: lock M (成功);
+    activate M;
+    
+    Note over A: A 就绪，抢占 C;
+    activate A;
+    A->>M: lock M (阻塞);
+    deactivate A;
+    Note over A: A 等待 M;
+    
+    Note over C: 系统提升 C 优先级 = A;
+    Note over B: B 就绪，但优先级 ≤ C;
+    Note over B: B 无法抢占 C;
+    
+    C->>C: 继续运行临界区;
+    C->>M: unlock M;
+    deactivate M;
+    Note over C: 恢复 C 原始优先级;
+    
+    Note over A: A 获得 M;
+    activate A;
+    deactivate C;
+    A->>A: 运行...;
+    deactivate A;
+    
+    Note over B: B 随后获得 CPU;
+    activate B;
+    B->>B: 运行...;
+    deactivate B;`}
+/>
+
+
+可以看到执行顺序正常了。
+
+这里有个优先级的提升，这是拯救执行顺序的关键。这是得益于互斥量（Mutex）内置的**优先级继承**协议，不需要手动执行。
+
+### 互斥量控制块
+
+互斥量控制块rt_mutex, 从 rt_ipc_object 中派生，由 IPC 容器所管理:
+
+```C
+struct rt_mutex
+    {
+        struct rt_ipc_object parent;                /* 继承自 ipc_object 类 */
+
+        rt_uint16_t          value;                   /* 互斥量的值 */
+        rt_uint8_t           original_priority;     /* 持有线程的原始优先级 */
+        rt_uint8_t           hold;                     /* 持有线程的持有次数   */
+        struct rt_thread    *owner;                 /* 当前拥有互斥量的线程 */
+    };
+    /* rt_mutext_t 为指向互斥量结构体的指针类型  */
+    typedef struct rt_mutex* rt_mutex_t;
+```
+
+### 互斥量的管理方式
+
+![](https://github.com/user-attachments/assets/adca5e99-6261-4d82-bd82-55e4d99f9c8f)
+
+互斥量控制块中含有互斥相关的重要参数，在互斥量功能的实现中起到重要的作用。对互斥量的操作包含：创建/初始化、获取、释放、删除/脱离。
+
+#### 创建和删除互斥量
+
+动态创建一个互斥量，内核首先创建互斥量控制块并完成初始化。
+
+```c
+/**
+ * @brief   创建并初始化一个互斥量。
+ *
+ * @param   name    互斥量的名称，用于调试和对象查找。
+ * @param   flag    该标志已作废，无论用户选择 RT_IPC_FLAG_PRIO 还是 RT_IPC_FLAG_FIFO，
+ *                  内核均按照 RT_IPC_FLAG_PRIO（优先级等待）处理。
+ *
+ * @return  成功时返回指向互斥量控制块的指针（rt_mutex_t 类型）；
+ *          失败时返回 RT_NULL，通常由于系统内存不足导致。
+ *
+ * @note    1. 该函数不能在中断服务例程（ISR）中调用。
+ *          2. 创建的互斥量对象在系统堆中动态分配内存，不再使用时需通过
+ *             rt_mutex_delete() 删除并释放内存。
+ *          3. 互斥量支持优先级继承，可防止优先级翻转。
+ *
+ * @see     rt_mutex_delete()
+ */
+rt_mutex_t rt_mutex_create(const char *name, rt_uint8_t flag);
+```
+删除一个动态创建的互斥量，并释放其占用的内存：
+
+```C
+rt_err_t rt_mutex_delete(rt_mutex_t mutex);
+```
+#### 初始化和脱离互斥量
+
+静态互斥量对象的内存由编译器在编译时分配，使用前需要先进行初始化。
+```c
+
+/**
+ * @brief   初始化静态互斥量对象。
+ *
+ * @param   mutex   互斥量对象的句柄，由用户提供并指向已分配的内存块。
+ * @param   name    互斥量的名称，长度不能超过 RT_NAME_MAX 个字符。
+ * @param   flag    该标志已作废，内核强制按 RT_IPC_FLAG_PRIO 处理。
+ *
+ * @return  rt_err_t 执行结果：
+ * @retval  RT_EOK          (0)  : 初始化成功
+ * @retval  -RT_ERROR       (1)  : 初始化失败（参数为空）
+ *
+ * @note    1. 该函数不能在中断服务例程（ISR）中调用。
+ *          2. 静态互斥量不使用堆内存，必须由用户提供互斥量控制块的内存空间。
+ *          3. 不再使用时，需通过 rt_mutex_detach() 将其从内核对象管理器中脱离。
+ *
+ * @see     rt_mutex_detach()
+ */
+rt_err_t rt_mutex_init(rt_mutex_t mutex, const char *name, rt_uint8_t flag);
+```
+
+脱离静态初始化的互斥量，将其从内核对象管理器中移除：
+```c
+rt_err_t rt_mutex_detach(rt_mutex_t mutex);
+```
+#### 获取互斥量
+
+线程获取互斥量后，将拥有该互斥量的所有权。同一时刻一个互斥量只能被一个线程持有。
+```c
+/**
+ * @brief   获取互斥量。
+ *
+ * @param   mutex   互斥量对象的句柄。
+ * @param   time    指定等待的时间（单位：系统时钟节拍）：
+ *                  - RT_WAITING_FOREVER : 永久等待
+ *                  - RT_WAITING_NO      : 不等待，立即返回
+ *                  - 其他正整数        : 最大等待节拍数
+ *
+ * @return  rt_err_t 执行结果：
+ * @retval  RT_EOK          (0)  : 成功获得互斥量
+ * @retval  -RT_ETIMEOUT    (2)  : 超时未获得
+ * @retval  -RT_ERROR       (1)  : 获取失败（如无效句柄）
+ *
+ * @note    1. 该函数不能在中断服务例程（ISR）中调用（可能引起阻塞）。
+ *          2. 如果互斥量未被其他线程持有，调用线程立即获得互斥量。
+ *          3. 如果互斥量已被**当前线程**持有，则持有计数加1，当前线程继续运行，不会挂起（递归特性）。
+ *          4. 如果互斥量已被其他线程持有，当前线程将挂起等待，直到超时或互斥量被释放。
+ *          5. 获取互斥量时，系统会根据需要临时提升持有者的优先级（优先级继承）。
+ *
+ * @see     rt_mutex_release()
+ */
+rt_err_t rt_mutex_take(rt_mutex_t mutex, rt_int32_t time);
+```
+
+#### 无等待获取互斥量
+
+当用户不希望因获取互斥量而挂起线程时，可使用无等待方式。
+```c
+/**
+ * @brief   无等待获取互斥量。
+ *
+ * @param   mutex   互斥量对象的句柄。
+ *
+ * @return  rt_err_t 执行结果：
+ * @retval  RT_EOK          (0)  : 成功获得互斥量
+ * @retval  -RT_ETIMEOUT    (2)  : 互斥量不可用（已被其他线程持有）
+ * @retval  -RT_ERROR       (1)  : 获取失败（如无效句柄）
+ *
+ * @note    1. 该函数可在中断服务例程（ISR）中调用（不会阻塞）。
+ *          2. 该函数等同于 rt_mutex_take(mutex, RT_WAITING_NO)。
+ *          3. 若互斥量已被当前线程持有，持有计数加1并立即成功返回。
+ *          4. 若互斥量被其他线程持有，函数立即返回 -RT_ETIMEOUT，不会挂起线程。
+ *
+ * @see     rt_mutex_take()
+ */
+rt_err_t rt_mutex_trytake(rt_mutex_t mutex);
+```
+
+#### 释放互斥量
+
+线程完成对互斥资源的访问后，必须尽快释放其持有的互斥量。
+```c
+
+/**
+ * @brief   释放互斥量。
+ *
+ * @param   mutex   互斥量对象的句柄。
+ *
+ * @return  rt_err_t 执行结果：
+ * @retval  RT_EOK          (0)  : 释放成功
+ * @retval  -RT_ERROR       (1)  : 释放失败（如当前线程并非持有者）
+ *
+ * @note    1. 该函数不能在中断服务例程（ISR）中调用。
+ *          2. **只有已经拥有互斥量控制权的线程才能释放它**，其他线程释放将返回错误。
+ *          3. 每释放一次互斥量，持有计数减1。当持有计数减为0时，互斥量变为可用状态，
+ *             并唤醒等待该互斥量的最高优先级线程（按优先级等待队列）。
+ *          4. 如果线程的优先级曾因优先级继承而被临时提升，释放互斥量后将恢复为原始优先级。
+ *
+ * @see     rt_mutex_take()
+ */
+rt_err_t rt_mutex_release(rt_mutex_t mutex);
+```
+### 如何使用互斥量
+
+官网文档说的太抽象了，我举个我做过的例子，机器人的电机驱动接口互斥。
+
+有若干个控制方式（PID、撞墙急停检测、SBUS遥控信号）都会生成速度指令，需要访问共享资源（电机驱动接口），但我们把它们划分为了若干个不同任务（Task），这些控制算法之间是互斥的。
+
+电机驱动任务一次只能处理一条指令，且指令数据是全局结构体 `motor_cmd_t`，必须保证写操作不被其他任务打断。
+
+此时（我用RT-Thread来举个例子）可以运用互斥量。这样写：
+
+```C
+/* 全局共享数据 */
+static rt_mutex_t cmd_mutex;
+static motor_cmd_t current_cmd;   // 待发送的电机指令
+static rt_sem_t cmd_updated;      // 通知电机驱动任务有新指令
+
+/* 初始化 */
+cmd_mutex = rt_mutex_create("cmd_mutex", RT_IPC_FLAG_PRIO);
+cmd_updated = rt_sem_create("cmd_updated", 0, RT_IPC_FLAG_PRIO);
+
+/* —— 任务A：PID速度控制器 —— */
+void speed_control_task(void *param) {
+    motor_cmd_t my_cmd;
+    while (1) {
+        my_cmd.left_speed  = compute_pid_left();
+        my_cmd.right_speed = compute_pid_right();
+        
+        /* 需要互斥地写入全局指令区 */
+        rt_mutex_take(cmd_mutex, RT_WAITING_FOREVER);
+        current_cmd = my_cmd;
+        rt_mutex_release(cmd_mutex);
+        
+        rt_sem_release(cmd_updated);  // 通知电机驱动任务
+        rt_thread_delay(10);          // 10ms 控制周期
+    }
+}
+
+/* —— 任务B：遥控指令解析 —— */
+void remote_ctrl_task(void *param) {
+    while (1) {
+        wait_for_remote_cmd(&my_cmd);
+        
+        rt_mutex_take(cmd_mutex, RT_WAITING_FOREVER);
+        current_cmd = my_cmd;
+        rt_mutex_release(cmd_mutex);
+        
+        rt_sem_release(cmd_updated);
+    }
+}
+
+/* —— 任务C：电机驱动任务（低优先级） —— */
+void motor_driver_task(void *param) {
+    motor_cmd_t cmd_to_send;
+    while (1) {
+        rt_sem_take(cmd_updated, RT_WAITING_FOREVER);  // 等待新指令
+        
+        rt_mutex_take(cmd_mutex, RT_WAITING_FOREVER);
+        cmd_to_send = current_cmd;    // 安全拷贝
+        rt_mutex_release(cmd_mutex);
+        
+        /* 实际发送指令给物理电机驱动器 */
+        can_send(&cmd_to_send);
+    }
+}
+```
+
+## 事件集
+
+事件集可以完成一对多，多对多的线程间同步。
+
+以打游戏举例：
+
+P1 想开始一局游戏（线程运行），但需要等待某些条件满足才能匹配进入。
+
+1. 特定事件唤醒线程
+
+P1 只想玩“排位赛”，必须等到排位赛模式开放（每天20:00才开放），其他模式都不玩。
+
+→ 线程等待单个特定事件，该事件发生即唤醒。
+
+2. 任意单个事件唤醒线程
+
+P1 只想快速开局，排位、匹配、大乱斗三种模式哪个先开放就玩哪个，只要有一种模式可进就立即开始。
+
+→ 线程等待多个事件，任一事件发生即唤醒。
+
+3. 多个事件同时发生才唤醒线程
+
+P1 和好友 P2 双排，必须同时满足 “P2 上线” 和 “排位赛开放”，两个条件都达成才能一起开始。
+
+→ 线程等待多个事件，所有事件都发生才唤醒。
+
+### 事件集工作机制
+
+事件集本质上描述了线程间同步所需的多个事件的逻辑与或关系。
+
+:::info
+更严谨的表述：
+
+线程同步的本质，是线程等待一个由若干事件构成的逻辑条件（与/或/组合）成立。
+
+“事件集”是某些系统提供的、专门用来表达这种逻辑关系的同步对象。
+:::
+
+
+事件集的特点：
+
+1. 事件只与线程相关，事件间相互独立：每个线程可拥有 32 个事件标志，采用一个 32 bit 无符号整型数进行记录，每一个 bit 代表一个事件；
+
+2. 事件仅用于同步，不提供数据传输功能；
+
+3. 事件无排队性，即多次向线程发送同一事件 (如果线程还未来得及读走)，其效果等同于只发送一次。
+
+RT-Thread 中，每个线程都拥有一个事件信息标记，分别是逻辑与（RT_EVENT_FLAG_AND），逻辑或（RT_EVENT_FLAG_OR）和清除（RT_EVENT_FLAG_CLEAR）。
+
+线程可以通过这个事件信息标记以及属性，来判断当前是否满足同步条件。
+
+![](https://github.com/user-attachments/assets/a3645e52-54d3-4c37-b3a0-3abda19751c6)
+
+如上图所示，线程 `#1` 的事件标志中第 1 位和第 30 位被置位，如果事件信息标记位设为逻辑与，则表示线程 `#1 `只有在事件 1 和事件 30 都发生以后才会被触发唤醒.
+
+如果事件信息标记位设为逻辑或，则事件 1 或事件 30 中的任意一个发生都会触发唤醒线程 `#1`。
+
+如果信息标记同时设置了清除标记位，则当线程` #1` 唤醒后将主动把事件 1 和事件 30 清为零，否则事件标志将依然存在（即置 1）。
+
+
+
+### 事件集控制块
+
+```C
+struct rt_event
+{
+    struct rt_ipc_object parent;    /* 继承自 ipc_object 类 */
+
+    /* 事件集合，每一 bit 表示 1 个事件，bit 位的值可以标记某事件是否发生 */
+    rt_uint32_t set;
+};
+/* rt_event_t 是指向事件结构体的指针类型  */
+typedef struct rt_event* rt_event_t;
+```
+
+### 事件集的管理方式
+
+
+#### 创建和删除事件集
+
+创建一个事件集时，内核首先创建一个事件集控制块，然后对该事件集控制块进行基本的初始化。
+
+```c
+/**
+ * @brief   创建并初始化一个事件集。
+ *
+ * @param   name    事件集的名称，用于调试和对象查找，长度不超过 RT_NAME_MAX。
+ * @param   flag    事件集的等待队列排序方式：
+ *                  - RT_IPC_FLAG_FIFO (0x00)：先进先出，非实时调度；
+ *                  - RT_IPC_FLAG_PRIO (0x01)：优先级等待，高优先级线程优先唤醒（推荐）。
+ *
+ * @return  成功时返回指向事件集控制块的指针（rt_event_t 类型）；
+ *          失败时返回 RT_NULL，通常由于系统内存不足或 flag 非法导致。
+ *
+ * @note    1. 该函数不能在中断服务例程（ISR）中调用。
+ *          2. 创建的事件集对象在系统堆中动态分配内存，不再使用时必须通过
+ *             rt_event_delete() 删除并释放内存。
+ *          3. RT_IPC_FLAG_FIFO 属于非实时调度方式，除非应用程序非常在意先来后到，
+ *             并且你清楚地明白所有涉及到该事件集的线程都将会变为非实时线程，
+ *             方可使用，否则建议采用 RT_IPC_FLAG_PRIO。
+ *
+ * @see     rt_event_delete()
+ */
+rt_event_t rt_event_create(const char *name, rt_uint8_t flag);
+```
+删除动态创建的事件集，释放系统资源：
+```C
+rt_err_t rt_event_delete(rt_event_t event);
+```
+#### 初始化和脱离事件集
+静态事件集对象的内存是在系统编译时由编译器分配的，使用前需先行初始化。
+
+```C
+/**
+ * @brief   初始化静态事件集对象。
+ *
+ * @param   event   事件集对象的句柄，指向用户已分配的事件集控制块内存。
+ * @param   name    事件集的名称。
+ * @param   flag    事件集的等待队列排序方式，取值同 rt_event_create()。
+ *
+ * @return  rt_err_t 执行结果：
+ * @retval  RT_EOK          (0)  : 初始化成功
+ * @retval  -RT_ERROR       (1)  : 初始化失败（参数为空或非法）
+ *
+ * @note    1. 该函数不能在中断服务例程（ISR）中调用。
+ *          2. 静态事件集不使用堆内存，必须由用户提供事件集控制块的内存空间。
+ *          3. 不再使用时，需通过 rt_event_detach() 将其从内核对象管理器中脱离。
+ *
+ * @see     rt_event_detach()
+ */
+rt_err_t rt_event_init(rt_event_t event, const char *name, rt_uint8_t flag);
+```
+
+脱离静态初始化的事件集，将其从内核对象管理器中移除：
+
+```C
+rt_err_t rt_event_detach(rt_event_t event);
+```
+
+#### 发送事件
+
+发送事件函数可以发送事件集中的一个或多个事件，并唤醒满足条件的等待线程。
+```c
+
+/**
+ * @brief   向事件集发送一个或多个事件标志。
+ *
+ * @param   event   事件集对象的句柄。
+ * @param   set     发送的事件标志值（32 位掩码），可以同时置位多个位。
+ *
+ * @return  rt_err_t 执行结果：
+ * @retval  RT_EOK          (0)  : 发送成功
+ * @retval  -RT_ERROR       (1)  : 发送失败（无效句柄）
+ *
+ * @note    1. 该函数**可以**在中断服务例程（ISR）中调用。
+ *          2. 发送事件时，内核会将 event 对象的事件标志与 set 进行**按位或**操作。
+ *          3. 随后遍历等待在 event 事件集对象上的等待线程链表，判断是否有线程的
+ *             事件激活要求与当前 event 对象事件标志值匹配，如果有，则唤醒该线程。
+ *          4. 可能同时唤醒多个满足条件的线程。
+ *
+ * @see     rt_event_recv()
+ */
+rt_err_t rt_event_send(rt_event_t event, rt_uint32_t set);
+```
+
+#### 接收事件
+
+内核使用 32 位的无符号整数标识事件集，每一位代表一个事件。线程可通过逻辑与（AND）或逻辑或（OR）等待事件，并选择是否清除已接收的事件标志。
+```c
+/**
+ * @brief   接收事件标志。
+ *
+ * @param   event   事件集对象的句柄。
+ * @param   set     接收线程感兴趣的事件标志掩码（32 位）。
+ * @param   option  接收选项，由以下标志按位或组合而成：
+ *                  - RT_EVENT_FLAG_AND  (0x01)：逻辑与，必须等待 set 指定的所有事件都发生；
+ *                  - RT_EVENT_FLAG_OR   (0x02)：逻辑或，只要 set 中的任一事件发生即可；
+ *                  - RT_EVENT_FLAG_CLEAR(0x04)：唤醒线程后，自动清除已匹配的事件标志位。
+ * @param   timeout 超时时间（单位：系统时钟节拍）：
+ *                  - RT_WAITING_FOREVER : 永久等待
+ *                  - RT_WAITING_NO      : 不等待，立即返回
+ *                  - 其他正整数        : 最大等待节拍数
+ * @param   recved  指向接收事件标志的指针，用于返回**实际匹配的事件标志**（清除前的值）。
+ *
+ * @return  rt_err_t 执行结果：
+ * @retval  RT_EOK          (0)  : 成功接收到事件
+ * @retval  -RT_ETIMEOUT    (2)  : 超时未接收到事件
+ * @retval  -RT_ERROR       (1)  : 接收错误（如参数非法或在线程被唤醒前事件集被删除）
+ *
+ * @note    1. 该函数**不能**在中断服务例程（ISR）中调用（可能引起阻塞）。
+ *          2. 若当前事件标志已满足条件，函数立即返回，并根据 RT_EVENT_FLAG_CLEAR
+ *             选项决定是否清除对应位。
+ *          3. 若条件不满足，线程将挂起在事件集的等待队列上，直到满足条件或超时。
+ *          4. option 必须包含且仅包含 RT_EVENT_FLAG_AND 或 RT_EVENT_FLAG_OR 之一，
+ *             但可与 RT_EVENT_FLAG_CLEAR 任意组合。
+ *          5. 如果 timeout 设置为零，则表示当线程要接收的事件没有满足其要求时
+ *             就不等待，直接返回 -RT_ETIMEOUT。
+ *
+ * @see     rt_event_send()
+ */
+rt_err_t rt_event_recv(rt_event_t  event,
+                       rt_uint32_t set,
+                       rt_uint8_t  option,
+                       rt_int32_t  timeout,
+                       rt_uint32_t *recved);
+```
+
+
+</WordCount>

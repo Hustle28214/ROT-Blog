@@ -1,0 +1,216 @@
+import WordCount from '../../../../src/components/WordCount/WordCount';
+
+<WordCount>
+
+# Rubric：从二元成功率到可工程化的多维评分合约
+
+机器人评测长期默认 **Success Rate（0/1）**。通用策略（VLA / generalist policy）出现后，这个默认值开始崩：同一成功率可以对应完全不同的执行质量；真机评测贵到无法做统计显著对比；而"让 VLM 打分"又容易变成不可复现的黑盒。**Rubric（评分量表 / 评分合约）** 正是这条裂缝里长出来的工程概念——把"什么叫好"拆成可声明、可加权、可校验的多准则契约，再决定由谁执行（仿真谓词、规则、人或 VLM judge）。
+
+本文不介绍某个单独 benchmark，而是梳理 **rubric 在机器人里的成熟工程脉络**，给出一套可落地的总体架构，并说明它和本栏目已有条目（[LIBERO](./01-LIBERO.mdx)、[CALVIN](./02-CALVIN.mdx)、[SimplerEnv](./03-SimplerEnv.mdx)、[DROID](./05-DROID.mdx)、[RoboCasa](./06-RoboCasa.mdx)）如何咬合。
+
+## 1. Rubric 到底指什么
+
+在教育测量里，rubric 是"按准则分档打分的量表"。迁到机器人后，它通常指三件事的合取：
+
+| 要素 | 含义 | 反例（不算 rubric） |
+|---|---|---|
+| **准则轴 (criteria)** | 成功、进度、效率、安全、协调、策略质量…… | 只报一个笼统 "quality = 0.73" |
+| **分档 / 刻度 (levels)** | 二元、1–5、0–100、KEEP/POLISH/REJECT | 无锚点的自由文本评价 |
+| **判定合约 (verifier)** | 谁根据什么证据给分：PDDL 谓词、轨迹启发式、人、VLM | "感觉差不多"的口头共识 |
+
+一句话：**rubric = 多准则评分合约 + 证据绑定 + 可聚合的标量/向量输出**。它既可用于 **离线评测 / A/B 排名**，也可蒸馏成 **reward model** 进入 RL 环。
+
+和相邻概念的边界：
+
+- **Benchmark**：固定任务集 + 协议 + leaderboard；rubric 是协议里"怎么打分"那一层。
+- **Metric**：某一条可计算量（jerk、path length）；rubric 决定用哪些 metric、如何分档与加权。
+- **Reward**：训练信号；rubric 可以是 reward 的生成器或教师，但不必等于 online reward。
+
+## 2. 为什么成功率不够用
+
+现有仿真 benchmark 大多已经把"成功"工程化了：LIBERO 用 PDDL 目标谓词，CALVIN 用长程链完成长度，RoboCasa 用脚本化成功条件。这对 **短程、状态可观测、目标清晰** 的任务够用。通用策略把问题推到了另一边：
+
+1. **同成功率、不同行为**：两套 policy 都 70% 成功，一套动作平滑、一套猛撞桌面后侥幸成功——SR 分不出优劣。[RoboEval](https://robo-eval.github.io/) 明确指出：behavioral metrics 在半数以上 task–metric 对上与成功相关，且在 SR 饱和时仍能区分策略。
+2. **部分进度被抹平**：长时任务失败在第 4 步和第 1 步，对 SR 都是 0；VLABench 因此引入 Progress Score / Intention Score，CALVIN 的 Avg.Len 也是同一思路的弱形式。
+3. **真机无法标准化到单一场景**：RoboArena 放弃"固定任务表"，改用分布式双盲 A/B + progress(0–100) + preference + 自然语言说明——这已经是 **以人为 verifier 的隐式 rubric**。
+4. **数据 curation 需要轴**：遥操作数据里 20–40% 会教坏习惯；仅靠 jerk 启发式或二值成功判定抓不住犹豫、多次重抓、近失安全事件。Crucible 一类系统用 **五轴行为 rubric**（视觉 / 运动学 / 任务 / 策略 / 安全）做 KEEP/POLISH/REJECT。
+
+因此工程上出现一条清晰迁移：
+
+```text
+二元成功谓词
+  → 分阶段进度 / Progress Score
+    → 多轴行为指标（效率·安全·协调）
+      → 结构化 rubric（分档 + 证据）
+        → VLM-as-Judge / Reward Model 蒸馏
+```
+
+## 3. 成熟方案的工程脉络
+
+按"判定器是谁、输出用于什么"把现有工作排成四条可复用的线。它们不是互斥产品，而是同一架构里不同层的实例。
+
+### 3.1 仿真侧：可脚本化的 outcome rubric
+
+| 代表 | 合约形态 | 工程要点 |
+|---|---|---|
+| LIBERO / robosuite | PDDL 谓词 → 二值成功 | 语义可验证、可复现；无行为质量轴 |
+| CALVIN | 链上累计完成步数 | 把"进度"做成协议一等公民 |
+| RoboCasa | 脚本成功条件 + atomic/composite | 任务规模大，仍以 SR 为主 |
+| VLABench | SR + Progress + Intention | 长时任务上的软指标补丁 |
+| RoboEval | Success / Progression + 效率·协调·安全 | **把行为轴写进 benchmark 本体** |
+
+这条线的成熟点：**outcome 必须可脚本化**；行为轴尽量从仿真接触、轨迹、滑移等 **可计算信号** 导出，避免一开始就上 LLM。
+
+### 3.2 真机侧：人在环的 progress + preference
+
+| 代表 | 合约形态 | 工程要点 |
+|---|---|---|
+| 常规真机表 | 人工看视频勾成功 | 贵、难复现、难扩任务 |
+| [AutoEval](https://arxiv.org/abs/2503.24278) | 学习成功分类器 + reset policy + 安全联锁 | 把"人判成功 / 人重置"自动化，仍偏二值 |
+| [RoboArena](https://arxiv.org/abs/2506.18123) | progress∈[0,100] + A/B preference + 长文反馈 | 不固定任务；用偏好聚合全局排名；progress 与 preference **互补** |
+
+RoboArena 的关键工程结论：评估者经常给 A/B **相同 progress**，但仍有明确偏好（更快、更稳、更自信）。因此 **只报 progress 或只报 SR 都会丢信息**——rubric 至少需要 outcome 轴 + preference / 行为轴。
+
+### 3.3 结构化多轴：评测与数据清洗共用一套合约
+
+| 代表 | 轴 | 输出 |
+|---|---|---|
+| RoboEval | outcome / efficiency / coordination / safety | 诊断表 + leaderboard 可按轴排序 |
+| Crucible（LeRobot 数据） | visual / kinematic / task / strategy / safety | 带时间戳证据的 KEEP/POLISH/REJECT |
+| OpenJudge 风格 grader 组合 | 规则 grader + LLM grader | 异步批量、加权聚合（从 LLM RL 迁过来的骨架） |
+
+成熟做法是 **分轴 specialist + aggregator**：每轴独立打分并附证据，再由固定规则（阈值阈值、加权和、否决项）合成判决。轴与 verifier 解耦——今天用规则，明天换成 VLM，合约不变。
+
+### 3.4 Rubric → Reward：离线教师，在线学生
+
+| 代表 | Rubric 角色 | 在线形态 |
+|---|---|---|
+| [RoboReward](https://arxiv.org/html/2601.00675) | 固定 1–5 进度量表；反事实指令 + 负向裁剪；VLM 校验标签 | 蒸馏成 4B/8B 端到端 progress 模型，供真机 RL |
+| [Robo-Dopamine](https://robo-dopamine.github.io/) | 逐步离散进度 / hop；多视角融合 | Process Reward Model + policy-invariant shaping |
+| LLM 侧 HealthBench / verl-rubric | 多准则加点/扣点 | 证明 **rubric-conditioned judge** 可进优化环（机器人在复用同一骨架） |
+
+RoboReward 的 1–5 量表是目前最常被引用的 **通用进度 rubric** 样板：
+
+| 分档 | 含义 |
+|---|---|
+| 1 No success | 终态无目标相关变化 |
+| 2 Minimal progress | 有微小但不足的变化 |
+| 3 Partial completion | 进展明显，但违反主要/多项要求 |
+| 4 Near completion | 区域与意图正确，缺一条次要约束 |
+| 5 Perfect completion | 满足全部要求 |
+
+它的工程要点不在量表本身，而在 **教师流水线太贵、不能进 RL 内环**：视频分析 → rubric-grounded 规划 → 约束指令生成 → 拒绝采样校验 →（可选）人工验 test set → **蒸馏成单次前向的 reward model**。这是当前最成熟的 "rubric 产品化"路径。
+
+## 4. 总体架构（建议落地的四层）
+
+把上面脉络收成一张可实施的总图：
+
+```text
+┌─────────────────────────────────────────────────────────────┐
+│  L0  Task Spec                                              │
+│  指令 / 场景分布 / 安全包络 / 超时 / 重置分布                    │
+└────────────────────────────┬────────────────────────────────┘
+                             ▼
+┌─────────────────────────────────────────────────────────────┐
+│  L1  Rubric Contract（声明式，与模型无关）                      │
+│  criteria[] + levels + weights + veto rules + evidence schema │
+│  例：outcome(1-5) · efficiency · safety · preference(A/B)     │
+└───────────────┬─────────────────────────────┬───────────────┘
+                ▼                             ▼
+┌───────────────────────────┐   ┌─────────────────────────────┐
+│  L2a  Deterministic       │   │  L2b  Judge / Human         │
+│  Verifiers                │   │  Verifiers                  │
+│  仿真谓词 · 接触/滑移计数   │   │  双盲人评 · VLM specialist   │
+│  轨迹启发式 · 脚本成功条件  │   │  带 timestamp 的 rationale   │
+└─────────────┬─────────────┘   └──────────────┬──────────────┘
+              └──────────────┬─────────────────┘
+                             ▼
+┌─────────────────────────────────────────────────────────────┐
+│  L3  Aggregation & Reporting                                │
+│  加权和 / 否决项 / Bradley-Terry 排名 / 分轴 leaderboard        │
+│  校准：κ / MAE / 与人偏好一致率 / sim-real 秩相关（SimplerEnv） │
+└────────────────────────────┬────────────────────────────────┘
+                             ▼
+┌─────────────────────────────────────────────────────────────┐
+│  L4  Consumers                                              │
+│  ① 论文表与 CI 门禁  ② 数据 curation  ③ Reward 蒸馏进 RL      │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### 4.1 设计原则
+
+1. **合约先于模型**：先冻结 L1（轴、分档、否决、证据字段），再选 L2 verifier。否则换一次 VLM 就换一套分数语义。
+2. **能确定性就别上 VLM**：碰撞次数、路径长度、PDDL 成功应用规则；把 VLM 预算留给策略质量、近失、指令对齐等难脚本化轴。
+3. **证据强制绑定**：每条准则要求 `evidence = {t0,t1, frame_ids, predicate_or_quote}`，否则无法做 κ 校准，也没法进 CI。
+4. **评测与训练分流**：L3 的完整 rubric 用于报告与 curation；L4 的 online reward 用蒸馏学生或 process reward，避免把多阶段 judge 塞进每步控制环。
+5. **校准是一等公民**：对人标算 Cohen's κ / preference accuracy；对进度算 MAE；对仿真对齐沿用 [SimplerEnv](./03-SimplerEnv.mdx) 的秩相关与 MMRV 思路。
+
+### 4.2 最小可行合约（MVP）
+
+对新开一个操作任务族，建议第一版只锁四项：
+
+```yaml
+rubric_id: pick_place_v1
+criteria:
+  - id: outcome
+    levels: [1, 2, 3, 4, 5]   # RoboReward 进度量表
+    weight: 1.0
+    verifier: human_or_vlm     # 仿真可改为 predicate
+  - id: safety
+    levels: [pass, fail]       # fail 为否决项
+    weight: veto
+    verifier: rule             # 碰撞 / 力矩限幅 / 人急停
+  - id: efficiency
+    metric: completion_time
+    levels: relative_to_demo   # 或不进总分，仅诊断
+    verifier: rule
+  - id: preference             # 仅 A/B 评测会话需要
+    levels: [A, B, tie]
+    verifier: human
+evidence_schema:
+  required: [episode_id, video_uri, t_start, t_end]
+aggregation: weighted_sum_with_veto
+calibration:
+  holdout_human_n: 100
+  report: [mae_outcome, kappa_safety, pref_acc]
+```
+
+有了这张表，LIBERO 式仿真、RoboArena 式真机、RoboReward 式蒸馏才能共享同一套语义。
+
+## 5. 和本栏目 Benchmark 的咬合关系
+
+| 已有条目 | 提供的能力 | Rubric 层还缺什么 |
+|---|---|---|
+| [LIBERO](./01-LIBERO.mdx) | 声明/程序知识拆分 + PDDL 成功 | 行为质量轴；终身设定下的"遗忘"尚未 rubric 化 |
+| [CALVIN](./02-CALVIN.mdx) | 长程链 Avg.Len | 链内失败模式分轴（对齐/抓取/放置） |
+| [SimplerEnv](./03-SimplerEnv.mdx) | sim–real **排名**对齐 | 可把 rubric 各轴分别做秩相关，而不只对 SR |
+| [Open X-Embodiment](./04-OpenX-Embodiment.mdx) / [DROID](./05-DROID.mdx) | 大规模真机轨迹 | 需要 curation rubric（Crucible 类）控数据质量 |
+| [RoboCasa](./06-RoboCasa.mdx) | 大规模厨房 sim + composite | composite 上应显式 progress，而非只报 SR |
+
+建议的阅读顺序：先用本篇建立 **L1 合约思维**，再读具体 benchmark 时主动问——它的成功谓词是哪一轴？有没有进度？有没有行为/安全轴？能否校准到真机排名？
+
+## 6. 落地时的常见坑
+
+- **把 VLM 分数直接当 SR**：未校准的 judge 方差常大于策略差；至少要有人标 holdout 与 κ。
+- **轴过多却无否决项**：安全与任务成功混进同一个加权和，会出现"撞了很多但进度高所以总分好看"。
+- **progress 与 preference 只报一个**：RoboArena 已表明二者经常分歧。
+- **教师流水线误当 online reward**：RoboReward 式多阶段生成只能做离线标签；环内必须用蒸馏模型或 PRM。
+- **仿真行为指标未做稳定性分析**：RoboEval 的标准是——换 variation 后指标是否还稳定、是否还能区分相近 SR 的策略。
+
+## 7. 小结与后续可写条目
+
+Rubric 在机器人里的成熟形态，不是另一张"打分表"，而是 **评测栈的合约层**：上接任务规格，下接确定性 verifier / 人 / VLM，旁通数据清洗与 reward 蒸馏。当前工程共识可以压成三句：
+
+1. **Outcome 要可脚本或可分档**（谓词或 1–5 progress），不能只有观感。
+2. **行为与安全要分轴**，并允许否决项。
+3. **贵的 rubric 做教师，便宜的学生进环**；所有自动 judge 必须对人校准。
+
+本篇是方法论打样。若系列化，自然续篇可以是：
+
+- RoboArena：分布式双盲真机排名协议
+- RoboReward / RoboRewardBench：进度 rubric 与奖励模型
+- RoboEval：双臂操作的行为诊断指标
+- AutoEval：真机评测自治化（成功检测 + 自动重置）
+- 数据侧：多轴 VLM critic 与演示清洗合约
+
+</WordCount>

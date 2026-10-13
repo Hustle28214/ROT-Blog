@@ -1,0 +1,8 @@
+{
+  "label": "状态估计",
+  "position": 2,
+  "link": {
+    "type": "generated-index",
+    "description": "概率估计、滤波与 IMU 姿态估计。"
+  }
+}

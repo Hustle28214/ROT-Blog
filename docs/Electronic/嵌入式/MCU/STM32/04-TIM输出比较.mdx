@@ -1,0 +1,373 @@
+
+import WordCount from '../../../../../src/components/WordCount/WordCount.jsx';
+import Mermaid from '@theme/Mermaid';
+
+<WordCount>
+
+## 1. 输出比较简介
+
+OC(Output Compare)输出比较。
+
+输出比较可以通过CNT（CNT计数器）与CCR寄存器值的关系，来对输出电平进行置1、置0或翻转的操作，用于输出一定频率和占空比的PWM波形。
+
+:::tip
+CNT计数器是正向计数器。它只能正向累加。
+
+CCR是捕获/比较寄存器，通常是我们给的一个固定值，正如其名，捕获数值后比较数值，这样就可以捕获CNT的数值并进行比较，看是大了、等于还是小了。
+
+TIM输出比较就是这样来决定置1、置0或翻转输出电平。
+:::
+
+每个高级定时器和通用定时器都拥有4个输出比较通道。
+
+高级定时器的前三个通道额外拥有死区生成和互补输出的功能。
+
+
+## 2. 通用定时器
+
+使用输入捕获时，CCR是作为捕获寄存器；使用输出比较时，CCR是作为比较寄存器。
+
+![Image](https://github.com/user-attachments/assets/d0d7968e-99cc-40d7-9431-fd1dc8ddd228)
+
+## 3. PWM简介
+
+PWM（Pulse Width Modulation）是脉冲宽度调制。
+
+在具有**惯性**的系统中，可以通过对一系列脉冲的宽度进行调制，来等效地获得所需要的模拟参量，常应用于电机控速等领域。
+
+PWM参数：
+
+- 频率 $= \frac{1}{T_s}$
+- 占空比 = $\frac{T_{on}}{T_s}$
+- 分辨率 = 占空比变化步距
+
+当上面电平时间长一点，下面的短一点的时候，上面的模拟量占主导；反之则是下面的模拟量占主导。
+
+![Image](https://github.com/user-attachments/assets/31da6858-3417-4463-a12e-afca600eaa0d)
+
+$T_{on}$是高电平的时间，$T_S$是一个时钟周期的时间。$\frac{T_on}{T_S}$为占空比，指的是高电平时间占整个周期的比例。用百分比表示。
+
+占空比决定了等效的模拟电压的大小。占空比越大，等效的模拟电压就趋近于高电平；越小，等效的模拟电压就趋近于低电平。
+
+![Image](https://github.com/user-attachments/assets/d4ccf8cb-1833-4bb2-b28c-287f41916e38)
+
+电机工作也是一个惯性系统。所以直流电机也是可以用PWM调速的。
+
+下图是
+
+![Image](https://github.com/user-attachments/assets/41f610c0-2023-447c-b5a7-dc214655cfb7)
+
+输入是CNT（CNT计数器）与CCR寄存器值的关系，输出是REF的高低电平。
+
+## 4. 输出比较模式
+
+|模式|描述|
+|:---|:---|
+|冻结|CNT=CCR时，REF保持为原状态（可用于定速巡航）|
+|匹配时置有效电平|CNT=CCR时，REF置有效电平|
+|匹配时置无效电平|CNT=CCR时，REF置无效电平|
+|匹配时电平翻转|CNT=CCR时，REF电平翻转|
+|强制为无效电平|CNT与CCR无效，REF强制为无效电平（可用于暂停波形输出）|
+|强制为有效电平|CNT与CCR无效，REF强制为有效电平（可用于暂停波形输出）|
+|PWM模式1|向上计数：CNT\<CCR时，REF置有效电平, CN\>=CCR时，REF置无效电平;向下计数：CNT\>CCR时，REF置无效电平, CN\<=CCR时，REF置有效电平|
+|PWM模式2|向下计数：CNT\<CCR时，REF置无效电平, CN\>=CCR时，REF置有效电平;向下计数：CNT\>CCR时，REF置有效电平, CN\<=CCR时，REF置无效电平|
+
+改变PWM模式1和2，**只是改变了REF电平的极性**。使用PWM1的正极性和PWM2的反极性是一样的效果。
+
+## 5. PWM基本结构
+
+![Image](https://github.com/user-attachments/assets/294f56ef-382c-49af-9d1c-62c97b2cc153)
+
+蓝色线是CNT的值，黄色线是ARR的值，蓝色线从0开始自增，一直增到ARR，也就是99，之后清零继续自增。
+
+红色线就是CCR，是我们预设的值。绿色线是电平大小。
+
+当CNT\<CCR时，置高电平；CNT\>=CCR时，置低电平。CNT溢出时，清零，重新置高电平。
+
+进一步分析，我们发现，电平的占空比是受CCR的值影响的。如果我们的CCR设置的低一些，占空比就小一些；如果CCR设置的高一些，占空比就大一些。
+
+REF是一个频率可调，占空比也可调的PWM波形。最终经过极性选择、输出使能，通向GPIO口。
+
+## 6. 参数计算
+
+
+我们回到节5的图。
+
+- PWM频率：$Freq = CK_PSC / (PSC+1) / (ARR+1)$
+- 占空比：$Duty = CCR / (ARR+1)$
+- 占空比变化步距：$DutyStep = 1 / (ARR+1)$
+
+我们按高电平第一次回落的点算，此时占空比为 $30 /(99+1) \times 100 \% = 30\% $ 
+
+CCR的范围取决于ARR，因为CCR去到和ARR差不多甚至相等的时候，占空比就是百分之百，这样便失去了意义。所以CCR需要始终小于ARR。
+
+变化步距是越小越好的，CCR越大越好。这样代表其变化越细腻。
+
+## 7. 输出比较通道（高级）
+
+为了更好地切换MOS管开关状态，有了死区生成电路。
+
+![Image](https://github.com/user-attachments/assets/7caf5b99-b4b6-4fc8-ab2c-beff3f35f605)
+
+## 8. 舵机简介
+
+舵机是一种根据输入PWM信号占空比来控制输出角度的装置。
+
+输入PWM信号要求：周期为20ms，高电平宽度为0.5ms-2.5ms。
+
+![Image](https://github.com/user-attachments/assets/2d810bd3-3753-42c3-8686-e604dccf5081)
+
+PWM在此图中是当一个通信协议来用。
+
+## 9. 舵机硬件电路
+
+![Image](https://github.com/user-attachments/assets/f78655eb-a20b-4603-a207-950dfad0dbc8)
+
+PWM信号线直接接到STM32引脚上就可以，比如PA0。舵机内部有驱动电路。
+
+## 10. 直流电机及驱动简介
+
+直流电机是一种将电能转换为机械能的装置，有两个电极，当电极正接时，电机正转，当电极反接时，电机反转。
+
+直流电机属于大功率器件，GPIO口无法直接驱动，需要配合电机驱动电路来操作。
+
+TB6612是一款双路H桥（一路四个开关管）型的直流电机驱动芯片，可以驱动两个直流电机并且控制其转速及方向。
+
+![Image](https://github.com/user-attachments/assets/c4fa644d-dcf1-4c98-9beb-4fc8d02bacea)
+
+ULN2003则一路只有一个开关管，只能控制电机在一个方向转。
+
+右边的电路即是H桥电路的基本结构，它是由两路推挽电路组成的。上管导通，下管断开，左边输出就是接在VM的电机电源正极。下管导通，上管断开，那就是PGND的电源负极。
+
+如果有两路推挽电路，中间O1和O2接一个电机，左上右下导通，电流就是从左流向右边；右上和左下导通，电流方向就反过来，从右流向左。H桥可以控制电流流过的方向，从而控制电机正反转。
+
+## 11. 电机硬件电路
+
+左边就是这个电机驱动模块的硬件电路。
+
+
+右下角的表中，输入是IN1、IN2、PWM和STBY。STBY低电平就待机，高电平就正常工作。右边是输出，O1、O2和模式状态。有电压差电机才会转，否则就是制动状态。此外还有正反转状态之分，取决于O1和O2的高低电平相对状态。
+
+
+![Image](https://github.com/user-attachments/assets/314be563-c747-4db7-b16f-06f04fb3a626)
+
+要接一个可以输出大电流的电源.
+
+VM是驱动电压输入端，输入电压一般和额定电压保持一致。
+
+VCC不需要大功率，可以和控制器共用一个电源。
+
+GND接系统的负极。随便一个GND就可以。
+
+AO1和AO2是A路的两个输出，其控制端是上面的PWMA、AIN2、AIN1。
+
+PWMA引脚接PWM的信号输出端，其他两个引脚可以任意接两个普通的GPIO口。
+
+三个引脚给一个低功率的控制信号，驱动电路就会从VM汲取电流，输出到电机。从而就能完成低功率控制大功率电路的目的。
+
+BO1和BO2是B路的两个输出，其控制端是上面的PWMB、BIN2、BIN1。
+
+STBY如果不需要待机模式的话，可以直接接VCC(3.3V)。
+
+
+## 12. 系统节拍定时器SysTick
+
+Systick是什么？它是一个24位的倒计数器，一次最多可以计数$2^{24}$个时钟脉冲。
+
+当从某个数倒数到0时，将从RELOAD寄存器中取值作为定时器的初始值，同时可以选择在这个时候产生中断。
+
+只要不把它在SysTick控制器及状态寄存器中的使能位清除，就永不停息，即使在睡眠模式下也能继续工作。
+
+所有的Cortex M3处理器都带有这个定时器。
+
+### 12.1 SysTick配置方法（标准库）
+
+首先看一下SysTick_Type结构体:
+
+```C
+typedef struct
+{
+    __IO uint32_t CTRL;  /**< SysTick 控制和状态寄存器 */
+    __IO uint32_t LOAD;  /**< SysTick 自动重装载数值寄存器 */
+    __IO uint32_t VAL;   /**< SysTick 当前数值寄存器 */
+    __I  uint32_t CALIB; /**< SysTick 校准值寄存器 */
+}SysTick_Type;
+```
+
+再来看一下SysTick_Config函数:
+
+```C
+static __INLINE uint32_t SysTick_Config(uint32_t ticks)
+{
+    if (ticks > SysTick_LOAD_RELOAD_Msk)  return (1);            /* Reload value impossible */
+
+    SysTick->LOAD  = (ticks & SysTick_LOAD_RELOAD_Msk) - 1;      /* set reload register */
+
+    NVIC_SetPriorty(ticks & SysTick_LOAD_RELOAD_Msk) - 1 ;
+
+    SysTick->VAL   = 0;
+    SysTick->CTRL  = SysTick_CTRL_CLKSOURCE_Msk |
+                     SysTick_CTRL_TICKINT_Msk   |
+                     SysTick_CTRL_ENABLE_Msk;
+    return(0);
+}
+```
+
+我们配置SysTick就是用SysTick_Config函数，传入ticks给重装寄存器LOAD就行了。
+
+
+ticks表示SysTick定时器从LOAD值倒数到0所需要的时钟周期数。
+
+### 12.2 SysTick初始化
+:::tip
+例子：通过一定的方法实现 LED 的闪烁，每隔特定的时间亮、灭一次。
+:::
+
+```C
+void SysTick_Init(void)
+{
+    SysTick_Config(80000);
+}
+
+void SysTick_Handler(void)
+{   // stm32f10x的库里面有一个同名函数，换个名字或者注释掉
+    static uint8_t i = 0;
+    i++;
+    if(i == 100){
+        LED1(1);
+    }
+
+    if(i == 200){
+        LED1(0);
+        i = 0;
+    }
+}// 假设LED1()已经写好了
+```
+
+### 12.3 实时时钟RTC初始化
+
+17章有讲RTC的基本原理，这里给出初始化代码：
+
+```C
+void RTC_Clock_Config(uint8_t hours, uint8_t minutes, uint8_t seconds){
+    RCC_APB1PeriphClockCmd(RCC_APB1Periph_PWR|RCC_APB1Periph_BKP, ENABLE);// 使能电源时钟和备份区域时钟。
+    PWR_BackupAccessCmd(ENABLE);//  使能RTC, 允许对备份区域进行访问。
+    BKP_DeInit(); //  初始化备份区域
+    RCC_LSEConfig(RCC_LSE_ON);// 你要用LSE外部低速振荡器，就用LSE，不然就用LSIConfig配置。
+    RCC_RTCCLKConfig(RCC_RTCCLKSource_LSE);// 配置RTC时钟源
+    RCC_RTCCLKCmd(ENABLE);// 使能RTC时钟
+    RTC_WaitForLastTask(); // 等待上次写操作完成
+    RTC_WaitForSynchro(); // 等待RTC时钟同步
+    RTC_EnterConfigMode(); // 进入配置模式
+    RTC_ExitConfigMode(); // 退出配置模式, 更新配置
+    RTCSetPrescaler(32767); //  设置预分频器, 32.768KHz / (32767+1) = 1Hz, 那现在周期就是1s.
+    RTC_ITConfig(RTC_IT_SEC, ENABLE); //  使能秒中断, RTC_IT_SEC (uint16_t)0x0001
+    
+    uint32_t time_value = (hours * 3600) + (minutes * 60) + seconds;
+    RTC_WaitForLastTask();
+    
+    RTC_SetCounter(time_value);
+    RTC_WaitForLastTask();
+    RTC_WaitForSynchro();
+    RTC_ExitConfigMode()；
+}
+// 或者通过单独的函数设置时间
+void RTC_SetTime(uint8_t hours, uint8_t minutes, uint8_t seconds) { 
+    uint32_t time_value = (hours * 3600) + (minutes * 60) + seconds;
+    RTC_WaitForLastTask();
+    
+    RTC_SetCounter(time_value);
+    RTC_WaitForLastTask();
+}
+// 没有直接可以用的寄存器来寄存日期，需要自己用RTC备用寄存器设置
+void RTC_SetDate(uint8_t day, uint8_t month, uint16_t year) { 
+    BKP_WriteBackupRegister(BKP_DR1, year);
+    BKP_WriteBackupRegister(BKP_DR2, month);
+    BKP_WriteBackupRegister(BKP_DR3, day);
+}
+```
+
+### 读取时间
+
+主要是调用RTC_GetCounter()来读取时间（计数值）。
+
+```c
+void RTC_GetTime(uint8_t *hour, uint8_t *minute, uint8_t *second) {
+    uint32_t timeValue = RTC_GetCounter();
+    *hour = timeValue / 3600;
+    *minute = (timeValue % 3600) / 60;
+    *second = (timeValue % 60);
+}
+```
+
+```C
+void RTC_GetDate(uint16_t *year, uint8_t *month, uint8_t *day) {
+    *year = BKP_ReadBackupRegister(BKP_DR1);
+    *month = BKP_ReadBackupRegister(BKP_DR2);
+    *day = BKP_ReadBackupRegister(BKP_DR3);
+}
+```
+
+### TIM配置
+
+用定时器TIM2控制LED灯的亮灭（PC13），每隔500ms闪烁一次：
+
+```C
+#include "stm32f10x.h"
+void LED_PC13_Init(void){
+    GPIO_InitTypeDef GPIO_InitStructure;
+    RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOC,ENABLE);
+    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_13;
+    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_OD; // 开漏输出，因为PC13是接VCC
+    GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz; // 高速
+    GPIO_Init(GPIOC,&GPIO_InitStructure);
+
+    GPIO_SetBits(LED_GPIO, LED_PIN); // 默认关闭LED, 注意：PC13默认高电平熄灭！
+}
+
+void TIM2_Example_Init(void){
+    TIM_TimeBaseInitTypeDef TIM_TimeBaseStructure;
+    RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM2, ENABLE);
+
+    TIM_TimeBaseStructure.Prescaler = 7200 - 1; // 72Mhz / (7199 + 1) = 0.01 MHz = 10kHz, 周期就是 1/ 10000 = 0.0001s = 0.1ms
+    TIM_TimeBaseStructure.Period = 5000 - 1 ; // 5000 - 1 = 4999, 4999个计数后，TIM2中断一次
+    TIM_TimeBaseStructure.ClockDivision = TIM_CKD_DIV1;// 填0x0也行
+    TIM_TimeBaseStructure.CounterMode = TIM_CounterMode_Up; // 往上计数
+    TIM_TimeBaseInit(TIM2, &TIM_TimeBaseStructure); // 初始化TIM2
+
+    TIM_ITConfig(TIM2, TIM_IT_Update, ENABLE); // 使能TIM2秒中断
+    TIM_Cmd(TIM2, ENABLE); // 使能TIM2
+}
+
+void NVIC_Example_Init(void){
+    NVIC_InitTypeDef NVIC_InitStructure;
+    NVIC_InitStructure.NVIC_IRQChannel = TIM2_IRQn; // 选择中断源
+    NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 0; // 抢占优先级
+    NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0; // 子优先级
+    NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE; // 使能中断
+    NVIC_Init(&NVIC_InitStructure); // 初始化中断
+}
+
+int main(void){
+    LED_PC13_Init();
+
+    TIM2_Example_Init();
+    NVIC_Example_Init();
+
+    while(1){
+        if (TIM_GetFlagStatus(TIM2, TIM_FLAG_Update) == SET) {
+            TIM_ClearFlag(TIM2, TIM_FLAG_Update); // 清除标志
+            
+            // 翻转LED状态
+            if (GPIO_ReadOutputDataBit(GPIOC, GPIO_Pin_13)) {
+                GPIO_ResetBits(GPIOC, GPIO_Pin_13); // 点亮LED
+            } else {
+                GPIO_SetBits(GPIOC, GPIO_Pin_13);   // 熄灭LED
+            }
+        }
+    }   
+}
+
+```
+
+</WordCount>

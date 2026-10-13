@@ -1,0 +1,8 @@
+{
+  "label": "全身控制与模型预测",
+  "position": 2,
+  "link": {
+    "type": "generated-index",
+    "description": "WBC、MPC、QP 与模型基运动控制。"
+  }
+}

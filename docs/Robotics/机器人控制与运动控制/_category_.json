@@ -1,0 +1,8 @@
+{
+  "label": "机器人控制与运动控制",
+  "position": 4,
+  "link": {
+    "type": "generated-index",
+    "description": "工业传统控制、全身/MPC，以及高等机器人控制。"
+  }
+}

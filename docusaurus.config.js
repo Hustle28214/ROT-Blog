@@ -118,10 +118,12 @@ const config = {
         // ... Your options.
         // `hashed` is recommended as long-term-cache of index file is possible.
         hashed: true,
-        // For Docs using Chinese, The `language` is recommended to set to:
-        // ```
-        language: ["zh"],
-        // ```
+        // Must include both: zh-only trimmer strips Latin tokens (STM32/Pytorch/etc.)
+        // so English technical keywords become unsearchable.
+        language: ["en", "zh"],
+        // Index all docs instances (default only covers /docs)
+        docsRouteBasePath: ["docs", "leetcode-answer", "hardware-and-silicon"],
+        indexBlog: true,
       }),
     ],
     '@docusaurus/theme-mermaid',

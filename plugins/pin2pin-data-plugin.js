@@ -70,9 +70,8 @@ function computePermalink(relPath, fm) {
   let p = relPath
     .replace(/\.(mdx?|MDX?)$/, '')
     .replace(/^hardware-and-silicon\//, '');
-  const parts = p.split('/');
-  const last = parts.pop();
-  parts.push(slugifyFileName(last));
+  // Strip number prefixes on every path segment (dirs + file), matching Docusaurus.
+  const parts = p.split('/').map(slugifyFileName).filter(Boolean);
   return ROUTE_BASE + '/' + parts.join('/');
 }
 

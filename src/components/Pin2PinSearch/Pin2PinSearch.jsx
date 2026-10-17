@@ -39,7 +39,7 @@ export default function Pin2PinSearch() {
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return allModels;
+    if (!q) return []; // 无搜索词时不展示任何卡片
     return allModels.filter((k) => {
       if (k.toLowerCase().includes(q)) return true;
       const arr = bidirectional[k] || [];
@@ -73,9 +73,14 @@ export default function Pin2PinSearch() {
         </div>
       </div>
 
-      {filtered.length === 0 ? (
+      {query.trim() === '' ? (
+        // 搜索框为空：仅显示提示，不渲染任何卡片
         <div className={styles.empty}>
-          {query ? `没有匹配 "${query}" 的型号` : '暂无替代料数据'}
+          输入型号开始搜索（如 <code>STM32F103</code>、<code>INA282</code>、<code>GD32</code>）
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className={styles.empty}>
+          没有匹配 "<strong>{query.trim()}</strong>" 的型号
         </div>
       ) : (
         <ul className={styles.resultList}>

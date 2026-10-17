@@ -228,7 +228,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/AI Infra/LLM/微调专题/继续预训练",
-      "progress": 13,
+      "progress": 2,
       "tags": []
     },
     {
@@ -2237,6 +2237,7 @@
       "color": "#3B82F6",
       "docPath": "Computering/操作系统/操作系统导论/线程API",
       "progress": 36,
+      "progress": 36,
       "tags": []
     },
     {
@@ -2878,7 +2879,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/数据结构/块/块状数组",
-      "progress": 28,
+      "progress": 4,
       "tags": []
     },
     {
@@ -3369,6 +3370,7 @@
       "color": "#3B82F6",
       "docPath": "Computering/算法/搜索/遗传算法",
       "progress": 19,
+      "progress": 19,
       "tags": []
     },
     {
@@ -3525,7 +3527,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/编程语言/C/指针深入",
-      "progress": 72,
+      "progress": 63,
       "tags": []
     },
     {
@@ -4110,6 +4112,7 @@
       "color": "#3B82F6",
       "docPath": "Computering/编程语言/C++/C++20/三路比较运算符",
       "progress": 9,
+      "progress": 9,
       "tags": []
     },
     {
@@ -4248,7 +4251,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/编程语言/C++/STL/Algorithms/计数对比算法",
-      "progress": 6,
+      "progress": 20,
       "tags": []
     },
     {
@@ -4612,7 +4615,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/编译原理/语法制导的翻译",
-      "progress": 45,
+      "progress": 58,
       "tags": []
     },
     {
@@ -5643,6 +5646,7 @@
       "color": "#3B82F6",
       "docPath": "Computering/设计模式/过滤器模式",
       "progress": 36,
+      "progress": 36,
       "tags": []
     },
     {
@@ -5816,7 +5820,7 @@
       "level": "intermediate",
       "color": "#3B82F6",
       "docPath": "Computering/软件测试/测试过程与生命周期",
-      "progress": 29,
+      "progress": 75,
       "tags": []
     },
     {
@@ -6202,7 +6206,7 @@
       "level": "intermediate",
       "color": "#10B981",
       "docPath": "Control/机电传动控制/概述",
-      "progress": 95,
+      "progress": 68,
       "tags": []
     },
     {
@@ -6213,6 +6217,7 @@
       "level": "intermediate",
       "color": "#10B981",
       "docPath": "Control/机电传动控制/机电传动系统的动力学基础",
+      "progress": 63,
       "progress": 63,
       "tags": []
     },
@@ -6626,6 +6631,7 @@
       "level": "intermediate",
       "color": "#10B981",
       "docPath": "Control/自动控制原理/05-线性系统频域分析与校正/Bode图",
+      "progress": 18,
       "progress": 18,
       "tags": []
     },
@@ -7238,6 +7244,7 @@
       "color": "#EF4444",
       "docPath": "Electronic/信号与系统/信号完整性分析/电感物理基础",
       "progress": 95,
+      "progress": 95,
       "tags": []
     },
     {
@@ -7847,8 +7854,9 @@
       "category": "Electronic",
       "type": "topic",
       "color": "#EF4444",
-      "docPath": "Electronic/嵌入式/MCU",
-      "progress": 60
+      "docPath": "Electronic/嵌入式/ARM/AArch64异常模型",
+      "progress": 83,
+      "tags": []
     },
     {
       "id": "Electronic-嵌入式-MCU-BEKEN",
@@ -8465,8 +8473,9 @@
       "category": "Electronic",
       "type": "topic",
       "color": "#EF4444",
-      "docPath": "Electronic/嵌入式/协议接口/USB",
-      "progress": 60
+      "docPath": "Electronic/嵌入式/STM32/CAN通信协议",
+      "progress": 14,
+      "tags": []
     },
     {
       "id": "Electronic-嵌入式-协议接口-USB-HID",
@@ -8485,17 +8494,9 @@
       "category": "Electronic",
       "type": "topic",
       "color": "#EF4444",
-      "docPath": "Electronic/嵌入式/实时操作系统",
-      "progress": 60
-    },
-    {
-      "id": "Electronic-嵌入式-实时操作系统-Embassy",
-      "title": "Embassy",
-      "category": "Electronic",
-      "type": "topic",
-      "color": "#EF4444",
-      "docPath": "Electronic/嵌入式/实时操作系统/Embassy",
-      "progress": 60
+      "docPath": "Electronic/嵌入式/STM32/Bootloader",
+      "progress": 95,
+      "tags": []
     },
     {
       "id": "Electronic-嵌入式-实时操作系统-Embassy-01-Embassy概览",
@@ -8673,7 +8674,7 @@
       "level": "intermediate",
       "color": "#EF4444",
       "docPath": "Electronic/微波工程/电磁理论",
-      "progress": 50,
+      "progress": 51,
       "tags": []
     },
     {
@@ -8768,7 +8769,7 @@
       "level": "intermediate",
       "color": "#EF4444",
       "docPath": "Electronic/电子技术基础/数字电子技术基础/半导体存储器",
-      "progress": 49,
+      "progress": 72,
       "tags": []
     },
     {
@@ -9828,6 +9829,7 @@
       "level": "intermediate",
       "color": "#8B5CF6",
       "docPath": "Mathematics/微积分/无穷级数",
+      "progress": 71,
       "progress": 71,
       "tags": []
     },
@@ -12029,8 +12031,8 @@
       "type": "skill",
       "level": "intermediate",
       "color": "#06B6D4",
-      "docPath": "Robotics/机器人控制与运动控制/高等机器人控制/视觉语言动作 VLA/SpatialVLA",
-      "progress": 31,
+      "docPath": "Robotics/WAM/可交互生成环境/Genie",
+      "progress": 6,
       "tags": []
     },
     {
@@ -12348,8 +12350,9 @@
       "category": "Robotics",
       "type": "topic",
       "color": "#06B6D4",
-      "docPath": "Robotics/机器人操作系统与中间件/数据记录与回放",
-      "progress": 60
+      "docPath": "Robotics/机器人学状态估计/IMU/UKF",
+      "progress": 78,
+      "tags": []
     },
     {
       "id": "Robotics-机器人操作系统与中间件-数据记录与回放-MCAP",
@@ -12368,8 +12371,9 @@
       "category": "Robotics",
       "type": "topic",
       "color": "#06B6D4",
-      "docPath": "Robotics/机器人操作系统与中间件/车规与新一代通信",
-      "progress": 60
+      "docPath": "Robotics/机器人学状态估计/IMU/四元数",
+      "progress": 92,
+      "tags": []
     },
     {
       "id": "Robotics-机器人操作系统与中间件-车规与新一代通信-00-专栏说明",

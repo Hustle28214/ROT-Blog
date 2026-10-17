@@ -74,6 +74,20 @@
   background: var(--ifm-card-background-color, #f5f7fa);
   border: 1px dashed var(--ifm-color-emphasis-300, #cfd2d8);
   border-radius: 12px;
+  font-size: 0.95rem;
+}
+
+.empty code {
+  background: rgba(127, 127, 127, 0.15);
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  font-family: var(--ifm-font-family-monospace, monospace);
+}
+
+.empty strong {
+  color: var(--ifm-color-primary, #2e8555);
+  font-weight: 600;
 }
 
 .resultList {

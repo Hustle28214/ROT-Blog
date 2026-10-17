@@ -1,4 +1,4 @@
-import WordCount from '../../../src/components/WordCount/WordCount';
+import WordCount from '@site/src/components/WordCount/WordCount';
 
 <WordCount>
 
@@ -524,7 +524,7 @@ $$
 <img width="145" alt="Image" src="https://github.com/user-attachments/assets/380e0fb4-9e08-49fe-9d35-63151ac9adbe" />
 
 
-由上式总可以计算出一个在0度到180度之间的$\theta$值。对于任意一对轴-角$(^A\hat{K},\theta)$，存在另一对轴-角，即$(-^A\hat{K},-\theta)$，它们在空间中的姿态相同，可用同样的旋转矩阵描述。因此，在将旋转矩阵转化为等效轴角坐标系表示法时，我们需要对解进行选择。一个更加重要的问题是，对于小角度的旋转，此时的轴将变得不确定。如果转动量$\theta$为0，那么旋转轴将完全无法确定，如果$\theta=0$或$180°时$，上式将无解。
+由上式总可以计算出一个在0度到180度之间的$\theta$值。对于任意一对轴-角$(^A\hat{K},\theta)$，存在另一对轴-角，即$(-^A\hat{K},-\theta)$，它们在空间中的姿态相同，可用同样的旋转矩阵描述。因此，在将旋转矩阵转化为等效轴角坐标系表示法时，我们需要对解进行选择。一个更加重要的问题是，对于小角度的旋转，此时的轴将变得不确定。如果转动量$\theta$为0，那么旋转轴将完全无法确定，如果$\theta=0$或$180^\circ$时，上式将无解。
 
 例：坐标系B最初与坐标系A重合。我们使坐标系B绕矢量$\hat{K}=\left[\begin{matrix}0.707&0.70&70.0\end{matrix}\right]$（$^A\hat{K}$经过原点）旋转，转角$\theta=30°$，求坐标系B的描述。
 

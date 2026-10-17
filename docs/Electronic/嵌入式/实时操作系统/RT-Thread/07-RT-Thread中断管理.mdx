@@ -1,4 +1,4 @@
-import WordCount from '../../../../../src/components/WordCount/WordCount.jsx';
+import WordCount from '@site/src/components/WordCount/WordCount';
 
 <WordCount>
 
@@ -57,7 +57,7 @@ MSP 为主堆栈，PSP 为进程堆栈，处理模式总是使用 MSP 作为堆�
 
 ## 嵌套向量中断控制器（NVIC）
 
-在STM32栏目的[外部中断](../STM32/02-EXTI外部中断.mdx)中有讲到NVIC，这里不重复部分内容，仅作补充。
+在STM32栏目的[外部中断](../../MCU/STM32/02-EXTI外部中断.mdx)中有讲到NVIC，这里不重复部分内容，仅作补充。
 
 当一个中断触发并且系统进行响应时，处理器硬件会将当前运行位置的上下文寄存器自动压入中断栈中，涉及的是 PSR、PC、LR、R12、R3-R0 寄存器。
 
@@ -80,7 +80,7 @@ PendSV专门用来辅助操作系统进行上下文切换。但PendSV异常初�
 
 ### 中断向量表
 
-其实在[Bootloader](../STM32/23-Bootloader.mdx)有提到过中断向量表,这里不重复部分内容,仅作补充。
+其实在[Bootloader](../../MCU/STM32/23-Bootloader.mdx)有提到过中断向量表,这里不重复部分内容,仅作补充。
 
 ![](https://github.com/user-attachments/assets/03610bbc-9d20-45c5-85f8-617581a5194d)
 

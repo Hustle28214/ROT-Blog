@@ -1,4 +1,4 @@
-import WordCount from '../../../../../src/components/WordCount/WordCount';
+import WordCount from '@site/src/components/WordCount/WordCount';
 
 <WordCount>
 
@@ -74,7 +74,7 @@ $a \bmod b$：设$a,b\in\mathbb{Z}$且$b>0$，如果$q,r\in\mathbb{Z}$满足$a=q
 
 对于负整数的模运算，则与正整数正好相反，
 设$a\<0,b\>0$。$a \bmod b$可理解为$a$不断地加上$b$直至得数$d>0$($d\<b$)。
-但事实上，还存在这种争议结果：求出的$d$只需满足$0\<|d|\<|b|$，也就是说假设$-5%3$，得数可以是$1$，也可以是$-2$。
+但事实上，还存在这种争议结果：求出的$d$只需满足$0\<|d|\<|b|$，也就是说假设$-5 \bmod 3$，得数可以是$1$，也可以是$-2$。
 
 现如今大多数人认可的是这个模运算定义：
 > 若$a,b$为整数，$c\neq 0$，那么余数$d$满足$a=kb+c$($k\in\mathbb{Z}$)。

@@ -120,15 +120,24 @@ html[data-theme='light'][data-scrolled='true'] .navbar {
 .navbar__inner {
   max-width: var(--ifm-container-width);
   margin: 0 auto;
+  /* 导航项多：禁止换行，防止被裁切造成「错位」 */
+  flex-wrap: nowrap;
+}
+
+.navbar__items {
+  flex-wrap: nowrap;
+  min-width: 0;
 }
 
 .navbar__link {
   position: relative;
-  font-size: 0.875rem;
+  font-size: 0.84rem;
   font-weight: 500;
+  line-height: 1.5;
+  white-space: nowrap;
   color: var(--text-secondary);
   border-radius: var(--r-btn);
-  padding: 6px 10px;
+  padding: 5px 7px;
   transition: color var(--ifm-transition-fast) ease,
     background var(--ifm-transition-fast) ease;
 }
@@ -148,8 +157,8 @@ html[data-theme='light'][data-scrolled='true'] .navbar {
 .navbar__link--active::after {
   content: '';
   position: absolute;
-  left: 10px;
-  right: 10px;
+  left: 7px;
+  right: 7px;
   bottom: 0;
   height: 2px;
   border-radius: 2px;
@@ -175,6 +184,13 @@ html[data-theme='light'][data-scrolled='true'] .navbar {
 .navbar__search-input:focus {
   border-color: var(--border-accent);
   box-shadow: 0 0 0 3px rgba(94, 234, 212, 0.1);
+}
+
+/* 窄屏（<1280px）隐藏低优先级导航项，保证一行排下 */
+@media (max-width: 1279px) {
+  .hideOnNarrow {
+    display: none !important;
+  }
 }
 
 /* 移动侧栏 */

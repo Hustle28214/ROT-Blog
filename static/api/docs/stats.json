@@ -1,5 +1,21 @@
 {
-  "totalWordCount": 1796901,
-  "totalReadingTime": 3594,
-  "generatedAt": "2026-10-25T12:56:57.652Z"
+  "totalWordCount": 1817975,
+  "totalReadingTime": 3636,
+  "fileCount": 1009,
+  "countedFiles": 902,
+  "byInstance": {
+    "docs": {
+      "files": 942,
+      "words": 1796901
+    },
+    "leetcode-answer": {
+      "files": 51,
+      "words": 20478
+    },
+    "hardware-and-silicon": {
+      "files": 16,
+      "words": 596
+    }
+  },
+  "generatedAt": "2026-10-25T15:53:05.870Z"
 }

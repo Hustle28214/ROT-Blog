@@ -276,10 +276,12 @@ const config = {
             href: 'https://rot-blog.vercel.app/blog/rss.xml',
             label: 'RSS',
             position: 'right',
+            className: 'hideOnNarrow',
           },
           {
             type: 'localeDropdown',
             position: 'right',
+            className: 'hideOnNarrow',
           },
         ],
       },

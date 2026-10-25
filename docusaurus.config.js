@@ -198,9 +198,9 @@ const config = {
     },// if you want to enable giscus, pls change "repo","repoId","categoryId" to yours
   
       colorMode: {
-        defaultMode: 'light',
+        defaultMode: 'dark',
         disableSwitch: false,
-        respectPrefersColorScheme: true,
+        respectPrefersColorScheme: false,
       },
       announcementBar: {
         id: 'announcementBar-1',

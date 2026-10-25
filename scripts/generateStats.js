@@ -2,6 +2,17 @@ const fs = require('fs');
 const path = require('path');
 
 const DOCS_DIR = path.join(__dirname, '../docs');
+
+/**
+ * 站点全部 docs 实例的内容目录（与 docusaurus.config.js 中的三个实例一致）：
+ * 默认实例 docs + leetcode-answer + hardware-and-silicon
+ */
+const ALL_DOCS_DIRS = [
+  DOCS_DIR,
+  path.join(__dirname, '../leetcode-answer'),
+  path.join(__dirname, '../hardware-and-silicon'),
+];
+
 const OUTPUT_DIR = path.join(__dirname, '../static/api/docs');
 const OUTPUT_FILE = path.join(OUTPUT_DIR, 'stats.json');
 
@@ -58,30 +69,44 @@ function getAllFiles(dirPath, arrayOfFiles) {
 
 async function generateStats(log = true) {
   try {
-    const files = getAllFiles(DOCS_DIR);
     let totalWordCount = 0;
     let fileCount = 0;
+    let countedFiles = 0;
+    const byInstance = {};
 
-    if (log) console.log(`Scanning ${files.length} files...`);
+    for (const dir of ALL_DOCS_DIRS) {
+      if (!fs.existsSync(dir)) continue;
+      const files = getAllFiles(dir);
+      const name = path.basename(dir);
+      let instanceWords = 0;
+      let instanceCounted = 0;
 
-    for (const file of files) {
-      const content = fs.readFileSync(file, 'utf8');
-      
-      // Check if file uses WordCount
-      const regex = /<WordCount>([\s\S]*?)<\/WordCount>/g;
-      let match;
-      let fileHasWordCount = false;
-      
-      while ((match = regex.exec(content)) !== null) {
+      if (log) console.log(`Scanning ${name}: ${files.length} files...`);
+
+      for (const file of files) {
+        const content = fs.readFileSync(file, 'utf8');
+
+        // Check if file uses WordCount
+        const regex = /<WordCount>([\s\S]*?)<\/WordCount>/g;
+        let match;
+        let fileHasWordCount = false;
+
+        while ((match = regex.exec(content)) !== null) {
           fileHasWordCount = true;
           const innerContent = match[1];
           const count = countWords(innerContent);
-          totalWordCount += count;
+          instanceWords += count;
+        }
+
+        if (fileHasWordCount) {
+          instanceCounted += 1;
+        }
       }
-      
-      if (fileHasWordCount) {
-          fileCount++;
-      }
+
+      fileCount += files.length;
+      countedFiles += instanceCounted;
+      totalWordCount += instanceWords;
+      byInstance[name] = { files: files.length, words: instanceWords };
     }
 
     const totalReadingTime = Math.ceil(totalWordCount / 500);
@@ -89,12 +114,17 @@ async function generateStats(log = true) {
     const stats = {
       totalWordCount,
       totalReadingTime,
+      /** 文章总数 = 所有 docs 实例下 .md / .mdx 之和 */
+      fileCount,
+      /** 其中已插入 <WordCount> 的篇数 */
+      countedFiles,
+      byInstance,
       generatedAt: new Date().toISOString()
     };
 
     fs.writeFileSync(OUTPUT_FILE, JSON.stringify(stats, null, 2));
     if (log) {
-      console.log(`Generated stats for ${fileCount} files.`);
+      console.log(`Generated stats for ${fileCount} files across ${ALL_DOCS_DIRS.length} instances.`);
       console.log(`Total Word Count: ${totalWordCount}`);
       console.log(`Stats saved to ${OUTPUT_FILE}`);
     }
@@ -110,5 +140,6 @@ if (require.main === module) {
 
 module.exports = {
   generateStats,
-  DOCS_DIR
+  DOCS_DIR,
+  ALL_DOCS_DIRS
 };

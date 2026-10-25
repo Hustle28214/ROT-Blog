@@ -1,0 +1,1072 @@
+{
+  "generatedAt": "2026-10-25T11:14:04.960Z",
+  "total": 942,
+  "nodes": [
+    {
+      "id": "cat:Computering",
+      "type": "category",
+      "name": "计算机",
+      "en": "Computering",
+      "color": "#3B82F6",
+      "count": 461,
+      "docPath": "Computering"
+    },
+    {
+      "id": "sub:Computering/编程语言",
+      "type": "sub",
+      "name": "编程语言",
+      "en": "Computering",
+      "color": "#3B82F6",
+      "count": 89,
+      "docPath": "Computering/编程语言"
+    },
+    {
+      "id": "sub:Computering/AI Infra",
+      "type": "sub",
+      "name": "AI Infra",
+      "en": "Computering",
+      "color": "#3B82F6",
+      "count": 79,
+      "docPath": "Computering/AI Infra"
+    },
+    {
+      "id": "sub:Computering/并行计算与分布式系统",
+      "type": "sub",
+      "name": "并行计算与分布式系统",
+      "en": "Computering",
+      "color": "#3B82F6",
+      "count": 36,
+      "docPath": "Computering/并行计算与分布式系统"
+    },
+    {
+      "id": "sub:Computering/操作系统",
+      "type": "sub",
+      "name": "操作系统",
+      "en": "Computering",
+      "color": "#3B82F6",
+      "count": 35,
+      "docPath": "Computering/操作系统"
+    },
+    {
+      "id": "sub:Computering/计算机图形学",
+      "type": "sub",
+      "name": "计算机图形学",
+      "en": "Computering",
+      "color": "#3B82F6",
+      "count": 30,
+      "docPath": "Computering/计算机图形学"
+    },
+    {
+      "id": "sub:Computering/数据结构",
+      "type": "sub",
+      "name": "数据结构",
+      "en": "Computering",
+      "color": "#3B82F6",
+      "count": 26,
+      "docPath": "Computering/数据结构"
+    },
+    {
+      "id": "sub:Computering/设计模式",
+      "type": "sub",
+      "name": "设计模式",
+      "en": "Computering",
+      "color": "#3B82F6",
+      "count": 26,
+      "docPath": "Computering/设计模式"
+    },
+    {
+      "id": "sub:Computering/算法",
+      "type": "sub",
+      "name": "算法",
+      "en": "Computering",
+      "color": "#3B82F6",
+      "count": 25,
+      "docPath": "Computering/算法"
+    },
+    {
+      "id": "sub:Computering/数据库系统",
+      "type": "sub",
+      "name": "数据库系统",
+      "en": "Computering",
+      "color": "#3B82F6",
+      "count": 20,
+      "docPath": "Computering/数据库系统"
+    },
+    {
+      "id": "sub:Computering/数字图像处理",
+      "type": "sub",
+      "name": "数字图像处理",
+      "en": "Computering",
+      "color": "#3B82F6",
+      "count": 17,
+      "docPath": "Computering/数字图像处理"
+    },
+    {
+      "id": "sub:Computering/软件测试",
+      "type": "sub",
+      "name": "软件测试",
+      "en": "Computering",
+      "color": "#3B82F6",
+      "count": 16,
+      "docPath": "Computering/软件测试"
+    },
+    {
+      "id": "sub:Computering/计算机网络",
+      "type": "sub",
+      "name": "计算机网络",
+      "en": "Computering",
+      "color": "#3B82F6",
+      "count": 15,
+      "docPath": "Computering/计算机网络"
+    },
+    {
+      "id": "sub:Computering/信息安全",
+      "type": "sub",
+      "name": "信息安全",
+      "en": "Computering",
+      "color": "#3B82F6",
+      "count": 14,
+      "docPath": "Computering/信息安全"
+    },
+    {
+      "id": "sub:Computering/编译原理",
+      "type": "sub",
+      "name": "编译原理",
+      "en": "Computering",
+      "color": "#3B82F6",
+      "count": 13,
+      "docPath": "Computering/编译原理"
+    },
+    {
+      "id": "sub:Computering/计算机组成原理",
+      "type": "sub",
+      "name": "计算机组成原理",
+      "en": "Computering",
+      "color": "#3B82F6",
+      "count": 7,
+      "docPath": "Computering/计算机组成原理"
+    },
+    {
+      "id": "sub:Computering/通信原理",
+      "type": "sub",
+      "name": "通信原理",
+      "en": "Computering",
+      "color": "#3B82F6",
+      "count": 5,
+      "docPath": "Computering/通信原理"
+    },
+    {
+      "id": "sub:Computering/WEB开发",
+      "type": "sub",
+      "name": "WEB开发",
+      "en": "Computering",
+      "color": "#3B82F6",
+      "count": 4,
+      "docPath": "Computering/WEB开发"
+    },
+    {
+      "id": "sub:Computering/实用工作流",
+      "type": "sub",
+      "name": "实用工作流",
+      "en": "Computering",
+      "color": "#3B82F6",
+      "count": 3,
+      "docPath": "Computering/实用工作流"
+    },
+    {
+      "id": "sub:Computering/虚拟化容器",
+      "type": "sub",
+      "name": "虚拟化容器",
+      "en": "Computering",
+      "color": "#3B82F6",
+      "count": 1,
+      "docPath": "Computering/虚拟化容器"
+    },
+    {
+      "id": "cat:Electronic",
+      "type": "category",
+      "name": "电子",
+      "en": "Electronic",
+      "color": "#EF4444",
+      "count": 160,
+      "docPath": "Electronic"
+    },
+    {
+      "id": "sub:Electronic/嵌入式",
+      "type": "sub",
+      "name": "嵌入式",
+      "en": "Electronic",
+      "color": "#EF4444",
+      "count": 62,
+      "docPath": "Electronic/嵌入式"
+    },
+    {
+      "id": "sub:Electronic/元器件设计",
+      "type": "sub",
+      "name": "元器件设计",
+      "en": "Electronic",
+      "color": "#EF4444",
+      "count": 36,
+      "docPath": "Electronic/元器件设计"
+    },
+    {
+      "id": "sub:Electronic/电子技术基础",
+      "type": "sub",
+      "name": "电子技术基础",
+      "en": "Electronic",
+      "color": "#EF4444",
+      "count": 25,
+      "docPath": "Electronic/电子技术基础"
+    },
+    {
+      "id": "sub:Electronic/信号与系统",
+      "type": "sub",
+      "name": "信号与系统",
+      "en": "Electronic",
+      "color": "#EF4444",
+      "count": 22,
+      "docPath": "Electronic/信号与系统"
+    },
+    {
+      "id": "sub:Electronic/FPGA",
+      "type": "sub",
+      "name": "FPGA",
+      "en": "Electronic",
+      "color": "#EF4444",
+      "count": 9,
+      "docPath": "Electronic/FPGA"
+    },
+    {
+      "id": "sub:Electronic/ASIC",
+      "type": "sub",
+      "name": "ASIC",
+      "en": "Electronic",
+      "color": "#EF4444",
+      "count": 1,
+      "docPath": "Electronic/ASIC"
+    },
+    {
+      "id": "sub:Electronic/EDA",
+      "type": "sub",
+      "name": "EDA",
+      "en": "Electronic",
+      "color": "#EF4444",
+      "count": 1,
+      "docPath": "Electronic/EDA"
+    },
+    {
+      "id": "sub:Electronic/低功耗开发",
+      "type": "sub",
+      "name": "低功耗开发",
+      "en": "Electronic",
+      "color": "#EF4444",
+      "count": 1,
+      "docPath": "Electronic/低功耗开发"
+    },
+    {
+      "id": "sub:Electronic/微波工程",
+      "type": "sub",
+      "name": "微波工程",
+      "en": "Electronic",
+      "color": "#EF4444",
+      "count": 1,
+      "docPath": "Electronic/微波工程"
+    },
+    {
+      "id": "sub:Electronic/电池管理系统",
+      "type": "sub",
+      "name": "电池管理系统",
+      "en": "Electronic",
+      "color": "#EF4444",
+      "count": 1,
+      "docPath": "Electronic/电池管理系统"
+    },
+    {
+      "id": "sub:Electronic/电磁场与电磁波",
+      "type": "sub",
+      "name": "电磁场与电磁波",
+      "en": "Electronic",
+      "color": "#EF4444",
+      "count": 1,
+      "docPath": "Electronic/电磁场与电磁波"
+    },
+    {
+      "id": "cat:Robotics",
+      "type": "category",
+      "name": "机器人",
+      "en": "Robotics",
+      "color": "#06B6D4",
+      "count": 137,
+      "docPath": "Robotics"
+    },
+    {
+      "id": "sub:Robotics/机器人控制与运动控制",
+      "type": "sub",
+      "name": "机器人控制与运动控制",
+      "en": "Robotics",
+      "color": "#06B6D4",
+      "count": 75,
+      "docPath": "Robotics/机器人控制与运动控制"
+    },
+    {
+      "id": "sub:Robotics/机器人学基础",
+      "type": "sub",
+      "name": "机器人学基础",
+      "en": "Robotics",
+      "color": "#06B6D4",
+      "count": 23,
+      "docPath": "Robotics/机器人学基础"
+    },
+    {
+      "id": "sub:Robotics/感知与建图",
+      "type": "sub",
+      "name": "感知与建图",
+      "en": "Robotics",
+      "color": "#06B6D4",
+      "count": 20,
+      "docPath": "Robotics/感知与建图"
+    },
+    {
+      "id": "sub:Robotics/机器人操作系统与中间件",
+      "type": "sub",
+      "name": "机器人操作系统与中间件",
+      "en": "Robotics",
+      "color": "#06B6D4",
+      "count": 15,
+      "docPath": "Robotics/机器人操作系统与中间件"
+    },
+    {
+      "id": "sub:Robotics/机器人不同构型实践",
+      "type": "sub",
+      "name": "机器人不同构型实践",
+      "en": "Robotics",
+      "color": "#06B6D4",
+      "count": 4,
+      "docPath": "Robotics/机器人不同构型实践"
+    },
+    {
+      "id": "cat:Control",
+      "type": "category",
+      "name": "控制",
+      "en": "Control",
+      "color": "#10B981",
+      "count": 68,
+      "docPath": "Control"
+    },
+    {
+      "id": "sub:Control/自动控制原理",
+      "type": "sub",
+      "name": "自动控制原理",
+      "en": "Control",
+      "color": "#10B981",
+      "count": 34,
+      "docPath": "Control/自动控制原理"
+    },
+    {
+      "id": "sub:Control/强化学习",
+      "type": "sub",
+      "name": "强化学习",
+      "en": "Control",
+      "color": "#10B981",
+      "count": 13,
+      "docPath": "Control/强化学习"
+    },
+    {
+      "id": "sub:Control/现代控制理论",
+      "type": "sub",
+      "name": "现代控制理论",
+      "en": "Control",
+      "color": "#10B981",
+      "count": 7,
+      "docPath": "Control/现代控制理论"
+    },
+    {
+      "id": "sub:Control/机电传动控制",
+      "type": "sub",
+      "name": "机电传动控制",
+      "en": "Control",
+      "color": "#10B981",
+      "count": 5,
+      "docPath": "Control/机电传动控制"
+    },
+    {
+      "id": "sub:Control/模仿学习",
+      "type": "sub",
+      "name": "模仿学习",
+      "en": "Control",
+      "color": "#10B981",
+      "count": 5,
+      "docPath": "Control/模仿学习"
+    },
+    {
+      "id": "sub:Control/MPC模型预测控制",
+      "type": "sub",
+      "name": "MPC模型预测控制",
+      "en": "Control",
+      "color": "#10B981",
+      "count": 1,
+      "docPath": "Control/MPC模型预测控制"
+    },
+    {
+      "id": "sub:Control/Simulink",
+      "type": "sub",
+      "name": "Simulink",
+      "en": "Control",
+      "color": "#10B981",
+      "count": 1,
+      "docPath": "Control/Simulink"
+    },
+    {
+      "id": "sub:Control/微机原理",
+      "type": "sub",
+      "name": "微机原理",
+      "en": "Control",
+      "color": "#10B981",
+      "count": 1,
+      "docPath": "Control/微机原理"
+    },
+    {
+      "id": "sub:Control/高阶控制理论",
+      "type": "sub",
+      "name": "高阶控制理论",
+      "en": "Control",
+      "color": "#10B981",
+      "count": 1,
+      "docPath": "Control/高阶控制理论"
+    },
+    {
+      "id": "cat:Mathematics",
+      "type": "category",
+      "name": "数学",
+      "en": "Mathematics",
+      "color": "#8B5CF6",
+      "count": 47,
+      "docPath": "Mathematics"
+    },
+    {
+      "id": "sub:Mathematics/概率论与数理统计",
+      "type": "sub",
+      "name": "概率论与数理统计",
+      "en": "Mathematics",
+      "color": "#8B5CF6",
+      "count": 16,
+      "docPath": "Mathematics/概率论与数理统计"
+    },
+    {
+      "id": "sub:Mathematics/微积分",
+      "type": "sub",
+      "name": "微积分",
+      "en": "Mathematics",
+      "color": "#8B5CF6",
+      "count": 15,
+      "docPath": "Mathematics/微积分"
+    },
+    {
+      "id": "sub:Mathematics/旋量代数与李群李代数",
+      "type": "sub",
+      "name": "旋量代数与李群李代数",
+      "en": "Mathematics",
+      "color": "#8B5CF6",
+      "count": 8,
+      "docPath": "Mathematics/旋量代数与李群李代数"
+    },
+    {
+      "id": "sub:Mathematics/线性代数",
+      "type": "sub",
+      "name": "线性代数",
+      "en": "Mathematics",
+      "color": "#8B5CF6",
+      "count": 6,
+      "docPath": "Mathematics/线性代数"
+    },
+    {
+      "id": "sub:Mathematics/复变函数与积分变换",
+      "type": "sub",
+      "name": "复变函数与积分变换",
+      "en": "Mathematics",
+      "color": "#8B5CF6",
+      "count": 1,
+      "docPath": "Mathematics/复变函数与积分变换"
+    },
+    {
+      "id": "sub:Mathematics/最优化问题",
+      "type": "sub",
+      "name": "最优化问题",
+      "en": "Mathematics",
+      "color": "#8B5CF6",
+      "count": 1,
+      "docPath": "Mathematics/最优化问题"
+    },
+    {
+      "id": "cat:Materials",
+      "type": "category",
+      "name": "材料",
+      "en": "Materials",
+      "color": "#EC4899",
+      "count": 37,
+      "docPath": "Materials"
+    },
+    {
+      "id": "sub:Materials/半导体器件",
+      "type": "sub",
+      "name": "半导体器件",
+      "en": "Materials",
+      "color": "#EC4899",
+      "count": 15,
+      "docPath": "Materials/半导体器件"
+    },
+    {
+      "id": "sub:Materials/半导体物理学",
+      "type": "sub",
+      "name": "半导体物理学",
+      "en": "Materials",
+      "color": "#EC4899",
+      "count": 13,
+      "docPath": "Materials/半导体物理学"
+    },
+    {
+      "id": "sub:Materials/高分子化学",
+      "type": "sub",
+      "name": "高分子化学",
+      "en": "Materials",
+      "color": "#EC4899",
+      "count": 9,
+      "docPath": "Materials/高分子化学"
+    },
+    {
+      "id": "cat:Machinery",
+      "type": "category",
+      "name": "机械",
+      "en": "Machinery",
+      "color": "#F59E0B",
+      "count": 13,
+      "docPath": "Machinery"
+    },
+    {
+      "id": "sub:Machinery/机械设计",
+      "type": "sub",
+      "name": "机械设计",
+      "en": "Machinery",
+      "color": "#F59E0B",
+      "count": 11,
+      "docPath": "Machinery/机械设计"
+    },
+    {
+      "id": "sub:Machinery/Pyslvs",
+      "type": "sub",
+      "name": "Pyslvs",
+      "en": "Machinery",
+      "color": "#F59E0B",
+      "count": 1,
+      "docPath": "Machinery/Pyslvs"
+    },
+    {
+      "id": "sub:Machinery/机械设计经典五十问",
+      "type": "sub",
+      "name": "机械设计经典五十问",
+      "en": "Machinery",
+      "color": "#F59E0B",
+      "count": 1,
+      "docPath": "Machinery/机械设计经典五十问"
+    },
+    {
+      "id": "cat:Sensor",
+      "type": "category",
+      "name": "传感器",
+      "en": "Sensor",
+      "color": "#84CC16",
+      "count": 7,
+      "docPath": "Sensor"
+    },
+    {
+      "id": "sub:Sensor/传感器与机器人感知技术",
+      "type": "sub",
+      "name": "传感器与机器人感知技术",
+      "en": "Sensor",
+      "color": "#84CC16",
+      "count": 6,
+      "docPath": "Sensor/传感器与机器人感知技术"
+    },
+    {
+      "id": "sub:Sensor/视触觉传感器",
+      "type": "sub",
+      "name": "视触觉传感器",
+      "en": "Sensor",
+      "color": "#84CC16",
+      "count": 1,
+      "docPath": "Sensor/视触觉传感器"
+    },
+    {
+      "id": "cat:Optics",
+      "type": "category",
+      "name": "光学",
+      "en": "Optics",
+      "color": "#CCCCCC",
+      "count": 4,
+      "docPath": "Optics"
+    },
+    {
+      "id": "sub:Optics/工程光学",
+      "type": "sub",
+      "name": "工程光学",
+      "en": "Optics",
+      "color": "#CCCCCC",
+      "count": 4,
+      "docPath": "Optics/工程光学"
+    },
+    {
+      "id": "cat:Mechanics",
+      "type": "category",
+      "name": "力学",
+      "en": "Mechanics",
+      "color": "#6B7280",
+      "count": 3,
+      "docPath": "Mechanics"
+    },
+    {
+      "id": "sub:Mechanics/刚体动力学",
+      "type": "sub",
+      "name": "刚体动力学",
+      "en": "Mechanics",
+      "color": "#6B7280",
+      "count": 2,
+      "docPath": "Mechanics/刚体动力学"
+    },
+    {
+      "id": "sub:Mechanics/Adams",
+      "type": "sub",
+      "name": "Adams",
+      "en": "Mechanics",
+      "color": "#6B7280",
+      "count": 1,
+      "docPath": "Mechanics/Adams"
+    },
+    {
+      "id": "cat:Paper",
+      "type": "category",
+      "name": "论文",
+      "en": "Paper",
+      "color": "#F97316",
+      "count": 3,
+      "docPath": "Paper"
+    },
+    {
+      "id": "sub:Paper/论文复现",
+      "type": "sub",
+      "name": "论文复现",
+      "en": "Paper",
+      "color": "#F97316",
+      "count": 3,
+      "docPath": "Paper/论文复现"
+    },
+    {
+      "id": "cat:Synbio",
+      "type": "category",
+      "name": "合成生物学",
+      "en": "Synbio",
+      "color": "#14B8A6",
+      "count": 2,
+      "docPath": "Synbio"
+    },
+    {
+      "id": "sub:Synbio/生物信息学",
+      "type": "sub",
+      "name": "生物信息学",
+      "en": "Synbio",
+      "color": "#14B8A6",
+      "count": 1,
+      "docPath": "Synbio/生物信息学"
+    },
+    {
+      "id": "sub:Synbio/记替朋友解决的一个化信问题",
+      "type": "sub",
+      "name": "记替朋友解决的一个化信问题",
+      "en": "Synbio",
+      "color": "#14B8A6",
+      "count": 1,
+      "docPath": "Synbio/记替朋友解决的一个化信问题"
+    }
+  ],
+  "links": [
+    {
+      "source": "cat:Computering",
+      "target": "sub:Computering/编程语言",
+      "kind": "tree"
+    },
+    {
+      "source": "cat:Computering",
+      "target": "sub:Computering/AI Infra",
+      "kind": "tree"
+    },
+    {
+      "source": "cat:Computering",
+      "target": "sub:Computering/并行计算与分布式系统",
+      "kind": "tree"
+    },
+    {
+      "source": "cat:Computering",
+      "target": "sub:Computering/操作系统",
+      "kind": "tree"
+    },
+    {
+      "source": "cat:Computering",
+      "target": "sub:Computering/计算机图形学",
+      "kind": "tree"
+    },
+    {
+      "source": "cat:Computering",
+      "target": "sub:Computering/数据结构",
+      "kind": "tree"
+    },
+    {
+      "source": "cat:Computering",
+      "target": "sub:Computering/设计模式",
+      "kind": "tree"
+    },
+    {
+      "source": "cat:Computering",
+      "target": "sub:Computering/算法",
+      "kind": "tree"
+    },
+    {
+      "source": "cat:Computering",
+      "target": "sub:Computering/数据库系统",
+      "kind": "tree"
+    },
+    {
+      "source": "cat:Computering",
+      "target": "sub:Computering/数字图像处理",
+      "kind": "tree"
+    },
+    {
+      "source": "cat:Computering",
+      "target": "sub:Computering/软件测试",
+      "kind": "tree"
+    },
+    {
+      "source": "cat:Computering",
+      "target": "sub:Computering/计算机网络",
+      "kind": "tree"
+    },
+    {
+      "source": "cat:Computering",
+      "target": "sub:Computering/信息安全",
+      "kind": "tree"
+    },
+    {
+      "source": "cat:Computering",
+      "target": "sub:Computering/编译原理",
+      "kind": "tree"
+    },
+    {
+      "source": "cat:Computering",
+      "target": "sub:Computering/计算机组成原理",
+      "kind": "tree"
+    },
+    {
+      "source": "cat:Computering",
+      "target": "sub:Computering/通信原理",
+      "kind": "tree"
+    },
+    {
+      "source": "cat:Computering",
+      "target": "sub:Computering/WEB开发",
+      "kind": "tree"
+    },
+    {
+      "source": "cat:Computering",
+      "target": "sub:Computering/实用工作流",
+      "kind": "tree"
+    },
+    {
+      "source": "cat:Computering",
+      "target": "sub:Computering/虚拟化容器",
+      "kind": "tree"
+    },
+    {
+      "source": "cat:Electronic",
+      "target": "sub:Electronic/嵌入式",
+      "kind": "tree"
+    },
+    {
+      "source": "cat:Electronic",
+      "target": "sub:Electronic/元器件设计",
+      "kind": "tree"
+    },
+    {
+      "source": "cat:Electronic",
+      "target": "sub:Electronic/电子技术基础",
+      "kind": "tree"
+    },
+    {
+      "source": "cat:Electronic",
+      "target": "sub:Electronic/信号与系统",
+      "kind": "tree"
+    },
+    {
+      "source": "cat:Electronic",
+      "target": "sub:Electronic/FPGA",
+      "kind": "tree"
+    },
+    {
+      "source": "cat:Electronic",
+      "target": "sub:Electronic/ASIC",
+      "kind": "tree"
+    },
+    {
+      "source": "cat:Electronic",
+      "target": "sub:Electronic/EDA",
+      "kind": "tree"
+    },
+    {
+      "source": "cat:Electronic",
+      "target": "sub:Electronic/低功耗开发",
+      "kind": "tree"
+    },
+    {
+      "source": "cat:Electronic",
+      "target": "sub:Electronic/微波工程",
+      "kind": "tree"
+    },
+    {
+      "source": "cat:Electronic",
+      "target": "sub:Electronic/电池管理系统",
+      "kind": "tree"
+    },
+    {
+      "source": "cat:Electronic",
+      "target": "sub:Electronic/电磁场与电磁波",
+      "kind": "tree"
+    },
+    {
+      "source": "cat:Robotics",
+      "target": "sub:Robotics/机器人控制与运动控制",
+      "kind": "tree"
+    },
+    {
+      "source": "cat:Robotics",
+      "target": "sub:Robotics/机器人学基础",
+      "kind": "tree"
+    },
+    {
+      "source": "cat:Robotics",
+      "target": "sub:Robotics/感知与建图",
+      "kind": "tree"
+    },
+    {
+      "source": "cat:Robotics",
+      "target": "sub:Robotics/机器人操作系统与中间件",
+      "kind": "tree"
+    },
+    {
+      "source": "cat:Robotics",
+      "target": "sub:Robotics/机器人不同构型实践",
+      "kind": "tree"
+    },
+    {
+      "source": "cat:Control",
+      "target": "sub:Control/自动控制原理",
+      "kind": "tree"
+    },
+    {
+      "source": "cat:Control",
+      "target": "sub:Control/强化学习",
+      "kind": "tree"
+    },
+    {
+      "source": "cat:Control",
+      "target": "sub:Control/现代控制理论",
+      "kind": "tree"
+    },
+    {
+      "source": "cat:Control",
+      "target": "sub:Control/机电传动控制",
+      "kind": "tree"
+    },
+    {
+      "source": "cat:Control",
+      "target": "sub:Control/模仿学习",
+      "kind": "tree"
+    },
+    {
+      "source": "cat:Control",
+      "target": "sub:Control/MPC模型预测控制",
+      "kind": "tree"
+    },
+    {
+      "source": "cat:Control",
+      "target": "sub:Control/Simulink",
+      "kind": "tree"
+    },
+    {
+      "source": "cat:Control",
+      "target": "sub:Control/微机原理",
+      "kind": "tree"
+    },
+    {
+      "source": "cat:Control",
+      "target": "sub:Control/高阶控制理论",
+      "kind": "tree"
+    },
+    {
+      "source": "cat:Mathematics",
+      "target": "sub:Mathematics/概率论与数理统计",
+      "kind": "tree"
+    },
+    {
+      "source": "cat:Mathematics",
+      "target": "sub:Mathematics/微积分",
+      "kind": "tree"
+    },
+    {
+      "source": "cat:Mathematics",
+      "target": "sub:Mathematics/旋量代数与李群李代数",
+      "kind": "tree"
+    },
+    {
+      "source": "cat:Mathematics",
+      "target": "sub:Mathematics/线性代数",
+      "kind": "tree"
+    },
+    {
+      "source": "cat:Mathematics",
+      "target": "sub:Mathematics/复变函数与积分变换",
+      "kind": "tree"
+    },
+    {
+      "source": "cat:Mathematics",
+      "target": "sub:Mathematics/最优化问题",
+      "kind": "tree"
+    },
+    {
+      "source": "cat:Materials",
+      "target": "sub:Materials/半导体器件",
+      "kind": "tree"
+    },
+    {
+      "source": "cat:Materials",
+      "target": "sub:Materials/半导体物理学",
+      "kind": "tree"
+    },
+    {
+      "source": "cat:Materials",
+      "target": "sub:Materials/高分子化学",
+      "kind": "tree"
+    },
+    {
+      "source": "cat:Machinery",
+      "target": "sub:Machinery/机械设计",
+      "kind": "tree"
+    },
+    {
+      "source": "cat:Machinery",
+      "target": "sub:Machinery/Pyslvs",
+      "kind": "tree"
+    },
+    {
+      "source": "cat:Machinery",
+      "target": "sub:Machinery/机械设计经典五十问",
+      "kind": "tree"
+    },
+    {
+      "source": "cat:Sensor",
+      "target": "sub:Sensor/传感器与机器人感知技术",
+      "kind": "tree"
+    },
+    {
+      "source": "cat:Sensor",
+      "target": "sub:Sensor/视触觉传感器",
+      "kind": "tree"
+    },
+    {
+      "source": "cat:Optics",
+      "target": "sub:Optics/工程光学",
+      "kind": "tree"
+    },
+    {
+      "source": "cat:Mechanics",
+      "target": "sub:Mechanics/刚体动力学",
+      "kind": "tree"
+    },
+    {
+      "source": "cat:Mechanics",
+      "target": "sub:Mechanics/Adams",
+      "kind": "tree"
+    },
+    {
+      "source": "cat:Paper",
+      "target": "sub:Paper/论文复现",
+      "kind": "tree"
+    },
+    {
+      "source": "cat:Synbio",
+      "target": "sub:Synbio/生物信息学",
+      "kind": "tree"
+    },
+    {
+      "source": "cat:Synbio",
+      "target": "sub:Synbio/记替朋友解决的一个化信问题",
+      "kind": "tree"
+    },
+    {
+      "source": "sub:Robotics/机器人操作系统与中间件",
+      "target": "sub:Computering/操作系统",
+      "kind": "cross"
+    },
+    {
+      "source": "sub:Robotics/感知与建图",
+      "target": "sub:Mathematics/概率论与数理统计",
+      "kind": "cross"
+    },
+    {
+      "source": "sub:Robotics/机器人控制与运动控制",
+      "target": "sub:Control/自动控制原理",
+      "kind": "cross"
+    },
+    {
+      "source": "sub:Robotics/感知与建图",
+      "target": "sub:Computering/数字图像处理",
+      "kind": "cross"
+    },
+    {
+      "source": "sub:Robotics/感知与建图",
+      "target": "sub:Computering/计算机图形学",
+      "kind": "cross"
+    },
+    {
+      "source": "sub:Control/强化学习",
+      "target": "sub:Computering/AI Infra",
+      "kind": "cross"
+    },
+    {
+      "source": "sub:Control/MPC模型预测控制",
+      "target": "sub:Mathematics/最优化问题",
+      "kind": "cross"
+    },
+    {
+      "source": "sub:Electronic/嵌入式",
+      "target": "sub:Computering/操作系统",
+      "kind": "cross"
+    },
+    {
+      "source": "sub:Electronic/信号与系统",
+      "target": "sub:Mathematics/复变函数与积分变换",
+      "kind": "cross"
+    },
+    {
+      "source": "sub:Electronic/元器件设计",
+      "target": "sub:Materials/半导体器件",
+      "kind": "cross"
+    },
+    {
+      "source": "sub:Electronic/嵌入式",
+      "target": "sub:Robotics/机器人操作系统与中间件",
+      "kind": "cross"
+    },
+    {
+      "source": "sub:Sensor/传感器与机器人感知技术",
+      "target": "sub:Robotics/感知与建图",
+      "kind": "cross"
+    }
+  ]
+}

@@ -1,141 +1,69 @@
-import { type Variants, motion } from 'framer-motion';
-import styles from './styles.module.css';
-import Link from '@docusaurus/Link';
-import Translate from '@docusaurus/Translate';
-import { MovingButton } from '../../UIButton/MovingButton';
-import MeSvg from './img/intro2.svg';
 import React from 'react';
-import Links from '../../Link/Link';
-import { Tilt } from '@jdion/tilt-react'
-import { MsgCard } from '../MsgCard/MsgCard';
-import Particles from '../StarrySky/StarrySky'
-import SkillGraph from '../../SkillGraph';
+import Link from '@docusaurus/Link';
+import SystemPanel from '../SystemPanel/SystemPanel';
+import { formatWords, useSiteStats } from '../hooks';
 
-const variants: Variants = {
-    visible: i => ({
-        opacity: 1,
-        y: 0,
-        transition: {
-            type: 'spring',
-            damping: 25,
-            stiffness: 100,
-            duration: 0.3,
-            delay: i * 0.3,
-        },
-    }),
-    hidden: { opacity: 0, y: 30 },
-};
+/**
+ * Hero 区：左侧信息（一句话定位 / 简介 / CTA / 数据），
+ * 右侧抽象系统面板。移除了原先压在插画上的浮层卡片。
+ */
+export default function HeadIntro({ showcase }: { showcase: boolean }) {
+  const stats = useSiteStats();
 
-function Circle() {
-    return <div className={styles.circle} />;
-}
+  return (
+    <section className="hero" id="top">
+      <div className="heroGrid" aria-hidden="true" />
+      <div className="heroGlowA" aria-hidden="true" />
+      <div className="heroGlowB" aria-hidden="true" />
 
-function MsgCardShow(){
-    return (
-        <MsgCard />
-    );
-}
+      <div className="heroWrap">
+        <div className="heroCopy">
+          <span className="heroEyebrow rise d0">
+            <i aria-hidden="true" />
+            PROGRAMMER · ROBOTICS ENGINEER
+          </span>
 
-function HeadGreet() {
-    return (
-        <motion.div
-            className={styles.hero_text}
-            custom={1}
-            initial="hidden"
-            animate="visible"
-            variants={{
-                hidden: { opacity: 0, y: 20 },
-                visible: { opacity: 1, y: 0 },
-            }}
-            onMouseMove={(e) => {
-                e.currentTarget.style.setProperty('--x', `${e.clientX}px`);
-                e.currentTarget.style.setProperty('--y', `${e.clientY}px`);
-            }}
-        >
-            <span
-                className={styles.name}
-                onMouseMove={(e) => {
-                    const bounding = e.currentTarget.getBoundingClientRect();
-                    e.currentTarget.style.setProperty('--mouse-x', `${bounding.x}px`);
-                    e.currentTarget.style.setProperty('--mouse-y', `${bounding.y}px`);
-                }}
-            >
-                <Translate id="homepage.hero.name">Leyan</Translate>
-            </span>
-            <Translate id="homepage.hero.greet">的小站😉</Translate>
-        </motion.div>
-    );
-}
+          <h1 className="heroTitle rise d1">
+            搞机器人的
+            <span className="heroName">白灯塔</span>
+          </h1>
+          <p className="heroEn rise d2">BUILD THINGS THAT MOVE — AND LAST</p>
 
-function SkillGraphComponent() {
-    const handleNodeClick = (node) => {
-        console.log('选中节点:', node);
-    };
+          <p className="heroLead rise d2">
+            咔咔，小机器人向你问好！
+          </p>
 
-    return (
-        <motion.div
-            className={styles.skill_graph_container}
-            custom={5}
-            initial="hidden"
-            animate="visible"
-            variants={variants}
-        >
-            <SkillGraph
-                width={1400}
-                height={900}
-                onNodeClick={handleNodeClick}
-            />
-        </motion.div>
-    );
-}
+          <div className="heroActions rise d3">
+            <Link className="btnPrimary" to="/docs/category/computering">
+              进入技术栈
+            </Link>
+            <Link className="btnGhost" href="#log">
+              最近动态 →
+            </Link>
+          </div>
 
-export default function HeadIntro() {
-    return (
-        <motion.div className={styles.hero} style={{ backgroundColor: 'transparent' }}>
-            <div className={styles.intro}>
-                <HeadGreet />
-                <motion.p custom={2} initial="hidden" animate="visible" variants={variants} className="max-lg:px-4">
-                    <Translate id="homepage.hero.text">
-                        一名机器人开发者，热爱一切新技术，分享我在技术路上的经验和感悟。
-                    </Translate>
-                </motion.p>
-                <motion.div custom={3} initial="hidden" animate="visible" variants={variants} className='items-center'>
-                    <Links />
-                </motion.div>
-                <motion.div className="mt-4 flex gap-2" custom={4} initial="hidden" animate="visible" variants={variants}>
-                    <MovingButton
-                        borderRadius="1.25rem"
-                        className="relative z-10 flex items-center rounded-2xl border-solid border-neutral-200 px-5 py-3 text-center text-base"
-                        style={{ backgroundColor: 'transparent' }}
-                    >
-                        <div className={styles.buttons}>
-                            <Link to="/intro">
-                                <Translate>HELLO THATS ME 👉</Translate>
-                            </Link>
-                        </div>
-                    </MovingButton>
-                </motion.div>
+          <dl className="heroStats rise d4">
+            <div>
+              <dt>文章</dt>
+              <dd>{stats?.fileCount ?? '—'}</dd>
             </div>
-            <motion.div className={styles.background}>
-                <MeSvg />
-                <Circle />
-                <MsgCard />
-            </motion.div>
-        </motion.div>
-    );
-}
+            <div>
+              <dt>字数</dt>
+              <dd>{formatWords(stats?.totalWordCount)}</dd>
+            </div>
+            <div>
+              <dt>文档库</dt>
+              <dd>
+                {stats?.byInstance ? Object.keys(stats.byInstance).length : '3'}
+              </dd>
+            </div>
+          </dl>
+        </div>
 
-// 保留导出的Skill函数，以便其他组件仍然可以导入使用
-export function Skill() {
-    const handleNodeClick = (node) => {
-        console.log('选中节点:', node);
-    };
-
-    return (
-        <SkillGraph
-            width={1400}
-            height={900}
-            onNodeClick={handleNodeClick}
-        />
-    );
+        <div className="heroPanel rise d2">
+          <SystemPanel showcase={showcase} />
+        </div>
+      </div>
+    </section>
+  );
 }

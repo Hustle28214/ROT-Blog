@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Source+Code+Pro:wght@200..900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap');
 
 @font-face {
   font-family: 'DreamHanSansCN';
@@ -16,71 +16,181 @@
   font-display: swap;
 }
 
+/* ============================================================
+   主题变量（Infima）
+   注意：这里必须是 :root，写成 ::root 会导致整条规则被浏览器丢弃
+   深色为默认主题：#07090C 底 / #0E1218 面板 / 信号蓝主色
+   ============================================================ */
 :root {
-  --ifm-color-primary: #11659a;
-  --ifm-color-primary-dark: #0f5b8b;
-  --ifm-color-primary-darker: #0e5683;
-  --ifm-color-primary-darkest: #0c476c;
-  --ifm-color-primary-light: #136fa9;
-  --ifm-color-primary-lighter: #1474b1;
-  --ifm-color-primary-lightest: #1683c8;
-  --ifm-background-color: #e9f1f6;
-  --ifm-navbar-background-color: #E9F1F6;
-  --ifm-font-family-base: 'DreamHanSansCN', 'Mengyuan', ui-sans-serif, system-ui, -apple-system;
-  --ifm-font-family-monospace: 'DreamHanSansCN', 'Mengyuan', ui-sans-serif, system-ui, -apple-system;
-  --ifm-heading-font-family: 'DreamHanSansCN', 'Mengyuan', ui-sans-serif, system-ui, -apple-system;
+  /* 主色：信号蓝 */
+  --ifm-color-primary: #38BDF8;
+  --ifm-color-primary-dark: #0EA5E9;
+  --ifm-color-primary-darker: #0284C7;
+  --ifm-color-primary-darkest: #075985;
+  --ifm-color-primary-light: #7DD3FC;
+  --ifm-color-primary-lighter: #BAE6FD;
+  --ifm-color-primary-lightest: #E0F2FE;
+
+  /* 点缀色（单屏不超过 3 种） */
+  --accent-teal: #5EEAD4;
+  --accent-orange: #FF8A3D;
+  --accent-green: #7CFFB2;
+  --accent-blue: #38BDF8;
+
+  /* 背景：页面底 / 面板 */
+  --ifm-background-color: #07090C;
+  --ifm-background-surface-color: #0E1218;
+
+  /* 文字 */
+  --ifm-color-content: #E6EDF3;
+  --ifm-color-content-secondary: #8B98A7;
+  --ifm-heading-color: #E6EDF3;
+
+  /* 链接 */
+  --ifm-link-color: #38BDF8;
+  --ifm-link-hover-color: #7DD3FC;
+
+  /* 边框 */
+  --ifm-border-color: rgba(255, 255, 255, 0.08);
+  --ifm-border-color-base: rgba(255, 255, 255, 0.08);
+
+  /* 代码块 */
+  --ifm-code-background: #0A0E14;
+  --ifm-code-border-radius: 8px;
   --ifm-code-font-size: 95%;
-  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.1);
-  --sb-track-color:#222222;
-  --sb-thumb-color: #f6c430;
-  --sb-thumb-color-dark: #4a8a6f;
-  --sb-size: 100px;
+  --docusaurus-highlighted-code-line-bg: rgba(56, 189, 248, 0.10);
+
+  /* 卡片 */
+  --ifm-card-background-color: #0E1218;
+  --ifm-card-border-radius: 16px;
+  --ifm-card-border-color: rgba(255, 255, 255, 0.08);
+
+  /* 圆角与阴影 */
+  --ifm-global-radius: 14px;
+  --ifm-global-shadow-tl: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --blog-item-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+
+  /* 表格 */
+  --ifm-table-border-color: rgba(255, 255, 255, 0.10);
+  --ifm-table-stripe-background: rgba(255, 255, 255, 0.02);
+  --ifm-table-head-background: rgba(255, 255, 255, 0.04);
+
+  /* 导航与页脚 */
+  --ifm-navbar-background-color: rgba(7, 9, 12, 0.82);
+  --ifm-navbar-shadow: 0 1px 0 rgba(255, 255, 255, 0.06);
+  --ifm-footer-background-color: #0A0E14;
+
+  /* 侧边栏菜单 */
+  --ifm-menu-color-background-active: rgba(56, 189, 248, 0.10);
+  --ifm-menu-color-background-hover: rgba(255, 255, 255, 0.04);
+  --ifm-toc-border-color: rgba(255, 255, 255, 0.08);
+
+  /* 字体 */
+  --ifm-font-family-base: 'Inter', 'DreamHanSansCN', 'Mengyuan', ui-sans-serif, system-ui, -apple-system, 'PingFang SC';
+  --ifm-font-family-monospace: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --ifm-heading-font-family: 'Space Grotesk', 'Inter', 'DreamHanSansCN', ui-sans-serif, system-ui, 'PingFang SC';
+  --font-display: 'Space Grotesk', 'Inter', 'DreamHanSansCN', ui-sans-serif, system-ui, 'PingFang SC';
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  /* 首页装饰层 */
+  --tech-grid: rgba(255, 255, 255, 0.045);
+  --tech-glow-a: rgba(94, 234, 212, 0.13);
+  --tech-glow-b: rgba(56, 189, 248, 0.13);
+
+  /* 滚动条 */
+  --sb-track-color: #0E1218;
+  --sb-thumb-color: #2A3441;
+  --sb-thumb-color-hover: #38BDF8;
+  --sb-size: 10px;
 }
 
-[data-theme='dark'] {
-  --ifm-color-primary: #0fd6f4;
-  --ifm-color-primary-dark: #c7dbe8;
-  --ifm-color-primary-darker: #b6d1e1;
-  --ifm-color-primary-darkest: #83b0cc;
-  --ifm-color-primary-light: #ffffff;
-  --ifm-color-primary-lighter: #ffffff;
-  --ifm-color-primary-lightest: #ffffff;
-  --ifm-background-color: #11659a;
-  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.3);
-  --ifm-navbar-background-color: #11659a;
-   /* 修改背景色为 #005153 */
-  --sb-track-color: #232e33;
-  --sb-thumb-color: #f6c430;
-  --sb-thumb-color-dark: #4a8a6f; /* 确保此颜色定义存在 */
-  --sb-size: 100px;
+/* 暗色主题与默认主题一致 */
+:root[data-theme='dark'] {
+  --ifm-color-primary: #38BDF8;
+  --ifm-color-primary-dark: #0EA5E9;
+  --ifm-color-primary-darker: #0284C7;
+  --ifm-color-primary-darkest: #075985;
+  --ifm-color-primary-light: #7DD3FC;
+  --ifm-color-primary-lighter: #BAE6FD;
+  --ifm-color-primary-lightest: #E0F2FE;
+  --ifm-background-color: #07090C;
+  --ifm-background-surface-color: #0E1218;
+  --ifm-navbar-background-color: rgba(7, 9, 12, 0.82);
+  --ifm-footer-background-color: #0A0E14;
+  --docusaurus-highlighted-code-line-bg: rgba(56, 189, 248, 0.14);
+}
+
+/* 亮色主题：浅色科技风 */
+:root[data-theme='light'] {
+  --ifm-color-primary: #0369A1;
+  --ifm-color-primary-dark: #075985;
+  --ifm-color-primary-darker: #0C4A6E;
+  --ifm-color-primary-darkest: #082F49;
+  --ifm-color-primary-light: #0284C7;
+  --ifm-color-primary-lighter: #0EA5E9;
+  --ifm-color-primary-lightest: #38BDF8;
+
+  --accent-teal: #0F766E;
+  --accent-orange: #C2410C;
+  --accent-green: #15803D;
+  --accent-blue: #0369A1;
+
+  --ifm-background-color: #F5F7FA;
+  --ifm-background-surface-color: #ffffff;
+
+  --ifm-color-content: #0B1420;
+  --ifm-color-content-secondary: #5A6B7C;
+  --ifm-heading-color: #0A1520;
+
+  --ifm-link-color: #0369A1;
+  --ifm-link-hover-color: #075985;
+
+  --ifm-border-color: rgba(11, 20, 32, 0.10);
+  --ifm-border-color-base: rgba(11, 20, 32, 0.10);
+
+  --ifm-code-background: #EEF2F6;
+  --docusaurus-highlighted-code-line-bg: rgba(3, 105, 161, 0.08);
+
+  --ifm-card-background-color: #ffffff;
+
+  --ifm-global-shadow-tl: 0 1px 2px rgba(11, 20, 32, 0.08);
+  --blog-item-shadow: 0 8px 24px rgba(11, 20, 32, 0.10);
+
+  --ifm-table-border-color: rgba(11, 20, 32, 0.12);
+  --ifm-table-stripe-background: rgba(11, 20, 32, 0.02);
+  --ifm-table-head-background: rgba(11, 20, 32, 0.04);
+
+  --ifm-navbar-background-color: rgba(245, 247, 250, 0.85);
+  --ifm-navbar-shadow: 0 1px 0 rgba(11, 20, 32, 0.06);
+  --ifm-footer-background-color: #0A1520;
+
+  --ifm-menu-color-background-active: rgba(3, 105, 161, 0.10);
+  --ifm-menu-color-background-hover: rgba(11, 20, 32, 0.04);
+  --ifm-toc-border-color: rgba(11, 20, 32, 0.08);
+
+  --tech-grid: rgba(11, 20, 32, 0.06);
+  --tech-glow-a: rgba(3, 105, 161, 0.10);
+  --tech-glow-b: rgba(2, 132, 199, 0.10);
+
+  --sb-track-color: #E4E9EF;
+  --sb-thumb-color: #9DB1C4;
+  --sb-thumb-color-hover: #0369A1;
 }
 
 /* 通用背景色 */
 body {
   background-color: var(--ifm-background-color);
-  font-family: 'DreamHanSansCN', 'Mengyuan', system-ui, -apple-system, 'PingFang SC';
+  font-family: 'Inter', 'DreamHanSansCN', 'Mengyuan', system-ui, -apple-system, 'PingFang SC';
 }
 
-/* 仅代码框使用 Source Code Pro，不影响正文、标题和行内代码。 */
+/* 代码框使用等宽字体，不影响正文、标题和行内代码。 */
 .theme-code-block pre,
 .theme-code-block code {
-  font-family: 'Source Code Pro', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-}
-
-
-/* 暗模式下背景色 */
-[data-theme='dark'] body {
-  background-color: transparent;
+  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
 body {
   scrollbar-color: var(--sb-thumb-color) var(--sb-track-color);
-}
-
-
-.medium-zoom-overlay,
-.medium-zoom-image--opened {
-  z-index: 999;
 }
 
 body::-webkit-scrollbar {
@@ -88,47 +198,37 @@ body::-webkit-scrollbar {
 }
 
 body::-webkit-scrollbar-track {
-  background: var(--isb-track-color);
-  border-radius: 10px;
-}
-
-body::-webkit-scrollbar-thumb {
-  background: var(--isb-thumb-color);
-  border-radius: 10px;
-  border: 1px solid #1a1a1a; /* 可以根据需要调整 */
-}
-
-
-
-
-
-
-/* 滚动条样式 */
-[data-theme='dark'] body::-webkit-scrollbar {
-  width: var(--sb-size);
-}
-
-[data-theme='dark'] body::-webkit-scrollbar-track {
   background: var(--sb-track-color);
   border-radius: 10px;
 }
 
-[data-theme='dark'] body::-webkit-scrollbar-thumb {
+body::-webkit-scrollbar-thumb {
   background: var(--sb-thumb-color);
   border-radius: 10px;
-  border: 1px solid #1a1a1a; /* 可以根据需要调整 */
 }
 
-/* Firefox 滚动条样式 */
-[data-theme='dark'] body {
-  scrollbar-color: var(--sb-thumb-color) var(--sb-track-color);
+body::-webkit-scrollbar-thumb:hover {
+  background: var(--sb-thumb-color-hover);
 }
 
-/* 导航栏颜色 */
-[data-theme='dark'] .navbar__link {
-  color: #E9F1F6;
+/* 深色底下的文本选中色 */
+::selection {
+  background: rgba(56, 189, 248, 0.28);
 }
 
-[data-theme='dark'] .navbar__title {
-  color: #E9F1F6;
+/* 引用块 */
+.markdown blockquote {
+  border-left: 3px solid var(--ifm-color-primary);
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 0 8px 8px 0;
+}
+
+/* 图片放大遮罩适配深色背景 */
+.medium-zoom-overlay {
+  background: rgba(4, 6, 9, 0.92) !important;
+}
+
+.medium-zoom-overlay,
+.medium-zoom-image--opened {
+  z-index: 999;
 }

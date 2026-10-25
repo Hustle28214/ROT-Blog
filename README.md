@@ -12,6 +12,10 @@ www.rotleyan.site
 
 👷‍♀ Built with Docusaurus+JavaScript+React.
 
+🎬 (2024.08.11) Video: Depending on the self-made Videoplayer component, tutorials can embed videos inline (autoplay disabled).
+
+📊 (2024.08.17) TOC Stats: The right-side TOC shows the word count and estimated reading time of the current article, plus the total word count of the whole site (served by the docs-stats plugin).
+
 📝 (2024.08.20) Word Count: Depending on React, now we can count words of every single .mdx or.jsx.
 
 🗨 (2024.08.23) Comment: Depending on Giscus, you can comment on my blog.
@@ -28,6 +32,18 @@ www.rotleyan.site
 
 🍅 (2024.08.29) Tomato: Depending on react-circular-progressbar, we can create a tomato clock. Besides, we can dive into CHAN mode(Fullscreen supported). 
 
+🌌 (2025.02.18) Landing: A Canvas starry-sky that follows your cursor, plus a framer-motion hero with tilt card, glowing button and a random "shh, she is..." message card.
+
+👾 (2025.10.05) Projects: A desktop-file-manager-like project page with a Matrix code-rain background, 3-level folder navigation, video cards, and an editable README persisted in localStorage.
+
+🧠 (2025.10.12) Skill Graph: A d3-force skill graph auto-generated from the `docs/` directory tree. Pan/zoom, filter by category, double-click a node to jump to its article. (🔎技能 in the navbar)
+
+📈 (2026.07.16) Interactive Visualization: React + Canvas widgets inside articles, e.g. the covariance-matrix visualizer with live sliders used by the EKF notes.
+
+🔬 (2026.10.09) Hardware Library & Pin2Pin: A third docs instance for electronic components. Write `pin2pin:` in the frontmatter and the plugin builds a **bidirectional** replacement index; `/hardware-and-silicon/pin2pin` gives you a searchable cross-reference table. (🔬元器件 / 🔁替代料 in the navbar)
+
+🔍 (2026.10.17) Search Update: The local full-text search now indexes all three docs instances (`docs`, `leetcode-answer`, `hardware-and-silicon`) and the blog, with mixed `en`+`zh` tokenizers (jieba) so terms like STM32 stay searchable.
+
 
 ## 😉Install (npm)
 ```bash
@@ -38,6 +54,9 @@ npm install
 npm run build
 npm run start
 ```
+
+> ⚠️ This site ships 1000+ articles across 3 docs instances, and the local full-text search index is built at compile time, so `npm run build` needs a bigger heap than Node's default 2 GB.
+> The scripts already cover this (`--max-old-space-size=8192` + `DOCUSAURUS_SSG_CONCURRENCY=2`). If it still runs out of memory, use `npm run build:lowmem` (single-threaded, no minify).
 
 
 ## 📸Shot

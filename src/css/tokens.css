@@ -56,13 +56,23 @@
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
   --shadow-focus: 0 0 0 3px rgba(56, 189, 248, 0.22);
 
-  /* ---------- 字体 ---------- */
-  --font-sans: 'Inter', 'DreamHanSansCN', 'Mengyuan', ui-sans-serif, system-ui,
-    -apple-system, 'PingFang SC', sans-serif;
-  --font-display: 'Space Grotesk', 'Inter', 'DreamHanSansCN', ui-sans-serif,
-    system-ui, -apple-system, 'PingFang SC', sans-serif;
-  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas,
-    monospace;
+  /* ---------- 字体：全站统一使用自托管的中文衬线体 ----------
+     'DreamHanSerif' = 梦源宋体（思源宋体同源），由 static/DreamHanSerifCN-W16.ttf
+     在 custom.css 里通过 @font-face 声明，不请求任何 CDN。
+     它放在字体栈最前面，Windows 上不会再先命中微软雅黑或宋体；
+     后面的系统宋体只作为字体文件加载失败时的兜底。 */
+  --font-serif: 'DreamHanSerif', 'Source Han Serif SC', 'Noto Serif CJK SC',
+    'Songti SC', STSong, SimSun, serif;
+  /* --font-sans / --font-display 是历史变量名，全站组件都在用，这里统一指向衬线体 */
+  --font-sans: var(--font-serif);
+  --font-display: var(--font-serif);
+  --font-mono: 'SF Mono', ui-monospace, SFMono-Regular, Menlo, Monaco,
+    'Cascadia Mono', 'Roboto Mono', Consolas, monospace;
+
+  /* Infima 映射：主题组件与自定义组件共用同一套字体 */
+  --ifm-font-family-base: var(--font-sans);
+  --ifm-font-family-monospace: var(--font-mono);
+  --ifm-heading-font-family: var(--font-display);
 
   /* ---------- 背景质感参数 ---------- */
   --grid-size: 48px;

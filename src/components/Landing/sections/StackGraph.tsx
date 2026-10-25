@@ -299,8 +299,8 @@ export default function StackGraph({ showcase }: { showcase: boolean }) {
         if (n.type === 'category' || n.count >= 10 || n === hover) {
           ctx.font =
             n.type === 'category'
-              ? '600 12px Inter, "PingFang SC", sans-serif'
-              : '11px Inter, "PingFang SC", sans-serif';
+              ? '600 12px "DreamHanSerif", "Songti SC", serif'
+              : '11px "DreamHanSerif", "Songti SC", serif';
           ctx.fillStyle = dim ? 'rgba(139,152,167,0.6)' : 'rgba(230,237,243,0.92)';
           ctx.fillText(n.name, n.x, n.y + n.r + 11);
         }

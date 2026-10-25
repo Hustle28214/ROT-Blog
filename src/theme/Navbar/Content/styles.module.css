@@ -1,13 +1,8 @@
 /*
 Hide color mode toggle in small viewports
  */
-@font-face{
-  font-family: DreamHanSansCN;
-  src: url(../../../../static/DreamHanSansCN-W16.ttf);
-}
-
 .customFont {
-  font-family: DreamHanSansCN;
+  font-family: var(--font-sans, serif);
 }
 
 @media (max-width: 996px) {

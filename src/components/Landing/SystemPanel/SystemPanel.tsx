@@ -79,7 +79,7 @@ function drawScene(ctx: CanvasRenderingContext2D, w: number, h: number, t: numbe
   ctx.fillRect(P0.x - 3, P0.y - 3, 6, 6);
   ctx.fillStyle = 'rgba(124,255,178,0.9)';
   ctx.fillRect(P3.x - 3, P3.y - 3, 6, 6);
-  ctx.font = '10px "JetBrains Mono", monospace';
+  ctx.font = '10px "SF Mono", ui-monospace, Menlo, monospace';
   ctx.fillStyle = 'rgba(139,152,167,0.7)';
   ctx.fillText('start', P0.x + 6, P0.y - 6);
   ctx.fillText('goal', P3.x - 34, P3.y - 8);

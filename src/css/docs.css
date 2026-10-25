@@ -129,7 +129,8 @@
 
 /* ---------- 代码块：比正文再深一级 + 1px 边框 + 语言标签 ---------- */
 .theme-code-block {
-  background: var(--bg-inset);
+  /* !important：Prism 主题会给容器写内联背景色，需要压回 Token 底色 */
+  background: var(--bg-inset) !important;
   border: 1px solid var(--border);
   border-radius: var(--r-code);
   box-shadow: none;

@@ -1,5 +1,5 @@
 <h2 align="center">
-烟雨夜灯的个人博客
+白色灯塔的个人博客
 Yan's Blog
 </h2>
 <p align="center">

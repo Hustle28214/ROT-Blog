@@ -3,24 +3,30 @@
    分层：字体 → Token → 全局外观（背景/导航/页脚） → 文章页 → 局部补充
    注意：@import 必须写在所有普通规则之前，否则整条规则会被丢弃。
    ============================================================ */
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap');
+/* 不再加载 Google Fonts：中文字形统一用下面自托管的宋体，代码用系统等宽字体，
+   既不依赖跨域 CDN（国内常被 blocking），也不会在不同平台回落到微软雅黑。 */
 @import './tokens.css';
 @import './chrome.css';
 @import './docs.css';
 
-/* ---------- 中文字体（系统回落，避免布局抖动） ---------- */
+/* ---------- 正文字体：梦源宋体（自托管，不请求 CDN） ----------
+   放在 --font-serif 栈首，Windows 上不会再回落到微软雅黑 / 宋体。
+   只声明 400：标题与加粗由浏览器合成字重，保证层级仍可分辨。 */
 @font-face {
-  font-family: 'DreamHanSansCN';
-  src: url('/DreamHanSansCN-W16.ttf') format('truetype');
-  font-weight: normal;
+  font-family: 'DreamHanSerif';
+  src: url('/DreamHanSerifCN-W16.woff2') format('woff2'),
+    url('/DreamHanSerifCN-W16.ttf') format('truetype');
+  font-weight: 400;
   font-style: normal;
   font-display: swap;
 }
 
+/* 兼容旧组件里写死的 'DreamHanSansCN'，指向同一款衬线体，避免局部还是黑体 */
 @font-face {
-  font-family: 'Mengyuan';
-  src: url('/DreamHanSansCN-W16.ttf') format('truetype');
-  font-weight: normal;
+  font-family: 'DreamHanSansCN';
+  src: url('/DreamHanSerifCN-W16.woff2') format('woff2'),
+    url('/DreamHanSerifCN-W16.ttf') format('truetype');
+  font-weight: 400;
   font-style: normal;
   font-display: swap;
 }

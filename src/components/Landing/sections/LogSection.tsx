@@ -11,7 +11,7 @@ export default function LogSection() {
       <header className="secHead">
         <span className="secEyebrow mono">02 / LOG</span>
         <h2>实验日志</h2>
-        <p>最近在折腾什么，按月记。</p>
+        <p>最近在折腾什么？</p>
       </header>
 
       <ol className="logList">

@@ -31,7 +31,7 @@ export default function ContactSection() {
       <span className="secEyebrow mono">03 / CONTACT</span>
       <h2>有想法？聊聊。</h2>
       <p className="contactLead">
-        机器人、嵌入式、工具链，或者单纯想交流某个器件的选型 —— 邮件最快，一般 48 小时内回复。
+        可以通过邮件联系我，也可以在社交平台上找到我。
       </p>
 
       <div className="contactRow">

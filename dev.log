@@ -1,0 +1,94 @@
+
+> prestart
+> npm run generate:skill-data && npm run generate:stack-graph
+
+
+> generate:skill-data
+> node scripts/generate-skill-data.js
+
+🚀 开始生成技能图谱数据...
+文档目录: F:\BLOG\ROT-Blog\docs
+输出文件: F:\BLOG\ROT-Blog\src\data\skill-data.json
+📂 找到顶级目录: [
+  'Computering', 'Control',
+  'Electronic',  'Machinery',
+  'Materials',   'Mathematics',
+  'Mechanics',   'Optics',
+  'Paper',       'Robotics',
+  'Sensor',      'Synbio'
+]
+✅ 技能数据已写入: F:\BLOG\ROT-Blog\src\data\skill-data.json
+📊 节点数: 1185, 链接数: 1173
+
+> generate:stack-graph
+> node scripts/generate-home-stack-graph.js
+
+generated src\data\home-stack-graph.json: 76 nodes, 76 links, 942 skills
+
+> start
+> cross-env DOCUSAURUS_SSG_CONCURRENCY=2 node --max-old-space-size=6144 ./node_modules/@docusaurus/core/bin/docusaurus.mjs start
+
+
+ ------------------------------------------------------------------------------                                                                                                         Update available 3.9.2 → 3.10.2                                                                                                                 To upgrade Docusaurus packages with the latest version, run the                                       following command:                                                     `yarn upgrade @docusaurus/core@latest                          @docusaurus/plugin-content-docs@latest @docusaurus/preset-classic@latest        @docusaurus/theme-live-codeblock@latest @docusaurus/theme-mermaid@latest            @docusaurus/module-type-aliases@latest @docusaurus/types@latest`                                                                                         ------------------------------------------------------------------------------ 
+
+[INFO] Starting the development server...
+[WARNING] The `siteConfig.onBrokenMarkdownLinks` config option is deprecated and will be removed in Docusaurus v4.
+Please migrate and move this option to `siteConfig.markdown.hooks.onBrokenMarkdownLinks` instead.
+Scanning docs: 942 files...
+Scanning leetcode-answer: 51 files...
+Scanning hardware-and-silicon: 16 files...
+Generated stats for 1009 files across 3 instances.
+Total Word Count: 1817975
+Stats saved to F:\BLOG\ROT-Blog\static\api\docs\stats.json
+[WARNING] Error: Failed to retrieve the git history for file "F:\BLOG\ROT-Blog\blog\20261026.md" because the file is not tracked by git.
+[WARNING] Docusaurus found blog posts without truncation markers:
+- "blog/20261026.md"
+
+We recommend using truncation markers (`<!-- truncate -->` or `{/* truncate */}`) in blog posts to create shorter previews on blog paginated lists.
+Tip: turn this security off with the `onUntruncatedBlogPosts: 'ignore'` blog plugin option.
+[SUCCESS] Docusaurus website is running at: http://localhost:3000/
+Browserslist: browsers data (caniuse-lite) is 10 months old. Please run:
+  npx update-browserslist-db@latest
+  Why you should do it regularly: https://github.com/browserslist/update-db#readme
+[90m[[90mwebpackbar[90m][39m [36mℹ[39m Compiling Client
+LaTeX-incompatible input and strict mode is set to 'warn': In LaTeX, \\ or \newline does nothing in display mode [newLineInDisplayMode]
+LaTeX-incompatible input and strict mode is set to 'warn': In LaTeX, \\ or \newline does nothing in display mode [newLineInDisplayMode]
+[WARNING] Docusaurus found 2 unused Markdown directives in file "docs/Mathematics/概率论与数理统计/平稳随机过程.mdx"
+- :::example (76:1)
+- :::example (166:1)
+Your content might render in an unexpected way. Visit https://github.com/facebook/docusaurus/pull/9394 to find out why and how to fix it.
+[WARNING] Docusaurus found 4 unused Markdown directives in file "docs/Mathematics/概率论与数理统计/随机过程.mdx"
+- :::example (80:1)
+- :::example (132:1)
+- :::example (210:1)
+- :::example (251:1)
+Your content might render in an unexpected way. Visit https://github.com/facebook/docusaurus/pull/9394 to find out why and how to fix it.
+[90m[[90mwebpackbar[90m][39m [32m✔[39m Client: Compiled successfully in 1.66m
+[1mclient[39m[22m (webpack 5.98.0) compiled [1m[32msuccessfully[39m[22m
+[90m[[90mwebpackbar[90m][39m [36mℹ[39m Compiling Client
+[90m[[90mwebpackbar[90m][39m [32m✔[39m Client: Compiled successfully in 4.71s
+[1mclient[39m[22m (webpack 5.98.0) compiled [1m[32msuccessfully[39m[22m
+[90m[[90mwebpackbar[90m][39m [36mℹ[39m Compiling Client
+[90m[[90mwebpackbar[90m][39m [32m✔[39m Client: Compiled successfully in 2.98s
+[1mclient[39m[22m (webpack 5.98.0) compiled [1m[32msuccessfully[39m[22m
+[90m[[90mwebpackbar[90m][39m [36mℹ[39m Compiling Client
+[90m[[90mwebpackbar[90m][39m [32m✔[39m Client: Compiled successfully in 2.47s
+[1mclient[39m[22m (webpack 5.98.0) compiled [1m[32msuccessfully[39m[22m
+[90m[[90mwebpackbar[90m][39m [36mℹ[39m Compiling Client
+LaTeX-incompatible input and strict mode is set to 'warn': In LaTeX, \\ or \newline does nothing in display mode [newLineInDisplayMode]
+LaTeX-incompatible input and strict mode is set to 'warn': In LaTeX, \\ or \newline does nothing in display mode [newLineInDisplayMode]
+[WARNING] Docusaurus found 2 unused Markdown directives in file "docs/Mathematics/概率论与数理统计/平稳随机过程.mdx"
+- :::example (76:1)
+- :::example (166:1)
+Your content might render in an unexpected way. Visit https://github.com/facebook/docusaurus/pull/9394 to find out why and how to fix it.
+[WARNING] Docusaurus found 4 unused Markdown directives in file "docs/Mathematics/概率论与数理统计/随机过程.mdx"
+- :::example (80:1)
+- :::example (132:1)
+- :::example (210:1)
+- :::example (251:1)
+Your content might render in an unexpected way. Visit https://github.com/facebook/docusaurus/pull/9394 to find out why and how to fix it.
+[90m[[90mwebpackbar[90m][39m [32m✔[39m Client: Compiled successfully in 54.11s
+[1mclient[39m[22m (webpack 5.98.0) compiled [1m[32msuccessfully[39m[22m
+[90m[[90mwebpackbar[90m][39m [36mℹ[39m Compiling Client
+[90m[[90mwebpackbar[90m][39m [32m✔[39m Client: Compiled successfully in 3.43s
+[1mclient[39m[22m (webpack 5.98.0) compiled [1m[32msuccessfully[39m[22m

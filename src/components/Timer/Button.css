@@ -1,16 +1,12 @@
 /* Button.css */
 
-@font-face {
-    font-family: DreamHanSansCN;
-    src: url(../../../static/DreamHanSansCN-W16.ttf);
-}
 .button {
     display: block; /* 使每个按钮独占一行 */
     border: 2px solid #4db8ff; /* 线框颜色 */
     border-radius: 50px; /* 圆角 */
     background-color: transparent;
     color: #4db8ff; /* 文字颜色 */
-    font-family: DreamHanSansCN;
+    font-family: var(--font-sans, serif);
     font-size: 14px; /* 减小字体大小 */
     text-align: center;
     cursor: pointer;

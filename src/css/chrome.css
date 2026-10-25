@@ -1,0 +1,270 @@
+/* ============================================================
+   全局外观：背景分层 / 导航 / 页脚 / 焦点 / 通用组件
+   质感来自层次，不来自特效：所有元素统一圆角、边框、阴影、间距。
+   ============================================================ */
+
+/* ---------- 基础底色与排版 ---------- */
+html {
+  background-color: var(--bg-base);
+  color-scheme: dark;
+}
+
+html[data-theme='light'] {
+  color-scheme: light;
+}
+
+body {
+  background-color: transparent;
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 17px;
+  line-height: 1.75;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ---------- 背景第二层：极淡网格 + 噪点 ---------- */
+html::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  pointer-events: none;
+  background-image:
+    linear-gradient(to right, var(--grid-line) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--grid-line) 1px, transparent 1px);
+  background-size:
+    var(--grid-size) var(--grid-size),
+    var(--grid-size) var(--grid-size);
+  opacity: var(--noise-opacity);
+  -webkit-mask-image: radial-gradient(
+    ellipse 100% 70% at 50% 0%,
+    #000 15%,
+    transparent 80%
+  );
+  mask-image: radial-gradient(
+    ellipse 100% 70% at 50% 0%,
+    #000 15%,
+    transparent 80%
+  );
+}
+
+/* ---------- 背景第三层：两团低透明青蓝柔光，极缓呼吸 ---------- */
+html::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -3;
+  pointer-events: none;
+  background:
+    radial-gradient(900px 520px at 78% -6%, var(--glow-a), transparent 70%),
+    radial-gradient(760px 460px at 10% 6%, var(--glow-b), transparent 72%);
+  animation: bgBreathe 14s ease-in-out infinite;
+}
+
+@keyframes bgBreathe {
+  0%,
+  100% {
+    opacity: 0.85;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* ---------- 选中色与焦点环 ---------- */
+::selection {
+  background: rgba(56, 189, 248, 0.28);
+  color: var(--text);
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent-blue);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ---------- 分割线 ---------- */
+hr,
+.markdown hr {
+  border: 0;
+  border-top: 1px solid var(--divider);
+}
+
+/* ============================================================
+   顶部悬浮导航：半透明玻璃 + 1px 底边
+   ============================================================ */
+.navbar {
+  background: var(--bg-panel-glass);
+  backdrop-filter: blur(16px) saturate(140%);
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+  border-bottom: 1px solid var(--border);
+  box-shadow: none;
+  transition: background var(--ifm-transition-slow) ease,
+    border-color var(--ifm-transition-slow) ease;
+}
+
+/* 滚动后背景加深 */
+html[data-scrolled='true'] .navbar {
+  background: rgba(8, 10, 13, 0.9);
+  border-bottom-color: var(--border-strong);
+}
+
+html[data-theme='light'] .navbar {
+  background: var(--bg-panel-glass);
+}
+
+html[data-theme='light'][data-scrolled='true'] .navbar {
+  background: rgba(245, 247, 250, 0.92);
+}
+
+.navbar__inner {
+  max-width: var(--ifm-container-width);
+  margin: 0 auto;
+}
+
+.navbar__link {
+  position: relative;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  border-radius: var(--r-btn);
+  padding: 6px 10px;
+  transition: color var(--ifm-transition-fast) ease,
+    background var(--ifm-transition-fast) ease;
+}
+
+.navbar__link:hover,
+.navbar__link:focus-visible {
+  color: var(--text);
+  background: var(--bg-hover);
+  text-decoration: none;
+}
+
+/* 当前区块：细下划线 + 小圆点，不用大色块 */
+.navbar__link--active {
+  color: var(--accent-teal);
+}
+
+.navbar__link--active::after {
+  content: '';
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: 0;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--accent-teal);
+  opacity: 0.75;
+}
+
+.navbar__logo {
+  height: 26px;
+}
+
+/* 搜索框：内凹感，聚焦时弱青色外发光 */
+.navbar__search-input {
+  background: var(--bg-inset);
+  border: 1px solid var(--border);
+  border-radius: var(--r-btn);
+  color: var(--text);
+  font-size: 0.875rem;
+  transition: border-color var(--ifm-transition-fast) ease,
+    box-shadow var(--ifm-transition-fast) ease;
+}
+
+.navbar__search-input:focus {
+  border-color: var(--border-accent);
+  box-shadow: 0 0 0 3px rgba(94, 234, 212, 0.1);
+}
+
+/* 移动侧栏 */
+.navbar-sidebar {
+  background: var(--bg-panel);
+  border-left: 1px solid var(--border);
+}
+
+.navbar-sidebar__item {
+  color: var(--text-secondary);
+}
+
+/* ============================================================
+   页脚：极简，细分割线
+   ============================================================ */
+.footer {
+  background: var(--bg-layer2);
+  border-top: 1px solid var(--divider);
+  padding: var(--s-6) 0 var(--s-5);
+}
+
+.footer__title {
+  color: var(--text);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.footer__link-item {
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+}
+
+.footer__link-item:hover {
+  color: var(--accent-teal);
+  text-decoration: none;
+}
+
+.footer__copyright,
+.footer__bottom {
+  color: var(--text-muted);
+  font-size: 0.8125rem;
+}
+
+/* 回到顶部：低调 */
+.theme-back-to-top-button,
+button[class*='back-to-top'] {
+  background: var(--bg-panel-glass) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: var(--r-btn) !important;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: var(--shadow-panel) !important;
+  opacity: 0.75;
+  transition: opacity var(--ifm-transition-fast) ease,
+    border-color var(--ifm-transition-fast) ease;
+}
+
+.theme-back-to-top-button:hover,
+button[class*='back-to-top']:hover {
+  opacity: 1;
+  border-color: var(--border-accent) !important;
+}
+
+/* ---------- 移动端：弱化网格与光晕，关闭呼吸动画 ---------- */
+@media (max-width: 996px) {
+  html::before {
+    opacity: 0.025;
+  }
+
+  html::after {
+    animation: none;
+    opacity: 0.7;
+  }
+}
+
+/* ============================================================
+   阅读进度：顶部 2px 细线
+   ============================================================ */
+.readProgress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 2px;
+  width: 100%;
+  z-index: 400;
+  pointer-events: none;
+  transform-origin: 0 50%;
+  transform: scaleX(var(--read-progress, 0));
+  background: linear-gradient(90deg, var(--accent-blue), var(--accent-teal));
+  opacity: calc(var(--read-progress, 0) * 8);
+}

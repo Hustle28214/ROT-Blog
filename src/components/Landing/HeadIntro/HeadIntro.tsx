@@ -12,7 +12,6 @@ export default function HeadIntro({ showcase }: { showcase: boolean }) {
 
   return (
     <section className="hero" id="top">
-      <div className="heroGrid" aria-hidden="true" />
       <div className="heroGlowA" aria-hidden="true" />
       <div className="heroGlowB" aria-hidden="true" />
 

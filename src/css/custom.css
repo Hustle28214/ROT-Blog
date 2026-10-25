@@ -1,5 +1,14 @@
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap');
+/* ============================================================
+   全局样式入口
+   分层：字体 → Token → 全局外观（背景/导航/页脚） → 文章页 → 局部补充
+   注意：@import 必须写在所有普通规则之前，否则整条规则会被丢弃。
+   ============================================================ */
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap');
+@import './tokens.css';
+@import './chrome.css';
+@import './docs.css';
 
+/* ---------- 中文字体（系统回落，避免布局抖动） ---------- */
 @font-face {
   font-family: 'DreamHanSansCN';
   src: url('/DreamHanSansCN-W16.ttf') format('truetype');
@@ -16,214 +25,38 @@
   font-display: swap;
 }
 
-/* ============================================================
-   主题变量（Infima）
-   注意：这里必须是 :root，写成 ::root 会导致整条规则被浏览器丢弃
-   深色为默认主题：#07090C 底 / #0E1218 面板 / 信号蓝主色
-   ============================================================ */
-:root {
-  /* 主色：信号蓝 */
-  --ifm-color-primary: #38BDF8;
-  --ifm-color-primary-dark: #0EA5E9;
-  --ifm-color-primary-darker: #0284C7;
-  --ifm-color-primary-darkest: #075985;
-  --ifm-color-primary-light: #7DD3FC;
-  --ifm-color-primary-lighter: #BAE6FD;
-  --ifm-color-primary-lightest: #E0F2FE;
-
-  /* 点缀色（单屏不超过 3 种） */
-  --accent-teal: #5EEAD4;
-  --accent-orange: #FF8A3D;
-  --accent-green: #7CFFB2;
-  --accent-blue: #38BDF8;
-
-  /* 背景：页面底 / 面板 */
-  --ifm-background-color: #07090C;
-  --ifm-background-surface-color: #0E1218;
-
-  /* 文字 */
-  --ifm-color-content: #E6EDF3;
-  --ifm-color-content-secondary: #8B98A7;
-  --ifm-heading-color: #E6EDF3;
-
-  /* 链接 */
-  --ifm-link-color: #38BDF8;
-  --ifm-link-hover-color: #7DD3FC;
-
-  /* 边框 */
-  --ifm-border-color: rgba(255, 255, 255, 0.08);
-  --ifm-border-color-base: rgba(255, 255, 255, 0.08);
-
-  /* 代码块 */
-  --ifm-code-background: #0A0E14;
-  --ifm-code-border-radius: 8px;
-  --ifm-code-font-size: 95%;
-  --docusaurus-highlighted-code-line-bg: rgba(56, 189, 248, 0.10);
-
-  /* 卡片 */
-  --ifm-card-background-color: #0E1218;
-  --ifm-card-border-radius: 16px;
-  --ifm-card-border-color: rgba(255, 255, 255, 0.08);
-
-  /* 圆角与阴影 */
-  --ifm-global-radius: 14px;
-  --ifm-global-shadow-tl: 0 1px 2px rgba(0, 0, 0, 0.5);
-  --blog-item-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
-
-  /* 表格 */
-  --ifm-table-border-color: rgba(255, 255, 255, 0.10);
-  --ifm-table-stripe-background: rgba(255, 255, 255, 0.02);
-  --ifm-table-head-background: rgba(255, 255, 255, 0.04);
-
-  /* 导航与页脚 */
-  --ifm-navbar-background-color: rgba(7, 9, 12, 0.82);
-  --ifm-navbar-shadow: 0 1px 0 rgba(255, 255, 255, 0.06);
-  --ifm-footer-background-color: #0A0E14;
-
-  /* 侧边栏菜单 */
-  --ifm-menu-color-background-active: rgba(56, 189, 248, 0.10);
-  --ifm-menu-color-background-hover: rgba(255, 255, 255, 0.04);
-  --ifm-toc-border-color: rgba(255, 255, 255, 0.08);
-
-  /* 字体 */
-  --ifm-font-family-base: 'Inter', 'DreamHanSansCN', 'Mengyuan', ui-sans-serif, system-ui, -apple-system, 'PingFang SC';
-  --ifm-font-family-monospace: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  --ifm-heading-font-family: 'Space Grotesk', 'Inter', 'DreamHanSansCN', ui-sans-serif, system-ui, 'PingFang SC';
-  --font-display: 'Space Grotesk', 'Inter', 'DreamHanSansCN', ui-sans-serif, system-ui, 'PingFang SC';
-  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-
-  /* 首页装饰层 */
-  --tech-grid: rgba(255, 255, 255, 0.045);
-  --tech-glow-a: rgba(94, 234, 212, 0.13);
-  --tech-glow-b: rgba(56, 189, 248, 0.13);
-
-  /* 滚动条 */
-  --sb-track-color: #0E1218;
-  --sb-thumb-color: #2A3441;
-  --sb-thumb-color-hover: #38BDF8;
-  --sb-size: 10px;
-}
-
-/* 暗色主题与默认主题一致 */
-:root[data-theme='dark'] {
-  --ifm-color-primary: #38BDF8;
-  --ifm-color-primary-dark: #0EA5E9;
-  --ifm-color-primary-darker: #0284C7;
-  --ifm-color-primary-darkest: #075985;
-  --ifm-color-primary-light: #7DD3FC;
-  --ifm-color-primary-lighter: #BAE6FD;
-  --ifm-color-primary-lightest: #E0F2FE;
-  --ifm-background-color: #07090C;
-  --ifm-background-surface-color: #0E1218;
-  --ifm-navbar-background-color: rgba(7, 9, 12, 0.82);
-  --ifm-footer-background-color: #0A0E14;
-  --docusaurus-highlighted-code-line-bg: rgba(56, 189, 248, 0.14);
-}
-
-/* 亮色主题：浅色科技风 */
-:root[data-theme='light'] {
-  --ifm-color-primary: #0369A1;
-  --ifm-color-primary-dark: #075985;
-  --ifm-color-primary-darker: #0C4A6E;
-  --ifm-color-primary-darkest: #082F49;
-  --ifm-color-primary-light: #0284C7;
-  --ifm-color-primary-lighter: #0EA5E9;
-  --ifm-color-primary-lightest: #38BDF8;
-
-  --accent-teal: #0F766E;
-  --accent-orange: #C2410C;
-  --accent-green: #15803D;
-  --accent-blue: #0369A1;
-
-  --ifm-background-color: #F5F7FA;
-  --ifm-background-surface-color: #ffffff;
-
-  --ifm-color-content: #0B1420;
-  --ifm-color-content-secondary: #5A6B7C;
-  --ifm-heading-color: #0A1520;
-
-  --ifm-link-color: #0369A1;
-  --ifm-link-hover-color: #075985;
-
-  --ifm-border-color: rgba(11, 20, 32, 0.10);
-  --ifm-border-color-base: rgba(11, 20, 32, 0.10);
-
-  --ifm-code-background: #EEF2F6;
-  --docusaurus-highlighted-code-line-bg: rgba(3, 105, 161, 0.08);
-
-  --ifm-card-background-color: #ffffff;
-
-  --ifm-global-shadow-tl: 0 1px 2px rgba(11, 20, 32, 0.08);
-  --blog-item-shadow: 0 8px 24px rgba(11, 20, 32, 0.10);
-
-  --ifm-table-border-color: rgba(11, 20, 32, 0.12);
-  --ifm-table-stripe-background: rgba(11, 20, 32, 0.02);
-  --ifm-table-head-background: rgba(11, 20, 32, 0.04);
-
-  --ifm-navbar-background-color: rgba(245, 247, 250, 0.85);
-  --ifm-navbar-shadow: 0 1px 0 rgba(11, 20, 32, 0.06);
-  --ifm-footer-background-color: #0A1520;
-
-  --ifm-menu-color-background-active: rgba(3, 105, 161, 0.10);
-  --ifm-menu-color-background-hover: rgba(11, 20, 32, 0.04);
-  --ifm-toc-border-color: rgba(11, 20, 32, 0.08);
-
-  --tech-grid: rgba(11, 20, 32, 0.06);
-  --tech-glow-a: rgba(3, 105, 161, 0.10);
-  --tech-glow-b: rgba(2, 132, 199, 0.10);
-
-  --sb-track-color: #E4E9EF;
-  --sb-thumb-color: #9DB1C4;
-  --sb-thumb-color-hover: #0369A1;
-}
-
-/* 通用背景色 */
-body {
-  background-color: var(--ifm-background-color);
-  font-family: 'Inter', 'DreamHanSansCN', 'Mengyuan', system-ui, -apple-system, 'PingFang SC';
-}
-
-/* 代码框使用等宽字体，不影响正文、标题和行内代码。 */
+/* 代码框统一等宽字体，不影响正文与标题 */
 .theme-code-block pre,
 .theme-code-block code {
-  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: var(--font-mono);
 }
 
+/* ---------- 滚动条：细腻、不抢眼 ---------- */
 body {
-  scrollbar-color: var(--sb-thumb-color) var(--sb-track-color);
+  scrollbar-color: var(--ifm-scrollbar-thumb-background-color)
+    var(--ifm-scrollbar-track-background-color);
 }
 
 body::-webkit-scrollbar {
-  width: var(--sb-size);
+  width: var(--ifm-scrollbar-size);
+  height: var(--ifm-scrollbar-size);
 }
 
 body::-webkit-scrollbar-track {
-  background: var(--sb-track-color);
-  border-radius: 10px;
+  background: var(--ifm-scrollbar-track-background-color);
 }
 
 body::-webkit-scrollbar-thumb {
-  background: var(--sb-thumb-color);
-  border-radius: 10px;
+  background: var(--ifm-scrollbar-thumb-background-color);
+  border-radius: 999px;
+  border: 2px solid var(--ifm-scrollbar-track-background-color);
 }
 
 body::-webkit-scrollbar-thumb:hover {
-  background: var(--sb-thumb-color-hover);
+  background: var(--ifm-scrollbar-thumb-hover-background-color);
 }
 
-/* 深色底下的文本选中色 */
-::selection {
-  background: rgba(56, 189, 248, 0.28);
-}
-
-/* 引用块 */
-.markdown blockquote {
-  border-left: 3px solid var(--ifm-color-primary);
-  background: rgba(255, 255, 255, 0.03);
-  border-radius: 0 8px 8px 0;
-}
-
-/* 图片放大遮罩适配深色背景 */
+/* ---------- 图片灯箱：适配深色底 ---------- */
 .medium-zoom-overlay {
   background: rgba(4, 6, 9, 0.92) !important;
 }
@@ -231,4 +64,15 @@ body::-webkit-scrollbar-thumb:hover {
 .medium-zoom-overlay,
 .medium-zoom-image--opened {
   z-index: 999;
+}
+
+/* ---------- 侧边栏与目录滚动条：细窄 ---------- */
+.thin-scrollbar::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.thin-scrollbar::-webkit-scrollbar-thumb {
+  background: var(--ifm-scrollbar-thumb-background-color);
+  border-radius: 999px;
 }

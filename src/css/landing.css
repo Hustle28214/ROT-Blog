@@ -49,18 +49,7 @@
   overflow: hidden;
 }
 
-.heroGrid {
-  position: absolute;
-  inset: 0;
-  z-index: -3;
-  background-image:
-    linear-gradient(to right, var(--tech-grid) 1px, transparent 1px),
-    linear-gradient(to bottom, var(--tech-grid) 1px, transparent 1px);
-  background-size: 64px 64px;
-  -webkit-mask-image: radial-gradient(ellipse 80% 62% at 50% 40%, #000 35%, transparent 78%);
-  mask-image: radial-gradient(ellipse 80% 62% at 50% 40%, #000 35%, transparent 78%);
-}
-
+/* Hero 局部柔光：网格由全局背景层统一提供，这里不重复叠加 */
 .heroGlowA,
 .heroGlowB {
   position: absolute;
@@ -68,8 +57,24 @@
   border-radius: 50%;
   filter: blur(90px);
   pointer-events: none;
-  opacity: 0.55;
+  opacity: 0.42;
   transition: opacity 0.6s ease;
+}
+
+/* 仅展示模式下缓慢呼吸，幅度极小 */
+.landing--showcase .heroGlowA,
+.landing--showcase .heroGlowB {
+  animation: heroBreathe 12s ease-in-out infinite;
+}
+
+@keyframes heroBreathe {
+  0%,
+  100% {
+    opacity: 0.34;
+  }
+  50% {
+    opacity: 0.52;
+  }
 }
 
 .heroGlowA {
@@ -179,37 +184,41 @@
   align-items: center;
   height: 2.9rem;
   padding: 0 1.5rem;
-  border-radius: 999px;
+  border-radius: var(--r-btn);
   font-size: 0.9rem;
   font-weight: 600;
   text-decoration: none;
-  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+  transition: transform 0.2s ease, box-shadow 0.2s ease,
+    border-color 0.2s ease, color 0.2s ease, background 0.2s ease;
 }
 
+/* 主按钮：低透明青底 + 细边框 + 轻微内高光 */
 .btnPrimary {
-  background: var(--ifm-color-primary);
-  border: 1px solid var(--ifm-color-primary);
-  color: #04121a;
-  box-shadow: 0 10px 26px rgba(56, 189, 248, 0.18);
+  background: rgba(94, 234, 212, 0.1);
+  border: 1px solid rgba(94, 234, 212, 0.28);
+  color: var(--accent-teal);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
 .btnPrimary:hover {
-  transform: translateY(-2px);
-  color: #04121a;
+  transform: scale(1.02);
+  background: rgba(94, 234, 212, 0.16);
+  color: var(--accent-teal);
   text-decoration: none;
-  box-shadow: 0 14px 32px rgba(56, 189, 248, 0.28);
 }
 
+/* 次按钮：透明底 + 细边框 */
 .btnGhost {
-  border: 1px solid var(--ifm-border-color);
-  background: var(--ifm-background-surface-color);
-  color: var(--ifm-color-content);
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
 }
 
 .btnGhost:hover {
-  transform: translateY(-2px);
-  border-color: var(--ifm-color-primary);
-  color: var(--ifm-link-color);
+  transform: scale(1.02);
+  border-color: var(--border-accent);
+  background: var(--bg-hover);
+  color: var(--text);
   text-decoration: none;
 }
 
@@ -480,7 +489,7 @@
 .sec {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 5rem 2.5rem 0;
+  padding: var(--section-gap) 2.5rem 0;
   opacity: 0;
   transform: translateY(16px);
   transition: opacity 0.55s ease, transform 0.55s ease;
@@ -638,10 +647,20 @@
   align-items: center;
   gap: 0.35rem;
   padding: 0.24rem 0.6rem;
-  border: 1px solid var(--ifm-border-color);
-  border-radius: 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-tag);
   font-size: 11.5px;
-  color: var(--ifm-color-content-secondary);
+  letter-spacing: 0.06em;
+  text-transform: uppercase; /* 标签统一大写，避免中英混排混乱 */
+  color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.03);
+  transition: border-color var(--ifm-transition-fast) ease,
+    color var(--ifm-transition-fast) ease;
+}
+
+.tag:hover {
+  color: var(--text);
+  border-color: var(--border-accent);
 }
 
 .toolRow {
@@ -671,29 +690,57 @@
   list-style: none;
   margin: 0;
   padding: 0;
+  border-top: 1px solid var(--divider);
 }
 
+/* 精细行式列表：hover 提亮背景 + 左侧 2px 青色短线 */
 .logList li {
   display: grid;
-  grid-template-columns: 90px 1fr;
+  grid-template-columns: 96px 1fr;
   gap: 1.25rem;
-  padding: 1rem 0;
+  align-items: baseline;
+  padding: 0.95rem 0.85rem;
+  margin: 0 -0.85rem;
+  border-bottom: 1px solid var(--divider);
+  border-radius: var(--r-btn);
+  position: relative;
+  transition: background 200ms ease;
 }
 
-.logList li + li {
-  border-top: 1px solid var(--ifm-border-color);
+.logList li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 2px;
+  height: 0;
+  opacity: 0;
+  transform: translateY(-50%);
+  border-radius: 2px;
+  background: var(--accent-teal);
+  transition: height 200ms ease, opacity 200ms ease;
+}
+
+.logList li:hover {
+  background: var(--bg-hover);
+}
+
+.logList li:hover::before {
+  height: 56%;
+  opacity: 0.9;
 }
 
 .logDate {
-  font-size: 12px;
-  color: var(--ifm-color-content-secondary);
-  padding-top: 0.15rem;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
 }
 
 .logText {
-  font-size: 0.95rem;
-  line-height: 1.7;
-  color: var(--ifm-color-content);
+  font-size: 17px;
+  line-height: 1.75;
+  color: var(--text);
 }
 
 /* ---------- 联系 ---------- */
@@ -846,7 +893,10 @@
   .rise,
   .sp-cursor,
   .landing--showcase .sp-archDash,
-  .landing--showcase .dotGreen {
+  .landing--showcase .dotGreen,
+  html::after,
+  .landing--showcase .heroGlowA,
+  .landing--showcase .heroGlowB {
     animation: none;
   }
 

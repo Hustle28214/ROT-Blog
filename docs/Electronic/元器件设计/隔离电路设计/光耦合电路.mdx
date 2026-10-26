@@ -1,5 +1,5 @@
 
-import WordCount from '../../../../src/components/WordCount/WordCount.jsx';
+import WordCount from '@site/src/components/WordCount/WordCount';
 import Mermaid from '@theme/Mermaid';
 
 <WordCount>
@@ -13,6 +13,28 @@ import Mermaid from '@theme/Mermaid';
 信号DLP主控板上引出一个UART串口，PC那边用一个USB转串口模块接上，写个简单的采集程序，搞定。
 
 ![](https://github.com/user-attachments/assets/ac7fb9e7-f0d3-4bde-89b5-814f860f0342)
+
+光耦就像是一个“用光传话的隔离墙”。
+
+左边有个拿手电筒的人（输入电流让 LED 发光）。
+
+中间是一堵完全隔音的防弹玻璃墙（绝缘隔离层），声音对暗号，没招。
+
+右边有个瞎子守卫（光敏三极管），他看不见人，但他能看手电筒的光。
+
+左手的人只要一按手电筒（通电），右边的瞎子看到光，就会立刻去合上自己这边的电闸（输出端导通）。
+
+
+## 光耦的问题
+
+当光耦导通时，光敏三极管通常会进入深度饱和区。在饱和状态下，三极管基极会积累大量的“多余载流子”。当输入信号突然消失（光耦需要关断）时，这些存储的电荷不能瞬间消失，需要一定的时间去“消散”，这就导致光敏三极管不能立即截止。这种现象叫做存储时间延迟，它严重限制了普通光耦的开关速度和数据传输速率，也就是所谓的光耦“拖尾”现象。
+
+那么这种问题我之前看过一个08年的专利，引入了一个二极管和一个三极管，巧妙的解决了这个问题。我来给大家讲一讲。
+
+
+
+现代高速光耦已经普遍采用光电二极管 + TIA架构或者集成肖特基箝位的方法。
+
 
 </WordCount>
 

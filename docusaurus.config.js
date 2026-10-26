@@ -118,10 +118,12 @@ const config = {
         // ... Your options.
         // `hashed` is recommended as long-term-cache of index file is possible.
         hashed: true,
-        // For Docs using Chinese, The `language` is recommended to set to:
-        // ```
-        language: ["zh"],
-        // ```
+        // Must include both: zh-only trimmer strips Latin tokens (STM32/Pytorch/etc.)
+        // so English technical keywords become unsearchable.
+        language: ["en", "zh"],
+        // Index all docs instances (default only covers /docs)
+        docsRouteBasePath: ["docs", "leetcode-answer", "hardware-and-silicon"],
+        indexBlog: true,
       }),
     ],
     '@docusaurus/theme-mermaid',
@@ -196,9 +198,9 @@ const config = {
     },// if you want to enable giscus, pls change "repo","repoId","categoryId" to yours
   
       colorMode: {
-        defaultMode: 'light',
+        defaultMode: 'dark',
         disableSwitch: false,
-        respectPrefersColorScheme: true,
+        respectPrefersColorScheme: false,
       },
       announcementBar: {
         id: 'announcementBar-1',
@@ -274,10 +276,12 @@ const config = {
             href: 'https://rot-blog.vercel.app/blog/rss.xml',
             label: 'RSS',
             position: 'right',
+            className: 'hideOnNarrow',
           },
           {
             type: 'localeDropdown',
             position: 'right',
+            className: 'hideOnNarrow',
           },
         ],
       },

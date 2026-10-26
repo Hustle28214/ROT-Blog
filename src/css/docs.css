@@ -1,0 +1,546 @@
+/* ============================================================
+   文章页外观：安静、干净、正文优先
+   原则：正文区直接铺在背景上，不套大玻璃卡片；
+        层次靠字重/字号/留白/细分割线，不靠色块和阴影。
+   ============================================================ */
+
+/* ---------- 正文容器：720–760px 居中 ---------- */
+.markdown,
+.theme-doc-markdown {
+  max-width: var(--content-width);
+  margin: 0 auto;
+}
+
+.theme-doc-markdown {
+  font-size: 17px;
+  line-height: 1.75;
+  color: var(--text);
+}
+
+/* ---------- 标题：字距略紧，层级靠字重与留白 ---------- */
+.markdown h1,
+.theme-doc-markdown h1 {
+  font-family: var(--font-display);
+  font-size: clamp(1.9rem, 3.2vw, 2.4rem);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  margin: 0 0 0.75rem;
+}
+
+.markdown h2,
+.theme-doc-markdown h2 {
+  font-family: var(--font-display);
+  font-size: 1.45rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin: 3rem 0 1rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--divider);
+}
+
+.markdown h3,
+.theme-doc-markdown h3 {
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  margin: 2rem 0 0.75rem;
+}
+
+.markdown h4,
+.theme-doc-markdown h4 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 1.5rem 0 0.5rem;
+}
+
+/* 标题锚点：默认隐藏，hover 才出现，不干扰阅读 */
+.markdown .anchor,
+.theme-doc-markdown .anchor {
+  opacity: 0;
+  transition: opacity var(--ifm-transition-fast) ease;
+}
+
+.markdown h1:hover .anchor,
+.markdown h2:hover .anchor,
+.markdown h3:hover .anchor,
+.theme-doc-markdown h1:hover .anchor,
+.theme-doc-markdown h2:hover .anchor,
+.theme-doc-markdown h3:hover .anchor {
+  opacity: 0.6;
+}
+
+/* ---------- 段落与列表 ---------- */
+.markdown p,
+.theme-doc-markdown p {
+  margin: 0 0 1.25rem;
+}
+
+.markdown ul,
+.markdown ol,
+.theme-doc-markdown ul,
+.theme-doc-markdown ol {
+  margin: 0 0 1.25rem;
+  padding-left: 1.4rem;
+}
+
+.markdown li,
+.theme-doc-markdown li {
+  margin: 0.35rem 0;
+}
+
+/* ---------- 链接：强调色 + 细下划线，hover 变亮 ---------- */
+.markdown a,
+.theme-doc-markdown a {
+  color: var(--accent-blue);
+  text-decoration: none;
+  border-bottom: 1px solid rgba(56, 189, 248, 0.32);
+  transition: color var(--ifm-transition-fast) ease,
+    border-color var(--ifm-transition-fast) ease;
+}
+
+.markdown a:hover,
+.theme-doc-markdown a:hover {
+  color: var(--accent-teal);
+  border-bottom-color: var(--accent-teal);
+  text-decoration: none;
+}
+
+/* ---------- 行内代码：浅底色 + 细边框 ---------- */
+.markdown :not(pre) > code,
+.theme-doc-markdown :not(pre) > code {
+  font-family: var(--font-mono);
+  font-size: 0.8125em;
+  letter-spacing: 0.01em;
+  padding: 0.15em 0.4em;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-inset);
+  color: #cfe3f2;
+}
+
+:root[data-theme='light'] .markdown :not(pre) > code,
+:root[data-theme='light'] .theme-doc-markdown :not(pre) > code {
+  color: #0b4a6f;
+  background: rgba(3, 105, 161, 0.07);
+  border-color: rgba(11, 20, 32, 0.12);
+}
+
+/* ---------- 代码块：比正文再深一级 + 1px 边框 + 语言标签 ---------- */
+.theme-code-block {
+  /* !important：Prism 主题会给容器写内联背景色，需要压回 Token 底色 */
+  background: var(--bg-inset) !important;
+  border: 1px solid var(--border);
+  border-radius: var(--r-code);
+  box-shadow: none;
+  position: relative;
+  margin-bottom: 1.5rem;
+}
+
+.theme-code-block pre {
+  background: transparent !important;
+  border-radius: var(--r-code);
+  padding: 0.85rem 1rem 1rem;
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.7;
+}
+
+/* 语言标签（由 Root.js 注入 .cbLang） */
+.cbLang {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1;
+  padding: 4px 10px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  color: var(--text-muted);
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  border-radius: var(--r-code) 0 8px 0;
+  background: rgba(255, 255, 255, 0.02);
+  pointer-events: none;
+}
+
+/* 复制按钮 */
+.theme-code-block .clean-btn {
+  border-radius: 8px;
+  color: var(--text-muted);
+  transition: color var(--ifm-transition-fast) ease,
+    background var(--ifm-transition-fast) ease;
+}
+
+.theme-code-block .clean-btn:hover {
+  color: var(--accent-teal);
+  background: var(--bg-hover-strong);
+}
+
+/* ---------- 提示块：只有 Note / Warning / Result ---------- */
+.theme-admonition {
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid var(--border);
+  border-left: 2px solid var(--text-muted);
+  border-radius: var(--r-panel);
+  box-shadow: none;
+  padding: 0.9rem 1.1rem;
+  margin-bottom: 1.5rem;
+}
+
+.theme-admonition .admonitionHeading,
+.theme-admonition h5 {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  margin-bottom: 0.35rem;
+}
+
+.theme-admonition p:last-child {
+  margin-bottom: 0;
+}
+
+/* Note — 中性灰蓝 */
+.theme-admonition-note,
+.theme-admonition.alert--secondary {
+  border-left-color: rgba(139, 152, 167, 0.55);
+}
+
+/* Warning — 信号橙 */
+.theme-admonition-warning,
+.theme-admonition.alert--warning {
+  border-left-color: var(--accent-orange);
+}
+
+/* Result — 成功绿 */
+.theme-admonition-result,
+.theme-admonition.alert--result,
+.theme-admonition.alert--success,
+.theme-admonition-tip {
+  border-left-color: var(--accent-green);
+}
+
+/* 其余类型统一压成中性，避免五颜六色 */
+.theme-admonition.alert--info,
+.theme-admonition.alert--danger {
+  border-left-color: rgba(139, 152, 167, 0.55);
+}
+
+/* ---------- 图片与图表：细边框 + 轻圆角 + 弱化说明 ---------- */
+.markdown img,
+.theme-doc-markdown img {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  max-width: 100%;
+  height: auto;
+}
+
+.markdown figure,
+.theme-doc-markdown figure {
+  margin: 1.75rem 0;
+}
+
+.markdown figcaption,
+.theme-doc-markdown figcaption,
+.markdown img + em,
+.theme-doc-markdown img + em {
+  display: block;
+  margin-top: 0.5rem;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+/* ---------- 表格：细线、弱化表头 ---------- */
+.markdown table,
+.theme-doc-markdown table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 15.5px;
+  margin: 0 0 1.5rem;
+  display: table;
+}
+
+.markdown th,
+.theme-doc-markdown th {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.03);
+  border-bottom: 1px solid var(--border-strong);
+}
+
+.markdown td,
+.theme-doc-markdown td {
+  border-bottom: 1px solid var(--divider);
+}
+
+/* ---------- 引用块 ---------- */
+.markdown blockquote,
+.theme-doc-markdown blockquote {
+  border-left: 2px solid var(--border-accent);
+  background: rgba(255, 255, 255, 0.025);
+  border-radius: 0 10px 10px 0;
+  padding: 0.6rem 1rem;
+  color: var(--text-secondary);
+  margin: 0 0 1.5rem;
+}
+
+.markdown blockquote p:last-child,
+.theme-doc-markdown blockquote p:last-child {
+  margin-bottom: 0;
+}
+
+/* ============================================================
+   右侧吸顶目录：小号等宽，当前小节高亮
+   ============================================================ */
+.table-of-contents {
+  font-size: 12.5px;
+  border-left: 1px solid var(--divider);
+  padding-left: 12px !important;
+}
+
+.table-of-contents__link {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  letter-spacing: 0.02em;
+  color: var(--text-muted);
+  padding: 3px 0;
+  display: block;
+  transition: color var(--ifm-transition-fast) ease;
+}
+
+.table-of-contents__link:hover {
+  color: var(--text-secondary);
+  text-decoration: none;
+}
+
+.table-of-contents__link--active {
+  position: relative;
+  color: var(--accent-teal);
+}
+
+.table-of-contents__link--active::before {
+  content: '';
+  position: absolute;
+  left: -13px;
+  top: 4px;
+  bottom: 4px;
+  width: 2px;
+  border-radius: 2px;
+  background: var(--accent-teal);
+}
+
+/* ============================================================
+   面包屑 / 上下篇 / 元信息
+   ============================================================ */
+.theme-doc-breadcrumbs {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+
+.theme-doc-breadcrumbs .breadcrumbs__link {
+  color: var(--text-muted);
+}
+
+.theme-doc-breadcrumbs .breadcrumbs__link:hover {
+  color: var(--accent-teal);
+  text-decoration: none;
+}
+
+.theme-doc-footer {
+  margin-top: 3rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--divider);
+}
+
+.theme-doc-footer-tags-row,
+.theme-doc-footer-edit-meta-row {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+
+.theme-doc-footer-tags-row a {
+  color: var(--text-secondary);
+}
+
+.pagination-nav {
+  margin-top: 2.5rem;
+}
+
+.pagination-nav__link {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--r-panel);
+  box-shadow: none;
+  transition: border-color var(--ifm-transition-fast) ease,
+    background var(--ifm-transition-fast) ease,
+    transform var(--ifm-transition-fast) ease;
+}
+
+.pagination-nav__link:hover {
+  border-color: var(--border-accent);
+  background: var(--bg-hover);
+  transform: translateY(-1px);
+  text-decoration: none;
+}
+
+.pagination-nav__label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.pagination-nav__sublabel {
+  color: var(--text);
+  font-weight: 600;
+}
+
+/* ---------- 标签：等宽小字，深色底，细边框，hover 边框变亮 ---------- */
+.badge,
+.tag {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  letter-spacing: 0.06em;
+  color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border);
+  border-radius: var(--r-tag);
+  padding: 0.15rem 0.55rem;
+  transition: border-color var(--ifm-transition-fast) ease,
+    color var(--ifm-transition-fast) ease;
+}
+
+.badge:hover,
+.tag:hover {
+  color: var(--text);
+  border-color: var(--border-accent);
+}
+
+/* ============================================================
+   分类索引页：行式列表（swizzle DocCategoryGeneratedIndexPage）
+   ============================================================ */
+.catIndexArticle {
+  margin-top: 2rem;
+}
+
+.catIndexDesc {
+  color: var(--text-secondary);
+  max-width: 64ch;
+  margin: 0 0 0.5rem;
+}
+
+.catIndexList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--divider);
+}
+
+.catRow {
+  position: relative;
+  border-bottom: 1px solid var(--divider);
+  border-radius: var(--r-btn);
+  transition: background 200ms ease;
+}
+
+/* hover：背景轻微提亮 + 左侧 2px 青色短线 */
+.catRow::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 2px;
+  height: 0;
+  transform: translateY(-50%);
+  border-radius: 2px;
+  background: var(--accent-teal);
+  opacity: 0;
+  transition: height 200ms ease, opacity 200ms ease;
+}
+
+.catRow:hover {
+  background: var(--bg-hover);
+}
+
+.catRow:hover::before {
+  height: 56%;
+  opacity: 0.9;
+}
+
+.catRowLink {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.25rem;
+  padding: 0.95rem 0.85rem;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.catRowBody {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.catRowTitle {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text);
+  transition: color var(--ifm-transition-fast) ease;
+}
+
+.catRow:hover .catRowTitle {
+  color: var(--accent-teal);
+}
+
+.catRowDesc {
+  font-size: 0.85rem;
+  line-height: 1.65;
+  color: var(--text-secondary);
+}
+
+.catRowMeta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.catRowArrow {
+  opacity: 0;
+  transform: translateX(-3px);
+  transition: opacity 200ms ease, transform 200ms ease;
+}
+
+.catRow:hover .catRowArrow {
+  opacity: 0.9;
+  transform: none;
+  color: var(--accent-teal);
+}
+
+.catIndexFooter {
+  margin-top: 2.5rem;
+}

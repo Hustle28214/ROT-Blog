@@ -16,11 +16,11 @@ export default function Pin2PinSearch() {
 
   const [query, setQuery] = useState('');
 
-  if (!data) {
-    return <div className={styles.empty}>正在加载替代料数据…</div>;
-  }
+  const bidirectional = (data && data.bidirectional) || {};
+  const direct = (data && data.direct) || {};
+  const docsIndex = (data && data.docsIndex) || {};
 
-  const {bidirectional = {}, direct = {}, docsIndex = {}} = data;
+  // Hooks must stay above any early return (Rules of Hooks).
   const allModels = useMemo(
     () =>
       Object.keys(bidirectional).sort((a, b) =>
@@ -46,6 +46,10 @@ export default function Pin2PinSearch() {
       return arr.some((v) => v.toLowerCase().includes(q));
     });
   }, [query, allModels, bidirectional]);
+
+  if (!data) {
+    return <div className={styles.empty}>正在加载替代料数据…</div>;
+  }
 
   return (
     <div className={styles.wrapper}>

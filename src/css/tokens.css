@@ -1,0 +1,252 @@
+/* ============================================================
+   设计 Token —— 全站唯一来源
+   深色为默认。所有组件统一消费这些变量，避免拼凑感。
+   ============================================================ */
+:root {
+  /* ---------- 背景：三层 ---------- */
+  --bg-base: #080a0d; /* 页面底 */
+  --bg-layer2: #0b0e13; /* 背景第二层：次级容器 / 页脚 */
+  --bg-panel: #0e1218; /* 面板 / 卡片 */
+  --bg-panel-glass: rgba(14, 18, 24, 0.72); /* 半透明玻璃 */
+  --bg-inset: #0a0e14; /* 内凹：代码块 / 输入框 */
+  --bg-hover: rgba(255, 255, 255, 0.04);
+  --bg-hover-strong: rgba(255, 255, 255, 0.06);
+
+  /* ---------- 边框 ---------- */
+  --border: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.14);
+  --border-accent: rgba(94, 234, 212, 0.22);
+  --divider: rgba(255, 255, 255, 0.06);
+
+  /* ---------- 文字 ---------- */
+  --text: #e6edf3;
+  --text-secondary: #8b98a7;
+  --text-muted: #5b6675;
+
+  /* ---------- 强调色（单屏只用 2–3 种） ---------- */
+  --accent-teal: #5eead4; /* 链接 hover / 状态 / 关键数字 */
+  --accent-blue: #38bdf8; /* 主按钮 / 焦点 / 链接 */
+  --accent-orange: #ff8a3d; /* 警告 */
+  --accent-green: #7cffb2; /* 成功 / 在线 */
+
+  /* ---------- 光晕（只做背景气氛） ---------- */
+  --glow-a: rgba(94, 234, 212, 0.1);
+  --glow-b: rgba(56, 189, 248, 0.1);
+
+  /* ---------- 圆角 ---------- */
+  --r-card: 16px;
+  --r-panel: 14px;
+  --r-btn: 12px;
+  --r-code: 12px;
+  --r-tag: 999px;
+
+  /* ---------- 间距（8pt） ---------- */
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 16px;
+  --s-4: 24px;
+  --s-5: 32px;
+  --s-6: 48px;
+  --s-7: 64px;
+  --s-8: 80px;
+  --section-gap: 96px; /* 区块间距 80–120px */
+
+  /* ---------- 阴影（柔和，不重） ---------- */
+  --shadow-panel: 0 20px 60px rgba(0, 0, 0, 0.35);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --shadow-focus: 0 0 0 3px rgba(56, 189, 248, 0.22);
+
+  /* ---------- 字体：全站统一使用自托管的中文衬线体 ----------
+     'DreamHanSerif' = 梦源宋体（思源宋体同源），由 static/DreamHanSerifCN-W16.ttf
+     在 custom.css 里通过 @font-face 声明，不请求任何 CDN。
+     它放在字体栈最前面，Windows 上不会再先命中微软雅黑或宋体；
+     后面的系统宋体只作为字体文件加载失败时的兜底。 */
+  --font-serif: 'DreamHanSerif', 'Source Han Serif SC', 'Noto Serif CJK SC',
+    'Songti SC', STSong, SimSun, serif;
+  /* --font-sans / --font-display 是历史变量名，全站组件都在用，这里统一指向衬线体 */
+  --font-sans: var(--font-serif);
+  --font-display: var(--font-serif);
+  --font-mono: 'SF Mono', ui-monospace, SFMono-Regular, Menlo, Monaco,
+    'Cascadia Mono', 'Roboto Mono', Consolas, monospace;
+
+  /* Infima 映射：主题组件与自定义组件共用同一套字体 */
+  --ifm-font-family-base: var(--font-sans);
+  --ifm-font-family-monospace: var(--font-mono);
+  --ifm-heading-font-family: var(--font-display);
+
+  /* ---------- 背景质感参数 ---------- */
+  --grid-size: 48px;
+  --grid-line: rgba(255, 255, 255, 0.035);
+  --noise-opacity: 0.035;
+
+  /* ---------- 内容宽度 ---------- */
+  --content-width: 760px; /* 正文 720–760px */
+  --doc-item-container-width: 1180px;
+  --ifm-container-width: 1200px;
+
+  /* ============================================================
+     Infima 映射：让默认主题组件也走同一套 Token
+     ============================================================ */
+  --ifm-color-primary: #38bdf8;
+  --ifm-color-primary-dark: #0ea5e9;
+  --ifm-color-primary-darker: #0284c7;
+  --ifm-color-primary-darkest: #075985;
+  --ifm-color-primary-light: #7dd3fc;
+  --ifm-color-primary-lighter: #bae6fd;
+  --ifm-color-primary-lightest: #e0f2fe;
+
+  --ifm-background-color: var(--bg-base);
+  --ifm-background-surface-color: var(--bg-panel);
+
+  --ifm-color-content: var(--text);
+  --ifm-color-content-secondary: var(--text-secondary);
+  --ifm-heading-color: var(--text);
+  --ifm-color-emphasis-600: var(--text-secondary);
+  --ifm-color-emphasis-700: var(--text-secondary);
+
+  --ifm-link-color: var(--accent-blue);
+  --ifm-link-hover-color: var(--accent-teal);
+
+  --ifm-border-color: var(--border);
+  --ifm-border-color-base: var(--border);
+  --ifm-toc-border-color: var(--border);
+
+  --ifm-code-background: var(--bg-inset);
+  --ifm-code-border-radius: var(--r-code);
+  --ifm-code-font-size: 87.5%;
+  --ifm-pre-border-radius: var(--r-code);
+  --docusaurus-highlighted-code-line-bg: rgba(56, 189, 248, 0.1);
+
+  --ifm-card-background-color: var(--bg-panel);
+  --ifm-card-border-radius: var(--r-card);
+  --ifm-card-border-color: var(--border);
+
+  --ifm-global-radius: var(--r-panel);
+  --ifm-global-shadow-tl: var(--shadow-sm);
+  --ifm-global-shadow-md: var(--shadow-panel);
+  --ifm-global-shadow-lw: var(--shadow-panel);
+
+  --ifm-navbar-background-color: var(--bg-panel-glass);
+  --ifm-navbar-shadow: none;
+  --ifm-navbar-height: 60px;
+  --ifm-navbar-padding-vertical: 10px;
+
+  --ifm-footer-background-color: var(--bg-layer2);
+  --ifm-footer-padding-vertical: 48px;
+  --ifm-footer-link-color: var(--text-secondary);
+  --ifm-footer-link-hover-color: var(--accent-teal);
+  --ifm-footer-title-color: var(--text);
+
+  --ifm-menu-color-background-active: rgba(56, 189, 248, 0.1);
+  --ifm-menu-color-background-hover: var(--bg-hover);
+  --ifm-menu-color: var(--text-secondary);
+
+  --ifm-table-border-color: rgba(255, 255, 255, 0.1);
+  --ifm-table-stripe-background: rgba(255, 255, 255, 0.02);
+  --ifm-table-head-background: rgba(255, 255, 255, 0.04);
+
+  --ifm-blockquote-color: var(--text-secondary);
+  --ifm-blockquote-border-left-color: var(--border-accent);
+
+  --ifm-breadcrumb-color-active: var(--text);
+  --ifm-breadcrumb-separator-color: var(--text-muted);
+
+  --ifm-pagination-nav-color-hover: var(--accent-teal);
+  --ifm-pagination-nav-border-radius: var(--r-panel);
+
+  --ifm-scrollbar-size: 10px;
+  --ifm-scrollbar-track-background-color: var(--bg-panel);
+  --ifm-scrollbar-thumb-background-color: #2a3441;
+  --ifm-scrollbar-thumb-hover-background-color: var(--accent-blue);
+
+  --ifm-transition-fast: 150ms;
+  --ifm-transition-slow: 250ms;
+
+  /* 首页装饰层（历史变量保留，指向新 Token） */
+  --tech-grid: var(--grid-line);
+  --tech-glow-a: var(--glow-a);
+  --tech-glow-b: var(--glow-b);
+
+  /* 阅读进度（由 Root.js 注入） */
+  --read-progress: 0;
+}
+
+/* 暗色主题：与默认一致 */
+:root[data-theme='dark'] {
+  --ifm-color-primary: #38bdf8;
+  --ifm-background-color: var(--bg-base);
+  --ifm-background-surface-color: var(--bg-panel);
+  --ifm-navbar-background-color: var(--bg-panel-glass);
+  --ifm-footer-background-color: var(--bg-layer2);
+  --docusaurus-highlighted-code-line-bg: rgba(56, 189, 248, 0.14);
+}
+
+/* ============================================================
+   亮色主题：同一套结构，换成浅色材质
+   ============================================================ */
+:root[data-theme='light'] {
+  --bg-base: #f5f7fa;
+  --bg-layer2: #eef2f6;
+  --bg-panel: #ffffff;
+  --bg-panel-glass: rgba(255, 255, 255, 0.78);
+  --bg-inset: #eef2f6;
+  --bg-hover: rgba(11, 20, 32, 0.04);
+  --bg-hover-strong: rgba(11, 20, 32, 0.07);
+
+  --border: rgba(11, 20, 32, 0.1);
+  --border-strong: rgba(11, 20, 32, 0.18);
+  --border-accent: rgba(13, 148, 136, 0.3);
+  --divider: rgba(11, 20, 32, 0.08);
+
+  --text: #0b1420;
+  --text-secondary: #5a6b7c;
+  --text-muted: #8496a7;
+
+  --accent-teal: #0f766e;
+  --accent-blue: #0369a1;
+  --accent-orange: #c2410c;
+  --accent-green: #15803d;
+
+  --glow-a: rgba(3, 105, 161, 0.08);
+  --glow-b: rgba(2, 132, 199, 0.08);
+
+  --ifm-color-primary: #0369a1;
+  --ifm-color-primary-dark: #075985;
+  --ifm-color-primary-darker: #0c4a6e;
+  --ifm-color-primary-darkest: #082f49;
+  --ifm-color-primary-light: #0284c7;
+  --ifm-color-primary-lighter: #0ea5e9;
+  --ifm-color-primary-lightest: #38bdf8;
+
+  --ifm-background-color: var(--bg-base);
+  --ifm-background-surface-color: var(--bg-panel);
+
+  --ifm-color-content: var(--text);
+  --ifm-color-content-secondary: var(--text-secondary);
+  --ifm-heading-color: var(--text);
+
+  --ifm-link-color: var(--accent-blue);
+  --ifm-link-hover-color: var(--accent-teal);
+
+  --ifm-border-color: var(--border);
+  --ifm-border-color-base: var(--border);
+  --ifm-toc-border-color: var(--border);
+
+  --ifm-code-background: var(--bg-inset);
+  --docusaurus-highlighted-code-line-bg: rgba(3, 105, 161, 0.08);
+
+  --ifm-card-background-color: var(--bg-panel);
+
+  --ifm-global-shadow-tl: 0 1px 2px rgba(11, 20, 32, 0.08);
+  --ifm-global-shadow-md: 0 10px 30px rgba(11, 20, 32, 0.08);
+  --ifm-global-shadow-lw: 0 10px 30px rgba(11, 20, 32, 0.08);
+
+  --ifm-navbar-background-color: var(--bg-panel-glass);
+  --ifm-footer-background-color: #0a1520;
+  --ifm-footer-link-color: rgba(255, 255, 255, 0.7);
+  --ifm-footer-link-hover-color: var(--accent-teal);
+
+  --ifm-scrollbar-track-background-color: #e4e9ef;
+  --ifm-scrollbar-thumb-background-color: #9db1c4;
+  --ifm-scrollbar-thumb-hover-background-color: var(--accent-blue);
+}

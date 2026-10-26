@@ -1,134 +1,84 @@
-@import url('https://fonts.googleapis.com/css2?family=Source+Code+Pro:wght@200..900&display=swap');
+/* ============================================================
+   全局样式入口
+   分层：字体 → Token → 全局外观（背景/导航/页脚） → 文章页 → 局部补充
+   注意：@import 必须写在所有普通规则之前，否则整条规则会被丢弃。
+   ============================================================ */
+/* 不再加载 Google Fonts：中文字形统一用下面自托管的宋体，代码用系统等宽字体，
+   既不依赖跨域 CDN（国内常被 blocking），也不会在不同平台回落到微软雅黑。 */
+@import './tokens.css';
+@import './chrome.css';
+@import './docs.css';
 
+/* ---------- 正文字体：梦源宋体（自托管，不请求 CDN） ----------
+   放在 --font-serif 栈首，Windows 上不会再回落到微软雅黑 / 宋体。
+   只声明 400：标题与加粗由浏览器合成字重，保证层级仍可分辨。 */
+@font-face {
+  font-family: 'DreamHanSerif';
+  src: url('/DreamHanSerifCN-W16.woff2') format('woff2'),
+    url('/DreamHanSerifCN-W16.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* 兼容旧组件里写死的 'DreamHanSansCN'，指向同一款衬线体，避免局部还是黑体 */
 @font-face {
   font-family: 'DreamHanSansCN';
-  src: url('/DreamHanSansCN-W16.ttf') format('truetype');
-  font-weight: normal;
+  src: url('/DreamHanSerifCN-W16.woff2') format('woff2'),
+    url('/DreamHanSerifCN-W16.ttf') format('truetype');
+  font-weight: 400;
   font-style: normal;
   font-display: swap;
 }
 
-@font-face {
-  font-family: 'Mengyuan';
-  src: url('/DreamHanSansCN-W16.ttf') format('truetype');
-  font-weight: normal;
-  font-style: normal;
-  font-display: swap;
-}
-
-:root {
-  --ifm-color-primary: #11659a;
-  --ifm-color-primary-dark: #0f5b8b;
-  --ifm-color-primary-darker: #0e5683;
-  --ifm-color-primary-darkest: #0c476c;
-  --ifm-color-primary-light: #136fa9;
-  --ifm-color-primary-lighter: #1474b1;
-  --ifm-color-primary-lightest: #1683c8;
-  --ifm-background-color: #e9f1f6;
-  --ifm-navbar-background-color: #E9F1F6;
-  --ifm-font-family-base: 'DreamHanSansCN', 'Mengyuan', ui-sans-serif, system-ui, -apple-system;
-  --ifm-font-family-monospace: 'DreamHanSansCN', 'Mengyuan', ui-sans-serif, system-ui, -apple-system;
-  --ifm-heading-font-family: 'DreamHanSansCN', 'Mengyuan', ui-sans-serif, system-ui, -apple-system;
-  --ifm-code-font-size: 95%;
-  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.1);
-  --sb-track-color:#222222;
-  --sb-thumb-color: #f6c430;
-  --sb-thumb-color-dark: #4a8a6f;
-  --sb-size: 100px;
-}
-
-[data-theme='dark'] {
-  --ifm-color-primary: #0fd6f4;
-  --ifm-color-primary-dark: #c7dbe8;
-  --ifm-color-primary-darker: #b6d1e1;
-  --ifm-color-primary-darkest: #83b0cc;
-  --ifm-color-primary-light: #ffffff;
-  --ifm-color-primary-lighter: #ffffff;
-  --ifm-color-primary-lightest: #ffffff;
-  --ifm-background-color: #11659a;
-  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.3);
-  --ifm-navbar-background-color: #11659a;
-   /* 修改背景色为 #005153 */
-  --sb-track-color: #232e33;
-  --sb-thumb-color: #f6c430;
-  --sb-thumb-color-dark: #4a8a6f; /* 确保此颜色定义存在 */
-  --sb-size: 100px;
-}
-
-/* 通用背景色 */
-body {
-  background-color: var(--ifm-background-color);
-  font-family: 'DreamHanSansCN', 'Mengyuan', system-ui, -apple-system, 'PingFang SC';
-}
-
-/* 仅代码框使用 Source Code Pro，不影响正文、标题和行内代码。 */
+/* 代码框统一等宽字体，不影响正文与标题 */
 .theme-code-block pre,
 .theme-code-block code {
-  font-family: 'Source Code Pro', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-family: var(--font-mono);
 }
 
-
-/* 暗模式下背景色 */
-[data-theme='dark'] body {
-  background-color: transparent;
-}
-
+/* ---------- 滚动条：细腻、不抢眼 ---------- */
 body {
-  scrollbar-color: var(--sb-thumb-color) var(--sb-track-color);
+  scrollbar-color: var(--ifm-scrollbar-thumb-background-color)
+    var(--ifm-scrollbar-track-background-color);
 }
 
+body::-webkit-scrollbar {
+  width: var(--ifm-scrollbar-size);
+  height: var(--ifm-scrollbar-size);
+}
+
+body::-webkit-scrollbar-track {
+  background: var(--ifm-scrollbar-track-background-color);
+}
+
+body::-webkit-scrollbar-thumb {
+  background: var(--ifm-scrollbar-thumb-background-color);
+  border-radius: 999px;
+  border: 2px solid var(--ifm-scrollbar-track-background-color);
+}
+
+body::-webkit-scrollbar-thumb:hover {
+  background: var(--ifm-scrollbar-thumb-hover-background-color);
+}
+
+/* ---------- 图片灯箱：适配深色底 ---------- */
+.medium-zoom-overlay {
+  background: rgba(4, 6, 9, 0.92) !important;
+}
 
 .medium-zoom-overlay,
 .medium-zoom-image--opened {
   z-index: 999;
 }
 
-body::-webkit-scrollbar {
-  width: var(--sb-size);
+/* ---------- 侧边栏与目录滚动条：细窄 ---------- */
+.thin-scrollbar::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
 }
 
-body::-webkit-scrollbar-track {
-  background: var(--isb-track-color);
-  border-radius: 10px;
-}
-
-body::-webkit-scrollbar-thumb {
-  background: var(--isb-thumb-color);
-  border-radius: 10px;
-  border: 1px solid #1a1a1a; /* 可以根据需要调整 */
-}
-
-
-
-
-
-
-/* 滚动条样式 */
-[data-theme='dark'] body::-webkit-scrollbar {
-  width: var(--sb-size);
-}
-
-[data-theme='dark'] body::-webkit-scrollbar-track {
-  background: var(--sb-track-color);
-  border-radius: 10px;
-}
-
-[data-theme='dark'] body::-webkit-scrollbar-thumb {
-  background: var(--sb-thumb-color);
-  border-radius: 10px;
-  border: 1px solid #1a1a1a; /* 可以根据需要调整 */
-}
-
-/* Firefox 滚动条样式 */
-[data-theme='dark'] body {
-  scrollbar-color: var(--sb-thumb-color) var(--sb-track-color);
-}
-
-/* 导航栏颜色 */
-[data-theme='dark'] .navbar__link {
-  color: #E9F1F6;
-}
-
-[data-theme='dark'] .navbar__title {
-  color: #E9F1F6;
+.thin-scrollbar::-webkit-scrollbar-thumb {
+  background: var(--ifm-scrollbar-thumb-background-color);
+  border-radius: 999px;
 }

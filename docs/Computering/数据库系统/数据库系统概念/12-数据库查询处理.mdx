@@ -1,4 +1,4 @@
-import WordCount from '../../../../src/components/WordCount/WordCount';
+import WordCount from '@site/src/components/WordCount/WordCount';
 import Mermaid from '@theme/Mermaid';
 
 <WordCount>
@@ -271,9 +271,9 @@ $$
 
 ### 15.6.4 外连接
 
-- **左外连接** $r \mathbin{⟕} s$：对 $r$ 中未匹配的元组补 NULL；
-- **右外连接** $r \mathbin{⟖} s$：对 $s$ 中未匹配的元组补 NULL；
-- **全外连接** $r \mathbin{⟗} s$：两侧都补。
+- **左外连接** $r$ ⟕ $s$：对 $r$ 中未匹配的元组补 NULL；
+- **右外连接** $r$ ⟖ $s$：对 $s$ 中未匹配的元组补 NULL；
+- **全外连接** $r$ ⟗ $s$：两侧都补。
 
 可以在内嵌于任何连接算法的基础上，跟踪每个元组是否匹配来实现。
 

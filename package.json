@@ -2,17 +2,19 @@
     "scripts": {
         "docusaurus": "docusaurus",
         "generate:skill-data": "node scripts/generate-skill-data.js",
-        "prestart": "npm run generate:skill-data",
-        "start": "docusaurus start",
+        "prestart": "npm run generate:skill-data && npm run generate:stack-graph",
+        "start": "cross-env DOCUSAURUS_SSG_CONCURRENCY=2 node --max-old-space-size=6144 ./node_modules/@docusaurus/core/bin/docusaurus.mjs start",
         "swizzle": "docusaurus swizzle",
         "deploy": "docusaurus deploy",
         "clear": "docusaurus clear",
         "serve": "docusaurus serve",
         "write-translations": "docusaurus write-translations",
         "write-heading-ids": "docusaurus write-heading-ids",
+        "generate:stack-graph": "node scripts/generate-home-stack-graph.js",
         "generate:docs-stats": "node scripts/generateStats.js",
-        "prebuild": "npm run generate:skill-data && npm run generate:docs-stats",
-        "build": "docusaurus build"
+        "prebuild": "npm run generate:skill-data && npm run generate:stack-graph && npm run generate:docs-stats",
+        "build": "cross-env DOCUSAURUS_SSG_CONCURRENCY=2 node --max-old-space-size=8192 ./node_modules/@docusaurus/core/bin/docusaurus.mjs build",
+        "build:lowmem": "cross-env DOCUSAURUS_SSG_CONCURRENCY=1 node --max-old-space-size=8192 ./node_modules/@docusaurus/core/bin/docusaurus.mjs build --no-minify"
     },
     "dependencies": {
         "@docusaurus/core": "^3.9.2",

@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-10-25T16:49:28.568Z",
-  "total": 942,
+  "generatedAt": "2026-10-26T01:59:04.465Z",
+  "total": 943,
   "nodes": [
     {
       "id": "cat:Computering",
@@ -188,7 +188,7 @@
       "name": "电子",
       "en": "Electronic",
       "color": "#EF4444",
-      "count": 160,
+      "count": 161,
       "docPath": "Electronic"
     },
     {
@@ -206,7 +206,7 @@
       "name": "元器件设计",
       "en": "Electronic",
       "color": "#EF4444",
-      "count": 36,
+      "count": 37,
       "docPath": "Electronic/元器件设计"
     },
     {

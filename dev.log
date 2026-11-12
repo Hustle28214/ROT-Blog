@@ -92,3 +92,21 @@ Your content might render in an unexpected way. Visit https://github.com/faceboo
 [90m[[90mwebpackbar[90m][39m [36mℹ[39m Compiling Client
 [90m[[90mwebpackbar[90m][39m [32m✔[39m Client: Compiled successfully in 3.43s
 [1mclient[39m[22m (webpack 5.98.0) compiled [1m[32msuccessfully[39m[22m
+[Stats Plugin] File add: F:\BLOG\ROT-Blog\docs\Electronic\元器件设计\电源设计\02-DCDC电源.mdx
+[Stats Plugin] File unlink: F:\BLOG\ROT-Blog\docs\Computering\通信原理\通信框架\Zenoh.mdx
+[90m[[90mwebpackbar[90m][39m [36mℹ[39m Compiling Client
+[Stats Plugin] File add: F:\BLOG\ROT-Blog\docs\Computering\通信原理\通信框架\AMQP\AMQP.mdx
+[Stats Plugin] File add: F:\BLOG\ROT-Blog\docs\Computering\通信原理\通信框架\DDS\DDS.mdx
+[Stats Plugin] File add: F:\BLOG\ROT-Blog\docs\Computering\通信原理\通信框架\Kafka\Kafka.mdx
+[Stats Plugin] File add: F:\BLOG\ROT-Blog\docs\Computering\通信原理\通信框架\Zenoh\Zenoh.mdx
+[Stats Plugin] File add: F:\BLOG\ROT-Blog\docs\Computering\通信原理\通信框架\MQTT\MQTT.mdx
+[90m[[90mwebpackbar[90m][39m [32m✔[39m Client: Compiled with some errors in 11.13s
+Module not found: Error: Can't resolve '@site/docs/Computering/通信原理/通信框架/Zenoh.mdx' in 'F:\BLOG\ROT-Blog\.docusaurus'
+
+--------------------------
+
+Module not found: Error: Can't resolve '@site/docs/Computering/通信原理/通信框架/Zenoh.mdx' in 'F:\BLOG\ROT-Blog\.docusaurus'
+[1mclient[39m[22m (webpack 5.98.0) compiled with [1m[31m2 errors[39m[22m
+[90m[[90mwebpackbar[90m][39m [36mℹ[39m Compiling Client
+[90m[[90mwebpackbar[90m][39m [32m✔[39m Client: Compiled successfully in 4.09s
+[1mclient[39m[22m (webpack 5.98.0) compiled [1m[32msuccessfully[39m[22m

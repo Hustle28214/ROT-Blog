@@ -34,4 +34,6 @@ jobs:
         run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
 
       - name: Deploy prebuilt to Vercel
-        run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
+        # --archive=tgz 把整个产物打包成单个 tar.gz 上传，
+        # 避免免费版 "5000 次文件上传/24h" 配额（api-upload-free）被瞬间打满。
+        run: vercel deploy --prebuilt --prod --archive=tgz --token=${{ secrets.VERCEL_TOKEN }}

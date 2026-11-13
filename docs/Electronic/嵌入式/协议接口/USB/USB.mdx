@@ -55,7 +55,7 @@ Control：就像办手续。主机要先做SETUP事务，设地址、读描述�
 
 Interrupt：并不是中断，实际上没有中断线，主机是固定时间间隔来轮询的。这个间隔写在端点描述符的 `bInterval` 里，是写死的。如果鼠标有移动，就回复4-8个字节，没有移动就回NAK，
 
-:::tips
+:::tip
 在`bInterval`上，不同的速率模式有所分别：
 
 全速/低速：`bInterval` 就是轮询周期本身，单位是 1 ms 帧，取值范围 1\~255（低速为 10\~255 ms）。
@@ -67,13 +67,13 @@ Interrupt：并不是中断，实际上没有中断线，主机是固定时间�
 
 Isochronous：等时传输，没有握手。主机每 125 µs 来取一次，这个每次取数据的时间是事先定好的。全速等时端点最大包大小上限为 1023 字节；高速等时端点基础上限为 1024 字节，但高速下同样可以通过 `wMaxPacketSize` 的高位启用高带宽模式，每个微帧最多 3 个事务，从而传输更大的实时数据块。
 
-:::tips
+:::tip
 等时传输与中断传输共享周期性的预留带宽（低速/全速 90%，高速 80%），但等时传输不重传、无握手，用准确性换取了确定的时序。
 :::
 
 Bulk：像一个很酷的赏金猎人，有空就传数据，但是必须传对。主机发 IN 或 OUT 令牌，接着是数据包，最后有握手。全速 Bulk 端点最大包大小为 64 字节，高速为 512 字节。当端点暂时无法处理时，设备会回 NAK；在高速模式下，如果端点收到了数据但缓冲区尚未就绪，还可能回 NYET（Not Yet），主机据此调整后续传输节奏。
 
-:::tips
+:::tip
 注意低速设备不支持 Bulk 传输。
 :::
 
@@ -105,6 +105,80 @@ SuperSpeed 总线：全新的 5 Gbps 通道，专门负责高速数据传输。
 
 因此，USB 3.0 的接口从 4 针增加到 9 针。新增的 5 针中，4 针用于双向数据传输，1 针接地。前 4 针的位置和功能与 USB 2.0 完全相同，保证了物理上的向下兼容。
 
+## RTT
+
+实际上这个定义很简单就是往返时延，他的计算公式是：数据包接收时间和数据包发出时间的差。
+
+我们没必要深究这个定义，当然他是越小越好的，我想在此探讨一下RTT的选择标准，我以我做的这个USB测试工具为例讲一讲。
+
+
+```cpp
+RttReport control_rtt(const DeviceFilter& filter, const RttOptions& options) {
+    if (options.count == 0) throw Error("count 必须大于 0");
+    const auto raw = select_one(filter);
+    UsbSession session;
+    auto* device = find_for(session.ctx, raw);
+    if (!device) throw Error("libusb 没有找到设备");
+    libusb_device_handle* handle = nullptr;
+    const int opened = libusb_open(device, &handle);
+    libusb_unref_device(device);
+    if (opened != 0) throw Error(open_error(raw.record, opened));
+    std::vector<std::uint64_t> samples;
+    std::uint32_t errors = 0;
+    for (std::uint32_t i = 0; i < options.warmup + options.count; ++i) {
+        unsigned char data[2] = {};
+        const auto started = now_ns();
+        const int rc = libusb_control_transfer(handle, 0x80, 0x00, 0, 0, data, 2,
+                                               static_cast<unsigned>(options.timeout_ms));
+        const auto elapsed = now_ns() - started;
+        if (i < options.warmup) continue;
+        if (rc == 2) samples.push_back(elapsed);
+        else ++errors;
+    }
+    libusb_close(handle);
+    auto summary = summarize(samples);
+    if (!summary) throw Error("没有成功的 GET_STATUS 样本，失败 " + std::to_string(errors) + " 次");
+    RttReport report;
+    report.device = raw.record;
+    report.warmup_discarded = options.warmup;
+    report.timeout_ms = options.timeout_ms;
+    report.samples_ns = *summary;
+    report.timer_overhead_ns = *summarize(overhead_samples(200));
+    if (options.keep_samples) report.sample_ns = samples;
+    report.errors = errors;
+    return report;
+}
+```
+
+rtt 测量的对象是，标准设备请求 `GET_STATUS`（`bmRequestType` = 0x80，`bRequest` = 0，要回 2 字节）。时钟从调用 `libusb_control_transfer` 之前等到它返回。
+
+```cpp
+void MeasureWorker::measureRtt(quint16 vendor_id, quint16 product_id, const QString& bus_id, quint8 address, quint32 count) {
+    try {
+        linkbench::DeviceFilter filter;
+        filter.vendor_id = vendor_id;
+        filter.product_id = product_id;
+        if (!bus_id.isEmpty()) filter.bus_id = bus_id.toStdString();
+        filter.address = address;
+        linkbench::RttOptions options;
+        options.count = count;
+        options.warmup = 20;
+        auto report = linkbench::control_rtt(filter, options);
+        const double p50_us = report.samples_ns.p50 / 1000.0;
+        const double p95_us = report.samples_ns.p95 / 1000.0;
+        const double max_us = report.samples_ns.max / 1000.0;
+        QString detail = QStringLiteral("n=%1  mean %2 µs  stdev %3 µs")
+                             .arg(report.samples_ns.count)
+                             .arg(report.samples_ns.mean / 1000.0, 0, 'f', 1)
+                             .arg(report.samples_ns.stdev / 1000.0, 0, 'f', 1);
+        const auto notes = joinNotes(report.notes);
+        if (!notes.isEmpty()) detail += "\n" + notes;
+        emit rttReady(p50_us, p95_us, max_us, report.errors, detail);
+    } catch (const std::exception& ex) {
+        emit failed(QString::fromUtf8(ex.what()));
+    }
+}
+```
 
 
 

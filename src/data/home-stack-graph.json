@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-10-26T01:59:04.465Z",
-  "total": 943,
+  "generatedAt": "2026-11-11T08:23:23.279Z",
+  "total": 944,
   "nodes": [
     {
       "id": "cat:Computering",
@@ -188,7 +188,7 @@
       "name": "电子",
       "en": "Electronic",
       "color": "#EF4444",
-      "count": 161,
+      "count": 162,
       "docPath": "Electronic"
     },
     {
@@ -197,7 +197,7 @@
       "name": "嵌入式",
       "en": "Electronic",
       "color": "#EF4444",
-      "count": 62,
+      "count": 63,
       "docPath": "Electronic/嵌入式"
     },
     {
